@@ -1,12 +1,12 @@
 export interface Message {
   id: number;
-  wa_message_id?: string;
-  wa_from?: string;
-  wa_to?: string;
-  wa_phone_number_id?: string;
+  wa_message_id?: string | null;
+  wa_from?: string | null;
+  wa_to?: string | null;
+  wa_phone_number_id?: string | null;
   direction: 'inbound' | 'outbound';
-  body?: string;
-  wa_timestamp?: string;
+  body?: string | null;
+  wa_timestamp?: string | null;
   raw?: any;
   created_at: string;
 }

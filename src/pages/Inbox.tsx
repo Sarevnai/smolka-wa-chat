@@ -10,56 +10,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import Layout from "@/components/Layout";
 import { supabase } from "@/lib/supabaseClient";
-import { Message } from "@/types/message";
+import { fetchMessages, MessageRow, Period } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 
+// Period mapping for display labels
+const periodLabels: Record<Period, string> = {
+  "today": "Hoje",
+  "7d": "7 dias", 
+  "30d": "30 dias",
+  "all": "Tudo"
+};
+
 export default function Inbox() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchPhone, setSearchPhone] = useState("");
-  const [periodFilter, setPeriodFilter] = useState("tudo");
+  const [periodFilter, setPeriodFilter] = useState<Period>("all");
   const { toast } = useToast();
 
-  // Fetch messages
-  const fetchMessages = async () => {
+  // Fetch messages using the new fetchMessages function
+  const loadMessages = async () => {
     try {
       setLoading(true);
-      let query = supabase.from("messages").select("*").order("created_at", { ascending: false });
-
-      // Apply phone filter
-      if (searchPhone.trim()) {
-        query = query.ilike("wa_from", `%${searchPhone.trim()}%`);
-      }
-
-      // Apply period filter
-      if (periodFilter !== "tudo") {
-        const now = new Date();
-        let startDate: Date;
-        
-        switch (periodFilter) {
-          case "hoje":
-            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            break;
-          case "7dias":
-            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            break;
-          case "30dias":
-            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            break;
-          default:
-            startDate = new Date(0);
-        }
-        
-        query = query.gte("created_at", startDate.toISOString());
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw error;
-      }
-
-      setMessages(data || []);
+      const data = await fetchMessages({
+        q: searchPhone,
+        period: periodFilter,
+        limit: 100
+      });
+      setMessages(data);
     } catch (error) {
       console.error("Error fetching messages:", error);
       toast({
@@ -74,7 +52,7 @@ export default function Inbox() {
 
   // Setup realtime subscription
   useEffect(() => {
-    fetchMessages();
+    loadMessages();
 
     const channel = supabase
       .channel("messages-changes")
@@ -86,27 +64,27 @@ export default function Inbox() {
           table: "messages",
         },
         (payload) => {
-          const newMessage = payload.new as Message;
+          const newMessage = payload.new as MessageRow;
           
           // Check if the new message matches current filters
           const matchesPhone = !searchPhone.trim() || 
             newMessage.wa_from?.toLowerCase().includes(searchPhone.trim().toLowerCase());
           
           let matchesPeriod = true;
-          if (periodFilter !== "tudo") {
-            const messageDate = new Date(newMessage.created_at);
+          if (periodFilter !== "all") {
+            const messageDate = new Date(newMessage.created_at || new Date());
             const now = new Date();
             
             switch (periodFilter) {
-              case "hoje":
+              case "today":
                 const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                 matchesPeriod = messageDate >= today;
                 break;
-              case "7dias":
+              case "7d":
                 const week = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                 matchesPeriod = messageDate >= week;
                 break;
-              case "30dias":
+              case "30d":
                 const month = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
                 matchesPeriod = messageDate >= month;
                 break;
@@ -133,7 +111,7 @@ export default function Inbox() {
 
   const clearFilters = () => {
     setSearchPhone("");
-    setPeriodFilter("tudo");
+    setPeriodFilter("all");
   };
 
   const formatMessageDate = (dateString: string) => {
@@ -161,7 +139,7 @@ export default function Inbox() {
               {messages.length} mensagens encontradas
             </p>
           </div>
-          <Button onClick={fetchMessages} disabled={loading} variant="outline">
+          <Button onClick={loadMessages} disabled={loading} variant="outline">
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Atualizar
           </Button>
@@ -182,16 +160,16 @@ export default function Inbox() {
                   />
                 </div>
               </div>
-              <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <Select value={periodFilter} onValueChange={(value) => setPeriodFilter(value as Period)}>
                 <SelectTrigger className="w-full sm:w-48">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Período" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="hoje">Hoje</SelectItem>
-                  <SelectItem value="7dias">7 dias</SelectItem>
-                  <SelectItem value="30dias">30 dias</SelectItem>
-                  <SelectItem value="tudo">Tudo</SelectItem>
+                  <SelectItem value="today">{periodLabels.today}</SelectItem>
+                  <SelectItem value="7d">{periodLabels["7d"]}</SelectItem>
+                  <SelectItem value="30d">{periodLabels["30d"]}</SelectItem>
+                  <SelectItem value="all">{periodLabels.all}</SelectItem>
                 </SelectContent>
               </Select>
               <Button onClick={clearFilters} variant="outline">
