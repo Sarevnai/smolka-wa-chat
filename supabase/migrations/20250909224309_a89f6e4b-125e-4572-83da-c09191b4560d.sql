@@ -1,0 +1,7 @@
+-- Insert sample messages for demonstration
+INSERT INTO public.messages (wa_message_id, wa_from, wa_to, wa_phone_number_id, direction, body, wa_timestamp, raw) VALUES
+('msg_001', '5511999998888', '5511888887777', 'phone_123', 'inbound', 'Olá! Gostaria de saber mais informações sobre seus produtos.', NOW() - INTERVAL '2 hours', '{"id": "msg_001", "from": "5511999998888", "type": "text"}'),
+('msg_002', '5511777776666', '5511888887777', 'phone_123', 'inbound', 'Oi, vocês fazem entregas? Preciso urgente!', NOW() - INTERVAL '1 hour', '{"id": "msg_002", "from": "5511777776666", "type": "text"}'),
+('msg_003', '5511999998888', '5511888887777', 'phone_123', 'outbound', 'Olá! Claro, temos vários produtos disponíveis. Qual seu interesse?', NOW() - INTERVAL '1 hour 30 minutes', '{"id": "msg_003", "to": "5511999998888", "type": "text"}'),
+('msg_004', '5511555554444', '5511888887777', 'phone_123', 'inbound', 'Bom dia! Quando vocês abrem hoje?', NOW() - INTERVAL '30 minutes', '{"id": "msg_004", "from": "5511555554444", "type": "text"}'),
+('msg_005', '5511777776666', '5511888887777', 'phone_123', 'outbound', 'Sim, fazemos entregas! Nossa região de entrega cobre toda a cidade.', NOW() - INTERVAL '45 minutes', '{"id": "msg_005", "to": "5511777776666", "type": "text"}');
