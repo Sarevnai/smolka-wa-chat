@@ -14,7 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      messages: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          direction: string | null
+          id: number
+          raw: Json | null
+          wa_from: string | null
+          wa_message_id: string | null
+          wa_phone_number_id: string | null
+          wa_timestamp: string | null
+          wa_to: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          direction?: string | null
+          id?: number
+          raw?: Json | null
+          wa_from?: string | null
+          wa_message_id?: string | null
+          wa_phone_number_id?: string | null
+          wa_timestamp?: string | null
+          wa_to?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          direction?: string | null
+          id?: number
+          raw?: Json | null
+          wa_from?: string | null
+          wa_message_id?: string | null
+          wa_phone_number_id?: string | null
+          wa_timestamp?: string | null
+          wa_to?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
