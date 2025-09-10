@@ -15,7 +15,7 @@ import {
   Phone, 
   Mail, 
   FileText, 
-  Star,
+  Skull,
   Edit,
   Trash2,
   MessageSquare,
@@ -59,12 +59,12 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
     }
   };
 
-  const renderStars = (rating?: number) => {
+  const renderSkulls = (rating?: number) => {
     return Array.from({ length: 5 }, (_, i) => (
-      <Star
+      <Skull
         key={i}
         className={`h-4 w-4 ${
-          i < (rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+          i < (rating || 0) ? 'fill-red-500 text-red-500' : 'text-muted-foreground'
         }`}
       />
     ));
@@ -133,7 +133,7 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
                     </Badge>
                     {contact.rating && (
                       <div className="flex items-center gap-1">
-                        {renderStars(contact.rating)}
+                        {renderSkulls(contact.rating)}
                       </div>
                     )}
                   </div>
@@ -234,16 +234,16 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Star className="h-4 w-4" />
+                  <Skull className="h-4 w-4" />
                   Estatísticas
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {contact.rating && (
                   <div>
-                    <div className="text-sm font-medium mb-2">Classificação</div>
+                    <div className="text-sm font-medium mb-2">Classificação (Caveiras)</div>
                     <div className="flex items-center gap-1">
-                      {renderStars(contact.rating)}
+                      {renderSkulls(contact.rating)}
                     </div>
                   </div>
                 )}
