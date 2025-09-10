@@ -1,34 +1,81 @@
 import { useState, KeyboardEvent, useEffect } from "react";
-import { Send, Paperclip, Smile, User } from "lucide-react";
+import { Send, Paperclip, Smile, User, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserProfiles } from "@/hooks/useUserProfiles";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
 }
 
-const attendants = [
-  { value: "none", label: "Sem identificação" },
-  { value: "Giselle", label: "Giselle" },
-  { value: "Denny", label: "Denny" }
-];
-
 export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [selectedAttendant, setSelectedAttendant] = useState("none");
+  const { profile } = useAuth();
+  const { profiles } = useUserProfiles();
 
-  // Load attendant from localStorage on component mount
+  // Get available attendants based on user role
+  const getAvailableAttendants = () => {
+    const baseAttendants: Array<{ value: string; label: string; role?: 'admin' | 'user' }> = [
+      { value: "none", label: "Sem identificação" }
+    ];
+    
+    if (!profile) return baseAttendants;
+
+    // If user is admin, show all users
+    if (profile.role === 'admin') {
+      const userAttendants = profiles
+        .filter(p => p.full_name)
+        .map(p => ({
+          value: p.full_name!,
+          label: p.full_name!,
+          role: p.role as 'admin' | 'user'
+        }));
+      return [...baseAttendants, ...userAttendants];
+    }
+
+    // If user is regular user, only show their own name
+    if (profile.full_name) {
+      return [
+        ...baseAttendants,
+        { 
+          value: profile.full_name, 
+          label: profile.full_name,
+          role: profile.role as 'admin' | 'user'
+        }
+      ];
+    }
+
+    return baseAttendants;
+  };
+
+  const availableAttendants = getAvailableAttendants();
+
+  // Load attendant from localStorage on component mount and set default based on user
   useEffect(() => {
+    if (!profile) return;
+
     const savedAttendant = localStorage.getItem("selectedAttendant");
+    
+    // If user is not admin and has a name, automatically select their name
+    if (profile.role !== 'admin' && profile.full_name) {
+      setSelectedAttendant(profile.full_name);
+      return;
+    }
+
+    // For admin users, use saved preference or default to "none"
     if (savedAttendant && savedAttendant !== "") {
-      setSelectedAttendant(savedAttendant);
+      // Check if saved attendant is still valid in current available attendants
+      const isValidAttendant = availableAttendants.some(att => att.value === savedAttendant);
+      setSelectedAttendant(isValidAttendant ? savedAttendant : "none");
     } else {
       setSelectedAttendant("none");
     }
-  }, []);
+  }, [profile, availableAttendants]);
 
   // Save attendant to localStorage when it changes
   useEffect(() => {
@@ -61,14 +108,23 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
       {/* Attendant Selector */}
       <div className="flex items-center gap-3">
         <User className="h-4 w-4 text-muted-foreground shrink-0" />
-        <Select value={selectedAttendant} onValueChange={setSelectedAttendant} disabled={disabled}>
+        <Select 
+          value={selectedAttendant} 
+          onValueChange={setSelectedAttendant} 
+          disabled={disabled || (profile?.role !== 'admin' && Boolean(profile?.full_name))}
+        >
           <SelectTrigger className="w-48 h-8">
             <SelectValue placeholder="Selecionar atendente" />
           </SelectTrigger>
           <SelectContent>
-            {attendants.map((attendant) => (
+            {availableAttendants.map((attendant) => (
               <SelectItem key={attendant.value} value={attendant.value}>
-                {attendant.label}
+                <div className="flex items-center gap-2">
+                  <span>{attendant.label}</span>
+                  {attendant.role === 'admin' && (
+                    <Crown className="h-3 w-3 text-yellow-500" />
+                  )}
+                </div>
               </SelectItem>
             ))}
           </SelectContent>

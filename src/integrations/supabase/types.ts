@@ -210,6 +210,7 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           user_id: string
         }
@@ -217,6 +218,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id: string
         }
@@ -224,6 +226,7 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id?: string
         }
@@ -234,12 +237,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       contact_status: "ativo" | "inativo" | "bloqueado"
       contact_type: "proprietario" | "inquilino"
       contract_status: "ativo" | "encerrado" | "suspenso"
+      user_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -370,6 +381,7 @@ export const Constants = {
       contact_status: ["ativo", "inativo", "bloqueado"],
       contact_type: ["proprietario", "inquilino"],
       contract_status: ["ativo", "encerrado", "suspenso"],
+      user_role: ["admin", "user"],
     },
   },
 } as const

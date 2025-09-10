@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { MessageCircle, Send, Home, Inbox, Users, BarChart3, Settings, LogOut, User } from "lucide-react";
+import { MessageCircle, Send, Home, Inbox, Users, BarChart3, Settings, LogOut, User, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -55,11 +55,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        {user?.user_metadata?.full_name || 'Usuário'}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium leading-none">
+                          {profile?.full_name || user?.user_metadata?.full_name || 'Usuário'}
+                        </p>
+                        {profile?.role === 'admin' && (
+                          <Crown className="h-3 w-3 text-yellow-500" />
+                        )}
+                      </div>
                       <p className="text-xs leading-none text-muted-foreground">
-                        {user?.email}
+                        {user?.email} • {profile?.role || 'user'}
                       </p>
                     </div>
                   </DropdownMenuLabel>
