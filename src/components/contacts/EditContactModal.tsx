@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, X, Phone, Mail, FileText, Edit, Skull, Building2, Key } from 'lucide-react';
+import { Plus, X, Phone, Mail, FileText, Edit, Heart, Building2, Key } from 'lucide-react';
 import { useUpdateContact, useAddContract } from '@/hooks/useContacts';
 import { Contact } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
@@ -222,7 +222,7 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="rating">Classificação (Caveiras)</Label>
+                <Label htmlFor="rating">Classificação (Corações)</Label>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: 5 }, (_, i) => (
                     <button
@@ -231,9 +231,9 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
                       onClick={() => setRating(rating === i + 1 ? undefined : i + 1)}
                       className="p-1 hover:scale-110 transition-transform"
                     >
-                      <Skull
+                      <Heart
                         className={`h-5 w-5 ${
-                          i < (rating || 0) ? 'fill-red-500 text-red-500' : 'text-muted-foreground hover:text-red-300'
+                          i < (rating || 0) ? 'fill-rose-500 text-rose-500' : 'text-muted-foreground hover:text-rose-300'
                         }`}
                       />
                     </button>
