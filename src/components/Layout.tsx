@@ -58,6 +58,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span>Inbox</span>
             </Link>
             <Link
+              to="/chat"
+              className={cn(
+                "flex items-center space-x-2 py-4 text-sm font-medium border-b-2 transition-colors",
+                location.pathname === "/chat" || location.pathname.startsWith('/chat/')
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <MessageCircle className="h-4 w-4" />
+              <span>Chat</span>
+            </Link>
+            <Link
               to="/send"
               className={cn(
                 "flex items-center space-x-2 py-4 text-sm font-medium border-b-2 transition-colors",
