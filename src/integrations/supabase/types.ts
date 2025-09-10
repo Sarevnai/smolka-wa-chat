@@ -83,6 +83,77 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_contracts: {
+        Row: {
+          contact_id: string
+          contract_number: string
+          contract_type: string | null
+          created_at: string
+          id: string
+          property_code: string | null
+          status: Database["public"]["Enums"]["contract_status"]
+          updated_at: string
+        }
+        Insert: {
+          contact_id: string
+          contract_number: string
+          contract_type?: string | null
+          created_at?: string
+          id?: string
+          property_code?: string | null
+          status?: Database["public"]["Enums"]["contract_status"]
+          updated_at?: string
+        }
+        Update: {
+          contact_id?: string
+          contract_number?: string
+          contract_type?: string | null
+          created_at?: string
+          id?: string
+          property_code?: string | null
+          status?: Database["public"]["Enums"]["contract_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_contracts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string | null
+          phone: string
+          status: Database["public"]["Enums"]["contact_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone: string
+          status?: Database["public"]["Enums"]["contact_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string
+          status?: Database["public"]["Enums"]["contact_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string | null
@@ -130,7 +201,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      contact_status: "ativo" | "inativo" | "bloqueado"
+      contract_status: "ativo" | "encerrado" | "suspenso"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -257,6 +329,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      contact_status: ["ativo", "inativo", "bloqueado"],
+      contract_status: ["ativo", "encerrado", "suspenso"],
+    },
   },
 } as const
