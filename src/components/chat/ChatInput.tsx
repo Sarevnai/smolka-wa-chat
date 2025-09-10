@@ -11,20 +11,22 @@ interface ChatInputProps {
 }
 
 const attendants = [
-  { value: "", label: "Sem identificação" },
+  { value: "none", label: "Sem identificação" },
   { value: "Giselle", label: "Giselle" },
   { value: "Denny", label: "Denny" }
 ];
 
 export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
   const [message, setMessage] = useState("");
-  const [selectedAttendant, setSelectedAttendant] = useState("");
+  const [selectedAttendant, setSelectedAttendant] = useState("none");
 
   // Load attendant from localStorage on component mount
   useEffect(() => {
     const savedAttendant = localStorage.getItem("selectedAttendant");
-    if (savedAttendant) {
+    if (savedAttendant && savedAttendant !== "") {
       setSelectedAttendant(savedAttendant);
+    } else {
+      setSelectedAttendant("none");
     }
   }, []);
 
@@ -38,7 +40,7 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
       let formattedMessage = message.trim();
       
       // Add attendant prefix if an attendant is selected
-      if (selectedAttendant) {
+      if (selectedAttendant && selectedAttendant !== "none") {
         formattedMessage = `*${selectedAttendant}*\n\n${formattedMessage}`;
       }
       
@@ -71,7 +73,7 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
             ))}
           </SelectContent>
         </Select>
-        {selectedAttendant && (
+        {selectedAttendant && selectedAttendant !== "none" && (
           <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-xs">
             <User className="h-3 w-3" />
             <span>{selectedAttendant}</span>
