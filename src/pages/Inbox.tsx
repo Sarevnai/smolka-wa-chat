@@ -1,91 +1,19 @@
-import { useState, useEffect } from "react";
-import { Building, Users, Phone, Mail, Calendar, DollarSign, User } from "lucide-react";
+import { useState } from "react";
+import { Building, Users, Phone, Mail, Calendar, DollarSign, MapPin, Clock, AlertTriangle, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Layout from "@/components/Layout";
 import { cn } from "@/lib/utils";
+import { Ticket, CATEGORIES, PRIORITY_CONFIG } from "@/types/crm";
+import { mockTickets, stages } from "@/data/mockTickets";
 
-// CRM Lead interface
-interface Lead {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string;
-  stage: string;
-  value?: number;
-  lastContact: string;
-  source: string;
-  type: "owner" | "tenant";
-}
-
-// Mock data para demonstração
-const mockLeads: Lead[] = [
-  {
-    id: "1",
-    name: "João Silva",
-    phone: "+55 11 99999-1234",
-    email: "joao@email.com",
-    stage: "novo",
-    value: 500000,
-    lastContact: "2024-01-10",
-    source: "WhatsApp",
-    type: "owner"
-  },
-  {
-    id: "2", 
-    name: "Maria Santos",
-    phone: "+55 11 88888-5678",
-    email: "maria@email.com",
-    stage: "qualificado",
-    value: 2500,
-    lastContact: "2024-01-09",
-    source: "Site",
-    type: "tenant"
-  },
-  {
-    id: "3",
-    name: "Pedro Costa",
-    phone: "+55 11 77777-9012",
-    stage: "negociacao",
-    value: 750000,
-    lastContact: "2024-01-08",
-    source: "Indicação",
-    type: "owner"
-  },
-  {
-    id: "4",
-    name: "Ana Oliveira",
-    phone: "+55 11 66666-3456",
-    email: "ana@email.com",
-    stage: "novo",
-    value: 1800,
-    lastContact: "2024-01-07",
-    source: "WhatsApp",
-    type: "tenant"
-  }
-];
-
-const stages = {
-  owner: [
-    { id: "novo", name: "Novo", color: "bg-blue-500" },
-    { id: "qualificado", name: "Qualificado", color: "bg-yellow-500" },
-    { id: "negociacao", name: "Negociação", color: "bg-orange-500" },
-    { id: "fechado", name: "Fechado", color: "bg-green-500" }
-  ],
-  tenant: [
-    { id: "novo", name: "Novo", color: "bg-blue-500" },
-    { id: "qualificado", name: "Qualificado", color: "bg-yellow-500" },
-    { id: "visitado", name: "Visitado", color: "bg-purple-500" },
-    { id: "fechado", name: "Fechado", color: "bg-green-500" }
-  ]
-};
 
 export default function Inbox() {
-  const [leads] = useState<Lead[]>(mockLeads);
+  const [tickets] = useState<Ticket[]>(mockTickets);
 
-  const getLeadsByStageAndType = (stage: string, type: "owner" | "tenant") => {
-    return leads.filter(lead => lead.stage === stage && lead.type === type);
+  const getTicketsByStageAndType = (stage: string, type: "proprietario" | "inquilino") => {
+    return tickets.filter(ticket => ticket.stage === stage && ticket.type === type);
   };
 
   const formatCurrency = (value: number) => {
@@ -96,77 +24,132 @@ export default function Inbox() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric'
+    });
   };
 
-  const LeadCard = ({ lead }: { lead: Lead }) => (
-    <Card className="mb-4 hover:shadow-md transition-shadow cursor-pointer">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <User className="h-5 w-5 text-primary" />
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getCategoryInfo = (type: "proprietario" | "inquilino", categoryId: string) => {
+    const categories = CATEGORIES[type];
+    return categories.find(cat => cat.id === categoryId) || categories[0];
+  };
+
+  const TicketCard = ({ ticket }: { ticket: Ticket }) => {
+    const categoryInfo = getCategoryInfo(ticket.type, ticket.category);
+    const priorityInfo = PRIORITY_CONFIG[ticket.priority];
+    
+    return (
+      <Card className="mb-4 hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4 border-l-primary/20 hover:border-l-primary">
+        <CardContent className="p-4">
+          {/* Header com prioridade e categoria */}
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex items-center space-x-2">
+              <Badge className={cn("text-xs px-2 py-1", priorityInfo.color)}>
+                {priorityInfo.label}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {ticket.source}
+              </Badge>
             </div>
-            <div>
-              <h3 className="font-semibold text-foreground">{lead.name}</h3>
-              <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-                <Phone className="h-3 w-3" />
-                <span>{lead.phone}</span>
-              </div>
-              {lead.email && (
-                <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-                  <Mail className="h-3 w-3" />
-                  <span>{lead.email}</span>
-                </div>
+            <div className="flex items-center space-x-2">
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+
+          {/* Título e ID */}
+          <div className="mb-3">
+            <div className="flex items-start justify-between mb-1">
+              <h3 className="font-semibold text-foreground leading-tight">{ticket.title}</h3>
+              <span className="text-xs text-muted-foreground font-mono">#{ticket.id}</span>
+            </div>
+            <Badge className={cn("text-xs", categoryInfo.color)}>
+              {categoryInfo.name}
+            </Badge>
+          </div>
+          
+          {/* Descrição */}
+          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{ticket.description}</p>
+          
+          {/* Propriedade */}
+          <div className="flex items-center space-x-1 mb-2 text-sm">
+            <MapPin className="h-3 w-3 text-muted-foreground" />
+            <span className="text-muted-foreground">{ticket.property.address}</span>
+          </div>
+          
+          {/* Contato */}
+          <div className="flex items-center space-x-1 mb-2 text-sm">
+            <Phone className="h-3 w-3 text-muted-foreground" />
+            <span className="text-muted-foreground">{ticket.phone}</span>
+          </div>
+          
+          {/* Valor se existir */}
+          {ticket.value && (
+            <div className="flex items-center space-x-1 mb-2">
+              <DollarSign className="h-3 w-3 text-green-600" />
+              <span className="text-sm font-medium text-green-600">
+                {formatCurrency(ticket.value)}
+              </span>
+            </div>
+          )}
+          
+          {/* Footer com responsável e último contato */}
+          <div className="flex items-center justify-between pt-2 border-t border-border/50">
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+              {ticket.assignedTo && (
+                <>
+                  <span>Responsável: {ticket.assignedTo}</span>
+                </>
               )}
             </div>
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span>{formatDateTime(ticket.lastContact)}</span>
+            </div>
           </div>
-          <Badge variant="outline" className="text-xs">
-            {lead.source}
-          </Badge>
-        </div>
-        
-        {lead.value && (
-          <div className="flex items-center space-x-1 mb-2">
-            <DollarSign className="h-4 w-4 text-green-600" />
-            <span className="font-medium text-green-600">
-              {formatCurrency(lead.value)}
-            </span>
-          </div>
-        )}
-        
-        <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-          <Calendar className="h-3 w-3" />
-          <span>Último contato: {formatDate(lead.lastContact)}</span>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
-  const PipelineColumn = ({ stage, type }: { stage: { id: string; name: string; color: string }, type: "owner" | "tenant" }) => {
-    const stageLeads = getLeadsByStageAndType(stage.id, type);
+  const PipelineColumn = ({ stage, type }: { stage: { id: string; name: string; color: string }, type: "proprietario" | "inquilino" }) => {
+    const stageTickets = getTicketsByStageAndType(stage.id, type);
     
     return (
       <div className="flex-1 min-w-0">
         <div className="mb-4">
           <div className="flex items-center space-x-2 mb-2">
-            <div className={cn("w-3 h-3 rounded-full", stage.color)} />
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: stage.color }}
+            />
             <h3 className="font-semibold text-foreground">{stage.name}</h3>
             <Badge variant="secondary" className="text-xs">
-              {stageLeads.length}
+              {stageTickets.length}
             </Badge>
           </div>
         </div>
         
-        <div className="space-y-3">
-          {stageLeads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} />
+        <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+          {stageTickets.map((ticket) => (
+            <TicketCard key={ticket.id} ticket={ticket} />
           ))}
           
-          {stageLeads.length === 0 && (
+          {stageTickets.length === 0 && (
             <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center">
               <p className="text-sm text-muted-foreground">
-                Nenhum lead neste estágio
+                Nenhum ticket neste estágio
               </p>
             </div>
           )}
@@ -181,57 +164,81 @@ export default function Inbox() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">CRM - Pipelines</h1>
+            <h1 className="text-3xl font-bold text-foreground">CRM - Gestão de Demandas</h1>
             <p className="text-muted-foreground">
-              Gerencie seus leads de proprietários e inquilinos
+              Gerencie demandas de proprietários e inquilinos dos imóveis administrados
             </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground">Total de Tickets</div>
+              <div className="text-2xl font-bold text-foreground">{tickets.length}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground">Tickets Urgentes</div>
+              <div className="text-2xl font-bold text-orange-600">
+                {tickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}
+              </div>
+            </div>
           </div>
         </div>
 
-        <Tabs defaultValue="owners" className="w-full">
+        <Tabs defaultValue="proprietarios" className="w-full">
           <TabsList className="mb-8">
-            <TabsTrigger value="owners" className="flex items-center space-x-2">
+            <TabsTrigger value="proprietarios" className="flex items-center space-x-2">
               <Building className="h-4 w-4" />
               <span>Proprietários</span>
+              <Badge variant="secondary" className="ml-2">
+                {tickets.filter(t => t.type === 'proprietario').length}
+              </Badge>
             </TabsTrigger>
-            <TabsTrigger value="tenants" className="flex items-center space-x-2">
+            <TabsTrigger value="inquilinos" className="flex items-center space-x-2">
               <Users className="h-4 w-4" />
               <span>Inquilinos</span>
+              <Badge variant="secondary" className="ml-2">
+                {tickets.filter(t => t.type === 'inquilino').length}
+              </Badge>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="owners">
+          <TabsContent value="proprietarios">
             <div className="mb-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-foreground">Pipeline de Proprietários</h2>
+                <h2 className="text-xl font-semibold text-foreground">Demandas de Proprietários</h2>
                 <div className="flex space-x-4 text-sm text-muted-foreground">
-                  <span>Total: {leads.filter(l => l.type === 'owner').length} leads</span>
-                  <span>Valor total: {formatCurrency(leads.filter(l => l.type === 'owner').reduce((sum, lead) => sum + (lead.value || 0), 0))}</span>
+                  <div className="flex items-center space-x-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>Urgentes: {tickets.filter(t => t.type === 'proprietario' && (t.priority === 'alta' || t.priority === 'critica')).length}</span>
+                  </div>
+                  <span>Valor total: {formatCurrency(tickets.filter(t => t.type === 'proprietario').reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
                 </div>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {stages.owner.map((stage) => (
-                <PipelineColumn key={stage.id} stage={stage} type="owner" />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 overflow-x-auto">
+              {stages.proprietario.map((stage) => (
+                <PipelineColumn key={stage.id} stage={stage} type="proprietario" />
               ))}
             </div>
           </TabsContent>
 
-          <TabsContent value="tenants">
+          <TabsContent value="inquilinos">
             <div className="mb-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-foreground">Pipeline de Inquilinos</h2>
+                <h2 className="text-xl font-semibold text-foreground">Demandas de Inquilinos</h2>
                 <div className="flex space-x-4 text-sm text-muted-foreground">
-                  <span>Total: {leads.filter(l => l.type === 'tenant').length} leads</span>
-                  <span>Valor total: {formatCurrency(leads.filter(l => l.type === 'tenant').reduce((sum, lead) => sum + (lead.value || 0), 0))}</span>
+                  <div className="flex items-center space-x-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>Urgentes: {tickets.filter(t => t.type === 'inquilino' && (t.priority === 'alta' || t.priority === 'critica')).length}</span>
+                  </div>
+                  <span>Valor envolvido: {formatCurrency(tickets.filter(t => t.type === 'inquilino').reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
                 </div>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {stages.tenant.map((stage) => (
-                <PipelineColumn key={stage.id} stage={stage} type="tenant" />
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 overflow-x-auto">
+              {stages.inquilino.map((stage) => (
+                <PipelineColumn key={stage.id} stage={stage} type="inquilino" />
               ))}
             </div>
           </TabsContent>
