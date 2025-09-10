@@ -129,7 +129,7 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Edit className="h-5 w-5" />
@@ -137,131 +137,139 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="name">Nome</Label>
-              {contact.name && <AutoNameDetectionBadge name={contact.name} />}
-            </div>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nome do contato (opcional)"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">Telefone *</Label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+55 11 99999-9999"
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@exemplo.com"
-                className="pl-10"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="contact-type">Tipo de Contato</Label>
-            <Select value={contactType} onValueChange={(value: 'proprietario' | 'inquilino') => setContactType(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="proprietario">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Proprietário
-                  </div>
-                </SelectItem>
-                <SelectItem value="inquilino">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-4 w-4" />
-                    Inquilino
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descrição sobre o contato..."
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="rating">Classificação</Label>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: 5 }, (_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setRating(rating === i + 1 ? undefined : i + 1)}
-                  className="p-1"
-                >
-                  <Star
-                    className={`h-5 w-5 ${
-                      i < (rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
-                    }`}
-                  />
-                </button>
-              ))}
-              {rating && (
-                <button
-                  type="button"
-                  onClick={() => setRating(undefined)}
-                  className="ml-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  Limpar
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notas Internas</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notas internas sobre o contato..."
-              rows={2}
-            />
-          </div>
-
-          {/* Existing contracts */}
-          {contact.contracts && contact.contracts.length > 0 && (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Informações Básicas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Contratos Existentes</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="name">Nome</Label>
+                {contact.name && <AutoNameDetectionBadge name={contact.name} />}
+              </div>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nome do contato (opcional)"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Telefone *</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+55 11 99999-9999"
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@exemplo.com"
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contact-type">Tipo de Contato</Label>
+              <Select value={contactType} onValueChange={(value: 'proprietario' | 'inquilino') => setContactType(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="proprietario">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Proprietário
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="inquilino">
+                    <div className="flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      Inquilino
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Descrição e Classificação */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descrição sobre o contato..."
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="rating">Classificação</Label>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setRating(rating === i + 1 ? undefined : i + 1)}
+                      className="p-1"
+                    >
+                      <Star
+                        className={`h-5 w-5 ${
+                          i < (rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  {rating && (
+                    <button
+                      type="button"
+                      onClick={() => setRating(undefined)}
+                      className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notas Internas</Label>
+                <Textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Notas internas sobre o contato..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Contratos Existentes */}
+          {contact.contracts && contact.contracts.length > 0 && (
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-base font-semibold">Contratos Existentes</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {contact.contracts.map((contract) => (
-                  <div key={contract.id} className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                  <div key={contract.id} className="flex items-center gap-2 p-3 bg-muted rounded-md">
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span className="flex-1 text-sm font-medium">
                       {contract.contract_number}
@@ -283,18 +291,18 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
             </div>
           )}
 
-          {/* Add new contract */}
-          <div className="space-y-2">
-            <Label>Adicionar Novo Contrato</Label>
-            <div className="space-y-2 p-3 border rounded-md">
-              <div className="grid grid-cols-2 gap-2">
+          {/* Adicionar Novo Contrato */}
+          <div className="space-y-3 border-t pt-4">
+            <Label className="text-base font-semibold">Adicionar Novo Contrato</Label>
+            <div className="space-y-2 p-4 border rounded-md bg-muted/20">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <Input
-                  placeholder="CT 123"
+                  placeholder="Número do Contrato"
                   value={newContract.contract_number}
                   onChange={(e) => setNewContract({ ...newContract, contract_number: e.target.value })}
                 />
                 <Input
-                  placeholder="Tipo (opcional)"
+                  placeholder="Tipo do Contrato (opcional)"
                   value={newContract.contract_type}
                   onChange={(e) => setNewContract({ ...newContract, contract_type: e.target.value })}
                 />
@@ -318,7 +326,7 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
             </div>
           </div>
 
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2 pt-4 border-t">
             <Button
               type="button"
               variant="outline"
