@@ -113,7 +113,7 @@ export function ConversationItem({
             {contact?.contracts && contact.contracts.length > 0 && (
               <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5">
                 <FileText className="h-3 w-3" />
-                <span>{contact.contracts.length}</span>
+                <span>{contact.contracts[0].contract_number}</span>
               </Badge>
             )}
           </div>

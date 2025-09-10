@@ -193,7 +193,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             {contact?.contracts && contact.contracts.length > 0 && (
               <Badge variant="outline" className="flex items-center gap-1 text-xs">
                 <FileText className="h-3 w-3" />
-                {contact.contracts.length} contratos
+                {contact.contracts[0].contract_number}
               </Badge>
             )}
           </div>
