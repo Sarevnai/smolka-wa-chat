@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ChatLayout } from "@/components/chat/ChatLayout";
+import Layout from "@/components/Layout";
 
 export default function Chat() {
   const { phoneNumber } = useParams<{ phoneNumber?: string }>();
@@ -14,9 +15,11 @@ export default function Chat() {
   };
 
   return (
-    <ChatLayout
-      selectedContact={phoneNumber}
-      onContactSelect={handleContactSelect}
-    />
+    <Layout>
+      <ChatLayout
+        selectedContact={phoneNumber}
+        onContactSelect={handleContactSelect}
+      />
+    </Layout>
   );
 }
