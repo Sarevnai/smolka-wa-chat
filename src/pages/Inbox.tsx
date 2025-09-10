@@ -1,242 +1,241 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, RefreshCw, Clock, Phone, MessageSquare } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Building, Users, Phone, Mail, Calendar, DollarSign, User } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Layout from "@/components/Layout";
-import { supabase } from "@/lib/supabaseClient";
-import { fetchMessages, MessageRow, Period } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 
-// Period mapping for display labels
-const periodLabels: Record<Period, string> = {
-  "today": "Hoje",
-  "7d": "7 dias", 
-  "30d": "30 dias",
-  "all": "Tudo"
+// CRM Lead interface
+interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  stage: string;
+  value?: number;
+  lastContact: string;
+  source: string;
+  type: "owner" | "tenant";
+}
+
+// Mock data para demonstração
+const mockLeads: Lead[] = [
+  {
+    id: "1",
+    name: "João Silva",
+    phone: "+55 11 99999-1234",
+    email: "joao@email.com",
+    stage: "novo",
+    value: 500000,
+    lastContact: "2024-01-10",
+    source: "WhatsApp",
+    type: "owner"
+  },
+  {
+    id: "2", 
+    name: "Maria Santos",
+    phone: "+55 11 88888-5678",
+    email: "maria@email.com",
+    stage: "qualificado",
+    value: 2500,
+    lastContact: "2024-01-09",
+    source: "Site",
+    type: "tenant"
+  },
+  {
+    id: "3",
+    name: "Pedro Costa",
+    phone: "+55 11 77777-9012",
+    stage: "negociacao",
+    value: 750000,
+    lastContact: "2024-01-08",
+    source: "Indicação",
+    type: "owner"
+  },
+  {
+    id: "4",
+    name: "Ana Oliveira",
+    phone: "+55 11 66666-3456",
+    email: "ana@email.com",
+    stage: "novo",
+    value: 1800,
+    lastContact: "2024-01-07",
+    source: "WhatsApp",
+    type: "tenant"
+  }
+];
+
+const stages = {
+  owner: [
+    { id: "novo", name: "Novo", color: "bg-blue-500" },
+    { id: "qualificado", name: "Qualificado", color: "bg-yellow-500" },
+    { id: "negociacao", name: "Negociação", color: "bg-orange-500" },
+    { id: "fechado", name: "Fechado", color: "bg-green-500" }
+  ],
+  tenant: [
+    { id: "novo", name: "Novo", color: "bg-blue-500" },
+    { id: "qualificado", name: "Qualificado", color: "bg-yellow-500" },
+    { id: "visitado", name: "Visitado", color: "bg-purple-500" },
+    { id: "fechado", name: "Fechado", color: "bg-green-500" }
+  ]
 };
 
 export default function Inbox() {
-  const [messages, setMessages] = useState<MessageRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchPhone, setSearchPhone] = useState("");
-  const [periodFilter, setPeriodFilter] = useState<Period>("all");
-  const { toast } = useToast();
+  const [leads] = useState<Lead[]>(mockLeads);
 
-  // Fetch messages using the new fetchMessages function
-  const loadMessages = async () => {
-    try {
-      setLoading(true);
-      const data = await fetchMessages({
-        q: searchPhone,
-        period: periodFilter,
-        limit: 100
-      });
-      setMessages(data);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-      toast({
-        title: "Erro ao carregar mensagens",
-        description: "Não foi possível carregar as mensagens. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const getLeadsByStageAndType = (stage: string, type: "owner" | "tenant") => {
+    return leads.filter(lead => lead.stage === stage && lead.type === type);
   };
 
-  // Setup realtime subscription
-  useEffect(() => {
-    loadMessages();
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
 
-    const channel = supabase
-      .channel("messages-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-        },
-        (payload) => {
-          const newMessage = payload.new as MessageRow;
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+
+  const LeadCard = ({ lead }: { lead: Lead }) => (
+    <Card className="mb-4 hover:shadow-md transition-shadow cursor-pointer">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center space-x-3">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <User className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">{lead.name}</h3>
+              <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                <Phone className="h-3 w-3" />
+                <span>{lead.phone}</span>
+              </div>
+              {lead.email && (
+                <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                  <Mail className="h-3 w-3" />
+                  <span>{lead.email}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {lead.source}
+          </Badge>
+        </div>
+        
+        {lead.value && (
+          <div className="flex items-center space-x-1 mb-2">
+            <DollarSign className="h-4 w-4 text-green-600" />
+            <span className="font-medium text-green-600">
+              {formatCurrency(lead.value)}
+            </span>
+          </div>
+        )}
+        
+        <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+          <Calendar className="h-3 w-3" />
+          <span>Último contato: {formatDate(lead.lastContact)}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const PipelineColumn = ({ stage, type }: { stage: { id: string; name: string; color: string }, type: "owner" | "tenant" }) => {
+    const stageLeads = getLeadsByStageAndType(stage.id, type);
+    
+    return (
+      <div className="flex-1 min-w-0">
+        <div className="mb-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <div className={cn("w-3 h-3 rounded-full", stage.color)} />
+            <h3 className="font-semibold text-foreground">{stage.name}</h3>
+            <Badge variant="secondary" className="text-xs">
+              {stageLeads.length}
+            </Badge>
+          </div>
+        </div>
+        
+        <div className="space-y-3">
+          {stageLeads.map((lead) => (
+            <LeadCard key={lead.id} lead={lead} />
+          ))}
           
-          // Check if the new message matches current filters
-          const matchesPhone = !searchPhone.trim() || 
-            newMessage.wa_from?.toLowerCase().includes(searchPhone.trim().toLowerCase());
-          
-          let matchesPeriod = true;
-          if (periodFilter !== "all") {
-            const messageDate = new Date(newMessage.created_at || new Date());
-            const now = new Date();
-            
-            switch (periodFilter) {
-              case "today":
-                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                matchesPeriod = messageDate >= today;
-                break;
-              case "7d":
-                const week = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                matchesPeriod = messageDate >= week;
-                break;
-              case "30d":
-                const month = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                matchesPeriod = messageDate >= month;
-                break;
-            }
-          }
-
-          if (matchesPhone && matchesPeriod) {
-            setMessages((prev) => [newMessage, ...prev]);
-            
-            // Show toast for new message
-            toast({
-              title: "Nova mensagem recebida",
-              description: `De: ${newMessage.wa_from || "Desconhecido"}`,
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [searchPhone, periodFilter, toast]);
-
-  const clearFilters = () => {
-    setSearchPhone("");
-    setPeriodFilter("all");
-  };
-
-  const formatMessageDate = (dateString: string) => {
-    try {
-      const date = parseISO(dateString);
-      return format(date, "dd/MM/yyyy HH:mm", { locale: ptBR });
-    } catch {
-      return "Data inválida";
-    }
-  };
-
-  const truncateMessage = (text: string, maxLength: number = 100) => {
-    if (!text) return "Sem conteúdo";
-    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+          {stageLeads.length === 0 && (
+            <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Nenhum lead neste estágio
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Inbox</h1>
+            <h1 className="text-3xl font-bold text-foreground">CRM - Pipelines</h1>
             <p className="text-muted-foreground">
-              {messages.length} mensagens encontradas
+              Gerencie seus leads de proprietários e inquilinos
             </p>
           </div>
-          <Button onClick={loadMessages} disabled={loading} variant="outline">
-            <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-            Atualizar
-          </Button>
         </div>
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por número (wa_from)"
-                    value={searchPhone}
-                    onChange={(e) => setSearchPhone(e.target.value)}
-                    className="pl-10"
-                  />
+        <Tabs defaultValue="owners" className="w-full">
+          <TabsList className="mb-8">
+            <TabsTrigger value="owners" className="flex items-center space-x-2">
+              <Building className="h-4 w-4" />
+              <span>Proprietários</span>
+            </TabsTrigger>
+            <TabsTrigger value="tenants" className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span>Inquilinos</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="owners">
+            <div className="mb-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-foreground">Pipeline de Proprietários</h2>
+                <div className="flex space-x-4 text-sm text-muted-foreground">
+                  <span>Total: {leads.filter(l => l.type === 'owner').length} leads</span>
+                  <span>Valor total: {formatCurrency(leads.filter(l => l.type === 'owner').reduce((sum, lead) => sum + (lead.value || 0), 0))}</span>
                 </div>
               </div>
-              <Select value={periodFilter} onValueChange={(value) => setPeriodFilter(value as Period)}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Período" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">{periodLabels.today}</SelectItem>
-                  <SelectItem value="7d">{periodLabels["7d"]}</SelectItem>
-                  <SelectItem value="30d">{periodLabels["30d"]}</SelectItem>
-                  <SelectItem value="all">{periodLabels.all}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={clearFilters} variant="outline">
-                Limpar
-              </Button>
             </div>
-          </CardHeader>
-        </Card>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {stages.owner.map((stage) => (
+                <PipelineColumn key={stage.id} stage={stage} type="owner" />
+              ))}
+            </div>
+          </TabsContent>
 
-        {/* Messages List */}
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : messages.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium text-muted-foreground mb-2">
-                Sem mensagens ainda
-              </p>
-              <p className="text-sm text-muted-foreground text-center">
-                As mensagens aparecerão aqui quando forem recebidas ou enviadas.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <Card key={message.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                        <Phone className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {message.wa_from || "Número desconhecido"}
-                        </p>
-                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>
-                            {formatMessageDate(message.wa_timestamp || message.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <Badge
-                      variant={message.direction === "inbound" ? "default" : "secondary"}
-                      className={cn(
-                        message.direction === "inbound" 
-                          ? "bg-inbound/10 text-inbound border-inbound/20" 
-                          : "bg-outbound/10 text-outbound border-outbound/20"
-                      )}
-                    >
-                      {message.direction === "inbound" ? "Recebida" : "Enviada"}
-                    </Badge>
-                  </div>
-                  <p className="text-foreground leading-relaxed">
-                    {truncateMessage(message.body || "")}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+          <TabsContent value="tenants">
+            <div className="mb-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-foreground">Pipeline de Inquilinos</h2>
+                <div className="flex space-x-4 text-sm text-muted-foreground">
+                  <span>Total: {leads.filter(l => l.type === 'tenant').length} leads</span>
+                  <span>Valor total: {formatCurrency(leads.filter(l => l.type === 'tenant').reduce((sum, lead) => sum + (lead.value || 0), 0))}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {stages.tenant.map((stage) => (
+                <PipelineColumn key={stage.id} stage={stage} type="tenant" />
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
