@@ -65,13 +65,22 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         {
           event: "INSERT",
           schema: "public",
-          table: "messages",
-          filter: `or(wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber})`
+          table: "messages"
         },
         (payload) => {
           const newMessage = payload.new as MessageRow;
-          setMessages(prev => [...prev, newMessage]);
-          setTimeout(scrollToBottom, 100);
+          
+          // Check if this message belongs to the current conversation
+          const belongsToConversation = (
+            newMessage.wa_from === phoneNumber || 
+            newMessage.wa_to === phoneNumber ||
+            (newMessage.direction === "outbound" && newMessage.wa_to === phoneNumber)
+          );
+          
+          if (belongsToConversation) {
+            setMessages(prev => [...prev, newMessage]);
+            setTimeout(scrollToBottom, 100);
+          }
         }
       )
       .subscribe();
