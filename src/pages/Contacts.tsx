@@ -1,30 +1,37 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Layout from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import React, { useState } from "react";
+import { Plus, Search, Filter, MoreVertical, Edit, Trash2, UserPlus, Building2, Key, FileText, Star, User as UserIcon, Phone, Mail, Calendar, Activity, MessageCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Search, Plus, MessageCircle, Phone, Mail, Calendar, FileText, Activity, Trash2, Edit, Building2, Key, Star } from "lucide-react";
-import { useContacts, useContactStats } from "@/hooks/useContacts";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
 import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
+import { ContactProfile } from "@/components/contacts/ContactProfile";
+import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { Contact } from "@/types/contact";
+import { formatPhoneNumber } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
+import Layout from "@/components/Layout";
 
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewContactModal, setShowNewContactModal] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const navigate = useNavigate();
   
   const { data: contacts, isLoading } = useContacts(searchTerm);
   const { data: stats, isLoading: statsLoading } = useContactStats();
 
   const handleContactClick = (contact: Contact) => {
-    navigate(`/chat/${contact.phone}`);
+    setSelectedContact(contact);
+    setShowProfileModal(true);
   };
 
   const getInitials = (name?: string, phone?: string) => {
@@ -35,24 +42,6 @@ export default function Contacts() {
       return phone.slice(-2);
     }
     return '??';
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ativo': return 'default';
-      case 'inativo': return 'secondary';
-      case 'bloqueado': return 'destructive';
-      default: return 'secondary';
-    }
-  };
-
-  const getContractStatusColor = (status: string) => {
-    switch (status) {
-      case 'ativo': return 'bg-green-100 text-green-700';
-      case 'encerrado': return 'bg-gray-100 text-gray-700';
-      case 'suspenso': return 'bg-yellow-100 text-yellow-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
   };
 
   const getContactTypeInfo = (type?: string) => {
@@ -80,6 +69,24 @@ export default function Contacts() {
         ))}
       </div>
     );
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ativo': return 'default';
+      case 'inativo': return 'secondary';
+      case 'bloqueado': return 'destructive';
+      default: return 'secondary';
+    }
+  };
+
+  const getContractStatusColor = (status: string) => {
+    switch (status) {
+      case 'ativo': return 'bg-green-100 text-green-700';
+      case 'encerrado': return 'bg-gray-100 text-gray-700';
+      case 'suspenso': return 'bg-yellow-100 text-yellow-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
   };
 
   return (
@@ -218,33 +225,33 @@ export default function Contacts() {
                           {getInitials(contact.name, contact.phone)}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <CardTitle className="text-lg">
-                          {contact.name || contact.phone}
-                        </CardTitle>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge 
-                            variant={getStatusColor(contact.status) as any}
-                            className="text-xs"
-                          >
-                            {contact.status}
-                          </Badge>
-                          {(() => {
-                            const typeInfo = getContactTypeInfo(contact.contact_type);
-                            if (typeInfo) {
-                              const TypeIcon = typeInfo.icon;
-                              return (
-                                <Badge variant={typeInfo.variant} className="text-xs flex items-center gap-1">
-                                  <TypeIcon className="h-3 w-3" />
-                                  {typeInfo.label}
-                                </Badge>
-                              );
-                            }
-                            return null;
-                          })()}
-                          {renderStars(contact.rating)}
-                        </div>
-                      </div>
+                       <div>
+                         <CardTitle className="text-lg">
+                           {contact.name || formatPhoneNumber(contact.phone)}
+                         </CardTitle>
+                         <div className="flex items-center gap-2 mt-1">
+                           <Badge 
+                             variant={getStatusColor(contact.status) as any}
+                             className="text-xs"
+                           >
+                             {contact.status}
+                           </Badge>
+                           {(() => {
+                             const typeInfo = getContactTypeInfo(contact.contact_type);
+                             if (typeInfo) {
+                               const TypeIcon = typeInfo.icon;
+                               return (
+                                 <Badge variant={typeInfo.variant} className="text-xs flex items-center gap-1">
+                                   <TypeIcon className="h-3 w-3" />
+                                   {typeInfo.label}
+                                 </Badge>
+                               );
+                             }
+                             return null;
+                           })()}
+                           {renderStars(contact.rating)}
+                         </div>
+                       </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -252,10 +259,10 @@ export default function Contacts() {
                 <CardContent className="space-y-4">
                   {/* Contact Info */}
                   <div className="space-y-2">
-                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{contact.phone}</span>
-                    </div>
+                     <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                       <Phone className="h-4 w-4" />
+                       <span>{formatPhoneNumber(contact.phone)}</span>
+                     </div>
                     {contact.email && (
                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                         <Mail className="h-4 w-4" />
@@ -304,17 +311,17 @@ export default function Contacts() {
                     </div>
                     
                     <div className="flex space-x-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-8 w-8 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleContactClick(contact);
-                        }}
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </Button>
+                       <Button 
+                         size="sm" 
+                         variant="outline" 
+                         className="h-8 w-8 p-0"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           navigate(`/chat/${contact.phone}`);
+                         }}
+                       >
+                         <MessageCircle className="h-4 w-4" />
+                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline" 
@@ -400,13 +407,21 @@ export default function Contacts() {
           onOpenChange={setShowNewContactModal} 
         />
 
-        {editingContact && (
-          <EditContactModal 
-            open={!!editingContact} 
-            onOpenChange={(open) => !open && setEditingContact(null)}
-            contact={editingContact}
-          />
-        )}
+         {editingContact && (
+           <EditContactModal 
+             open={!!editingContact} 
+             onOpenChange={(open) => !open && setEditingContact(null)}
+             contact={editingContact}
+           />
+         )}
+
+         {selectedContact && (
+           <ContactProfile
+             phoneNumber={selectedContact.phone}
+             open={showProfileModal}
+             onOpenChange={setShowProfileModal}
+           />
+         )}
       </div>
     </Layout>
   );

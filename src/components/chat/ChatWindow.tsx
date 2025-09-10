@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { User, ArrowLeft, Phone } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageBubble } from "./MessageBubble";
@@ -11,6 +12,7 @@ import { ContactProfile } from "@/components/contacts/ContactProfile";
 import { supabase } from "@/lib/supabaseClient";
 import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
+import { formatPhoneNumber } from "@/lib/utils";
 
 interface ChatWindowProps {
   phoneNumber: string;
@@ -146,8 +148,22 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     return '??';
   };
 
-  const displayName = contact?.name || phoneNumber;
+  const displayName = contact?.name || formatPhoneNumber(phoneNumber);
   const displayInitials = getInitials(contact?.name, phoneNumber);
+
+  const getContactTypeInfo = (type?: string) => {
+    switch (type) {
+      case 'proprietario':
+        return { label: 'Proprietário', icon: Building2, variant: 'default' as const };
+      case 'inquilino':
+        return { label: 'Inquilino', icon: Key, variant: 'secondary' as const };
+      default:
+        return null;
+    }
+  };
+
+  const typeInfo = getContactTypeInfo(contact?.contact_type);
+  const TypeIcon = typeInfo?.icon;
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -166,9 +182,23 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         </Avatar>
         
         <div className="flex-1">
-          <h3 className="font-medium text-foreground">{displayName}</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-medium text-foreground">{displayName}</h3>
+            {typeInfo && TypeIcon && (
+              <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs">
+                <TypeIcon className="h-3 w-3" />
+                {typeInfo.label}
+              </Badge>
+            )}
+            {contact?.contracts && contact.contracts.length > 0 && (
+              <Badge variant="outline" className="flex items-center gap-1 text-xs">
+                <FileText className="h-3 w-3" />
+                {contact.contracts.length} contratos
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
-            {contact?.name ? phoneNumber : 'WhatsApp'}
+            {contact?.name ? formatPhoneNumber(phoneNumber) : 'WhatsApp'}
           </p>
         </div>
         

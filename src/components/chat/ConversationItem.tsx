@@ -1,8 +1,8 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useContactByPhone } from "@/hooks/useContacts";
-import { cn } from "@/lib/utils";
-import { SparklesIcon } from "lucide-react";
+import { cn, formatPhoneNumber } from "@/lib/utils";
+import { SparklesIcon, Building2, Key, FileText } from "lucide-react";
 
 interface ConversationItemProps {
   phoneNumber: string;
@@ -63,9 +63,23 @@ export function ConversationItem({
     return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
 
-  const displayName = contact?.name || phoneNumber;
+  const displayName = contact?.name || formatPhoneNumber(phoneNumber);
   const displayInitials = getInitials(contact?.name, phoneNumber);
   const isAutoDetectedName = contact?.name && contact.name !== phoneNumber && !contact.name.includes('@');
+
+  const getContactTypeInfo = (type?: string) => {
+    switch (type) {
+      case 'proprietario':
+        return { label: 'Proprietário', icon: Building2, variant: 'default' as const };
+      case 'inquilino':
+        return { label: 'Inquilino', icon: Key, variant: 'secondary' as const };
+      default:
+        return null;
+    }
+  };
+
+  const typeInfo = getContactTypeInfo(contact?.contact_type);
+  const TypeIcon = typeInfo?.icon;
 
   return (
     <div
@@ -83,12 +97,24 @@ export function ConversationItem({
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <p className="font-medium text-foreground truncate">
               {displayName}
             </p>
             {isAutoDetectedName && (
               <SparklesIcon className="h-3 w-3 text-primary/60 flex-shrink-0" />
+            )}
+            {typeInfo && TypeIcon && (
+              <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs px-1.5 py-0.5">
+                <TypeIcon className="h-3 w-3" />
+                <span className="hidden sm:inline">{typeInfo.label}</span>
+              </Badge>
+            )}
+            {contact?.contracts && contact.contracts.length > 0 && (
+              <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5">
+                <FileText className="h-3 w-3" />
+                <span>{contact.contracts.length}</span>
+              </Badge>
             )}
           </div>
           <span className="text-xs text-muted-foreground flex-shrink-0">
@@ -111,7 +137,7 @@ export function ConversationItem({
         
         {contact?.name && (
           <p className="text-xs text-muted-foreground mt-1">
-            {phoneNumber}
+            {formatPhoneNumber(phoneNumber)}
           </p>
         )}
       </div>

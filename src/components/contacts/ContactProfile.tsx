@@ -9,6 +9,7 @@ import { useContactByPhone, useUpdateContact, useDeleteContact } from "@/hooks/u
 import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
 import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { useToast } from "@/hooks/use-toast";
+import { formatPhoneNumber } from "@/lib/utils";
 import { 
   User, 
   Phone, 
@@ -157,7 +158,7 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
             </div>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Informações Básicas */}
             <Card>
               <CardHeader>
@@ -169,7 +170,7 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{contact.phone}</span>
+                  <span className="text-sm">{formatPhoneNumber(contact.phone)}</span>
                 </div>
                 {contact.email && (
                   <div className="flex items-center gap-2">
@@ -202,21 +203,21 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
               </CardHeader>
               <CardContent>
                 {contact.contracts && contact.contracts.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
                     {contact.contracts.map((contract) => (
-                      <div key={contract.id} className="p-2 border rounded-md">
-                        <div className="font-medium text-sm">{contract.contract_number}</div>
+                      <div key={contract.id} className="p-3 border rounded-md bg-muted/20">
+                        <div className="font-medium text-sm mb-1">{contract.contract_number}</div>
                         {contract.contract_type && (
-                          <div className="text-xs text-muted-foreground">{contract.contract_type}</div>
+                          <div className="text-xs text-muted-foreground mb-1">{contract.contract_type}</div>
                         )}
                         {contract.property_code && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground mb-2">
                             Imóvel: {contract.property_code}
                           </div>
                         )}
                         <Badge 
                           variant={contract.status === 'ativo' ? 'default' : 'secondary'}
-                          className="text-xs mt-1"
+                          className="text-xs"
                         >
                           {contract.status}
                         </Badge>
@@ -225,6 +226,38 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">Nenhum contrato cadastrado</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Estatísticas e Ações Rápidas */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-4 w-4" />
+                  Estatísticas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {contact.rating && (
+                  <div>
+                    <div className="text-sm font-medium mb-2">Classificação</div>
+                    <div className="flex items-center gap-1">
+                      {renderStars(contact.rating)}
+                    </div>
+                  </div>
+                )}
+                <div className="text-sm">
+                  <div className="font-medium mb-1">Status</div>  
+                  <Badge variant={contact.status === 'ativo' ? 'default' : 'secondary'}>
+                    {contact.status}
+                  </Badge>
+                </div>
+                {contact.totalMessages && (
+                  <div className="text-sm">
+                    <div className="font-medium mb-1">Interações</div>
+                    <div className="text-muted-foreground">{contact.totalMessages} mensagens</div>
+                  </div>
                 )}
               </CardContent>
             </Card>
