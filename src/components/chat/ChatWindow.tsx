@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Phone, MoreVertical, Send } from "lucide-react";
+import { User, ArrowLeft, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -7,6 +7,7 @@ import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
+import { ContactProfile } from "@/components/contacts/ContactProfile";
 import { supabase } from "@/lib/supabaseClient";
 import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
@@ -20,6 +21,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const { toast } = useToast();
   const { data: contact } = useContactByPhone(phoneNumber);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -174,8 +176,12 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           <Button variant="ghost" size="sm">
             <Phone className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm">
-            <MoreVertical className="h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setShowProfile(true)}
+          >
+            <User className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -213,6 +219,12 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
       <div className="border-t border-border bg-card">
         <ChatInput onSendMessage={sendMessage} disabled={sending} />
       </div>
+
+      <ContactProfile
+        phoneNumber={phoneNumber}
+        open={showProfile}
+        onOpenChange={setShowProfile}
+      />
     </div>
   );
 }

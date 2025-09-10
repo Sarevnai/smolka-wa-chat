@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X, Phone, Mail, FileText } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, X, Phone, Mail, FileText, Star, Building2, Key } from 'lucide-react';
 import { useCreateContact } from '@/hooks/useContacts';
 import { CreateContactRequest } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
@@ -24,6 +26,10 @@ export function NewContactModal({ open, onOpenChange }: NewContactModalProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [contactType, setContactType] = useState<'proprietario' | 'inquilino' | undefined>(undefined);
+  const [description, setDescription] = useState('');
+  const [rating, setRating] = useState<number | undefined>(undefined);
+  const [notes, setNotes] = useState('');
   const [contracts, setContracts] = useState<ContractForm[]>([]);
   const [newContract, setNewContract] = useState<ContractForm>({
     contract_number: '',
@@ -60,6 +66,10 @@ export function NewContactModal({ open, onOpenChange }: NewContactModalProps) {
       name: name.trim() || undefined,
       phone: phone.trim(),
       email: email.trim() || undefined,
+      contact_type: contactType,
+      description: description.trim() || undefined,
+      rating: rating,
+      notes: notes.trim() || undefined,
       contracts: contracts.length > 0 ? contracts : undefined
     };
 
@@ -75,6 +85,10 @@ export function NewContactModal({ open, onOpenChange }: NewContactModalProps) {
       setName('');
       setPhone('');
       setEmail('');
+      setContactType(undefined);
+      setDescription('');
+      setRating(undefined);
+      setNotes('');
       setContracts([]);
       setNewContract({ contract_number: '', contract_type: '', property_code: '' });
       
@@ -122,18 +136,77 @@ export function NewContactModal({ open, onOpenChange }: NewContactModalProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@exemplo.com"
-                className="pl-10"
-              />
+            <Label htmlFor="contact-type">Tipo de Contato *</Label>
+            <Select value={contactType} onValueChange={(value: 'proprietario' | 'inquilino') => setContactType(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="proprietario">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Proprietário
+                  </div>
+                </SelectItem>
+                <SelectItem value="inquilino">
+                  <div className="flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    Inquilino
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Descrição</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descrição sobre o contato..."
+              rows={2}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rating">Classificação</Label>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: 5 }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setRating(rating === i + 1 ? undefined : i + 1)}
+                  className="p-1"
+                >
+                  <Star
+                    className={`h-5 w-5 ${
+                      i < (rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+                    }`}
+                  />
+                </button>
+              ))}
+              {rating && (
+                <button
+                  type="button"
+                  onClick={() => setRating(undefined)}
+                  className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Limpar
+                </button>
+              )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notas Internas</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notas internas sobre o contato..."
+              rows={2}
+            />
           </div>
 
           <div className="space-y-3">

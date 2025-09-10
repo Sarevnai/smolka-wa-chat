@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, X, Phone, Mail, FileText, Edit } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, X, Phone, Mail, FileText, Edit, Star, Building2, Key } from 'lucide-react';
 import { useUpdateContact, useAddContract } from '@/hooks/useContacts';
 import { Contact } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
@@ -28,6 +29,10 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'ativo' | 'inativo' | 'bloqueado'>('ativo');
+  const [contactType, setContactType] = useState<'proprietario' | 'inquilino' | undefined>(undefined);
+  const [description, setDescription] = useState('');
+  const [rating, setRating] = useState<number | undefined>(undefined);
+  const [notes, setNotes] = useState('');
   const [newContract, setNewContract] = useState<ContractForm>({
     contract_number: '',
     contract_type: '',
@@ -44,6 +49,10 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
       setPhone(contact.phone || '');
       setEmail(contact.email || '');
       setStatus(contact.status);
+      setContactType(contact.contact_type);
+      setDescription(contact.description || '');
+      setRating(contact.rating);
+      setNotes(contact.notes || '');
     }
   }, [contact]);
 
@@ -95,7 +104,11 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
           name: name.trim() || null,
           phone: phone.trim(),
           email: email.trim() || null,
-          status
+          status,
+          contact_type: contactType,
+          description: description.trim() || null,
+          rating: rating,
+          notes: notes.trim() || null
         }
       });
       
@@ -169,17 +182,77 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select value={status} onValueChange={(value: any) => setStatus(value)}>
+            <Label htmlFor="contact-type">Tipo de Contato</Label>
+            <Select value={contactType} onValueChange={(value: 'proprietario' | 'inquilino') => setContactType(value)}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ativo">Ativo</SelectItem>
-                <SelectItem value="inativo">Inativo</SelectItem>
-                <SelectItem value="bloqueado">Bloqueado</SelectItem>
+                <SelectItem value="proprietario">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Proprietário
+                  </div>
+                </SelectItem>
+                <SelectItem value="inquilino">
+                  <div className="flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    Inquilino
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Descrição</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descrição sobre o contato..."
+              rows={2}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rating">Classificação</Label>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: 5 }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setRating(rating === i + 1 ? undefined : i + 1)}
+                  className="p-1"
+                >
+                  <Star
+                    className={`h-5 w-5 ${
+                      i < (rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+                    }`}
+                  />
+                </button>
+              ))}
+              {rating && (
+                <button
+                  type="button"
+                  onClick={() => setRating(undefined)}
+                  className="ml-2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notas Internas</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notas internas sobre o contato..."
+              rows={2}
+            />
           </div>
 
           {/* Existing contracts */}

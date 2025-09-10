@@ -18,9 +18,11 @@ import { Contact } from "@/types/contact";
 interface DeleteContactDialogProps {
   contact: Contact;
   children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function DeleteContactDialog({ contact, children }: DeleteContactDialogProps) {
+export function DeleteContactDialog({ contact, children, open, onOpenChange }: DeleteContactDialogProps) {
   const deleteContact = useDeleteContact();
   const { toast } = useToast();
 
@@ -41,7 +43,7 @@ export function DeleteContactDialog({ contact, children }: DeleteContactDialogPr
   };
 
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
         {children || (
           <Button

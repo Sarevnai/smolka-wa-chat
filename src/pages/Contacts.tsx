@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Search, Plus, MessageCircle, Phone, Mail, Calendar, FileText, Activity, Trash2, Edit } from "lucide-react";
+import { Users, Search, Plus, MessageCircle, Phone, Mail, Calendar, FileText, Activity, Trash2, Edit, Building2, Key, Star } from "lucide-react";
 import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
 import { EditContactModal } from "@/components/contacts/EditContactModal";
@@ -53,6 +53,33 @@ export default function Contacts() {
       case 'suspenso': return 'bg-yellow-100 text-yellow-700';
       default: return 'bg-gray-100 text-gray-700';
     }
+  };
+
+  const getContactTypeInfo = (type?: string) => {
+    switch (type) {
+      case 'proprietario':
+        return { label: 'Proprietário', icon: Building2, variant: 'default' as const };
+      case 'inquilino':
+        return { label: 'Inquilino', icon: Key, variant: 'secondary' as const };
+      default:
+        return null;
+    }
+  };
+
+  const renderStars = (rating?: number) => {
+    if (!rating) return null;
+    return (
+      <div className="flex items-center gap-1">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Star
+            key={i}
+            className={`h-3 w-3 ${
+              i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+            }`}
+          />
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -195,12 +222,28 @@ export default function Contacts() {
                         <CardTitle className="text-lg">
                           {contact.name || contact.phone}
                         </CardTitle>
-                        <Badge 
-                          variant={getStatusColor(contact.status) as any}
-                          className="text-xs"
-                        >
-                          {contact.status}
-                        </Badge>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge 
+                            variant={getStatusColor(contact.status) as any}
+                            className="text-xs"
+                          >
+                            {contact.status}
+                          </Badge>
+                          {(() => {
+                            const typeInfo = getContactTypeInfo(contact.contact_type);
+                            if (typeInfo) {
+                              const TypeIcon = typeInfo.icon;
+                              return (
+                                <Badge variant={typeInfo.variant} className="text-xs flex items-center gap-1">
+                                  <TypeIcon className="h-3 w-3" />
+                                  {typeInfo.label}
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          })()}
+                          {renderStars(contact.rating)}
+                        </div>
                       </div>
                     </div>
                   </div>

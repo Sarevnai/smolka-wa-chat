@@ -126,29 +126,41 @@ export type Database = {
       }
       contacts: {
         Row: {
+          contact_type: Database["public"]["Enums"]["contact_type"] | null
           created_at: string
+          description: string | null
           email: string | null
           id: string
           name: string | null
+          notes: string | null
           phone: string
+          rating: number | null
           status: Database["public"]["Enums"]["contact_status"]
           updated_at: string
         }
         Insert: {
+          contact_type?: Database["public"]["Enums"]["contact_type"] | null
           created_at?: string
+          description?: string | null
           email?: string | null
           id?: string
           name?: string | null
+          notes?: string | null
           phone: string
+          rating?: number | null
           status?: Database["public"]["Enums"]["contact_status"]
           updated_at?: string
         }
         Update: {
+          contact_type?: Database["public"]["Enums"]["contact_type"] | null
           created_at?: string
+          description?: string | null
           email?: string | null
           id?: string
           name?: string | null
+          notes?: string | null
           phone?: string
+          rating?: number | null
           status?: Database["public"]["Enums"]["contact_status"]
           updated_at?: string
         }
@@ -202,6 +214,7 @@ export type Database = {
     }
     Enums: {
       contact_status: "ativo" | "inativo" | "bloqueado"
+      contact_type: "proprietario" | "inquilino"
       contract_status: "ativo" | "encerrado" | "suspenso"
     }
     CompositeTypes: {
@@ -331,6 +344,7 @@ export const Constants = {
   public: {
     Enums: {
       contact_status: ["ativo", "inativo", "bloqueado"],
+      contact_type: ["proprietario", "inquilino"],
       contract_status: ["ativo", "encerrado", "suspenso"],
     },
   },

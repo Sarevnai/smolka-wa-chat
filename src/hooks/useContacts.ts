@@ -96,6 +96,10 @@ export const useCreateContact = () => {
           name: request.name,
           phone: request.phone,
           email: request.email,
+          contact_type: request.contact_type,
+          notes: request.notes,
+          rating: request.rating,
+          description: request.description,
           status: 'ativo'
         })
         .select()
@@ -198,12 +202,41 @@ export const useContactByPhone = (phone?: string) => {
       
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, name, phone, email, status')
+        .select(`
+          *,
+          contact_contracts (*)
+        `)
         .eq('phone', phone)
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      
+      if (!data) return null;
+
+      // Get message count and last contact
+      const { data: messageStats } = await supabase
+        .from('messages')
+        .select('id, wa_timestamp')
+        .eq('wa_from', phone)
+        .order('wa_timestamp', { ascending: false })
+        .limit(1);
+
+      const { count: totalMessages } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('wa_from', phone);
+
+      const lastMessage = messageStats?.[0];
+      const lastContact = lastMessage?.wa_timestamp 
+        ? formatLastContact(lastMessage.wa_timestamp)
+        : 'Nunca';
+
+      return {
+        ...data,
+        contracts: data.contact_contracts || [],
+        totalMessages: totalMessages || 0,
+        lastContact
+      } as Contact;
     },
     enabled: !!phone,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -216,7 +249,7 @@ export const useUpdateContact = () => {
   return useMutation({
     mutationFn: async ({ contactId, updates }: { 
       contactId: string; 
-      updates: Partial<Pick<Contact, 'name' | 'phone' | 'email' | 'status'>>
+      updates: Partial<Pick<Contact, 'name' | 'phone' | 'email' | 'status' | 'contact_type' | 'notes' | 'rating' | 'description'>>
     }) => {
       const { data, error } = await supabase
         .from('contacts')

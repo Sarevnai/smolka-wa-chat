@@ -4,6 +4,10 @@ export interface Contact {
   phone: string;
   email?: string;
   status: 'ativo' | 'inativo' | 'bloqueado';
+  contact_type?: 'proprietario' | 'inquilino';
+  notes?: string;
+  rating?: number;
+  description?: string;
   created_at: string;
   updated_at: string;
   contracts?: Contract[];
@@ -33,6 +37,10 @@ export interface CreateContactRequest {
   name?: string;
   phone: string;
   email?: string;
+  contact_type?: 'proprietario' | 'inquilino';
+  notes?: string;
+  rating?: number;
+  description?: string;
   contracts?: Array<{
     contract_number: string;
     contract_type?: string;
