@@ -1,7 +1,8 @@
-import { useState, KeyboardEvent } from "react";
-import { Send, Paperclip, Smile } from "lucide-react";
+import { useState, KeyboardEvent, useEffect } from "react";
+import { Send, Paperclip, Smile, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -9,12 +10,39 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
+const attendants = [
+  { value: "", label: "Sem identificação" },
+  { value: "Giselle", label: "Giselle" },
+  { value: "Denny", label: "Denny" }
+];
+
 export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
   const [message, setMessage] = useState("");
+  const [selectedAttendant, setSelectedAttendant] = useState("");
+
+  // Load attendant from localStorage on component mount
+  useEffect(() => {
+    const savedAttendant = localStorage.getItem("selectedAttendant");
+    if (savedAttendant) {
+      setSelectedAttendant(savedAttendant);
+    }
+  }, []);
+
+  // Save attendant to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem("selectedAttendant", selectedAttendant);
+  }, [selectedAttendant]);
 
   const handleSend = () => {
     if (message.trim() && !disabled) {
-      onSendMessage(message.trim());
+      let formattedMessage = message.trim();
+      
+      // Add attendant prefix if an attendant is selected
+      if (selectedAttendant) {
+        formattedMessage = `*${selectedAttendant}*\n\n${formattedMessage}`;
+      }
+      
+      onSendMessage(formattedMessage);
       setMessage("");
     }
   };
@@ -27,7 +55,31 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4 space-y-3">
+      {/* Attendant Selector */}
+      <div className="flex items-center gap-3">
+        <User className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Select value={selectedAttendant} onValueChange={setSelectedAttendant} disabled={disabled}>
+          <SelectTrigger className="w-48 h-8">
+            <SelectValue placeholder="Selecionar atendente" />
+          </SelectTrigger>
+          <SelectContent>
+            {attendants.map((attendant) => (
+              <SelectItem key={attendant.value} value={attendant.value}>
+                {attendant.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedAttendant && (
+          <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-xs">
+            <User className="h-3 w-3" />
+            <span>{selectedAttendant}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Message Input */}
       <div className="flex items-end gap-3">
         {/* Attachment button */}
         <Button
