@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { MessageCircle, Send, Home, Inbox, Users, BarChart3 } from "lucide-react";
+import { MessageCircle, Send, Home, Inbox, Users, BarChart3, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -127,6 +127,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <BarChart3 className="h-5 w-5" />
               <span>Relatórios</span>
+            </Link>
+
+            {/* ClickUp Integration */}
+            <Link
+              to="/clickup"
+              className={cn(
+                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200",
+                location.pathname === "/clickup"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              )}
+            >
+              <Settings className="h-5 w-5" />
+              <span>ClickUp</span>
             </Link>
           </div>
         </div>

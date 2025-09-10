@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Layout from "@/components/Layout";
+import { ClickUpIntegration } from "@/components/ClickUpIntegration";
 import { cn } from "@/lib/utils";
 import { Ticket, CATEGORIES, PRIORITY_CONFIG } from "@/types/crm";
 import { mockTickets, stages } from "@/data/mockTickets";
@@ -105,7 +106,7 @@ export default function Inbox() {
           )}
           
           {/* Footer com responsável e último contato */}
-          <div className="flex items-center justify-between pt-2 border-t border-border/50">
+          <div className="flex items-center justify-between pt-2 border-t border-border/50 mb-3">
             <div className="flex items-center space-x-1 text-xs text-muted-foreground">
               {ticket.assignedTo && (
                 <>
@@ -118,6 +119,9 @@ export default function Inbox() {
               <span>{formatDateTime(ticket.lastContact)}</span>
             </div>
           </div>
+          
+          {/* ClickUp Integration */}
+          <ClickUpIntegration ticket={ticket} />
         </CardContent>
       </Card>
     );

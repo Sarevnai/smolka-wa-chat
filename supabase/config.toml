@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.whatsapp-webhook]
 verify_jwt = false
+
+[functions.clickup-create-task]
+verify_jwt = false
+
+[functions.clickup-update-task]
+verify_jwt = false
+
+[functions.clickup-webhook]
+verify_jwt = false

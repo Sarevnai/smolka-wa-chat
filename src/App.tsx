@@ -9,6 +9,7 @@ import Chat from "./pages/Chat";
 import Send from "./pages/Send";
 import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
+import ClickUpConfig from "./pages/ClickUpConfig";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/send" element={<Send />} />
           <Route path="/contacts" element={<Contacts />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/clickup" element={<ClickUpConfig />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

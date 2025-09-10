@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      clickup_integration: {
+        Row: {
+          clickup_list_id: string
+          clickup_task_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          last_sync: string
+          sync_status: string
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          clickup_list_id: string
+          clickup_task_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_sync?: string
+          sync_status?: string
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          clickup_list_id?: string
+          clickup_task_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_sync?: string
+          sync_status?: string
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string | null
