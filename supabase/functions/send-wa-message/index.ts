@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,6 +82,37 @@ serve(async (req) => {
     }
 
     console.log('Message sent successfully:', result);
+
+    // Save the sent message to database
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      const messageData = {
+        wa_message_id: result.messages?.[0]?.id || null,
+        wa_from: null, // Outbound message, so from is null
+        wa_to: to,
+        wa_phone_number_id: phoneNumberId,
+        direction: 'outbound',
+        body: text,
+        wa_timestamp: new Date().toISOString(),
+        raw: result,
+        created_at: new Date().toISOString()
+      };
+
+      const { error: dbError } = await supabase
+        .from('messages')
+        .insert([messageData]);
+
+      if (dbError) {
+        console.error('Error saving message to database:', dbError);
+      } else {
+        console.log('Message saved to database successfully');
+      }
+    } catch (dbError) {
+      console.error('Database save error:', dbError);
+    }
 
     // Return success response
     return new Response(

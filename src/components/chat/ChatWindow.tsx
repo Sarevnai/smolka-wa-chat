@@ -106,22 +106,8 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           description: "Sua mensagem foi enviada com sucesso!",
         });
         
-        // Add optimistic message to UI
-        const optimisticMessage: MessageRow = {
-          id: Date.now(), // Temporary ID
-          wa_message_id: null,
-          wa_from: null,
-          wa_to: phoneNumber,
-          wa_phone_number_id: null,
-          direction: "outbound",
-          body: text.trim(),
-          wa_timestamp: new Date().toISOString(),
-          raw: null,
-          created_at: new Date().toISOString(),
-        };
-        
-        setMessages(prev => [...prev, optimisticMessage]);
-        setTimeout(scrollToBottom, 100);
+        // Message will be added via realtime subscription from database
+        // No need for optimistic UI update anymore
       } else {
         throw new Error(result.error || "Erro ao enviar mensagem");
       }
