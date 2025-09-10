@@ -30,23 +30,63 @@ serve(async (req) => {
       );
     }
 
-    // For now, we'll simulate a successful send
-    // In a real implementation, you would:
-    // 1. Get WhatsApp API credentials from secrets
-    // 2. Make the actual API call to WhatsApp
-    // 3. Handle the response and errors properly
+    // Get WhatsApp API credentials from secrets
+    const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+    const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
     
-    console.log('Message would be sent to:', to);
-    console.log('Message content:', text);
+    if (!accessToken || !phoneNumberId) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Configuração do WhatsApp não encontrada' 
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
-    // Simulate some processing time
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Make the actual API call to WhatsApp
+    const whatsappUrl = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
+    const whatsappPayload = {
+      messaging_product: 'whatsapp',
+      to: to,
+      text: { body: text }
+    };
+
+    const response = await fetch(whatsappUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(whatsappPayload)
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      console.error('WhatsApp API error:', result);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Erro ao enviar mensagem via WhatsApp' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('Message sent successfully:', result);
 
     // Return success response
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Mensagem enviada com sucesso (simulado)' 
+        message: 'Mensagem enviada com sucesso' 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

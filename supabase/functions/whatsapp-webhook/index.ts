@@ -27,8 +27,9 @@ serve(async (req) => {
 
       console.log('Webhook verification request:', { mode, token, challenge });
 
-      // In production, verify the token matches your configured verify token
-      if (mode === 'subscribe' && challenge) {
+      // Verify the token matches your configured verify token
+      const verifyToken = Deno.env.get('WHATSAPP_VERIFY_TOKEN');
+      if (mode === 'subscribe' && token === verifyToken && challenge) {
         console.log('Webhook verified successfully');
         return new Response(challenge, { headers: corsHeaders });
       }
