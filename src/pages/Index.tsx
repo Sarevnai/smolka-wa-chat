@@ -1,10 +1,13 @@
 import { Link } from "react-router-dom";
-import { MessageCircle, Send, ArrowRight } from "lucide-react";
+import { MessageCircle, Send, ArrowRight, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Layout from "@/components/Layout";
+import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
+  const { user } = useAuth();
+
   return (
     <Layout>
       <div className="max-w-4xl mx-auto">
@@ -23,19 +26,31 @@ const Index = () => {
             Visualize mensagens recebidas e envie novas mensagens facilmente.
           </p>
           <div className="flex gap-4 justify-center">
-            <Button asChild size="lg" className="bg-gradient-primary">
-              <Link to="/inbox">
-                <MessageCircle className="mr-2 h-4 w-4" />
-                Ver Mensagens
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link to="/send">
-                <Send className="mr-2 h-4 w-4" />
-                Enviar Mensagem
-              </Link>
-            </Button>
+            {user ? (
+              <>
+                <Button asChild size="lg" className="bg-gradient-primary">
+                  <Link to="/inbox">
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Ver Mensagens
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link to="/send">
+                    <Send className="mr-2 h-4 w-4" />
+                    Enviar Mensagem
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <Button asChild size="lg" className="bg-gradient-primary">
+                <Link to="/auth">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Fazer Login
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
 
