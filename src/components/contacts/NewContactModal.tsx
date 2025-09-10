@@ -191,7 +191,7 @@ export function NewContactModal({ open, onOpenChange }: NewContactModalProps) {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="rating">Classificação (Corações)</Label>
+                <Label htmlFor="rating">Classificação</Label>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: 5 }, (_, i) => (
                     <button

@@ -241,7 +241,7 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
               <CardContent className="space-y-4">
                 {contact.rating && (
                   <div>
-                    <div className="text-sm font-medium mb-2">Classificação (Corações)</div>
+                    <div className="text-sm font-medium mb-2">Classificação</div>
                     <div className="flex items-center gap-1">
                       {renderHearts(contact.rating)}
                     </div>
