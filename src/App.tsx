@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import Inbox from "./pages/Inbox";
 import Chat from "./pages/Chat";
 import Send from "./pages/Send";
+import Contacts from "./pages/Contacts";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +25,8 @@ const App = () => (
           <Route path="/chat" element={<Chat />} />
           <Route path="/chat/:phoneNumber" element={<Chat />} />
           <Route path="/send" element={<Send />} />
+          <Route path="/contacts" element={<Contacts />} />
+          <Route path="/reports" element={<Reports />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

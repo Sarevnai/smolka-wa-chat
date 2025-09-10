@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
-import { MessageCircle, Send, Home } from "lucide-react";
+import { MessageCircle, Send, Home, Inbox, Users, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -30,56 +31,102 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Navigation */}
-      <nav className="border-b bg-secondary/30">
+      <nav className="border-b bg-card shadow-sm">
         <div className="container mx-auto px-4">
-          <div className="flex space-x-8">
+          <div className="flex space-x-1">
+            {/* Dashboard/Home */}
             <Link
               to="/"
               className={cn(
-                "flex items-center space-x-2 py-4 text-sm font-medium border-b-2 transition-colors",
+                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200",
                 location.pathname === "/"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
               )}
             >
-              <Home className="h-4 w-4" />
-              <span>Home</span>
+              <Home className="h-5 w-5" />
+              <span>Dashboard</span>
             </Link>
+
+            {/* Inbox */}
             <Link
               to="/inbox"
               className={cn(
-                "flex items-center space-x-2 py-4 text-sm font-medium border-b-2 transition-colors",
+                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200 relative",
                 location.pathname === "/inbox"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
               )}
             >
-              <MessageCircle className="h-4 w-4" />
+              <Inbox className="h-5 w-5" />
               <span>Inbox</span>
+              <Badge 
+                variant="secondary" 
+                className={cn(
+                  "ml-2 text-xs px-2 py-0.5",
+                  location.pathname === "/inbox" 
+                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    : "bg-primary/10 text-primary"
+                )}
+              >
+                New
+              </Badge>
             </Link>
+
+            {/* Conversas */}
             <Link
               to="/chat"
               className={cn(
-                "flex items-center space-x-2 py-4 text-sm font-medium border-b-2 transition-colors",
+                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200",
                 location.pathname === "/chat" || location.pathname.startsWith('/chat/')
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
               )}
             >
-              <MessageCircle className="h-4 w-4" />
-              <span>Chat</span>
+              <MessageCircle className="h-5 w-5" />
+              <span>Conversas</span>
             </Link>
+
+            {/* Enviar Mensagem */}
             <Link
               to="/send"
               className={cn(
-                "flex items-center space-x-2 py-4 text-sm font-medium border-b-2 transition-colors",
+                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200",
                 location.pathname === "/send"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
               )}
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-5 w-5" />
               <span>Enviar</span>
+            </Link>
+
+            {/* Contatos - Nova seção CRM */}
+            <Link
+              to="/contacts"
+              className={cn(
+                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200",
+                location.pathname === "/contacts"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              )}
+            >
+              <Users className="h-5 w-5" />
+              <span>Contatos</span>
+            </Link>
+
+            {/* Relatórios - Nova seção CRM */}
+            <Link
+              to="/reports"
+              className={cn(
+                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200",
+                location.pathname === "/reports"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+              )}
+            >
+              <BarChart3 className="h-5 w-5" />
+              <span>Relatórios</span>
             </Link>
           </div>
         </div>
