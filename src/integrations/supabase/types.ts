@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      clickup_config: {
+        Row: {
+          api_token: string
+          created_at: string
+          id: string
+          inquilinos_list_id: string
+          proprietarios_list_id: string
+          space_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          api_token: string
+          created_at?: string
+          id?: string
+          inquilinos_list_id: string
+          proprietarios_list_id: string
+          space_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          api_token?: string
+          created_at?: string
+          id?: string
+          inquilinos_list_id?: string
+          proprietarios_list_id?: string
+          space_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       clickup_integration: {
         Row: {
           clickup_list_id: string

@@ -13,22 +13,8 @@ const priorityMap = {
   "baixa": 4    // Low
 };
 
-const statusMap = {
-  proprietario: {
-    "recebido": "Open",
-    "em-analise": "in progress", 
-    "em-andamento": "in review",
-    "aguardando": "blocked",
-    "resolvido": "complete"
-  },
-  inquilino: {
-    "recebido": "Open",
-    "triagem": "in progress",
-    "em-execucao": "in review", 
-    "aguardando-pagamento": "blocked",
-    "concluido": "complete"
-  }
-};
+// Removed status mapping to avoid "Status not found" errors
+// ClickUp will use the existing status or default status
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -86,18 +72,13 @@ serve(async (req) => {
       updateData.priority = priorityMap[updates.priority as keyof typeof priorityMap];
     }
 
-    if (updates.stage && updates.type) {
-      updateData.status = statusMap[updates.type as keyof typeof statusMap][updates.stage] || "Open";
-    }
-
+    // Skip status updates to avoid "Status not found" errors
+    
     if (updates.assignedTo) {
-      // This would need the actual ClickUp user ID
-      // For now, we'll update it as a custom field
-      updateData.custom_fields = updateData.custom_fields || [];
-      updateData.custom_fields.push({
-        id: "assigned_to",
-        value: updates.assignedTo
-      });
+      // Include assignedTo in description instead of custom field
+      if (updateData.description) {
+        updateData.description += `\n\n**Responsável:** ${updates.assignedTo}`;
+      }
     }
 
     // Update task in ClickUp

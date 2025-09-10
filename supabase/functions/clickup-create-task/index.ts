@@ -34,22 +34,8 @@ const priorityMap = {
   "baixa": 4    // Low
 };
 
-const statusMap = {
-  proprietario: {
-    "recebido": "Open",
-    "em-analise": "in progress", 
-    "em-andamento": "in review",
-    "aguardando": "blocked",
-    "resolvido": "complete"
-  },
-  inquilino: {
-    "recebido": "Open",
-    "triagem": "in progress",
-    "em-execucao": "in review", 
-    "aguardando-pagamento": "blocked",
-    "concluido": "complete"
-  }
-};
+// Removed status mapping to avoid "Status not found" errors
+// ClickUp will use the default status of the list
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -74,57 +60,30 @@ serve(async (req) => {
       );
     }
 
-    // Prepare task data for ClickUp
+    // Prepare simplified task data for ClickUp (avoiding custom field errors)
     const taskData = {
       name: ticket.title,
-      description: `**Descrição:** ${ticket.description}\n\n**Contato:** ${ticket.phone}${ticket.email ? ` | ${ticket.email}` : ''}\n\n**Último Contato:** ${ticket.lastContact}\n\n**Fonte:** ${ticket.source}`,
+      description: `**Descrição:** ${ticket.description}
+
+**Detalhes do Ticket:**
+• **ID:** ${ticket.id}
+• **Contato:** ${ticket.phone}${ticket.email ? ` | ${ticket.email}` : ''}
+• **Tipo:** ${ticket.type}
+• **Categoria:** ${ticket.category}
+• **Prioridade:** ${ticket.priority}
+• **Stage:** ${ticket.stage}
+• **Último Contato:** ${ticket.lastContact}
+• **Fonte:** ${ticket.source}
+
+**Propriedade:**
+• **Código:** ${ticket.property.code}
+• **Endereço:** ${ticket.property.address}
+• **Tipo:** ${ticket.property.type}
+
+${ticket.value ? `**Valor:** R$ ${ticket.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
+${ticket.assignedTo ? `**Responsável:** ${ticket.assignedTo}` : ''}`,
       priority: priorityMap[ticket.priority as keyof typeof priorityMap],
-      status: statusMap[ticket.type as keyof typeof statusMap][ticket.stage] || "Open",
-      tags: [ticket.category, ticket.type, ticket.property.type],
-      custom_fields: [
-        {
-          id: "phone", // This would need to be the actual custom field ID from ClickUp
-          value: ticket.phone
-        },
-        {
-          id: "email",
-          value: ticket.email || ""
-        },
-        {
-          id: "property_code", 
-          value: ticket.property.code
-        },
-        {
-          id: "property_address",
-          value: ticket.property.address
-        },
-        {
-          id: "property_type",
-          value: ticket.property.type
-        },
-        {
-          id: "last_contact",
-          value: ticket.lastContact
-        },
-        {
-          id: "source",
-          value: ticket.source
-        }
-      ].filter(field => field.value) // Remove empty fields
-    };
-
-    if (ticket.value) {
-      taskData.custom_fields.push({
-        id: "value",
-        value: ticket.value.toString()
-      });
-    }
-
-    if (ticket.assignedTo) {
-      taskData.custom_fields.push({
-        id: "assigned_to",
-        value: ticket.assignedTo
-      });
+      tags: [ticket.category, ticket.type, ticket.property.type, ticket.stage].filter(Boolean)
     }
 
     // Create task in ClickUp

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Settings, ExternalLink, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ClickUpWorkspace {
   id: string;
@@ -41,34 +42,103 @@ export function ClickUpSettings() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Load saved configuration from localStorage
-    const savedConfig = localStorage.getItem('clickup_config');
-    if (savedConfig) {
-      const config = JSON.parse(savedConfig);
-      setApiToken(config.apiToken || '');
-      setSelectedWorkspace(config.workspaceId || '');
-      setSelectedSpace(config.spaceId || '');
-      setProprietariosList(config.proprietariosListId || '');
-      setInquilinosList(config.inquilinosListId || '');
-      if (config.apiToken) {
-        setConnected(true);
+    const loadConfiguration = async () => {
+      try {
+        // Try to load from database first
+        const { data, error } = await supabase
+          .from('clickup_config')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data && !error) {
+          setApiToken(data.api_token || '');
+          setSelectedWorkspace(data.workspace_id || '');
+          setSelectedSpace(data.space_id || '');
+          setProprietariosList(data.proprietarios_list_id || '');
+          setInquilinosList(data.inquilinos_list_id || '');
+          if (data.api_token) {
+            setConnected(true);
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('Error loading config from database:', error);
       }
-    }
+
+      // Fallback to localStorage
+      const savedConfig = localStorage.getItem('clickup_config');
+      if (savedConfig) {
+        const config = JSON.parse(savedConfig);
+        setApiToken(config.apiToken || '');
+        setSelectedWorkspace(config.workspaceId || '');
+        setSelectedSpace(config.spaceId || '');
+        setProprietariosList(config.proprietariosListId || '');
+        setInquilinosList(config.inquilinosListId || '');
+        if (config.apiToken) {
+          setConnected(true);
+        }
+      }
+    };
+
+    loadConfiguration();
   }, []);
 
-  const saveConfiguration = () => {
-    const config = {
-      apiToken,
-      workspaceId: selectedWorkspace,
-      spaceId: selectedSpace,
-      proprietariosListId: proprietariosList,
-      inquilinosListId: inquilinosList
-    };
-    localStorage.setItem('clickup_config', JSON.stringify(config));
-    toast({
-      title: "Configuração salva",
-      description: "As configurações do ClickUp foram salvas com sucesso.",
-    });
+  const saveConfiguration = async () => {
+    if (!apiToken || !selectedWorkspace || !selectedSpace || !proprietariosList || !inquilinosList) {
+      toast({
+        title: "Erro",
+        description: "Por favor, preencha todas as configurações antes de salvar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Save to database
+      const { error } = await supabase
+        .from('clickup_config')
+        .upsert({
+          api_token: apiToken,
+          workspace_id: selectedWorkspace,
+          space_id: selectedSpace,
+          proprietarios_list_id: proprietariosList,
+          inquilinos_list_id: inquilinosList
+        });
+
+      if (error) {
+        console.error('Error saving config:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao salvar configuração no banco de dados.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Also save to localStorage for backward compatibility
+      const config = {
+        apiToken,
+        workspaceId: selectedWorkspace,
+        spaceId: selectedSpace,
+        proprietariosListId: proprietariosList,
+        inquilinosListId: inquilinosList
+      };
+      localStorage.setItem('clickup_config', JSON.stringify(config));
+      
+      toast({
+        title: "Configuração salva",
+        description: "As configurações do ClickUp foram salvas com sucesso.",
+      });
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao salvar configuração.",
+        variant: "destructive"
+      });
+    }
   };
 
   const testConnection = async () => {

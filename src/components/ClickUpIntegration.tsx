@@ -57,13 +57,43 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
   const syncToClickUp = async () => {
     setLoading(true);
     try {
-      // Get ClickUp configuration from localStorage
-      const savedConfig = localStorage.getItem('clickup_config');
-      if (!savedConfig) {
+      // Get ClickUp configuration from database first, then localStorage fallback
+      let config;
+      
+      try {
+        const { data, error } = await supabase
+          .from('clickup_config')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data && !error) {
+          config = {
+            proprietariosListId: data.proprietarios_list_id,
+            inquilinosListId: data.inquilinos_list_id
+          };
+        }
+      } catch (error) {
+        console.error('Error loading config from database:', error);
+      }
+
+      // Fallback to localStorage
+      if (!config) {
+        const savedConfig = localStorage.getItem('clickup_config');
+        if (savedConfig) {
+          const parsedConfig = JSON.parse(savedConfig);
+          config = {
+            proprietariosListId: parsedConfig.proprietariosListId,
+            inquilinosListId: parsedConfig.inquilinosListId
+          };
+        }
+      }
+
+      if (!config) {
         throw new Error('ClickUp não configurado. Acesse a página ClickUp para configurar.');
       }
 
-      const config = JSON.parse(savedConfig);
       const listId = ticket.type === 'proprietario' 
         ? config.proprietariosListId 
         : config.inquilinosListId;
