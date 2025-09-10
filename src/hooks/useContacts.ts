@@ -125,6 +125,7 @@ export const useCreateContact = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['contact-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['contact-by-phone'] });
     }
   });
 };
@@ -156,6 +157,55 @@ export const useAddContract = () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['contact-stats'] });
     }
+  });
+};
+
+export const useDeleteContact = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (contactId: string) => {
+      // Delete contracts first (cascade delete)
+      const { error: contractsError } = await supabase
+        .from('contact_contracts')
+        .delete()
+        .eq('contact_id', contactId);
+
+      if (contractsError) throw contractsError;
+
+      // Delete contact
+      const { error: contactError } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', contactId);
+
+      if (contactError) throw contactError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['contact-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['contact-by-phone'] });
+    }
+  });
+};
+
+export const useContactByPhone = (phone?: string) => {
+  return useQuery({
+    queryKey: ['contact-by-phone', phone],
+    queryFn: async () => {
+      if (!phone) return null;
+      
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('id, name, phone, email, status')
+        .eq('phone', phone)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!phone,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
 

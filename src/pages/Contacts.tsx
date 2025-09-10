@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Search, Plus, MessageCircle, Phone, Mail, Calendar, FileText, Activity } from "lucide-react";
+import { Users, Search, Plus, MessageCircle, Phone, Mail, Calendar, FileText, Activity, Trash2 } from "lucide-react";
 import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
+import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
 import { Contact } from "@/types/contact";
 
 export default function Contacts() {
@@ -21,7 +22,7 @@ export default function Contacts() {
   const { data: stats, isLoading: statsLoading } = useContactStats();
 
   const handleContactClick = (contact: Contact) => {
-    navigate(`/chat?phone=${contact.phone}`);
+    navigate(`/chat/${contact.phone}`);
   };
 
   const getInitials = (name?: string, phone?: string) => {
@@ -280,6 +281,16 @@ export default function Contacts() {
                       >
                         <Phone className="h-4 w-4" />
                       </Button>
+                      <DeleteContactDialog contact={contact}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </DeleteContactDialog>
                     </div>
                   </div>
                 </CardContent>

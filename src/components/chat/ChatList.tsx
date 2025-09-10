@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { ConversationItem } from "./ConversationItem";
 import { supabase } from "@/lib/supabaseClient";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ interface Conversation {
   lastMessage: MessageRow;
   messageCount: number;
   unreadCount: number;
+  contactName?: string;
 }
 
 interface ChatListProps {
@@ -117,7 +119,8 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   }, []);
 
   const filteredConversations = conversations.filter(conversation =>
-    conversation.phoneNumber.toLowerCase().includes(searchQuery.toLowerCase())
+    conversation.phoneNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (conversation.contactName && conversation.contactName.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const formatLastMessageTime = (dateString: string) => {
@@ -184,44 +187,15 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         ) : (
           <div className="p-2">
             {filteredConversations.map((conversation) => (
-              <div
+              <ConversationItem
                 key={conversation.phoneNumber}
+                phoneNumber={conversation.phoneNumber}
+                lastMessage={conversation.lastMessage}
+                messageCount={conversation.messageCount}
+                unreadCount={conversation.unreadCount}
+                isSelected={selectedContact === conversation.phoneNumber}
                 onClick={() => onContactSelect(conversation.phoneNumber)}
-                className={cn(
-                  "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-muted/50",
-                  selectedContact === conversation.phoneNumber && "bg-primary/10 border border-primary/20"
-                )}
-              >
-                <Avatar className="h-12 w-12">
-                  <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                    {getInitials(conversation.phoneNumber)}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="font-medium text-foreground truncate">
-                      {conversation.phoneNumber}
-                    </p>
-                    <span className="text-xs text-muted-foreground">
-                      {formatLastMessageTime(conversation.lastMessage.wa_timestamp || conversation.lastMessage.created_at || "")}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground truncate">
-                      {conversation.lastMessage.direction === "outbound" && "Você: "}
-                      {truncateMessage(conversation.lastMessage.body || "")}
-                    </p>
-                    
-                    {conversation.unreadCount > 0 && (
-                      <Badge variant="default" className="ml-2 h-5 min-w-5 text-xs">
-                        {conversation.unreadCount}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
+              />
             ))}
           </div>
         )}
