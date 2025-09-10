@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/hooks/useAuth";
-
 const Index = () => {
-  const { user } = useAuth();
-
-  return (
-    <Layout>
+  const {
+    user
+  } = useAuth();
+  return <Layout>
       <div className="max-w-4xl mx-auto">
         {/* Hero Section */}
         <div className="text-center mb-12">
@@ -18,16 +17,13 @@ const Index = () => {
               <MessageCircle className="h-10 w-10 text-white" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-foreground mb-4">
-            Smolka WhatsApp Inbox
-          </h1>
+          <h1 className="text-4xl font-bold text-foreground mb-4">Atendimento ADM - Smolka Imóveis</h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Gerencie suas mensagens do WhatsApp de forma eficiente com nossa interface limpa e moderna. 
             Visualize mensagens recebidas e envie novas mensagens facilmente.
           </p>
           <div className="flex gap-4 justify-center">
-            {user ? (
-              <>
+            {user ? <>
                 <Button asChild size="lg" className="bg-gradient-primary">
                   <Link to="/inbox">
                     <MessageCircle className="mr-2 h-4 w-4" />
@@ -41,16 +37,13 @@ const Index = () => {
                     Enviar Mensagem
                   </Link>
                 </Button>
-              </>
-            ) : (
-              <Button asChild size="lg" className="bg-gradient-primary">
+              </> : <Button asChild size="lg" className="bg-gradient-primary">
                 <Link to="/auth">
                   <LogIn className="mr-2 h-4 w-4" />
                   Fazer Login
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
-              </Button>
-            )}
+              </Button>}
           </div>
         </div>
 
@@ -95,8 +88,6 @@ const Index = () => {
           </Card>
         </div>
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default Index;
