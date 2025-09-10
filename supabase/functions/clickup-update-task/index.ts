@@ -13,9 +13,6 @@ const priorityMap = {
   "baixa": 4    // Low
 };
 
-// Removed status mapping to avoid "Status not found" errors
-// ClickUp will use the existing status or default status
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -57,7 +54,7 @@ serve(async (req) => {
       );
     }
 
-    // Prepare update data for ClickUp
+    // Prepare simplified update data for ClickUp (avoid problematic fields)
     const updateData: any = {};
 
     if (updates.title) {
@@ -72,14 +69,10 @@ serve(async (req) => {
       updateData.priority = priorityMap[updates.priority as keyof typeof priorityMap];
     }
 
-    // Skip status updates to avoid "Status not found" errors
-    
-    if (updates.assignedTo) {
-      // Include assignedTo in description instead of custom field
-      if (updateData.description) {
-        updateData.description += `\n\n**Responsável:** ${updates.assignedTo}`;
-      }
-    }
+    // Note: Status updates removed to avoid ClickUp API errors
+    // Users will need to update status manually in ClickUp for now
+
+    console.log('Updating ClickUp task with data:', JSON.stringify(updateData, null, 2));
 
     // Update task in ClickUp
     const clickupResponse = await fetch(`https://api.clickup.com/api/v2/task/${integration.clickup_task_id}`, {
@@ -112,6 +105,7 @@ serve(async (req) => {
     }
 
     const clickupTask = await clickupResponse.json();
+    console.log('ClickUp task updated successfully:', integration.clickup_task_id);
 
     // Update sync status to synced
     const { error: dbError } = await supabase

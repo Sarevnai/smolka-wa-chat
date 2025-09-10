@@ -34,9 +34,6 @@ const priorityMap = {
   "baixa": 4    // Low
 };
 
-// Removed status mapping to avoid "Status not found" errors
-// ClickUp will use the default status of the list
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -60,31 +57,36 @@ serve(async (req) => {
       );
     }
 
-    // Prepare simplified task data for ClickUp (avoiding custom field errors)
+    // Prepare comprehensive description with all ticket details
+    const fullDescription = `**Descrição:** ${ticket.description}
+
+**Detalhes do Contato:**
+• Telefone: ${ticket.phone}
+• Email: ${ticket.email || 'Não informado'}
+
+**Informações do Imóvel:**
+• Código: ${ticket.property.code}
+• Endereço: ${ticket.property.address}
+• Tipo: ${ticket.property.type}
+
+**Outras Informações:**
+• Último Contato: ${ticket.lastContact}
+• Fonte: ${ticket.source}
+• Categoria: ${ticket.category}
+• Estágio: ${ticket.stage}
+• Tipo de Cliente: ${ticket.type}
+${ticket.value ? `• Valor: R$ ${ticket.value}` : ''}
+${ticket.assignedTo ? `• Responsável: ${ticket.assignedTo}` : ''}`;
+
+    // Simplified task data to avoid ClickUp API errors
     const taskData = {
       name: ticket.title,
-      description: `**Descrição:** ${ticket.description}
-
-**Detalhes do Ticket:**
-• **ID:** ${ticket.id}
-• **Contato:** ${ticket.phone}${ticket.email ? ` | ${ticket.email}` : ''}
-• **Tipo:** ${ticket.type}
-• **Categoria:** ${ticket.category}
-• **Prioridade:** ${ticket.priority}
-• **Stage:** ${ticket.stage}
-• **Último Contato:** ${ticket.lastContact}
-• **Fonte:** ${ticket.source}
-
-**Propriedade:**
-• **Código:** ${ticket.property.code}
-• **Endereço:** ${ticket.property.address}
-• **Tipo:** ${ticket.property.type}
-
-${ticket.value ? `**Valor:** R$ ${ticket.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
-${ticket.assignedTo ? `**Responsável:** ${ticket.assignedTo}` : ''}`,
+      description: fullDescription,
       priority: priorityMap[ticket.priority as keyof typeof priorityMap],
-      tags: [ticket.category, ticket.type, ticket.property.type, ticket.stage].filter(Boolean)
-    }
+      tags: [ticket.category, ticket.type, ticket.property.type, ticket.stage]
+    };
+
+    console.log('Creating ClickUp task with data:', JSON.stringify(taskData, null, 2));
 
     // Create task in ClickUp
     const clickupResponse = await fetch(`https://api.clickup.com/api/v2/list/${listId}/task`, {
@@ -106,6 +108,7 @@ ${ticket.assignedTo ? `**Responsável:** ${ticket.assignedTo}` : ''}`,
     }
 
     const clickupTask = await clickupResponse.json();
+    console.log('ClickUp task created successfully:', clickupTask.id);
 
     // Store integration record in Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
