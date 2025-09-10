@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { cn } from "@/lib/utils";
+import { SparklesIcon } from "lucide-react";
 
 interface ConversationItemProps {
   phoneNumber: string;
@@ -64,6 +65,7 @@ export function ConversationItem({
 
   const displayName = contact?.name || phoneNumber;
   const displayInitials = getInitials(contact?.name, phoneNumber);
+  const isAutoDetectedName = contact?.name && contact.name !== phoneNumber && !contact.name.includes('@');
 
   return (
     <div
@@ -81,10 +83,15 @@ export function ConversationItem({
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <p className="font-medium text-foreground truncate">
-            {displayName}
-          </p>
-          <span className="text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 min-w-0">
+            <p className="font-medium text-foreground truncate">
+              {displayName}
+            </p>
+            {isAutoDetectedName && (
+              <SparklesIcon className="h-3 w-3 text-primary/60 flex-shrink-0" />
+            )}
+          </div>
+          <span className="text-xs text-muted-foreground flex-shrink-0">
             {formatLastMessageTime(lastMessage.wa_timestamp || lastMessage.created_at)}
           </span>
         </div>

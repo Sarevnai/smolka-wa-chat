@@ -9,6 +9,7 @@ import { Plus, X, Phone, Mail, FileText, Edit } from 'lucide-react';
 import { useUpdateContact, useAddContract } from '@/hooks/useContacts';
 import { Contact } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
+import { AutoNameDetectionBadge } from './AutoNameDetectionBadge';
 
 interface EditContactModalProps {
   open: boolean;
@@ -125,7 +126,10 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="name">Nome</Label>
+              {contact.name && <AutoNameDetectionBadge name={contact.name} />}
+            </div>
             <Input
               id="name"
               value={name}

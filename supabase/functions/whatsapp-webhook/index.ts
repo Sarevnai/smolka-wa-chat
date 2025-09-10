@@ -78,9 +78,47 @@ serve(async (req) => {
   }
 });
 
+function extractNameFromMessage(messageBody: string): string | null {
+  if (!messageBody) return null;
+  
+  const text = messageBody.toLowerCase().trim();
+  
+  // Patterns to detect name introductions
+  const namePatterns = [
+    /(?:^|[.\s])(?:oi|olá|ola|e ai|eai|hey|hello)[,\s]*(?:sou|eu sou|me chamo|meu nome é|é o|é a|aqui é o|aqui é a)\s+([a-záàâãéêíóôõúç\s]{2,30}?)(?:[.\s]|$)/i,
+    /(?:^|[.\s])(?:sou o|sou a|sou)\s+([a-záàâãéêíóôõúç\s]{2,30}?)(?:[.\s]|$)/i,
+    /(?:^|[.\s])(?:me chamo|meu nome é)\s+([a-záàâãéêíóôõúç\s]{2,30}?)(?:[.\s]|$)/i,
+    /(?:^|[.\s])(?:aqui é o|aqui é a|aqui quem fala é o|aqui quem fala é a)\s+([a-záàâãéêíóôõúç\s]{2,30}?)(?:[.\s]|$)/i,
+    /(?:^|[.\s])(?:é o|é a)\s+([a-záàâãéêíóôõúç\s]{2,30}?)(?:\s+(?:falando|aqui|mesmo))?(?:[.\s]|$)/i
+  ];
+  
+  for (const pattern of namePatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const extractedName = match[1].trim();
+      // Validate the extracted name (basic checks)
+      if (extractedName.length >= 2 && extractedName.length <= 30 && 
+          !extractedName.match(/^\d+$/) && // Not just numbers
+          !extractedName.includes('whatsapp') &&
+          !extractedName.includes('número')) {
+        // Capitalize properly
+        return extractedName
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+      }
+    }
+  }
+  
+  return null;
+}
+
 async function processIncomingMessage(message: any, value: any) {
   try {
     console.log('Processing message:', message);
+
+    const messageBody = message.text?.body || '';
+    const extractedName = extractNameFromMessage(messageBody);
 
     // Extract message data
     const messageData = {
@@ -89,7 +127,7 @@ async function processIncomingMessage(message: any, value: any) {
       wa_to: value.metadata?.phone_number_id || null,
       wa_phone_number_id: value.metadata?.phone_number_id || null,
       direction: 'inbound' as const,
-      body: message.text?.body || message.type || 'No content',
+      body: messageBody || message.type || 'No content',
       wa_timestamp: message.timestamp ? new Date(parseInt(message.timestamp) * 1000).toISOString() : new Date().toISOString(),
       raw: message,
     };
@@ -103,9 +141,49 @@ async function processIncomingMessage(message: any, value: any) {
       console.error('Error inserting message:', error);
     } else {
       console.log('Message inserted successfully:', messageData.wa_message_id);
+      
+      // If we extracted a name, try to update the contact
+      if (extractedName && message.from) {
+        console.log('Extracted name from message:', extractedName);
+        await updateContactWithExtractedName(message.from, extractedName);
+      }
     }
 
   } catch (error) {
     console.error('Error processing message:', error);
+  }
+}
+
+async function updateContactWithExtractedName(phoneNumber: string, extractedName: string) {
+  try {
+    // Check if contact exists and doesn't have a name yet
+    const { data: contact, error: fetchError } = await supabase
+      .from('contacts')
+      .select('id, name')
+      .eq('phone', phoneNumber)
+      .single();
+
+    if (fetchError) {
+      console.log('Contact not found or error fetching:', fetchError);
+      return;
+    }
+
+    // Only update if contact doesn't have a name or has a very generic name
+    if (!contact.name || contact.name === phoneNumber || contact.name.length <= 2) {
+      const { error: updateError } = await supabase
+        .from('contacts')
+        .update({ name: extractedName })
+        .eq('id', contact.id);
+
+      if (updateError) {
+        console.error('Error updating contact name:', updateError);
+      } else {
+        console.log(`Updated contact ${phoneNumber} with name: ${extractedName}`);
+      }
+    } else {
+      console.log(`Contact ${phoneNumber} already has name: ${contact.name}`);
+    }
+  } catch (error) {
+    console.error('Error in updateContactWithExtractedName:', error);
   }
 }
