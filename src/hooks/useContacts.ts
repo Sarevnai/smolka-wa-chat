@@ -156,6 +156,7 @@ export const useAddContract = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['contact-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['contact-by-phone'] });
     }
   });
 };
@@ -206,6 +207,32 @@ export const useContactByPhone = (phone?: string) => {
     },
     enabled: !!phone,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useUpdateContact = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ contactId, updates }: { 
+      contactId: string; 
+      updates: Partial<Pick<Contact, 'name' | 'phone' | 'email' | 'status'>>
+    }) => {
+      const { data, error } = await supabase
+        .from('contacts')
+        .update(updates)
+        .eq('id', contactId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['contact-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['contact-by-phone'] });
+    }
   });
 };
 

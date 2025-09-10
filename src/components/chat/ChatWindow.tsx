@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 import { useToast } from "@/hooks/use-toast";
+import { useContactByPhone } from "@/hooks/useContacts";
 import { supabase } from "@/lib/supabaseClient";
 import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
@@ -20,6 +21,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
+  const { data: contact } = useContactByPhone(phoneNumber);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -132,9 +134,18 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     }
   };
 
-  const getInitials = (phoneNumber: string) => {
-    return phoneNumber.slice(-2).toUpperCase();
+  const getInitials = (name?: string, phone?: string) => {
+    if (name) {
+      return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    }
+    if (phone) {
+      return phone.slice(-2);
+    }
+    return '??';
   };
+
+  const displayName = contact?.name || phoneNumber;
+  const displayInitials = getInitials(contact?.name, phoneNumber);
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -148,13 +159,15 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         
         <Avatar className="h-10 w-10">
           <AvatarFallback className="bg-primary/10 text-primary font-medium">
-            {getInitials(phoneNumber)}
+            {displayInitials}
           </AvatarFallback>
         </Avatar>
         
         <div className="flex-1">
-          <h3 className="font-medium text-foreground">{phoneNumber}</h3>
-          <p className="text-sm text-muted-foreground">WhatsApp</p>
+          <h3 className="font-medium text-foreground">{displayName}</h3>
+          <p className="text-sm text-muted-foreground">
+            {contact?.name ? phoneNumber : 'WhatsApp'}
+          </p>
         </div>
         
         <div className="flex items-center gap-2">

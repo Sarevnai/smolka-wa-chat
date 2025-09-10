@@ -7,15 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Search, Plus, MessageCircle, Phone, Mail, Calendar, FileText, Activity, Trash2 } from "lucide-react";
+import { Users, Search, Plus, MessageCircle, Phone, Mail, Calendar, FileText, Activity, Trash2, Edit } from "lucide-react";
 import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
+import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
 import { Contact } from "@/types/contact";
 
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewContactModal, setShowNewContactModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const navigate = useNavigate();
   
   const { data: contacts, isLoading } = useContacts(searchTerm);
@@ -281,6 +283,17 @@ export default function Contacts() {
                       >
                         <Phone className="h-4 w-4" />
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingContact(contact);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
                       <DeleteContactDialog contact={contact}>
                         <Button
                           size="sm"
@@ -343,6 +356,14 @@ export default function Contacts() {
           open={showNewContactModal} 
           onOpenChange={setShowNewContactModal} 
         />
+
+        {editingContact && (
+          <EditContactModal 
+            open={!!editingContact} 
+            onOpenChange={(open) => !open && setEditingContact(null)}
+            contact={editingContact}
+          />
+        )}
       </div>
     </Layout>
   );
