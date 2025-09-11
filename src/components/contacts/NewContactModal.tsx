@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { toast } from '@/hooks/use-toast';
 interface NewContactModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialPhone?: string;
 }
 
 interface ContractForm {
@@ -22,9 +23,9 @@ interface ContractForm {
   property_code: string;
 }
 
-export function NewContactModal({ open, onOpenChange }: NewContactModalProps) {
+export function NewContactModal({ open, onOpenChange, initialPhone }: NewContactModalProps) {
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(initialPhone || '');
   const [email, setEmail] = useState('');
   const [contactType, setContactType] = useState<'proprietario' | 'inquilino' | undefined>(undefined);
   const [description, setDescription] = useState('');
@@ -38,6 +39,13 @@ export function NewContactModal({ open, onOpenChange }: NewContactModalProps) {
   });
 
   const createContact = useCreateContact();
+
+  // Update phone when initialPhone changes
+  useEffect(() => {
+    if (initialPhone) {
+      setPhone(initialPhone);
+    }
+  }, [initialPhone]);
 
   const handleAddContract = () => {
     if (newContract.contract_number.trim()) {

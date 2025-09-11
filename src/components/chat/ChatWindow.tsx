@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { User, ArrowLeft, Phone, Building2, Key, FileText } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,6 +9,9 @@ import { ChatInput } from "./ChatInput";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
+import { NewContactModal } from "@/components/contacts/NewContactModal";
+import { DemandClassification } from "./DemandClassification";
+import { CreateTicketModal } from "./CreateTicketModal";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
@@ -24,6 +27,9 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showNewContact, setShowNewContact] = useState(false);
+  const [showDemandClassification, setShowDemandClassification] = useState(false);
+  const [showCreateTicket, setShowCreateTicket] = useState(false);
   const { toast } = useToast();
   const { data: contact } = useContactByPhone(phoneNumber);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -209,6 +215,24 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           <Button 
             variant="ghost" 
             size="sm"
+            onClick={() => setShowDemandClassification(true)}
+            title="Classificar demanda"
+          >
+            <Tags className="h-4 w-4" />
+          </Button>
+          {!contact && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setShowNewContact(true)}
+              title="Adicionar contato"
+            >
+              <UserPlus className="h-4 w-4" />
+            </Button>
+          )}
+          <Button 
+            variant="ghost" 
+            size="sm"
             onClick={() => setShowProfile(true)}
           >
             <User className="h-4 w-4" />
@@ -254,6 +278,31 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         phoneNumber={phoneNumber}
         open={showProfile}
         onOpenChange={setShowProfile}
+      />
+
+      <NewContactModal
+        open={showNewContact}
+        onOpenChange={setShowNewContact}
+        initialPhone={phoneNumber}
+      />
+
+      <DemandClassification
+        open={showDemandClassification}
+        onOpenChange={setShowDemandClassification}
+        phoneNumber={phoneNumber}
+        contact={contact}
+        onCreateTicket={() => {
+          setShowDemandClassification(false);
+          setShowCreateTicket(true);
+        }}
+      />
+
+      <CreateTicketModal
+        open={showCreateTicket}
+        onOpenChange={setShowCreateTicket}
+        phoneNumber={phoneNumber}
+        contact={contact}
+        messages={messages}
       />
     </div>
   );
