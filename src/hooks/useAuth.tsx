@@ -2,11 +2,12 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   user_id: string;
   full_name: string | null;
   role: 'admin' | 'user';
+  avatar_url?: string | null;
 }
 
 interface AuthContextType {
@@ -36,7 +37,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, user_id, full_name, role')
+        .select('id, user_id, full_name, role, avatar_url')
         .eq('user_id', userId)
         .single();
 

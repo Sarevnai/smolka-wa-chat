@@ -12,6 +12,7 @@ import Chat from "./pages/Chat";
 import Send from "./pages/Send";
 import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
+import Profile from "./pages/Profile";
 import ClickUpConfig from "./pages/ClickUpConfig";
 import NotFound from "./pages/NotFound";
 
@@ -63,6 +64,11 @@ const App = () => (
             <Route path="/reports" element={
               <ProtectedRoute>
                 <Reports />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             } />
             <Route path="/clickup" element={
