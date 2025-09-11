@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import { useNewMessages } from "@/hooks/useNewMessages";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, profile, signOut } = useAuth();
+  const { unreadCount } = useNewMessages();
 
   const handleSignOut = async () => {
     await signOut();
@@ -134,7 +136,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link
               to="/chat"
               className={cn(
-                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200",
+                "flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200 relative",
                 location.pathname === "/chat" || location.pathname.startsWith('/chat/')
                   ? "bg-primary text-primary-foreground shadow-md"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
@@ -142,6 +144,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <MessageCircle className="h-5 w-5" />
               <span>Conversas</span>
+              {unreadCount > 0 && (
+                <Badge 
+                  variant="secondary" 
+                  className={cn(
+                    "ml-2 text-xs px-2 py-0.5",
+                    location.pathname === "/chat" || location.pathname.startsWith('/chat/')
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-destructive text-destructive-foreground"
+                  )}
+                >
+                  {unreadCount}
+                </Badge>
+              )}
             </Link>
 
             {/* Enviar Mensagem */}
