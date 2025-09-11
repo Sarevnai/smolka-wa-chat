@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ConversationItem } from "./ConversationItem";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +55,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
           if (!conversationMap.has(phoneNumber)) {
             conversationMap.set(phoneNumber, []);
           }
-          conversationMap.get(phoneNumber)!.push(message);
+          conversationMap.get(phoneNumber)!.push(message as MessageRow);
         }
       });
 

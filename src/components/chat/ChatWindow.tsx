@@ -9,7 +9,7 @@ import { ChatInput } from "./ChatInput";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
 import { formatPhoneNumber } from "@/lib/utils";
@@ -46,7 +46,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
       if (error) throw error;
       
-      setMessages(data || []);
+      setMessages((data || []) as MessageRow[]);
       setTimeout(scrollToBottom, 100);
     } catch (error) {
       console.error("Error loading messages:", error);
