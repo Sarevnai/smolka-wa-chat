@@ -29,16 +29,28 @@ export function useDeleteConversation() {
         throw new Error('Usuário não autenticado');
       }
 
-      // Delete all messages for this phone number (corrected syntax)
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .or(`wa_from.eq."${phoneNumber}",wa_to.eq."${phoneNumber}"`);
+      // Normalize phone number (remove special characters)
+      const normalizedPhone = phoneNumber.replace(/\D/g, '');
+      
+      // Delete messages using two parallel operations for better reliability
+      // This approach is more robust than using .or() which can have issues
+      const [fromResult, toResult] = await Promise.all([
+        supabase.from('messages').delete({ count: 'exact' }).eq('wa_from', phoneNumber),
+        supabase.from('messages').delete({ count: 'exact' }).eq('wa_to', phoneNumber)
+      ]);
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      if (fromResult.error) {
+        console.error('Error deleting from messages:', fromResult.error);
+        throw new Error(`Erro ao excluir mensagens enviadas: ${fromResult.error.message}`);
       }
+
+      if (toResult.error) {
+        console.error('Error deleting to messages:', toResult.error);
+        throw new Error(`Erro ao excluir mensagens recebidas: ${toResult.error.message}`);
+      }
+
+      const totalDeleted = (fromResult.count || 0) + (toResult.count || 0);
+      console.log(`Successfully deleted ${totalDeleted} messages for phone: ${phoneNumber}`);
 
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -47,10 +59,10 @@ export function useDeleteConversation() {
 
       toast({
         title: "Conversa excluída",
-        description: "A conversa foi excluída com sucesso.",
+        description: `${totalDeleted} mensagem(ns) foram excluídas com sucesso.`,
       });
 
-      return { success: true };
+      return { success: true, deletedCount: totalDeleted };
     } catch (error: any) {
       console.error('Error deleting conversation:', error);
       
