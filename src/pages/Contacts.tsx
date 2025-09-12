@@ -13,6 +13,7 @@ import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
 import { ImportContactsModal } from "@/components/ImportContactsModal";
+import { BulkMessageModal } from "@/components/contacts/BulkMessageModal";
 import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { Contact } from "@/types/contact";
 import { formatPhoneNumber } from "@/lib/utils";
@@ -23,6 +24,7 @@ export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewContactModal, setShowNewContactModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showBulkMessageModal, setShowBulkMessageModal] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -405,7 +407,11 @@ export default function Contacts() {
                 <Upload className="h-4 w-4" />
                 <span>Importar Contatos</span>
               </Button>
-              <Button variant="outline" className="justify-start space-x-2">
+              <Button 
+                variant="outline" 
+                className="justify-start space-x-2"
+                onClick={() => setShowBulkMessageModal(true)}
+              >
                 <MessageCircle className="h-4 w-4" />
                 <span>Mensagem em Massa</span>
               </Button>
@@ -429,6 +435,11 @@ export default function Contacts() {
             // Refresh contacts list after successful import
             window.location.reload();
           }}
+        />
+
+        <BulkMessageModal
+          open={showBulkMessageModal}
+          onOpenChange={setShowBulkMessageModal}
         />
 
          {editingContact && (
