@@ -56,6 +56,7 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
 
   const syncToClickUp = async () => {
     setLoading(true);
+    setIntegrationStatus({ status: 'pending' });
     try {
       // Get ClickUp configuration from database first, then localStorage fallback
       let config;
@@ -145,23 +146,39 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
     if (!integrationStatus.clickup_task_id) return;
 
     setLoading(true);
+    setIntegrationStatus(prev => ({ ...prev, status: 'pending' }));
+    
     try {
-      const response = await supabase.functions.invoke('clickup-update-task', {
+      // Update general fields
+      const updateResponse = await supabase.functions.invoke('clickup-update-task', {
         body: { 
           ticketId: ticket.id, 
           updates: {
             title: ticket.title,
             description: ticket.description,
             priority: ticket.priority,
-            stage: ticket.stage,
             type: ticket.type,
             assignedTo: ticket.assigned_to
           }
         }
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to update ClickUp task');
+      if (updateResponse.error) {
+        throw new Error(updateResponse.error.message || 'Failed to update ClickUp task');
+      }
+
+      // Also update status if stage changed
+      const statusResponse = await supabase.functions.invoke('clickup-update-task-status', {
+        body: { 
+          ticketId: ticket.id, 
+          updates: {
+            stage: ticket.stage
+          }
+        }
+      });
+
+      if (statusResponse.error) {
+        console.warn('Status update failed:', statusResponse.error);
       }
 
       toast({
@@ -176,6 +193,7 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
 
     } catch (error) {
       console.error('Error updating ClickUp task:', error);
+      setIntegrationStatus(prev => ({ ...prev, status: 'error', error_message: error instanceof Error ? error.message : 'Update failed' }));
       toast({
         title: "Erro na atualização",
         description: error instanceof Error ? error.message : "Falha ao atualizar task no ClickUp",

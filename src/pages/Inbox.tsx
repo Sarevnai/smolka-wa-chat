@@ -16,6 +16,8 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
+  closestCenter,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
@@ -49,6 +51,8 @@ export default function Inbox() {
     if (over && active.id !== over.id) {
       const ticketId = active.id as string;
       const newStage = over.id as string;
+      
+      console.log('Drag ended:', { ticketId, newStage, overId: over.id });
       
       updateTicketMutation.mutate({
         id: ticketId,
@@ -219,8 +223,12 @@ export default function Inbox() {
     const stageTickets = getTicketsByStageAndType(stage.name, type);
     const urgentTickets = stageTickets.filter(ticket => ticket.priority === "critica" || ticket.priority === "alta");
     
+    const { setNodeRef } = useDroppable({
+      id: stage.name,
+    });
+    
     return (
-      <div className="flex-shrink-0 w-96 bg-muted/30 rounded-xl p-6 border">
+      <div ref={setNodeRef} className="flex-shrink-0 w-96 bg-muted/30 rounded-xl p-6 border">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <div 
@@ -244,7 +252,6 @@ export default function Inbox() {
         <SortableContext 
           items={stageTickets.map(t => t.id)} 
           strategy={verticalListSortingStrategy}
-          id={stage.name}
         >
           <div 
             className="space-y-4 max-h-[700px] overflow-y-auto pr-2 min-h-24"
@@ -305,6 +312,7 @@ export default function Inbox() {
           sensors={sensors}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          collisionDetection={closestCenter}
         >
           <Tabs defaultValue="proprietarios" className="w-full">
             <TabsList className="mb-8">

@@ -111,7 +111,7 @@ ${ticket.assigned_to ? `• Responsável: ${ticket.assigned_to}` : ''}`;
 
     // Store integration record in Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { error: dbError } = await supabase
@@ -120,7 +120,8 @@ ${ticket.assigned_to ? `• Responsável: ${ticket.assigned_to}` : ''}`;
         ticket_id: ticket.id,
         clickup_task_id: clickupTask.id,
         clickup_list_id: listId,
-        sync_status: 'synced'
+        sync_status: 'synced',
+        last_sync: new Date().toISOString()
       });
 
     if (dbError) {
