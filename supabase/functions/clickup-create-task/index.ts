@@ -15,16 +15,15 @@ interface TicketData {
   stage: string;
   category: string;
   priority: "baixa" | "media" | "alta" | "critica";
-  property: {
-    code: string;
-    address: string;
-    type: "apartamento" | "casa" | "comercial" | "terreno";
-  };
-  assignedTo?: string;
-  lastContact: string;
+  property_code?: string;
+  property_address?: string;
+  property_type?: "apartamento" | "casa" | "comercial" | "terreno";
+  assigned_to?: string;
+  last_contact: string;
   source: string;
   type: "proprietario" | "inquilino";
   value?: number;
+  contact_id?: string;
 }
 
 const priorityMap = {
@@ -65,25 +64,25 @@ serve(async (req) => {
 • Email: ${ticket.email || 'Não informado'}
 
 **Informações do Imóvel:**
-• Código: ${ticket.property.code}
-• Endereço: ${ticket.property.address}
-• Tipo: ${ticket.property.type}
+• Código: ${ticket.property_code || 'Não informado'}
+• Endereço: ${ticket.property_address || 'Não informado'}
+• Tipo: ${ticket.property_type || 'Não informado'}
 
 **Outras Informações:**
-• Último Contato: ${ticket.lastContact}
+• Último Contato: ${ticket.last_contact}
 • Fonte: ${ticket.source}
 • Categoria: ${ticket.category}
 • Estágio: ${ticket.stage}
 • Tipo de Cliente: ${ticket.type}
 ${ticket.value ? `• Valor: R$ ${ticket.value}` : ''}
-${ticket.assignedTo ? `• Responsável: ${ticket.assignedTo}` : ''}`;
+${ticket.assigned_to ? `• Responsável: ${ticket.assigned_to}` : ''}`;
 
     // Simplified task data to avoid ClickUp API errors
     const taskData = {
       name: ticket.title,
       description: fullDescription,
       priority: priorityMap[ticket.priority as keyof typeof priorityMap],
-      tags: [ticket.category, ticket.type, ticket.property.type, ticket.stage]
+      tags: [ticket.category, ticket.type, ticket.property_type || 'geral', ticket.stage].filter(Boolean)
     };
 
     console.log('Creating ClickUp task with data:', JSON.stringify(taskData, null, 2));
