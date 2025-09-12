@@ -7,6 +7,7 @@ import { ClickUpIntegration } from "@/components/ClickUpIntegration";
 import { cn } from "@/lib/utils";
 import { CATEGORIES, PRIORITY_CONFIG } from "@/types/crm";
 import { useTickets, useTicketStages, useUpdateTicket, Ticket, TicketStage } from "@/hooks/useTickets";
+import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
 import { useState } from "react";
 import {
   DndContext,
@@ -114,7 +115,10 @@ export default function Inbox() {
                 {ticket.source}
               </Badge>
             </div>
-            <span className="text-sm text-muted-foreground font-mono">#{ticket.id.slice(0, 8)}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground font-mono">#{ticket.id.slice(0, 8)}</span>
+              <DeleteTicketDialog ticket={ticket} />
+            </div>
           </div>
 
           <div>
