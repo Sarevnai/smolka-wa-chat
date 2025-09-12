@@ -204,7 +204,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {contact?.name ? formatPhoneNumber(phoneNumber) : 'WhatsApp'}
+            {contact?.name ? 'WhatsApp' : formatPhoneNumber(phoneNumber)}
           </p>
         </div>
         
