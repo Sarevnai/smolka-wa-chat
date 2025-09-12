@@ -175,6 +175,7 @@ export type Database = {
           created_at: string | null
           direction: string | null
           id: number
+          is_template: boolean | null
           media_caption: string | null
           media_filename: string | null
           media_mime_type: string | null
@@ -192,6 +193,7 @@ export type Database = {
           created_at?: string | null
           direction?: string | null
           id?: number
+          is_template?: boolean | null
           media_caption?: string | null
           media_filename?: string | null
           media_mime_type?: string | null
@@ -209,6 +211,7 @@ export type Database = {
           created_at?: string | null
           direction?: string | null
           id?: number
+          is_template?: boolean | null
           media_caption?: string | null
           media_filename?: string | null
           media_mime_type?: string | null

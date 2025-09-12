@@ -4,6 +4,8 @@ import { Check, CheckCheck } from "lucide-react";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { MediaMessage } from "./MediaMessage";
+import { InteractiveMessage } from "./InteractiveMessage";
+import { Badge } from "@/components/ui/badge";
 
 interface MessageBubbleProps {
   message: MessageRow;
@@ -13,6 +15,10 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, isLast }: MessageBubbleProps) {
   const isOutbound = message.direction === "outbound";
   const hasMedia = message.media_type && message.media_type !== 'text';
+  const isTemplate = message.is_template;
+  
+  // Try to parse interactive content from raw data
+  const interactive = message.raw?.interactive || null;
   
   const formatTime = (dateString: string) => {
     try {
@@ -43,6 +49,15 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
           ? "bg-primary text-primary-foreground rounded-br-md" 
           : "bg-card border border-border rounded-bl-md"
       )}>
+        {/* Template badge */}
+        {isTemplate && (
+          <div className={hasMedia ? "px-2 pt-2" : "mb-2"}>
+            <Badge variant="secondary" className="text-xs">
+              Mensagem de template
+            </Badge>
+          </div>
+        )}
+
         {/* Media Content */}
         {hasMedia && (
           <div className="mb-2">
@@ -52,6 +67,16 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
               caption={message.media_caption}
               filename={message.media_filename}
               mimeType={message.media_mime_type}
+              isOutbound={isOutbound}
+            />
+          </div>
+        )}
+        
+        {/* Interactive Message */}
+        {interactive && (
+          <div className={hasMedia ? "px-2 mb-2" : "mb-2"}>
+            <InteractiveMessage
+              interactive={interactive}
               isOutbound={isOutbound}
             />
           </div>

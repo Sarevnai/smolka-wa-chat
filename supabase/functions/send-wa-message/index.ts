@@ -107,7 +107,8 @@ serve(async (req) => {
         body: text,
         wa_timestamp: new Date().toISOString(),
         raw: result,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        is_template: !!interactive // Mark as template if interactive message
       };
 
       const { error: dbError } = await supabase

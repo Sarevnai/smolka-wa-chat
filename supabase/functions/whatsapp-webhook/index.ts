@@ -120,6 +120,33 @@ async function processIncomingMessage(message: any, value: any) {
     const messageBody = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || '';
     const mediaInfo = await extractMediaInfo(message, value);
 
+    // If media exists, download and store permanently
+    if (mediaInfo?.type && mediaInfo?.id) {
+      try {
+        console.log(`Downloading media for permanent storage: ${mediaInfo.id}`);
+        
+        const downloadResponse = await supabase.functions.invoke('download-media', {
+          body: {
+            mediaId: mediaInfo.id,
+            mediaType: mediaInfo.type,
+            filename: mediaInfo.filename
+          }
+        });
+
+        if (downloadResponse.data?.success) {
+          console.log(`Media downloaded successfully: ${downloadResponse.data.url}`);
+          mediaInfo.url = downloadResponse.data.url;
+          mediaInfo.filename = downloadResponse.data.filename;
+          mediaInfo.mimeType = downloadResponse.data.contentType;
+        } else {
+          console.error('Failed to download media:', downloadResponse.error);
+        }
+      } catch (error) {
+        console.error('Error downloading media:', error);
+        // Continue with original URL as fallback
+      }
+    }
+
     // Extract message data
     const messageData = {
       wa_message_id: message.id,
@@ -135,6 +162,7 @@ async function processIncomingMessage(message: any, value: any) {
       media_caption: mediaInfo?.caption || null,
       media_filename: mediaInfo?.filename || null,
       media_mime_type: mediaInfo?.mimeType || null,
+      is_template: false, // Incoming messages are not templates
     };
 
     // Insert into database

@@ -16,6 +16,7 @@ export type MessageRow = {
   media_caption: string | null;
   media_filename: string | null;
   media_mime_type: string | null;
+  is_template: boolean | null;
 };
 
 export type Period = "today" | "7d" | "30d" | "all";

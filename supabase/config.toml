@@ -1,5 +1,8 @@
 project_id = "wpjxsgxxhogzkkuznyke"
 
+[functions.download-media]
+verify_jwt = false
+
 [functions.send-wa-message]
 verify_jwt = false
 

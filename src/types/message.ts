@@ -14,6 +14,7 @@ export interface Message {
   media_caption?: string | null;
   media_filename?: string | null;
   media_mime_type?: string | null;
+  is_template?: boolean;
 }
 
 export interface SendMessageRequest {
