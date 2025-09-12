@@ -58,11 +58,6 @@ export default function Send() {
       const result: SendMessageResponse = await response.json();
 
       if (response.ok && result.success) {
-        toast({
-          title: "Mensagem enviada",
-          description: "Sua mensagem foi enviada com sucesso!",
-        });
-        
         // Clear form
         setPhoneNumber("");
         setMessage("");

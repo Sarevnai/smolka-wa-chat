@@ -141,11 +141,6 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
       const result = await response.json();
 
       if (result.success) {
-        toast({
-          title: "Mensagem enviada",
-          description: "Sua mensagem foi enviada com sucesso!",
-        });
-        
         // Message will be added via realtime subscription from database
         // No need for optimistic UI update anymore
       } else {
