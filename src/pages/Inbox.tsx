@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Building, Users, Phone, Mail, Calendar, DollarSign, MapPin, Clock, AlertTriangle, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,15 +5,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Layout from "@/components/Layout";
 import { ClickUpIntegration } from "@/components/ClickUpIntegration";
 import { cn } from "@/lib/utils";
-import { Ticket, CATEGORIES, PRIORITY_CONFIG } from "@/types/crm";
-import { mockTickets, stages } from "@/data/mockTickets";
+import { CATEGORIES, PRIORITY_CONFIG } from "@/types/crm";
+import { useTickets, useTicketStages, Ticket, TicketStage } from "@/hooks/useTickets";
 
 
 export default function Inbox() {
-  const [tickets] = useState<Ticket[]>(mockTickets);
+  const { data: proprietarioTickets = [], isLoading: loadingProprietario } = useTickets("proprietario");
+  const { data: inquilinoTickets = [], isLoading: loadingInquilino } = useTickets("inquilino");
+  const { data: proprietarioStages = [] } = useTicketStages("proprietario");
+  const { data: inquilinoStages = [] } = useTicketStages("inquilino");
 
   const getTicketsByStageAndType = (stage: string, type: "proprietario" | "inquilino") => {
-    return tickets.filter(ticket => ticket.stage === stage && ticket.type === type);
+    const tickets = type === "proprietario" ? proprietarioTickets : inquilinoTickets;
+    return tickets.filter(ticket => ticket.stage === stage);
   };
 
   const formatCurrency = (value: number) => {
@@ -52,71 +55,89 @@ export default function Inbox() {
     const priorityInfo = PRIORITY_CONFIG[ticket.priority];
     
     return (
-      <Card className="mb-4 hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4 border-l-primary/20 hover:border-l-primary">
-        <CardContent className="p-4">
-          {/* Header com prioridade e categoria */}
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center space-x-2">
-              <Badge className={cn("text-xs px-2 py-1", priorityInfo.color)}>
+      <Card className="mb-6 hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4 border-l-primary/20 hover:border-l-primary">
+        <CardHeader className="pb-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center space-x-3">
+              <Badge className={cn("text-sm px-3 py-1 font-medium", priorityInfo.color)}>
                 {priorityInfo.label}
               </Badge>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-sm px-2 py-1">
                 {ticket.source}
               </Badge>
             </div>
-            <div className="flex items-center space-x-2">
-              <MessageCircle className="h-4 w-4 text-muted-foreground" />
-            </div>
+            <span className="text-sm text-muted-foreground font-mono">#{ticket.id.slice(0, 8)}</span>
           </div>
 
-          {/* Título e ID */}
-          <div className="mb-3">
-            <div className="flex items-start justify-between mb-1">
-              <h3 className="font-semibold text-foreground leading-tight">{ticket.title}</h3>
-              <span className="text-xs text-muted-foreground font-mono">#{ticket.id}</span>
-            </div>
-            <Badge className={cn("text-xs", categoryInfo.color)}>
+          <div>
+            <h3 className="font-semibold text-lg text-foreground leading-tight mb-2">{ticket.title}</h3>
+            <Badge className={cn("text-sm px-3 py-1", categoryInfo.color)}>
               {categoryInfo.name}
             </Badge>
           </div>
-          
+        </CardHeader>
+
+        <CardContent className="pt-0 space-y-4">
           {/* Descrição */}
-          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{ticket.description}</p>
+          {ticket.description && (
+            <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">{ticket.description}</p>
+          )}
           
-          {/* Propriedade */}
-          <div className="flex items-center space-x-1 mb-2 text-sm">
-            <MapPin className="h-3 w-3 text-muted-foreground" />
-            <span className="text-muted-foreground">{ticket.property.address}</span>
-          </div>
-          
-          {/* Contato */}
-          <div className="flex items-center space-x-1 mb-2 text-sm">
-            <Phone className="h-3 w-3 text-muted-foreground" />
-            <span className="text-muted-foreground">{ticket.phone}</span>
+          <div className="grid grid-cols-1 gap-3">
+            {/* Propriedade */}
+            {ticket.property_address && (
+              <div className="flex items-center space-x-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground">{ticket.property_address}</span>
+              </div>
+            )}
+            
+            {/* Contato */}
+            <div className="flex items-center space-x-2 text-sm">
+              <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground font-medium">{ticket.phone}</span>
+            </div>
+            
+            {/* Código da Propriedade */}
+            {ticket.property_code && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Código:</span>
+                <Badge variant="outline" className="text-sm">{ticket.property_code}</Badge>
+              </div>
+            )}
           </div>
           
           {/* Valor se existir */}
           {ticket.value && (
-            <div className="flex items-center space-x-1 mb-2">
-              <DollarSign className="h-3 w-3 text-green-600" />
-              <span className="text-sm font-medium text-green-600">
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center space-x-2">
+                <DollarSign className="h-4 w-4 text-green-600" />
+                <span className="text-sm text-green-700">Valor envolvido:</span>
+              </div>
+              <span className="text-lg font-bold text-green-600">
                 {formatCurrency(ticket.value)}
               </span>
             </div>
           )}
           
           {/* Footer com responsável e último contato */}
-          <div className="flex items-center justify-between pt-2 border-t border-border/50 mb-3">
-            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-              {ticket.assignedTo && (
-                <>
-                  <span>Responsável: {ticket.assignedTo}</span>
-                </>
-              )}
-            </div>
-            <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span>{formatDateTime(ticket.lastContact)}</span>
+          <div className="pt-4 border-t space-y-3">
+            {ticket.assigned_to && (
+              <div className="flex items-center space-x-2 text-sm">
+                <span className="text-muted-foreground">Responsável:</span>
+                <Badge variant="secondary" className="text-sm">{ticket.assigned_to}</Badge>
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>Criado: {formatDate(ticket.created_at)}</span>
+              </div>
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>{formatDateTime(ticket.last_contact)}</span>
+              </div>
             </div>
           </div>
           
@@ -127,31 +148,39 @@ export default function Inbox() {
     );
   };
 
-  const PipelineColumn = ({ stage, type }: { stage: { id: string; name: string; color: string }, type: "proprietario" | "inquilino" }) => {
-    const stageTickets = getTicketsByStageAndType(stage.id, type);
+  const PipelineColumn = ({ stage, type }: { stage: TicketStage, type: "proprietario" | "inquilino" }) => {
+    const stageTickets = getTicketsByStageAndType(stage.name, type);
+    const urgentTickets = stageTickets.filter(ticket => ticket.priority === "critica" || ticket.priority === "alta");
     
     return (
-      <div className="flex-1 min-w-0">
-        <div className="mb-4">
-          <div className="flex items-center space-x-2 mb-2">
+      <div className="flex-shrink-0 w-96 bg-muted/30 rounded-xl p-6 border">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
             <div 
-              className="w-3 h-3 rounded-full" 
+              className="w-4 h-4 rounded-full" 
               style={{ backgroundColor: stage.color }}
             />
-            <h3 className="font-semibold text-foreground">{stage.name}</h3>
-            <Badge variant="secondary" className="text-xs">
+            <h3 className="font-semibold text-lg text-foreground">{stage.name}</h3>
+          </div>
+          <div className="flex gap-2">
+            <Badge variant="secondary" className="text-sm px-3 py-1 font-medium">
               {stageTickets.length}
             </Badge>
+            {urgentTickets.length > 0 && (
+              <Badge variant="destructive" className="text-sm px-3 py-1 font-medium">
+                {urgentTickets.length} urgentes
+              </Badge>
+            )}
           </div>
         </div>
         
-        <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+        <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
           {stageTickets.map((ticket) => (
             <TicketCard key={ticket.id} ticket={ticket} />
           ))}
           
           {stageTickets.length === 0 && (
-            <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center">
+            <div className="border-2 border-dashed border-muted rounded-lg p-12 text-center">
               <p className="text-sm text-muted-foreground">
                 Nenhum ticket neste estágio
               </p>
@@ -168,22 +197,28 @@ export default function Inbox() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">CRM - Gestão de Demandas</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-4xl font-bold text-foreground">CRM - Gestão de Demandas</h1>
+            <p className="text-muted-foreground text-lg mt-2">
               Gerencie demandas de proprietários e inquilinos dos imóveis administrados
             </p>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-right">
-              <div className="text-sm text-muted-foreground">Total de Tickets</div>
-              <div className="text-2xl font-bold text-foreground">{tickets.length}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-muted-foreground">Tickets Urgentes</div>
-              <div className="text-2xl font-bold text-orange-600">
-                {tickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}
+          <div className="flex items-center space-x-6">
+            <Card className="p-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-foreground">
+                  {proprietarioTickets.length + inquilinoTickets.length}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">Total de Tickets</p>
               </div>
-            </div>
+            </Card>
+            <Card className="p-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-orange-600">
+                  {[...proprietarioTickets, ...inquilinoTickets].filter(t => t.priority === 'alta' || t.priority === 'critica').length}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">Tickets Urgentes</p>
+              </div>
+            </Card>
           </div>
         </div>
 
@@ -193,58 +228,74 @@ export default function Inbox() {
               <Building className="h-4 w-4" />
               <span>Proprietários</span>
               <Badge variant="secondary" className="ml-2">
-                {tickets.filter(t => t.type === 'proprietario').length}
+                {proprietarioTickets.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="inquilinos" className="flex items-center space-x-2">
               <Users className="h-4 w-4" />
               <span>Inquilinos</span>
               <Badge variant="secondary" className="ml-2">
-                {tickets.filter(t => t.type === 'inquilino').length}
+                {inquilinoTickets.length}
               </Badge>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="proprietarios">
-            <div className="mb-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-foreground">Demandas de Proprietários</h2>
-                <div className="flex space-x-4 text-sm text-muted-foreground">
-                  <div className="flex items-center space-x-1">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span>Urgentes: {tickets.filter(t => t.type === 'proprietario' && (t.priority === 'alta' || t.priority === 'critica')).length}</span>
-                  </div>
-                  <span>Valor total: {formatCurrency(tickets.filter(t => t.type === 'proprietario').reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
-                </div>
+            {loadingProprietario ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">Carregando tickets...</p>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 overflow-x-auto">
-              {stages.proprietario.map((stage) => (
-                <PipelineColumn key={stage.id} stage={stage} type="proprietario" />
-              ))}
-            </div>
+            ) : (
+              <>
+                <div className="mb-8">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold text-foreground">Demandas de Proprietários</h2>
+                    <div className="flex space-x-6 text-sm text-muted-foreground">
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span>Urgentes: {proprietarioTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
+                      </div>
+                      <span>Valor total: {formatCurrency(proprietarioTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-8 overflow-x-auto pb-6">
+                  {proprietarioStages.map((stage) => (
+                    <PipelineColumn key={stage.id} stage={stage} type="proprietario" />
+                  ))}
+                </div>
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="inquilinos">
-            <div className="mb-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-foreground">Demandas de Inquilinos</h2>
-                <div className="flex space-x-4 text-sm text-muted-foreground">
-                  <div className="flex items-center space-x-1">
-                    <AlertTriangle className="h-4 w-4" />
-                    <span>Urgentes: {tickets.filter(t => t.type === 'inquilino' && (t.priority === 'alta' || t.priority === 'critica')).length}</span>
-                  </div>
-                  <span>Valor envolvido: {formatCurrency(tickets.filter(t => t.type === 'inquilino').reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
-                </div>
+            {loadingInquilino ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">Carregando tickets...</p>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 overflow-x-auto">
-              {stages.inquilino.map((stage) => (
-                <PipelineColumn key={stage.id} stage={stage} type="inquilino" />
-              ))}
-            </div>
+            ) : (
+              <>
+                <div className="mb-8">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold text-foreground">Demandas de Inquilinos</h2>
+                    <div className="flex space-x-6 text-sm text-muted-foreground">
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span>Urgentes: {inquilinoTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
+                      </div>
+                      <span>Valor envolvido: {formatCurrency(inquilinoTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-8 overflow-x-auto pb-6">
+                  {inquilinoStages.map((stage) => (
+                    <PipelineColumn key={stage.id} stage={stage} type="inquilino" />
+                  ))}
+                </div>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       </div>

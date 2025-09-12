@@ -265,6 +265,110 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_stages: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          order_index: number
+          ticket_type: string
+          updated_at: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          name: string
+          order_index: number
+          ticket_type: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          order_index?: number
+          ticket_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          contact_id: string | null
+          created_at: string
+          description: string | null
+          email: string | null
+          id: string
+          last_contact: string
+          phone: string
+          priority: string
+          property_address: string | null
+          property_code: string | null
+          property_type: string | null
+          source: string
+          stage: string
+          title: string
+          type: string
+          updated_at: string
+          value: number | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          category: string
+          contact_id?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          last_contact?: string
+          phone: string
+          priority: string
+          property_address?: string | null
+          property_code?: string | null
+          property_type?: string | null
+          source?: string
+          stage: string
+          title: string
+          type: string
+          updated_at?: string
+          value?: number | null
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          contact_id?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          last_contact?: string
+          phone?: string
+          priority?: string
+          property_address?: string | null
+          property_code?: string | null
+          property_type?: string | null
+          source?: string
+          stage?: string
+          title?: string
+          type?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

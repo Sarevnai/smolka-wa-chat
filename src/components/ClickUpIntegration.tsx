@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { ExternalLink, RefreshCw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import type { Ticket } from '@/types/crm';
+import type { Ticket } from '@/hooks/useTickets';
 
 interface ClickUpIntegrationProps {
   ticket: Ticket;
@@ -144,7 +144,7 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
             priority: ticket.priority,
             stage: ticket.stage,
             type: ticket.type,
-            assignedTo: ticket.assignedTo
+            assignedTo: ticket.assigned_to
           }
         }
       });

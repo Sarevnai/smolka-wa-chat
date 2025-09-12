@@ -10,10 +10,10 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileText, Phone, Building2, User, Calendar, AlertTriangle } from 'lucide-react';
 import { CATEGORIES, PRIORITY_CONFIG } from '@/types/crm';
-import { stages } from '@/data/mockTickets';
 import { Contact } from '@/types/contact';
 import { MessageRow } from '@/lib/messages';
 import { useToast } from '@/hooks/use-toast';
+import { useCreateTicket, useTicketStages } from '@/hooks/useTickets';
 
 interface CreateTicketModalProps {
   open: boolean;
@@ -37,7 +37,7 @@ export function CreateTicketModal({
   );
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPriority, setSelectedPriority] = useState<'baixa' | 'media' | 'alta' | 'critica'>('media');
-  const [selectedStage, setSelectedStage] = useState<string>('recebido');
+  const [selectedStage, setSelectedStage] = useState<string>('');
   const [assignedTo, setAssignedTo] = useState('');
   const [propertyCode, setPropertyCode] = useState('');
   const [propertyAddress, setPropertyAddress] = useState('');
@@ -46,11 +46,13 @@ export function CreateTicketModal({
   const [includeMessages, setIncludeMessages] = useState(true);
 
   const { toast } = useToast();
+  const createTicketMutation = useCreateTicket();
+  const { data: ticketStages } = useTicketStages(selectedType);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim() || !description.trim() || !selectedCategory) {
+    if (!title.trim() || !description.trim() || !selectedCategory || !selectedStage) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios",
@@ -59,56 +61,44 @@ export function CreateTicketModal({
       return;
     }
 
-    // Generate ticket ID
-    const ticketId = `${selectedType === 'proprietario' ? 'P' : 'I'}${Date.now().toString().slice(-3)}`;
-    
-    // Prepare ticket data
-    const ticketData = {
-      id: ticketId,
-      title: title.trim(),
-      description: description.trim(),
-      phone: phoneNumber,
-      email: contact?.email,
-      stage: selectedStage,
-      category: selectedCategory,
-      priority: selectedPriority,
-      property: {
-        code: propertyCode || `${selectedType.toUpperCase()}${Date.now().toString().slice(-3)}`,
-        address: propertyAddress || 'Endereço não informado',
-        type: propertyType
-      },
-      assignedTo: assignedTo || undefined,
-      lastContact: new Date().toISOString(),
-      source: "WhatsApp",
-      type: selectedType,
-      createdAt: new Date().toISOString(),
-      value: ticketValue ? parseFloat(ticketValue) : undefined
-    };
-
-    // Include recent messages if selected
+    // Prepare description with messages if selected
+    let finalDescription = description.trim();
     if (includeMessages && messages.length > 0) {
       const recentMessages = messages.slice(-5); // Last 5 messages
       const messagesText = recentMessages.map(msg => 
         `[${new Date(msg.wa_timestamp!).toLocaleString()}] ${msg.direction === 'inbound' ? 'Cliente' : 'Atendente'}: ${msg.body}`
       ).join('\n');
       
-      ticketData.description += `\n\n--- Mensagens Recentes ---\n${messagesText}`;
+      finalDescription += `\n\n--- Mensagens Recentes ---\n${messagesText}`;
     }
+    
+    // Prepare ticket data
+    const ticketData = {
+      title: title.trim(),
+      description: finalDescription,
+      phone: phoneNumber,
+      email: contact?.email || undefined,
+      stage: selectedStage,
+      category: selectedCategory,
+      priority: selectedPriority,
+      property_code: propertyCode || undefined,
+      property_address: propertyAddress || undefined,
+      property_type: propertyType,
+      assigned_to: assignedTo || undefined,
+      source: "WhatsApp",
+      type: selectedType,
+      value: ticketValue ? parseFloat(ticketValue) : undefined,
+      contact_id: contact?.id
+    };
 
     try {
-      // Here you would normally save to database
-      // For now, we'll just show success message
-      console.log('Ticket criado:', ticketData);
-      
-      toast({
-        title: "Ticket criado com sucesso!",
-        description: `Ticket ${ticketId} foi criado e será gerenciado no CRM.`,
-      });
+      await createTicketMutation.mutateAsync(ticketData);
       
       // Reset form
       setTitle('');
       setDescription('');
       setSelectedCategory('');
+      setSelectedStage('');
       setAssignedTo('');
       setPropertyCode('');
       setPropertyAddress('');
@@ -116,11 +106,7 @@ export function CreateTicketModal({
       
       onOpenChange(false);
     } catch (error) {
-      toast({
-        title: "Erro ao criar ticket",
-        description: "Tente novamente em alguns instantes.",
-        variant: "destructive"
-      });
+      console.error('Erro ao criar ticket:', error);
     }
   };
 
@@ -258,8 +244,8 @@ export function CreateTicketModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {stages[selectedType].map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
+                  {(ticketStages || []).map((stage) => (
+                    <SelectItem key={stage.id} value={stage.name}>
                       {stage.name}
                     </SelectItem>
                   ))}
@@ -373,9 +359,10 @@ export function CreateTicketModal({
             <Button
               type="submit"
               className="flex-1"
+              disabled={createTicketMutation.isPending}
             >
               <FileText className="h-4 w-4 mr-2" />
-              Criar Ticket
+              {createTicketMutation.isPending ? "Criando..." : "Criar Ticket"}
             </Button>
           </div>
         </form>
