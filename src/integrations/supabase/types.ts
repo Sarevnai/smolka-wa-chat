@@ -133,6 +133,7 @@ export type Database = {
           id: string
           name: string | null
           notes: string | null
+          onboarding_status: string | null
           phone: string
           rating: number | null
           status: Database["public"]["Enums"]["contact_status"]
@@ -146,6 +147,7 @@ export type Database = {
           id?: string
           name?: string | null
           notes?: string | null
+          onboarding_status?: string | null
           phone: string
           rating?: number | null
           status?: Database["public"]["Enums"]["contact_status"]
@@ -159,6 +161,7 @@ export type Database = {
           id?: string
           name?: string | null
           notes?: string | null
+          onboarding_status?: string | null
           phone?: string
           rating?: number | null
           status?: Database["public"]["Enums"]["contact_status"]
@@ -368,6 +371,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_templates: {
+        Row: {
+          category: string
+          components: Json
+          created_at: string
+          id: string
+          language: string
+          status: string
+          template_id: string
+          template_name: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          components: Json
+          created_at?: string
+          id?: string
+          language?: string
+          status?: string
+          template_id: string
+          template_name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          components?: Json
+          created_at?: string
+          id?: string
+          language?: string
+          status?: string
+          template_id?: string
+          template_name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

@@ -13,16 +13,16 @@ serve(async (req) => {
   }
 
   try {
-    const { to, text } = await req.json();
+    const { to, text, interactive } = await req.json();
 
-    console.log('Send message request:', { to, text });
+    console.log('Send message request:', { to, text, interactive });
 
     // Validate input
-    if (!to || !text) {
+    if (!to || (!text && !interactive)) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Campos "to" e "text" são obrigatórios' 
+          error: 'Campos "to" e "text" (ou interactive) são obrigatórios' 
         }),
         { 
           status: 400, 
@@ -50,11 +50,20 @@ serve(async (req) => {
 
     // Make the actual API call to WhatsApp
     const whatsappUrl = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
-    const whatsappPayload = {
+    
+    let whatsappPayload: any = {
       messaging_product: 'whatsapp',
-      to: to,
-      text: { body: text }
+      to: to
     };
+
+    // Add message content based on type
+    if (interactive) {
+      whatsappPayload.type = 'interactive';
+      whatsappPayload.interactive = interactive;
+    } else {
+      whatsappPayload.type = 'text';
+      whatsappPayload.text = { body: text };
+    }
 
     const response = await fetch(whatsappUrl, {
       method: 'POST',

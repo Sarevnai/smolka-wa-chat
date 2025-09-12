@@ -117,8 +117,7 @@ async function processIncomingMessage(message: any, value: any) {
   try {
     console.log('Processing message:', message);
 
-    const messageBody = message.text?.body || '';
-    const extractedName = extractNameFromMessage(messageBody);
+    const messageBody = message.text?.body || message.button?.text || '';
 
     // Extract message data
     const messageData = {
@@ -142,11 +141,8 @@ async function processIncomingMessage(message: any, value: any) {
     } else {
       console.log('Message inserted successfully:', messageData.wa_message_id);
       
-      // If we extracted a name, try to update the contact
-      if (extractedName && message.from) {
-        console.log('Extracted name from message:', extractedName);
-        await updateContactWithExtractedName(message.from, extractedName);
-      }
+      // Handle auto-triage flow
+      await handleAutoTriage(message.from, messageBody, message);
     }
 
   } catch (error) {
@@ -154,36 +150,190 @@ async function processIncomingMessage(message: any, value: any) {
   }
 }
 
-async function updateContactWithExtractedName(phoneNumber: string, extractedName: string) {
+async function handleAutoTriage(phoneNumber: string, messageBody: string, message: any) {
   try {
-    // Check if contact exists and doesn't have a name yet
-    const { data: contact, error: fetchError } = await supabase
+    // Get or create contact
+    const { data: contact, error: contactError } = await supabase
       .from('contacts')
-      .select('id, name')
+      .select('id, name, onboarding_status, contact_type')
       .eq('phone', phoneNumber)
-      .single();
+      .maybeSingle();
 
-    if (fetchError) {
-      console.log('Contact not found or error fetching:', fetchError);
+    if (contactError) {
+      console.error('Error fetching contact:', contactError);
       return;
     }
 
-    // Only update if contact doesn't have a name or has a very generic name
-    if (!contact.name || contact.name === phoneNumber || contact.name.length <= 2) {
-      const { error: updateError } = await supabase
+    let currentContact = contact;
+    
+    // Create contact if doesn't exist
+    if (!currentContact) {
+      const { data: newContact, error: createError } = await supabase
         .from('contacts')
-        .update({ name: extractedName })
-        .eq('id', contact.id);
+        .insert([{
+          phone: phoneNumber,
+          status: 'ativo',
+          onboarding_status: 'pending'
+        }])
+        .select()
+        .single();
 
-      if (updateError) {
-        console.error('Error updating contact name:', updateError);
-      } else {
-        console.log(`Updated contact ${phoneNumber} with name: ${extractedName}`);
+      if (createError) {
+        console.error('Error creating contact:', createError);
+        return;
       }
-    } else {
-      console.log(`Contact ${phoneNumber} already has name: ${contact.name}`);
+      currentContact = newContact;
     }
+
+    // Handle onboarding flow based on current status
+    const status = currentContact.onboarding_status || 'pending';
+    console.log(`Processing triage for ${phoneNumber}, status: ${status}`);
+
+    switch (status) {
+      case 'pending':
+        await sendWelcomeMessage(phoneNumber);
+        await updateContactStatus(phoneNumber, 'waiting_name');
+        break;
+
+      case 'waiting_name':
+        if (messageBody && messageBody.trim().length > 0) {
+          await updateContactName(phoneNumber, messageBody.trim());
+          await sendClassificationMessage(phoneNumber, messageBody.trim());
+          await updateContactStatus(phoneNumber, 'waiting_type');
+        }
+        break;
+
+      case 'waiting_type':
+        if (messageBody) {
+          const contactType = classifyContactType(messageBody);
+          if (contactType) {
+            await updateContactType(phoneNumber, contactType);
+            await updateContactStatus(phoneNumber, 'completed');
+            await sendConfirmationMessage(phoneNumber, contactType);
+          }
+        }
+        break;
+
+      case 'completed':
+        // Onboarding complete, check for name extraction from legacy messages
+        const extractedName = extractNameFromMessage(messageBody);
+        if (extractedName && (!currentContact.name || currentContact.name === phoneNumber)) {
+          await updateContactName(phoneNumber, extractedName);
+        }
+        console.log('Contact onboarding completed, processing normal message');
+        break;
+
+      default:
+        console.log('Unknown onboarding status:', status);
+    }
+
   } catch (error) {
-    console.error('Error in updateContactWithExtractedName:', error);
+    console.error('Error in handleAutoTriage:', error);
+  }
+}
+
+async function sendWelcomeMessage(phoneNumber: string) {
+  try {
+    await supabase.functions.invoke('send-wa-message', {
+      body: {
+        to: phoneNumber,
+        text: 'Olá! Seja bem-vindo(a)! Para melhor atendê-lo(a), qual é o seu nome?'
+      }
+    });
+  } catch (error) {
+    console.error('Error sending welcome message:', error);
+  }
+}
+
+async function sendClassificationMessage(phoneNumber: string, name: string) {
+  try {
+    await supabase.functions.invoke('send-wa-message', {
+      body: {
+        to: phoneNumber,
+        text: `Obrigado ${name}! Como posso ajudá-lo(a) hoje?`,
+        interactive: {
+          type: 'button',
+          body: { text: `Olá ${name}! Como posso ajudá-lo(a)?` },
+          action: {
+            buttons: [
+              {
+                type: 'reply',
+                reply: {
+                  id: 'proprietario',
+                  title: 'Sou Proprietário'
+                }
+              },
+              {
+                type: 'reply',
+                reply: {
+                  id: 'inquilino',
+                  title: 'Sou Inquilino'
+                }
+              }
+            ]
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error sending classification message:', error);
+  }
+}
+
+async function sendConfirmationMessage(phoneNumber: string, contactType: string) {
+  const typeText = contactType === 'proprietario' ? 'proprietário' : 'inquilino';
+  try {
+    await supabase.functions.invoke('send-wa-message', {
+      body: {
+        to: phoneNumber,
+        text: `Perfeito! Registrei você como ${typeText}. Agora posso ajudá-lo(a) com suas necessidades. Em que posso ser útil?`
+      }
+    });
+  } catch (error) {
+    console.error('Error sending confirmation message:', error);
+  }
+}
+
+function classifyContactType(message: string): string | null {
+  const text = message.toLowerCase();
+  if (text.includes('proprietário') || text.includes('proprietario') || text.includes('dono')) {
+    return 'proprietario';
+  }
+  if (text.includes('inquilino') || text.includes('locatário') || text.includes('locatario')) {
+    return 'inquilino';
+  }
+  return null;
+}
+
+async function updateContactStatus(phoneNumber: string, status: string) {
+  const { error } = await supabase
+    .from('contacts')
+    .update({ onboarding_status: status })
+    .eq('phone', phoneNumber);
+
+  if (error) {
+    console.error('Error updating contact status:', error);
+  }
+}
+
+async function updateContactName(phoneNumber: string, name: string) {
+  const { error } = await supabase
+    .from('contacts')
+    .update({ name })
+    .eq('phone', phoneNumber);
+
+  if (error) {
+    console.error('Error updating contact name:', error);
+  }
+}
+
+async function updateContactType(phoneNumber: string, contactType: string) {
+  const { error } = await supabase
+    .from('contacts')
+    .update({ contact_type: contactType })
+    .eq('phone', phoneNumber);
+
+  if (error) {
+    console.error('Error updating contact type:', error);
   }
 }
