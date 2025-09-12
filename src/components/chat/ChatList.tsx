@@ -111,6 +111,18 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
           loadConversations();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "messages",
+        },
+        () => {
+          // Reload conversations when messages are deleted
+          loadConversations();
+        }
+      )
       .subscribe();
 
     return () => {

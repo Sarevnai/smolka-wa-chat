@@ -1,8 +1,18 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useContactByPhone } from "@/hooks/useContacts";
+import { useDeleteConversation } from "@/hooks/useDeleteConversation";
 import { cn, formatPhoneNumber } from "@/lib/utils";
-import { SparklesIcon, Building2, Key, FileText } from "lucide-react";
+import { SparklesIcon, Building2, Key, FileText, MoreVertical, Trash2 } from "lucide-react";
+import { DeleteConversationDialog } from "./DeleteConversationDialog";
+import { useState } from "react";
 
 interface ConversationItemProps {
   phoneNumber: string;
@@ -27,6 +37,15 @@ export function ConversationItem({
   onClick
 }: ConversationItemProps) {
   const { data: contact } = useContactByPhone(phoneNumber);
+  const { deleteConversation, isDeleting } = useDeleteConversation();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const handleDeleteConversation = async () => {
+    const result = await deleteConversation(phoneNumber);
+    if (result.success) {
+      setShowDeleteDialog(false);
+    }
+  };
 
   const formatLastMessageTime = (dateString: string | null) => {
     if (!dateString) return "";
@@ -83,12 +102,12 @@ export function ConversationItem({
 
   return (
     <div
-      onClick={onClick}
       className={cn(
-        "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-muted/50",
+        "flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-muted/50 group",
         isSelected && "bg-primary/10 border border-primary/20"
       )}
     >
+      <div onClick={onClick} className="flex items-center gap-3 flex-1 cursor-pointer min-w-0">
       <Avatar className="h-12 w-12">
         <AvatarFallback className="bg-primary/10 text-primary font-medium">
           {displayInitials}
@@ -141,6 +160,41 @@ export function ConversationItem({
           </p>
         )}
       </div>
+      </div>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <MoreVertical className="h-4 w-4" />
+            <span className="sr-only">Abrir menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDeleteDialog(true);
+            }}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Excluir conversa
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <DeleteConversationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        phoneNumber={phoneNumber}
+        contactName={contact?.name}
+        onConfirm={handleDeleteConversation}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }
