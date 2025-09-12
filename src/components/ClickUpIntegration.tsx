@@ -214,88 +214,83 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              ClickUp Integration
-              {getStatusIcon()}
-            </CardTitle>
-            <CardDescription>
-              Sincronize este ticket com o ClickUp para melhor gerenciamento
-            </CardDescription>
-          </div>
-          {getStatusBadge()}
+    <div className="border border-border rounded-lg p-3 bg-card">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">ClickUp</span>
+          {getStatusIcon()}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {integrationStatus.status === 'not_synced' && (
+        {getStatusBadge()}
+      </div>
+
+      {integrationStatus.status === 'not_synced' && (
+        <Button 
+          onClick={syncToClickUp} 
+          disabled={loading}
+          size="sm"
+          className="w-full"
+        >
+          {loading ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Sincronizar"}
+        </Button>
+      )}
+
+      {integrationStatus.status === 'synced' && (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button 
+              onClick={updateClickUpTask} 
+              disabled={loading}
+              variant="outline"
+              size="sm"
+              className="flex-1"
+            >
+              {loading ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Atualizar"}
+            </Button>
+            <Button 
+              onClick={openInClickUp} 
+              variant="outline"
+              size="sm"
+              className="px-2"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          </div>
+          {integrationStatus.last_sync && (
+            <p className="text-xs text-muted-foreground">
+              Última sync: {new Date(integrationStatus.last_sync).toLocaleString('pt-BR', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {integrationStatus.status === 'error' && (
+        <div className="space-y-2">
+          <p className="text-xs text-red-600 truncate">
+            {integrationStatus.error_message}
+          </p>
           <Button 
             onClick={syncToClickUp} 
             disabled={loading}
+            variant="outline"
+            size="sm"
             className="w-full"
           >
-            {loading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-            Sincronizar com ClickUp
+            {loading ? <RefreshCw className="h-3 w-3 animate-spin" /> : "Retry"}
           </Button>
-        )}
+        </div>
+      )}
 
-        {integrationStatus.status === 'synced' && (
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <Button 
-                onClick={updateClickUpTask} 
-                disabled={loading}
-                variant="outline"
-                className="flex-1"
-              >
-                {loading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-                Atualizar Task
-              </Button>
-              <Button 
-                onClick={openInClickUp} 
-                variant="outline"
-                size="sm"
-                className="px-3"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </div>
-            {integrationStatus.last_sync && (
-              <p className="text-xs text-muted-foreground">
-                Última sincronização: {new Date(integrationStatus.last_sync).toLocaleString('pt-BR')}
-              </p>
-            )}
-          </div>
-        )}
-
-        {integrationStatus.status === 'error' && (
-          <div className="space-y-2">
-            <p className="text-sm text-red-600">
-              Erro: {integrationStatus.error_message}
-            </p>
-            <Button 
-              onClick={syncToClickUp} 
-              disabled={loading}
-              variant="outline"
-              className="w-full"
-            >
-              {loading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-              Tentar Novamente
-            </Button>
-          </div>
-        )}
-
-        {integrationStatus.status === 'pending' && (
-          <div className="text-center">
-            <RefreshCw className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground mt-2">
-              Sincronizando...
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {integrationStatus.status === 'pending' && (
+        <div className="text-center py-2">
+          <RefreshCw className="mx-auto h-4 w-4 animate-spin text-muted-foreground" />
+          <p className="text-xs text-muted-foreground mt-1">Sincronizando...</p>
+        </div>
+      )}
+    </div>
   );
 }

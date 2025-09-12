@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Layout from "@/components/Layout";
 import { ClickUpIntegration } from "@/components/ClickUpIntegration";
+import { ChatList } from "@/components/chat/ChatList";
 import { cn } from "@/lib/utils";
 import { CATEGORIES, PRIORITY_CONFIG } from "@/types/crm";
 import { useTickets, useTicketStages, Ticket, TicketStage } from "@/hooks/useTickets";
+import { useState } from "react";
 
 
 export default function Inbox() {
@@ -14,6 +16,7 @@ export default function Inbox() {
   const { data: inquilinoTickets = [], isLoading: loadingInquilino } = useTickets("inquilino");
   const { data: proprietarioStages = [] } = useTicketStages("proprietario");
   const { data: inquilinoStages = [] } = useTicketStages("inquilino");
+  const [selectedContact, setSelectedContact] = useState<string | undefined>();
 
   const getTicketsByStageAndType = (stage: string, type: "proprietario" | "inquilino") => {
     const tickets = type === "proprietario" ? proprietarioTickets : inquilinoTickets;
@@ -238,6 +241,10 @@ export default function Inbox() {
                 {inquilinoTickets.length}
               </Badge>
             </TabsTrigger>
+            <TabsTrigger value="conversas" className="flex items-center space-x-2">
+              <MessageCircle className="h-4 w-4" />
+              <span>Conversas</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="proprietarios">
@@ -296,6 +303,22 @@ export default function Inbox() {
                 </div>
               </>
             )}
+          </TabsContent>
+
+          <TabsContent value="conversas">
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-foreground">Conversas WhatsApp</h2>
+              <p className="text-muted-foreground mt-2">
+                Gerencie todas as conversas do WhatsApp. Você pode excluir conversas inteiras usando o menu de opções.
+              </p>
+            </div>
+            
+            <div className="max-w-md">
+              <ChatList 
+                onContactSelect={setSelectedContact} 
+                selectedContact={selectedContact} 
+              />
+            </div>
           </TabsContent>
         </Tabs>
       </div>
