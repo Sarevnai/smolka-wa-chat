@@ -178,7 +178,30 @@ serve(async (req) => {
 
     console.log('Starting contact import process...');
 
-    const lines = CSV_DATA.split('\n');
+    // Try to read CSV from request body; fallback to embedded CSV_DATA
+    let csvText = CSV_DATA;
+    try {
+      const contentType = req.headers.get('content-type') || '';
+      if (req.method === 'POST') {
+        if (contentType.includes('application/json')) {
+          const body = await req.json().catch(() => null);
+          if (body?.csv && typeof body.csv === 'string' && body.csv.trim().length > 0) {
+            csvText = body.csv;
+            console.log('Using uploaded CSV from JSON body');
+          }
+        } else {
+          const textBody = await req.text();
+          if (textBody && textBody.trim().length > 0) {
+            csvText = textBody;
+            console.log('Using uploaded CSV from text body');
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse request body, using fallback CSV_DATA:', e?.message);
+    }
+
+    const lines = csvText.split(/\r?\n/);
     console.log(`Found ${lines.length - 1} contacts to process`);
 
     const contacts: ContactData[] = [];

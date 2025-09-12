@@ -1,10 +1,11 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, CheckCircle, XCircle, Info } from "lucide-react";
 import { Progress } from "./ui/progress";
+import { Input } from "./ui/input";
 
 interface ImportResult {
   success: boolean;
@@ -29,20 +30,47 @@ export function ImportContactsModal({
 }: ImportContactsModalProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [csvText, setCsvText] = useState<string>('');
+  const [fileName, setFileName] = useState<string>('');
   const { toast } = useToast();
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    try {
+      const text = await file.text();
+      setCsvText(text);
+    } catch (err) {
+      console.error('Erro ao ler o arquivo CSV:', err);
+      toast({
+        title: 'Erro ao ler arquivo',
+        description: 'Não foi possível ler o conteúdo do CSV.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleImport = async () => {
     try {
+      if (!csvText?.trim()) {
+        toast({
+          title: 'Selecione um arquivo CSV',
+          description: 'Escolha o arquivo com todos os contatos antes de iniciar.',
+        });
+        return;
+      }
+
       setIsImporting(true);
       setImportResult(null);
 
       toast({
-        title: "Iniciando importação",
-        description: "Processando contatos do arquivo CSV...",
+        title: 'Iniciando importação',
+        description: 'Processando contatos do arquivo CSV...',
       });
 
       const { data, error } = await supabase.functions.invoke('import-contacts', {
-        body: {}
+        body: { csv: csvText }
       });
 
       if (error) {
@@ -53,25 +81,25 @@ export function ImportContactsModal({
       
       if (data.success) {
         toast({
-          title: "Importação concluída",
+          title: 'Importação concluída',
           description: data.summary,
         });
         
         onImportComplete?.();
       } else {
         toast({
-          title: "Erro na importação",
-          description: data.error || "Erro desconhecido",
-          variant: "destructive",
+          title: 'Erro na importação',
+          description: (data as any).error || 'Erro desconhecido',
+          variant: 'destructive',
         });
       }
 
     } catch (error) {
       console.error('Import error:', error);
       toast({
-        title: "Erro na importação",
-        description: "Falha ao importar contatos",
-        variant: "destructive",
+        title: 'Erro na importação',
+        description: 'Falha ao importar contatos',
+        variant: 'destructive',
       });
     } finally {
       setIsImporting(false);
@@ -100,7 +128,7 @@ export function ImportContactsModal({
                 <div className="flex items-start gap-3">
                   <Info className="h-5 w-5 text-blue-500 mt-0.5" />
                   <div className="space-y-2">
-                    <h3 className="font-medium">Arquivo CSV Detectado</h3>
+                    <h3 className="font-medium">Selecione o arquivo CSV</h3>
                     <p className="text-sm text-muted-foreground">
                       O sistema irá importar os contatos do arquivo CSV carregado, 
                       extraindo informações de contratos e classificando automaticamente 
@@ -114,6 +142,14 @@ export function ImportContactsModal({
                     </ul>
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Arquivo CSV</label>
+                <Input type="file" accept=".csv,text/csv" onChange={handleFileChange} disabled={isImporting} />
+                {fileName && (
+                  <p className="text-xs text-muted-foreground">Selecionado: {fileName} ({(csvText.length/1024).toFixed(1)} KB)</p>
+                )}
               </div>
 
               {isImporting && (
@@ -210,7 +246,7 @@ export function ImportContactsModal({
             {!importResult && (
               <Button 
                 onClick={handleImport}
-                disabled={isImporting}
+                disabled={isImporting || !csvText?.trim()}
               >
                 {isImporting ? 'Importando...' : 'Iniciar Importação'}
               </Button>
