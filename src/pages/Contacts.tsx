@@ -14,6 +14,7 @@ import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
 import { ImportContactsModal } from "@/components/ImportContactsModal";
 import { BulkMessageModal } from "@/components/contacts/BulkMessageModal";
+import { ContactFilters, ContactFiltersState } from "@/components/contacts/ContactFilters";
 import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { Contact } from "@/types/contact";
 import { formatPhoneNumber } from "@/lib/utils";
@@ -22,6 +23,7 @@ import Layout from "@/components/Layout";
 
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [filters, setFilters] = useState<ContactFiltersState>({});
   const [showNewContactModal, setShowNewContactModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showBulkMessageModal, setShowBulkMessageModal] = useState(false);
@@ -30,7 +32,7 @@ export default function Contacts() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const navigate = useNavigate();
   
-  const { data: contacts, isLoading } = useContacts(searchTerm);
+  const { data: contacts, isLoading } = useContacts(searchTerm, filters);
   const { data: stats, isLoading: statsLoading } = useContactStats();
 
   const handleContactClick = (contact: Contact) => {
@@ -178,7 +180,7 @@ export default function Contacts() {
           </div>
         )}
 
-        {/* Search and Filters */}
+        {/* Search */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center space-x-4">
@@ -197,6 +199,13 @@ export default function Contacts() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Filters */}
+        <ContactFilters 
+          filters={filters}
+          onFiltersChange={setFilters}
+          contactCount={contacts?.length}
+        />
 
         {/* Contacts Grid */}
         {isLoading ? (

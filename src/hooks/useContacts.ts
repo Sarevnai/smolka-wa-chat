@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Contact, Contract, ContactStats, CreateContactRequest } from '@/types/contact';
+import { ContactFiltersState } from '@/components/contacts/ContactFilters';
 
-export const useContacts = (searchTerm?: string) => {
+export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) => {
   return useQuery({
-    queryKey: ['contacts', searchTerm],
+    queryKey: ['contacts', searchTerm, filters],
     queryFn: async () => {
       let query = supabase
         .from('contacts')
@@ -14,9 +15,9 @@ export const useContacts = (searchTerm?: string) => {
         `)
         .order('updated_at', { ascending: false });
 
+      // Apply search term
       if (searchTerm && searchTerm.trim()) {
         const term = searchTerm.trim();
-        // Search in name, phone, email, or contract number
         query = query.or(`
           name.ilike.%${term}%,
           phone.ilike.%${term}%,
@@ -25,11 +26,24 @@ export const useContacts = (searchTerm?: string) => {
         `);
       }
 
+      // Apply filters
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      if (filters?.contactType) {
+        query = query.eq('contact_type', filters.contactType);
+      }
+
+      if (filters?.rating) {
+        query = query.gte('rating', filters.rating);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
 
       // Enhance contacts with message statistics
-      const contactsWithStats = await Promise.all(
+      let contactsWithStats = await Promise.all(
         data.map(async (contact) => {
           // Get message count and last contact
           const { data: messageStats } = await supabase
@@ -57,6 +71,29 @@ export const useContacts = (searchTerm?: string) => {
           } as Contact;
         })
       );
+
+      // Apply client-side filters that require processed data
+      if (filters?.hasContracts !== undefined) {
+        contactsWithStats = contactsWithStats.filter(contact => {
+          const hasContracts = contact.contracts && contact.contracts.length > 0;
+          return filters.hasContracts ? hasContracts : !hasContracts;
+        });
+      }
+
+      if (filters?.hasRecentActivity !== undefined) {
+        contactsWithStats = contactsWithStats.filter(contact => {
+          const hasRecentActivity = contact.lastContact !== 'Nunca';
+          if (hasRecentActivity && contact.lastContact !== 'Nunca') {
+            // Check if activity is recent (last 30 days)
+            const isRecent = ['Hoje', 'Ontem'].includes(contact.lastContact) || 
+                           contact.lastContact.includes('dias atrás') || 
+                           (contact.lastContact.includes('semanas atrás') && 
+                            parseInt(contact.lastContact) <= 4);
+            return filters.hasRecentActivity ? isRecent : !isRecent;
+          }
+          return !filters.hasRecentActivity;
+        });
+      }
 
       return contactsWithStats;
     }

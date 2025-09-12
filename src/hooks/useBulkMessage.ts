@@ -47,49 +47,22 @@ export function useBulkMessage() {
         throw new Error(error.message || 'Erro ao enviar mensagens');
       }
 
-      // Simulate progress updates (in real implementation, this would come from the edge function via websockets or polling)
-      let sent = 0;
-      let failed = 0;
-      const total = contacts.length;
+      // Use actual data from edge function
+      const finalResults: BulkMessageResults = {
+        successful: data?.successful || 0,
+        failed: data?.failed || 0,
+        errors: data?.errors || []
+      };
 
-      // Simulate progress with intervals
-      const progressInterval = setInterval(() => {
-        if (sent + failed < total) {
-          // Simulate mostly successful sends with occasional failures
-          if (Math.random() > 0.1) { // 90% success rate
-            sent++;
-          } else {
-            failed++;
-          }
-          
-          setProgress({ sent, failed, total });
-        } else {
-          clearInterval(progressInterval);
-          
-          // Set final results
-          const finalResults: BulkMessageResults = {
-            successful: data?.successful || sent,
-            failed: data?.failed || failed,
-            errors: data?.errors || []
-          };
-          
-          setResults(finalResults);
-          setIsLoading(false);
-        }
-      }, 2000); // Update every 2 seconds to simulate real sending
-
-      // Clean up interval after 30 seconds max
-      setTimeout(() => {
-        clearInterval(progressInterval);
-        if (isLoading) {
-          setResults({
-            successful: sent,
-            failed: total - sent,
-            errors: []
-          });
-          setIsLoading(false);
-        }
-      }, 30000);
+      // Set progress to complete
+      setProgress({ 
+        sent: finalResults.successful, 
+        failed: finalResults.failed, 
+        total: contacts.length 
+      });
+      
+      setResults(finalResults);
+      setIsLoading(false);
 
     } catch (error: any) {
       console.error('Bulk message error:', error);

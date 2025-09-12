@@ -56,6 +56,7 @@ export function BulkMessageModal({ open, onOpenChange }: BulkMessageModalProps) 
   const [message, setMessage] = useState(MIGRATION_TEMPLATE);
   const [statusFilter, setStatusFilter] = useState<'all' | 'ativo' | 'inativo'>('ativo');
   const [showProgress, setShowProgress] = useState(false);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
   
   const { data: contacts, isLoading } = useContacts(searchTerm);
   const { sendBulkMessage, isLoading: isSending, progress, results } = useBulkMessage();
@@ -141,6 +142,7 @@ export function BulkMessageModal({ open, onOpenChange }: BulkMessageModalProps) 
     setSelectedContacts(new Set());
     setMessage(MIGRATION_TEMPLATE);
     setSearchTerm("");
+    setShowErrorDetails(false);
   };
 
   const handleClose = () => {
@@ -199,15 +201,44 @@ export function BulkMessageModal({ open, onOpenChange }: BulkMessageModalProps) 
             </div>
 
             {results && (
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">{results.successful}</div>
-                  <div className="text-sm text-muted-foreground">Enviadas</div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{results.successful}</div>
+                    <div className="text-sm text-muted-foreground">Enviadas</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{results.failed}</div>
+                    <div className="text-sm text-muted-foreground">Falharam</div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">{results.failed}</div>
-                  <div className="text-sm text-muted-foreground">Falharam</div>
-                </div>
+
+                {/* Error Details */}
+                {results.errors && results.errors.length > 0 && (
+                  <div className="space-y-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowErrorDetails(!showErrorDetails)}
+                      className="w-full"
+                    >
+                      {showErrorDetails ? 'Ocultar' : 'Ver'} Detalhes dos Erros ({results.errors.length})
+                    </Button>
+                    
+                    {showErrorDetails && (
+                      <div className="max-h-40 overflow-y-auto border rounded p-3 bg-red-50">
+                        <div className="space-y-2">
+                          {results.errors.map((error, index) => (
+                            <div key={index} className="text-sm">
+                              <span className="font-medium text-red-700">{formatPhoneNumber(error.phone)}</span>
+                              <span className="text-red-600 ml-2">{error.error}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

@@ -161,10 +161,10 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contact-type">Tipo de Contato *</Label>
-              <Select value={contactType} onValueChange={(value: 'proprietario' | 'inquilino') => setContactType(value)}>
+              <Label htmlFor="contact-type">Tipo de Contato</Label>
+              <Select value={contactType || ''} onValueChange={(value: 'proprietario' | 'inquilino') => setContactType(value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo" />
+                  <SelectValue placeholder="Selecione o tipo (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="proprietario">
