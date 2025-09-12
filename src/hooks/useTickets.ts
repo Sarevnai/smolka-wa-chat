@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 export interface Ticket {
   id: string;
@@ -130,6 +131,7 @@ export const useCreateTicket = () => {
 
 export const useUpdateTicket = () => {
   const queryClient = useQueryClient();
+  const { toast: toastHook } = useToast();
   
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Ticket> }) => {
@@ -144,16 +146,40 @@ export const useUpdateTicket = () => {
         console.error("Erro ao atualizar ticket:", error);
         throw error;
       }
+
+      // If stage was updated, sync with ClickUp
+      if (updates.stage) {
+        try {
+          await supabase.functions.invoke('clickup-update-task-status', {
+            body: {
+              ticketId: id,
+              updates: {
+                status: updates.stage
+              }
+            }
+          });
+        } catch (clickupError) {
+          console.error('ClickUp sync error:', clickupError);
+          // Don't throw here - ticket update succeeded even if ClickUp sync failed
+        }
+      }
       
       return data as Ticket;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
-      toast.success("Ticket atualizado com sucesso!");
+      toastHook({
+        title: "Ticket atualizado",
+        description: "O ticket foi atualizado com sucesso.",
+      });
     },
     onError: (error) => {
       console.error("Erro ao atualizar ticket:", error);
-      toast.error("Erro ao atualizar ticket. Tente novamente.");
+      toastHook({
+        title: "Erro ao atualizar",
+        description: "Não foi possível atualizar o ticket.",
+        variant: "destructive",
+      });
     },
   });
 };

@@ -1,22 +1,63 @@
-import { Building, Users, Phone, Mail, Calendar, DollarSign, MapPin, Clock, AlertTriangle, MessageCircle } from "lucide-react";
+import { Building, Users, Phone, Mail, Calendar, DollarSign, MapPin, Clock, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Layout from "@/components/Layout";
 import { ClickUpIntegration } from "@/components/ClickUpIntegration";
-import { ChatList } from "@/components/chat/ChatList";
 import { cn } from "@/lib/utils";
 import { CATEGORIES, PRIORITY_CONFIG } from "@/types/crm";
-import { useTickets, useTicketStages, Ticket, TicketStage } from "@/hooks/useTickets";
+import { useTickets, useTicketStages, useUpdateTicket, Ticket, TicketStage } from "@/hooks/useTickets";
 import { useState } from "react";
-
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export default function Inbox() {
   const { data: proprietarioTickets = [], isLoading: loadingProprietario } = useTickets("proprietario");
   const { data: inquilinoTickets = [], isLoading: loadingInquilino } = useTickets("inquilino");
   const { data: proprietarioStages = [] } = useTicketStages("proprietario");
   const { data: inquilinoStages = [] } = useTicketStages("inquilino");
-  const [selectedContact, setSelectedContact] = useState<string | undefined>();
+  const updateTicketMutation = useUpdateTicket();
+  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const allTickets = [...proprietarioTickets, ...inquilinoTickets];
+    const ticket = allTickets.find(t => t.id === event.active.id);
+    setActiveTicket(ticket || null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const ticketId = active.id as string;
+      const newStage = over.id as string;
+      
+      updateTicketMutation.mutate({
+        id: ticketId,
+        updates: { stage: newStage }
+      });
+    }
+    
+    setActiveTicket(null);
+  };
 
   const getTicketsByStageAndType = (stage: string, type: "proprietario" | "inquilino") => {
     const tickets = type === "proprietario" ? proprietarioTickets : inquilinoTickets;
@@ -151,6 +192,29 @@ export default function Inbox() {
     );
   };
 
+  const DraggableTicketCard = ({ ticket }: { ticket: Ticket }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: ticket.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+        <TicketCard ticket={ticket} />
+      </div>
+    );
+  };
+
   const PipelineColumn = ({ stage, type }: { stage: TicketStage, type: "proprietario" | "inquilino" }) => {
     const stageTickets = getTicketsByStageAndType(stage.name, type);
     const urgentTickets = stageTickets.filter(ticket => ticket.priority === "critica" || ticket.priority === "alta");
@@ -177,19 +241,31 @@ export default function Inbox() {
           </div>
         </div>
         
-        <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2">
-          {stageTickets.map((ticket) => (
-            <TicketCard key={ticket.id} ticket={ticket} />
-          ))}
-          
-          {stageTickets.length === 0 && (
-            <div className="border-2 border-dashed border-muted rounded-lg p-12 text-center">
-              <p className="text-sm text-muted-foreground">
-                Nenhum ticket neste estágio
-              </p>
-            </div>
-          )}
-        </div>
+        <SortableContext 
+          items={stageTickets.map(t => t.id)} 
+          strategy={verticalListSortingStrategy}
+          id={stage.name}
+        >
+          <div 
+            className="space-y-4 max-h-[700px] overflow-y-auto pr-2 min-h-24"
+            style={{ 
+              borderRadius: '8px',
+              background: stageTickets.length === 0 ? 'rgba(0,0,0,0.02)' : 'transparent'
+            }}
+          >
+            {stageTickets.map((ticket) => (
+              <DraggableTicketCard key={ticket.id} ticket={ticket} />
+            ))}
+            
+            {stageTickets.length === 0 && (
+              <div className="border-2 border-dashed border-muted rounded-lg p-12 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Nenhum ticket neste estágio
+                </p>
+              </div>
+            )}
+          </div>
+        </SortableContext>
       </div>
     );
   };
@@ -225,102 +301,93 @@ export default function Inbox() {
           </div>
         </div>
 
-        <Tabs defaultValue="proprietarios" className="w-full">
-          <TabsList className="mb-8">
-            <TabsTrigger value="proprietarios" className="flex items-center space-x-2">
-              <Building className="h-4 w-4" />
-              <span>Proprietários</span>
-              <Badge variant="secondary" className="ml-2">
-                {proprietarioTickets.length}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="inquilinos" className="flex items-center space-x-2">
-              <Users className="h-4 w-4" />
-              <span>Inquilinos</span>
-              <Badge variant="secondary" className="ml-2">
-                {inquilinoTickets.length}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="conversas" className="flex items-center space-x-2">
-              <MessageCircle className="h-4 w-4" />
-              <span>Conversas</span>
-            </TabsTrigger>
-          </TabsList>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <Tabs defaultValue="proprietarios" className="w-full">
+            <TabsList className="mb-8">
+              <TabsTrigger value="proprietarios" className="flex items-center space-x-2">
+                <Building className="h-4 w-4" />
+                <span>Proprietários</span>
+                <Badge variant="secondary" className="ml-2">
+                  {proprietarioTickets.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="inquilinos" className="flex items-center space-x-2">
+                <Users className="h-4 w-4" />
+                <span>Inquilinos</span>
+                <Badge variant="secondary" className="ml-2">
+                  {inquilinoTickets.length}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="proprietarios">
-            {loadingProprietario ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">Carregando tickets...</p>
-              </div>
-            ) : (
-              <>
-                <div className="mb-8">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-semibold text-foreground">Demandas de Proprietários</h2>
-                    <div className="flex space-x-6 text-sm text-muted-foreground">
-                      <div className="flex items-center space-x-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span>Urgentes: {proprietarioTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
+            <TabsContent value="proprietarios">
+              {loadingProprietario ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground text-lg">Carregando tickets...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl font-semibold text-foreground">Demandas de Proprietários</h2>
+                      <div className="flex space-x-6 text-sm text-muted-foreground">
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span>Urgentes: {proprietarioTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
+                        </div>
+                        <span>Valor total: {formatCurrency(proprietarioTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
                       </div>
-                      <span>Valor total: {formatCurrency(proprietarioTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex gap-8 overflow-x-auto pb-6">
-                  {proprietarioStages.map((stage) => (
-                    <PipelineColumn key={stage.id} stage={stage} type="proprietario" />
-                  ))}
-                </div>
-              </>
-            )}
-          </TabsContent>
+                  
+                  <div className="flex gap-8 overflow-x-auto pb-6">
+                    {proprietarioStages.map((stage) => (
+                      <PipelineColumn key={stage.id} stage={stage} type="proprietario" />
+                    ))}
+                  </div>
+                </>
+              )}
+            </TabsContent>
 
-          <TabsContent value="inquilinos">
-            {loadingInquilino ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg">Carregando tickets...</p>
-              </div>
-            ) : (
-              <>
-                <div className="mb-8">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-semibold text-foreground">Demandas de Inquilinos</h2>
-                    <div className="flex space-x-6 text-sm text-muted-foreground">
-                      <div className="flex items-center space-x-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span>Urgentes: {inquilinoTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
+            <TabsContent value="inquilinos">
+              {loadingInquilino ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground text-lg">Carregando tickets...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-8">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl font-semibold text-foreground">Demandas de Inquilinos</h2>
+                      <div className="flex space-x-6 text-sm text-muted-foreground">
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span>Urgentes: {inquilinoTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
+                        </div>
+                        <span>Valor envolvido: {formatCurrency(inquilinoTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
                       </div>
-                      <span>Valor envolvido: {formatCurrency(inquilinoTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
                     </div>
                   </div>
-                </div>
-                
-                <div className="flex gap-8 overflow-x-auto pb-6">
-                  {inquilinoStages.map((stage) => (
-                    <PipelineColumn key={stage.id} stage={stage} type="inquilino" />
-                  ))}
-                </div>
-              </>
-            )}
-          </TabsContent>
+                  
+                  <div className="flex gap-8 overflow-x-auto pb-6">
+                    {inquilinoStages.map((stage) => (
+                      <PipelineColumn key={stage.id} stage={stage} type="inquilino" />
+                    ))}
+                  </div>
+                </>
+              )}
+            </TabsContent>
 
-          <TabsContent value="conversas">
-            <div className="mb-8">
-              <h2 className="text-2xl font-semibold text-foreground">Conversas WhatsApp</h2>
-              <p className="text-muted-foreground mt-2">
-                Gerencie todas as conversas do WhatsApp. Você pode excluir conversas inteiras usando o menu de opções.
-              </p>
-            </div>
-            
-            <div className="max-w-md">
-              <ChatList 
-                onContactSelect={setSelectedContact} 
-                selectedContact={selectedContact} 
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
+          </Tabs>
+
+          <DragOverlay>
+            {activeTicket ? <TicketCard ticket={activeTicket} /> : null}
+          </DragOverlay>
+        </DndContext>
       </div>
     </Layout>
   );

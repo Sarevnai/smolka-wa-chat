@@ -124,8 +124,10 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
         description: "Ticket sincronizado com ClickUp com sucesso.",
       });
 
-      // Refresh status
-      await checkIntegrationStatus();
+      // Refresh status with delay to allow backend processing
+      setTimeout(async () => {
+        await checkIntegrationStatus();
+      }, 1000);
 
     } catch (error) {
       console.error('Error syncing to ClickUp:', error);
@@ -167,7 +169,10 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
         description: "Task do ClickUp atualizada com sucesso.",
       });
 
-      await checkIntegrationStatus();
+      // Refresh status with delay to allow backend processing
+      setTimeout(async () => {
+        await checkIntegrationStatus();
+      }, 1000);
 
     } catch (error) {
       console.error('Error updating ClickUp task:', error);
