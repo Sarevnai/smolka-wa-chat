@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2, UserPlus, Building2, Key, FileText, Star, User as UserIcon, Phone, Mail, Calendar, Activity, MessageCircle, Users } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Edit, Trash2, UserPlus, Building2, Key, FileText, Star, User as UserIcon, Phone, Mail, Calendar, Activity, MessageCircle, Users, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { NewContactModal } from "@/components/contacts/NewContactModal";
 import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
+import { ImportContactsModal } from "@/components/ImportContactsModal";
 import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { Contact } from "@/types/contact";
 import { formatPhoneNumber } from "@/lib/utils";
@@ -21,6 +22,7 @@ import Layout from "@/components/Layout";
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showNewContactModal, setShowNewContactModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -103,13 +105,22 @@ export default function Contacts() {
               </div>
             </div>
           </div>
-          <Button 
-            className="flex items-center space-x-2"
-            onClick={() => setShowNewContactModal(true)}
-          >
-            <Plus className="h-4 w-4" />
-            <span>Novo Contato</span>
-          </Button>
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              <span>Importar CSV</span>
+            </Button>
+            <Button 
+              className="flex items-center space-x-2"
+              onClick={() => setShowNewContactModal(true)}
+            >
+              <Plus className="h-4 w-4" />
+              <span>Novo Contato</span>
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -386,8 +397,12 @@ export default function Contacts() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button variant="outline" className="justify-start space-x-2">
-                <Plus className="h-4 w-4" />
+              <Button 
+                variant="outline" 
+                className="justify-start space-x-2"
+                onClick={() => setShowImportModal(true)}
+              >
+                <Upload className="h-4 w-4" />
                 <span>Importar Contatos</span>
               </Button>
               <Button variant="outline" className="justify-start space-x-2">
@@ -405,6 +420,15 @@ export default function Contacts() {
         <NewContactModal 
           open={showNewContactModal} 
           onOpenChange={setShowNewContactModal} 
+        />
+
+        <ImportContactsModal
+          open={showImportModal}
+          onOpenChange={setShowImportModal}
+          onImportComplete={() => {
+            // Refresh contacts list after successful import
+            window.location.reload();
+          }}
         />
 
          {editingContact && (
