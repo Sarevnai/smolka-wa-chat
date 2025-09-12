@@ -9,6 +9,11 @@ export interface Message {
   wa_timestamp?: string | null;
   raw?: any;
   created_at: string;
+  media_type?: string | null;
+  media_url?: string | null;
+  media_caption?: string | null;
+  media_filename?: string | null;
+  media_mime_type?: string | null;
 }
 
 export interface SendMessageRequest {

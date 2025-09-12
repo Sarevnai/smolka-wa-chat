@@ -175,6 +175,11 @@ export type Database = {
           created_at: string | null
           direction: string | null
           id: number
+          media_caption: string | null
+          media_filename: string | null
+          media_mime_type: string | null
+          media_type: string | null
+          media_url: string | null
           raw: Json | null
           wa_from: string | null
           wa_message_id: string | null
@@ -187,6 +192,11 @@ export type Database = {
           created_at?: string | null
           direction?: string | null
           id?: number
+          media_caption?: string | null
+          media_filename?: string | null
+          media_mime_type?: string | null
+          media_type?: string | null
+          media_url?: string | null
           raw?: Json | null
           wa_from?: string | null
           wa_message_id?: string | null
@@ -199,6 +209,11 @@ export type Database = {
           created_at?: string | null
           direction?: string | null
           id?: number
+          media_caption?: string | null
+          media_filename?: string | null
+          media_mime_type?: string | null
+          media_type?: string | null
+          media_url?: string | null
           raw?: Json | null
           wa_from?: string | null
           wa_message_id?: string | null

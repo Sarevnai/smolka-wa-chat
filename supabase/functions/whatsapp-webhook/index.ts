@@ -117,7 +117,8 @@ async function processIncomingMessage(message: any, value: any) {
   try {
     console.log('Processing message:', message);
 
-    const messageBody = message.text?.body || message.button?.text || '';
+    const messageBody = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || '';
+    const mediaInfo = await extractMediaInfo(message, value);
 
     // Extract message data
     const messageData = {
@@ -126,9 +127,14 @@ async function processIncomingMessage(message: any, value: any) {
       wa_to: value.metadata?.phone_number_id || null,
       wa_phone_number_id: value.metadata?.phone_number_id || null,
       direction: 'inbound' as const,
-      body: messageBody || message.type || 'No content',
+      body: messageBody || mediaInfo?.caption || message.type || 'Mídia recebida',
       wa_timestamp: message.timestamp ? new Date(parseInt(message.timestamp) * 1000).toISOString() : new Date().toISOString(),
       raw: message,
+      media_type: mediaInfo?.type || null,
+      media_url: mediaInfo?.url || null,
+      media_caption: mediaInfo?.caption || null,
+      media_filename: mediaInfo?.filename || null,
+      media_mime_type: mediaInfo?.mimeType || null,
     };
 
     // Insert into database
@@ -335,5 +341,124 @@ async function updateContactType(phoneNumber: string, contactType: string) {
 
   if (error) {
     console.error('Error updating contact type:', error);
+  }
+}
+
+async function extractMediaInfo(message: any, value: any) {
+  const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+  
+  if (!accessToken) {
+    console.error('WhatsApp access token not found');
+    return null;
+  }
+
+  let mediaInfo = null;
+
+  try {
+    // Handle different message types
+    switch (message.type) {
+      case 'image':
+        mediaInfo = {
+          type: 'image',
+          id: message.image.id,
+          caption: message.image.caption || null,
+          mimeType: message.image.mime_type || 'image/jpeg',
+          filename: null
+        };
+        break;
+
+      case 'audio':
+        mediaInfo = {
+          type: 'audio', 
+          id: message.audio.id,
+          caption: null,
+          mimeType: message.audio.mime_type || 'audio/ogg',
+          filename: null
+        };
+        break;
+
+      case 'video':
+        mediaInfo = {
+          type: 'video',
+          id: message.video.id,
+          caption: message.video.caption || null,
+          mimeType: message.video.mime_type || 'video/mp4',
+          filename: null
+        };
+        break;
+
+      case 'document':
+        mediaInfo = {
+          type: 'document',
+          id: message.document.id,
+          caption: message.document.caption || null,
+          mimeType: message.document.mime_type || 'application/octet-stream',
+          filename: message.document.filename || 'documento'
+        };
+        break;
+
+      case 'sticker':
+        mediaInfo = {
+          type: 'sticker',
+          id: message.sticker.id,
+          caption: null,
+          mimeType: message.sticker.mime_type || 'image/webp',
+          filename: null
+        };
+        break;
+
+      case 'voice':
+        mediaInfo = {
+          type: 'voice',
+          id: message.voice.id,
+          caption: null,
+          mimeType: message.voice.mime_type || 'audio/ogg',
+          filename: null
+        };
+        break;
+
+      case 'location':
+        mediaInfo = {
+          type: 'location',
+          id: null,
+          caption: `📍 ${message.location.name || 'Localização'}\n${message.location.address || ''}`,
+          mimeType: null,
+          filename: null,
+          coordinates: {
+            latitude: message.location.latitude,
+            longitude: message.location.longitude
+          }
+        };
+        break;
+
+      default:
+        return null;
+    }
+
+    // If we have media with an ID, fetch the URL from WhatsApp API
+    if (mediaInfo?.id) {
+      try {
+        const response = await fetch(`https://graph.facebook.com/v18.0/${mediaInfo.id}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+
+        if (response.ok) {
+          const mediaData = await response.json();
+          mediaInfo.url = mediaData.url;
+          console.log('Media URL fetched:', mediaInfo.url);
+        } else {
+          console.error('Failed to fetch media URL:', response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error('Error fetching media URL:', error);
+      }
+    }
+
+    return mediaInfo;
+  } catch (error) {
+    console.error('Error extracting media info:', error);
+    return null;
   }
 }

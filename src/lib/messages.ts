@@ -11,6 +11,11 @@ export type MessageRow = {
   wa_timestamp: string | null; // ISO
   raw: any;
   created_at: string | null;
+  media_type: string | null;
+  media_url: string | null;
+  media_caption: string | null;
+  media_filename: string | null;
+  media_mime_type: string | null;
 };
 
 export type Period = "today" | "7d" | "30d" | "all";
