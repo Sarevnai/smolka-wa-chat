@@ -84,6 +84,11 @@ serve(async (req) => {
       updateData.status = statusMap[updates.status];
     }
 
+    // Handle stage updates (drag-and-drop scenarios) 
+    if (updates.stage && statusMap[updates.stage]) {
+      updateData.status = statusMap[updates.stage];
+    }
+
     console.log('Sending update to ClickUp:', updateData);
 
     // Update ClickUp task
