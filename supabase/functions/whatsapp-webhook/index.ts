@@ -186,10 +186,16 @@ async function processIncomingMessage(message: any, value: any) {
 
 async function handleAutoTriage(phoneNumber: string, messageBody: string, message: any) {
   try {
-    // Get or create contact
+    // Get or create contact with contracts
     const { data: contact, error: contactError } = await supabase
       .from('contacts')
-      .select('id, name, onboarding_status, contact_type')
+      .select(`
+        id, 
+        name, 
+        onboarding_status, 
+        contact_type,
+        contact_contracts(id, contract_number)
+      `)
       .eq('phone', phoneNumber)
       .maybeSingle();
 
@@ -209,7 +215,13 @@ async function handleAutoTriage(phoneNumber: string, messageBody: string, messag
           status: 'ativo',
           onboarding_status: 'pending'
         }])
-        .select()
+        .select(`
+          id, 
+          name, 
+          onboarding_status, 
+          contact_type,
+          contact_contracts(id, contract_number)
+        `)
         .single();
 
       if (createError) {
@@ -217,6 +229,25 @@ async function handleAutoTriage(phoneNumber: string, messageBody: string, messag
         return;
       }
       currentContact = newContact;
+    }
+
+    // Check if contact is already registered (has name, contact_type, or contracts)
+    const isRegistered = !!(
+      currentContact.name || 
+      currentContact.contact_type || 
+      (currentContact.contact_contracts && currentContact.contact_contracts.length > 0)
+    );
+
+    if (isRegistered) {
+      console.log(`Contact ${phoneNumber} is already registered, skipping triage and marking as completed`);
+      
+      // Mark as completed if not already
+      if (currentContact.onboarding_status !== 'completed') {
+        await updateContactStatus(phoneNumber, 'completed');
+      }
+      
+      console.log('Contact onboarding completed, processing normal message');
+      return;
     }
 
     // Handle onboarding flow based on current status

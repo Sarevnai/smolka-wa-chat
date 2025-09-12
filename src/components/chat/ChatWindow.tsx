@@ -78,13 +78,32 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           event: "INSERT",
           schema: "public",
           table: "messages",
-          filter: `or(wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber})`
+          filter: `wa_from=eq.${phoneNumber}`
         },
         (payload) => {
           const newMessage = payload.new as MessageRow;
-          console.log("Nova mensagem recebida via realtime:", newMessage);
+          console.log("Nova mensagem INBOUND recebida via realtime:", newMessage);
           
-          // Add message to current conversation
+          setMessages(prev => {
+            const exists = prev.some(msg => msg.id === newMessage.id);
+            if (exists) return prev;
+            return [...prev, newMessage];
+          });
+          setTimeout(scrollToBottom, 100);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `wa_to=eq.${phoneNumber}`
+        },
+        (payload) => {
+          const newMessage = payload.new as MessageRow;
+          console.log("Nova mensagem OUTBOUND recebida via realtime:", newMessage);
+          
           setMessages(prev => {
             const exists = prev.some(msg => msg.id === newMessage.id);
             if (exists) return prev;
