@@ -170,13 +170,39 @@ export const useDeleteContact = () => {
 
   return useMutation({
     mutationFn: async (contactId: string) => {
+      if (!contactId) {
+        throw new Error('ID do contato é obrigatório');
+      }
+
+      console.log('Deleting contact with ID:', contactId);
+
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Check if contact exists and has tickets that prevent deletion
+      const { data: ticketsCheck } = await supabase
+        .from('tickets')
+        .select('id')
+        .eq('contact_id', contactId)
+        .limit(1);
+
+      if (ticketsCheck && ticketsCheck.length > 0) {
+        throw new Error('Não é possível excluir este contato pois ele possui tickets associados.');
+      }
+
       // Delete contracts first (cascade delete)
       const { error: contractsError } = await supabase
         .from('contact_contracts')
         .delete()
         .eq('contact_id', contactId);
 
-      if (contractsError) throw contractsError;
+      if (contractsError) {
+        console.error('Error deleting contracts:', contractsError);
+        throw new Error(`Erro ao excluir contratos: ${contractsError.message}`);
+      }
 
       // Delete contact
       const { error: contactError } = await supabase
@@ -184,12 +210,21 @@ export const useDeleteContact = () => {
         .delete()
         .eq('id', contactId);
 
-      if (contactError) throw contactError;
+      if (contactError) {
+        console.error('Error deleting contact:', contactError);
+        throw new Error(`Erro ao excluir contato: ${contactError.message}`);
+      }
+
+      console.log('Contact deleted successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['contact-stats'] });
       queryClient.invalidateQueries({ queryKey: ['contact-by-phone'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: (error) => {
+      console.error('useDeleteContact mutation error:', error);
     }
   });
 };
