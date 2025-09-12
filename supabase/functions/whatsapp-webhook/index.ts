@@ -274,7 +274,6 @@ async function handleAutoTriage(phoneNumber: string, messageBody: string, messag
           if (contactType) {
             await updateContactType(phoneNumber, contactType);
             await updateContactStatus(phoneNumber, 'completed');
-            await sendConfirmationMessage(phoneNumber, contactType);
           }
         }
         break;
