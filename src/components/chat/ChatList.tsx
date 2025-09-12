@@ -95,39 +95,6 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
 
   useEffect(() => {
     loadConversations();
-
-    // Setup realtime subscription
-    const channel = supabase
-      .channel("messages-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-        },
-        () => {
-          // Reload conversations when new message arrives
-          loadConversations();
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "messages",
-        },
-        () => {
-          // Reload conversations when messages are deleted
-          loadConversations();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const filteredConversations = conversations.filter(conversation =>

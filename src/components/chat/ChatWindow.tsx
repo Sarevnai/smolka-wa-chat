@@ -77,25 +77,25 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         {
           event: "INSERT",
           schema: "public",
-          table: "messages"
+          table: "messages",
+          filter: `or(wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber})`
         },
         (payload) => {
           const newMessage = payload.new as MessageRow;
+          console.log("Nova mensagem recebida via realtime:", newMessage);
           
-          // Check if this message belongs to the current conversation
-          const belongsToConversation = (
-            newMessage.wa_from === phoneNumber || 
-            newMessage.wa_to === phoneNumber ||
-            (newMessage.direction === "outbound" && newMessage.wa_to === phoneNumber)
-          );
-          
-          if (belongsToConversation) {
-            setMessages(prev => [...prev, newMessage]);
-            setTimeout(scrollToBottom, 100);
-          }
+          // Add message to current conversation
+          setMessages(prev => {
+            const exists = prev.some(msg => msg.id === newMessage.id);
+            if (exists) return prev;
+            return [...prev, newMessage];
+          });
+          setTimeout(scrollToBottom, 100);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Status da subscrição realtime:", status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
