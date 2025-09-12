@@ -102,11 +102,20 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
         throw new Error(`Lista do ClickUp não configurada para ${ticket.type === 'proprietario' ? 'proprietários' : 'inquilinos'}`);
       }
 
+      console.log('Syncing ticket to ClickUp:', {
+        ticketId: ticket.id,
+        listId,
+        ticketType: ticket.type
+      });
+
       const response = await supabase.functions.invoke('clickup-create-task', {
         body: { ticket, listId }
       });
 
+      console.log('ClickUp sync response:', response);
+
       if (response.error) {
+        console.error('ClickUp sync error details:', response.error);
         throw new Error(response.error.message || 'Failed to sync with ClickUp');
       }
 
