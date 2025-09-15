@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { MessageCircle, Send, ArrowRight, LogIn } from "lucide-react";
+import smolkaLogo from "@/assets/smolka-logo.png";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Layout from "@/components/Layout";
@@ -13,8 +14,8 @@ const Index = () => {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
-            <div className="h-20 w-20 rounded-full bg-gradient-primary flex items-center justify-center">
-              <MessageCircle className="h-10 w-10 text-white" />
+            <div className="h-20 w-20 rounded-full overflow-hidden">
+              <img src={smolkaLogo} alt="Smolka Logo" className="h-full w-full object-cover" />
             </div>
           </div>
           <h1 className="text-4xl font-bold text-foreground mb-4">Atendimento ADM - Smolka Imóveis</h1>
