@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { MessageCircle, Send, Home, Inbox, Users, BarChart3, Settings, LogOut, User, Crown } from "lucide-react";
+import monogramaLogo from "@/assets/monograma-logo.png";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <MessageCircle className="h-8 w-8 text-primary" />
+              <img src={monogramaLogo} alt="Smolka Logo" className="h-8 w-8" />
               <h1 className="text-2xl font-bold text-foreground">
                 Smolka WhatsApp Inbox
               </h1>
