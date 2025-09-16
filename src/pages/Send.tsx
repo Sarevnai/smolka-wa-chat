@@ -186,6 +186,12 @@ export default function Send() {
                   </CardContent>
                 </Card>
 
+                {/* Template Selector */}
+                <TemplateSelector
+                  selectedTemplate={selectedTemplate}
+                  onTemplateSelect={setSelectedTemplate}
+                />
+
                 {/* Custom Message for non-template campaigns */}
                 {!selectedTemplate && (
                   <Card>
@@ -224,6 +230,14 @@ export default function Send() {
                 />
 
                 {/* Campaign Preview */}
+                <CampaignPreview
+                  message={getMessage()}
+                  template={selectedTemplate}
+                  selectedContacts={contacts.filter(c => selectedContacts.has(c.id))}
+                  scheduledAt={scheduledAt}
+                  campaignName={campaignName}
+                />
+
                 {/* Send Button */}
                 <Card>
                   <CardContent className="pt-6">

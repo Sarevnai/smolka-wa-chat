@@ -7,7 +7,7 @@ export const useTemplates = () => {
   return useQuery({
     queryKey: ["message-templates"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("message_templates")
         .select("*")
         .order("created_at", { ascending: false });
@@ -24,13 +24,9 @@ export const useCreateTemplate = () => {
 
   return useMutation({
     mutationFn: async (template: Omit<MessageTemplate, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("message_templates")
-        .insert([{
-          ...template,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }])
+        .insert([template])
         .select()
         .single();
 
@@ -60,9 +56,9 @@ export const useUpdateTemplate = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<MessageTemplate> & { id: string }) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("message_templates")
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(updates)
         .eq("id", id)
         .select()
         .single();
@@ -93,7 +89,7 @@ export const useDeleteTemplate = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("message_templates")
         .delete()
         .eq("id", id);

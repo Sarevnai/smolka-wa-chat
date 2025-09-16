@@ -3,13 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Campaign, CampaignResult, CampaignStats, BulkMessageRequest } from "@/types/campaign";
 import { useToast } from "@/hooks/use-toast";
 
-const SUPABASE_PROJECT_URL = "https://wpjxsgxxhogzkkuznyke.supabase.co";
-
 export const useCampaigns = () => {
   return useQuery({
     queryKey: ["campaigns"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("campaigns")
         .select("*")
         .order("created_at", { ascending: false });
@@ -26,7 +24,7 @@ export const useCampaignResults = (campaignId?: string) => {
     queryFn: async () => {
       if (!campaignId) return [];
       
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("campaign_results")
         .select("*")
         .eq("campaign_id", campaignId)
@@ -64,13 +62,9 @@ export const useCreateCampaign = () => {
 
   return useMutation({
     mutationFn: async (campaign: Omit<Campaign, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("campaigns")
-        .insert([{
-          ...campaign,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }])
+        .insert([campaign])
         .select()
         .single();
 
@@ -101,36 +95,30 @@ export const useSendCampaign = () => {
   return useMutation({
     mutationFn: async ({ campaignId, request }: { campaignId: string; request: BulkMessageRequest }) => {
       // First update campaign status to 'sending'
-      await (supabase as any)
+      await supabase
         .from("campaigns")
-        .update({ status: "sending", updated_at: new Date().toISOString() })
+        .update({ status: "sending" })
         .eq("id", campaignId);
 
       // Send the bulk messages via edge function
-      const response = await fetch(`${SUPABASE_PROJECT_URL}/functions/v1/send-bulk-messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const { data: result, error: functionError } = await supabase.functions.invoke('send-bulk-messages', {
+        body: {
           ...request,
           campaign_id: campaignId,
-        }),
+        },
       });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao enviar campanha");
+      if (functionError) {
+        throw new Error(functionError.message || "Erro ao enviar campanha");
       }
 
       // Update campaign status to 'sent'
-      await (supabase as any)
+      await supabase
         .from("campaigns")
         .update({ 
           status: "sent", 
-          sent_count: result.successful,
-          updated_at: new Date().toISOString(),
+          sent_count: result.successful || 0,
+          failed_count: result.failed || 0,
         })
         .eq("id", campaignId);
 
@@ -160,12 +148,11 @@ export const useScheduleCampaign = () => {
 
   return useMutation({
     mutationFn: async ({ campaignId, scheduledAt }: { campaignId: string; scheduledAt: string }) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("campaigns")
         .update({ 
           scheduled_at: scheduledAt,
           status: "scheduled",
-          updated_at: new Date().toISOString(),
         })
         .eq("id", campaignId)
         .select()

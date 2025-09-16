@@ -14,6 +14,8 @@ interface ContactInfo {
 interface BulkMessageRequest {
   contacts: ContactInfo[];
   message: string;
+  template_id?: string;
+  campaign_id?: string;
 }
 
 serve(async (req) => {
@@ -23,7 +25,7 @@ serve(async (req) => {
   }
 
   try {
-    const { contacts, message }: BulkMessageRequest = await req.json();
+    const { contacts, message, template_id, campaign_id }: BulkMessageRequest = await req.json();
 
     console.log('Bulk message request:', { contactCount: contacts.length, messageLength: message.length });
 
@@ -130,7 +132,7 @@ serve(async (req) => {
             wa_timestamp: new Date().toISOString(),
             raw: result,
             created_at: new Date().toISOString(),
-            is_template: false
+            is_template: !!template_id
           };
 
           const { error: dbError } = await supabase
@@ -139,6 +141,25 @@ serve(async (req) => {
 
           if (dbError) {
             console.error(`Database error for ${contact.phone}:`, dbError);
+          }
+
+          // Save campaign result if campaign_id is provided
+          if (campaign_id) {
+            const campaignResultData = {
+              campaign_id,
+              contact_id: null, // We'd need to find this by phone
+              phone: contact.phone,
+              status: 'sent' as const,
+              sent_at: new Date().toISOString(),
+            };
+
+            const { error: campaignError } = await supabase
+              .from('campaign_results')
+              .insert([campaignResultData]);
+
+            if (campaignError) {
+              console.error(`Campaign result error for ${contact.phone}:`, campaignError);
+            }
           }
         } catch (dbError) {
           console.error(`Database save error for ${contact.phone}:`, dbError);
@@ -154,6 +175,25 @@ serve(async (req) => {
           phone: contact.phone,
           error: error.message || 'Erro desconhecido'
         });
+
+        // Save failed campaign result if campaign_id is provided
+        if (campaign_id) {
+          try {
+            const campaignResultData = {
+              campaign_id,
+              contact_id: null,
+              phone: contact.phone,
+              status: 'failed' as const,
+              error_message: error.message || 'Erro desconhecido',
+            };
+
+            await supabase
+              .from('campaign_results')
+              .insert([campaignResultData]);
+          } catch (dbError) {
+            console.error(`Campaign result error for failed ${contact.phone}:`, dbError);
+          }
+        }
       }
 
       // Add delay between messages to respect rate limits (2 seconds)

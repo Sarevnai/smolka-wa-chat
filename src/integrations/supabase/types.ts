@@ -127,6 +127,119 @@ export type Database = {
           },
         ]
       }
+      campaign_results: {
+        Row: {
+          campaign_id: string
+          contact_id: string | null
+          created_at: string
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          phone: string
+          read_at: string | null
+          replied_at: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          campaign_id: string
+          contact_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          phone: string
+          read_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          campaign_id?: string
+          contact_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          phone?: string
+          read_at?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_results_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_results_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          created_at: string
+          delivered_count: number | null
+          failed_count: number | null
+          id: string
+          message: string
+          name: string
+          response_count: number | null
+          scheduled_at: string | null
+          sent_count: number | null
+          status: string
+          target_contacts: string[]
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_count?: number | null
+          failed_count?: number | null
+          id?: string
+          message: string
+          name: string
+          response_count?: number | null
+          scheduled_at?: string | null
+          sent_count?: number | null
+          status?: string
+          target_contacts?: string[]
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivered_count?: number | null
+          failed_count?: number | null
+          id?: string
+          message?: string
+          name?: string
+          response_count?: number | null
+          scheduled_at?: string | null
+          sent_count?: number | null
+          status?: string
+          target_contacts?: string[]
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "message_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clickup_config: {
         Row: {
           api_token: string
@@ -237,6 +350,36 @@ export type Database = {
           },
         ]
       }
+      contact_groups: {
+        Row: {
+          contact_ids: string[]
+          created_at: string
+          description: string | null
+          filters: Json | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          contact_ids?: string[]
+          created_at?: string
+          description?: string | null
+          filters?: Json | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          contact_ids?: string[]
+          created_at?: string
+          description?: string | null
+          filters?: Json | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           contact_type: Database["public"]["Enums"]["contact_type"] | null
@@ -279,6 +422,39 @@ export type Database = {
           rating?: number | null
           status?: Database["public"]["Enums"]["contact_status"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      message_templates: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          variables: string[] | null
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          variables?: string[] | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          variables?: string[] | null
         }
         Relationships: []
       }
