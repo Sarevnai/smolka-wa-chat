@@ -3,6 +3,69 @@ import { supabase } from '@/integrations/supabase/client';
 import { Contact, Contract, ContactStats, CreateContactRequest } from '@/types/contact';
 import { ContactFiltersState } from '@/components/contacts/ContactFilters';
 
+// Optimized hook for contact selection (without message stats to improve performance)
+export const useContactsForSelection = (searchTerm?: string, filters?: ContactFiltersState, limit = 100) => {
+  return useQuery({
+    queryKey: ['contacts-selection', searchTerm, filters, limit],
+    queryFn: async () => {
+      let query = supabase
+        .from('contacts')
+        .select(`
+          *,
+          contact_contracts (*)
+        `)
+        .order('updated_at', { ascending: false })
+        .limit(limit);
+
+      // Apply search term - server-side search for better performance
+      if (searchTerm && searchTerm.trim()) {
+        const term = searchTerm.trim();
+        query = query.or(`
+          name.ilike.%${term}%,
+          phone.ilike.%${term}%,
+          email.ilike.%${term}%,
+          contact_contracts.contract_number.ilike.%${term}%
+        `);
+      }
+
+      // Apply filters - server-side filtering
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+
+      if (filters?.contactType) {
+        query = query.eq('contact_type', filters.contactType);
+      }
+
+      if (filters?.rating) {
+        query = query.gte('rating', filters.rating);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Transform data without expensive message queries
+      let contacts = data.map(contact => ({
+        ...contact,
+        contracts: contact.contact_contracts || [],
+        totalMessages: 0, // Skip for performance
+        lastContact: 'N/A' // Skip for performance
+      })) as Contact[];
+
+      // Apply client-side filters that require processed data
+      if (filters?.hasContracts !== undefined) {
+        contacts = contacts.filter(contact => {
+          const hasContracts = contact.contracts && contact.contracts.length > 0;
+          return filters.hasContracts ? hasContracts : !hasContracts;
+        });
+      }
+
+      return contacts;
+    },
+    staleTime: 30 * 1000, // Cache for 30 seconds
+  });
+};
+
 export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) => {
   return useQuery({
     queryKey: ['contacts', searchTerm, filters],
@@ -42,35 +105,40 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
       const { data, error } = await query;
       if (error) throw error;
 
+      // For better performance, get all message statistics in batches
+      const phoneNumbers = data.map(contact => contact.phone);
+      
+      // Get message statistics for all contacts in a single optimized query
+      const { data: messageStats } = await supabase
+        .rpc('get_contact_message_stats', { 
+          phone_numbers: phoneNumbers 
+        });
+
+      // Create a map for quick lookup
+      const statsMap = new Map();
+      if (messageStats) {
+        messageStats.forEach((stat: any) => {
+          statsMap.set(stat.phone, {
+            totalMessages: stat.total_messages || 0,
+            lastTimestamp: stat.last_timestamp
+          });
+        });
+      }
+
       // Enhance contacts with message statistics
-      let contactsWithStats = await Promise.all(
-        data.map(async (contact) => {
-          // Get message count and last contact
-          const { data: messageStats } = await supabase
-            .from('messages')
-            .select('id, wa_timestamp')
-            .eq('wa_from', contact.phone)
-            .order('wa_timestamp', { ascending: false })
-            .limit(1);
+      let contactsWithStats = data.map(contact => {
+        const stats = statsMap.get(contact.phone) || { totalMessages: 0, lastTimestamp: null };
+        const lastContact = stats.lastTimestamp 
+          ? formatLastContact(stats.lastTimestamp)
+          : 'Nunca';
 
-          const { count: totalMessages } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('wa_from', contact.phone);
-
-          const lastMessage = messageStats?.[0];
-          const lastContact = lastMessage?.wa_timestamp 
-            ? formatLastContact(lastMessage.wa_timestamp)
-            : 'Nunca';
-
-          return {
-            ...contact,
-            contracts: contact.contact_contracts || [],
-            totalMessages: totalMessages || 0,
-            lastContact
-          } as Contact;
-        })
-      );
+        return {
+          ...contact,
+          contracts: contact.contact_contracts || [],
+          totalMessages: stats.totalMessages,
+          lastContact
+        } as Contact;
+      });
 
       // Apply client-side filters that require processed data
       if (filters?.hasContracts !== undefined) {

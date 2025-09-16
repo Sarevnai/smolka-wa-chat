@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Contact } from "@/types/contact";
-import { useContacts } from "@/hooks/useContacts";
+import { useContactsForSelection } from "@/hooks/useContacts";
 import { cn } from "@/lib/utils";
 
 interface ContactSelectorProps {
@@ -34,12 +34,12 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  const { data: contacts = [], isLoading } = useContacts(searchTerm, {
+  const { data: contacts = [], isLoading } = useContactsForSelection(searchTerm, {
     status: filters.status.length > 0 ? filters.status as any : undefined,
     contactType: filters.contactType.length > 0 ? filters.contactType as any : undefined,
     rating: filters.rating,
     hasContracts: filters.hasContracts,
-  });
+  }, 500); // Load up to 500 contacts for selection
 
   const filteredContacts = contacts.filter(contact => 
     contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
