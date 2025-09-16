@@ -104,11 +104,11 @@ const AICommunicatorWidget: React.FC<AICommunicatorWidgetProps> = ({ className =
 
       {/* Full-screen modal dialog */}
       <DialogContent className={cn(
-        "fixed inset-4 w-auto h-auto max-w-4xl max-h-[90vh]",
+        "w-[90vw] h-[85vh] max-w-4xl",
         "p-0 gap-0 border-none shadow-2xl",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
         "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-        "sm:rounded-lg"
+        "rounded-lg"
       )}>
         {/* Header */}
         <DialogHeader className="p-6 pb-4 border-b">
