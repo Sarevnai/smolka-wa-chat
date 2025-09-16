@@ -2,13 +2,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Campaign, CampaignResult, CampaignStats, BulkMessageRequest } from "@/types/campaign";
 import { useToast } from "@/hooks/use-toast";
-import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
+
+const SUPABASE_PROJECT_URL = "https://wpjxsgxxhogzkkuznyke.supabase.co";
 
 export const useCampaigns = () => {
   return useQuery({
     queryKey: ["campaigns"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaigns")
         .select("*")
         .order("created_at", { ascending: false });
@@ -25,7 +26,7 @@ export const useCampaignResults = (campaignId?: string) => {
     queryFn: async () => {
       if (!campaignId) return [];
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaign_results")
         .select("*")
         .eq("campaign_id", campaignId)
@@ -63,7 +64,7 @@ export const useCreateCampaign = () => {
 
   return useMutation({
     mutationFn: async (campaign: Omit<Campaign, "id" | "created_at" | "updated_at">) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaigns")
         .insert([{
           ...campaign,
@@ -100,7 +101,7 @@ export const useSendCampaign = () => {
   return useMutation({
     mutationFn: async ({ campaignId, request }: { campaignId: string; request: BulkMessageRequest }) => {
       // First update campaign status to 'sending'
-      await supabase
+      await (supabase as any)
         .from("campaigns")
         .update({ status: "sending", updated_at: new Date().toISOString() })
         .eq("id", campaignId);
@@ -124,7 +125,7 @@ export const useSendCampaign = () => {
       }
 
       // Update campaign status to 'sent'
-      await supabase
+      await (supabase as any)
         .from("campaigns")
         .update({ 
           status: "sent", 
@@ -159,7 +160,7 @@ export const useScheduleCampaign = () => {
 
   return useMutation({
     mutationFn: async ({ campaignId, scheduledAt }: { campaignId: string; scheduledAt: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("campaigns")
         .update({ 
           scheduled_at: scheduledAt,

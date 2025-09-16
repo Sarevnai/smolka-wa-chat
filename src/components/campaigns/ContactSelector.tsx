@@ -20,7 +20,7 @@ interface ContactSelectorProps {
 interface FilterState {
   status: string[];
   contactType: string[];
-  ratingMin: number | null;
+  rating: number | null;
   hasContracts: boolean | null;
 }
 
@@ -29,7 +29,7 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
   const [filters, setFilters] = useState<FilterState>({
     status: [],
     contactType: [],
-    ratingMin: null,
+    rating: null,
     hasContracts: null,
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -37,7 +37,7 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
   const { data: contacts = [], isLoading } = useContacts(searchTerm, {
     status: filters.status.length > 0 ? filters.status as any : undefined,
     contactType: filters.contactType.length > 0 ? filters.contactType as any : undefined,
-    ratingMin: filters.ratingMin,
+    rating: filters.rating,
     hasContracts: filters.hasContracts,
   });
 
@@ -69,7 +69,7 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
     setFilters({
       status: [],
       contactType: [],
-      ratingMin: null,
+      rating: null,
       hasContracts: null,
     });
     setSearchTerm("");
@@ -79,7 +79,7 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
     searchTerm || 
     filters.status.length > 0 || 
     filters.contactType.length > 0 || 
-    filters.ratingMin !== null || 
+    filters.rating !== null || 
     filters.hasContracts !== null;
 
   const getContactDisplayName = (contact: Contact) => {
@@ -200,9 +200,9 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
               <div>
                 <label className="text-sm font-medium">Avaliação Mín.</label>
                 <Select
-                  value={filters.ratingMin?.toString() || ""}
+                  value={filters.rating?.toString() || ""}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, ratingMin: value ? parseInt(value) : null })
+                    setFilters({ ...filters, rating: value ? parseInt(value) : null })
                   }
                 >
                   <SelectTrigger>
