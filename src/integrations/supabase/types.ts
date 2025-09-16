@@ -720,6 +720,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_contact_message_stats: {
+        Args: { phone_numbers: string[] }
+        Returns: {
+          last_timestamp: string
+          phone: string
+          total_messages: number
+        }[]
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["user_role"]

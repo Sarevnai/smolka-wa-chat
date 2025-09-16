@@ -105,29 +105,47 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
       const { data, error } = await query;
       if (error) throw error;
 
-      // For better performance, get all message statistics in batches
+      // For better performance, get all message statistics in a single optimized query
       const phoneNumbers = data.map(contact => contact.phone);
       
-      // Get message statistics for all contacts in a single optimized query
-      const { data: messageStats } = await supabase
-        .rpc('get_contact_message_stats', { 
-          phone_numbers: phoneNumbers 
-        });
+      // Get message statistics for all contacts using direct SQL query
+      let messageStatsMap = new Map();
+      
+      if (phoneNumbers.length > 0) {
+        const { data: messageStats } = await supabase
+          .from('messages')
+          .select('wa_from, wa_timestamp')
+          .in('wa_from', phoneNumbers)
+          .order('wa_timestamp', { ascending: false });
 
-      // Create a map for quick lookup
-      const statsMap = new Map();
-      if (messageStats) {
-        messageStats.forEach((stat: any) => {
-          statsMap.set(stat.phone, {
-            totalMessages: stat.total_messages || 0,
-            lastTimestamp: stat.last_timestamp
+        if (messageStats) {
+          // Process message statistics
+          const statsTemp = new Map();
+          messageStats.forEach((msg: any) => {
+            const phone = msg.wa_from;
+            if (!statsTemp.has(phone)) {
+              statsTemp.set(phone, {
+                totalMessages: 0,
+                lastTimestamp: null
+              });
+            }
+            
+            const current = statsTemp.get(phone);
+            current.totalMessages += 1;
+            
+            // Keep the most recent timestamp
+            if (!current.lastTimestamp || msg.wa_timestamp > current.lastTimestamp) {
+              current.lastTimestamp = msg.wa_timestamp;
+            }
           });
-        });
+          
+          messageStatsMap = statsTemp;
+        }
       }
 
       // Enhance contacts with message statistics
       let contactsWithStats = data.map(contact => {
-        const stats = statsMap.get(contact.phone) || { totalMessages: 0, lastTimestamp: null };
+        const stats = messageStatsMap.get(contact.phone) || { totalMessages: 0, lastTimestamp: null };
         const lastContact = stats.lastTimestamp 
           ? formatLastContact(stats.lastTimestamp)
           : 'Nunca';

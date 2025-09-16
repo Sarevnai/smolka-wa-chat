@@ -135,7 +135,10 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
           </div>
         </CardTitle>
         <CardDescription>
-          Escolha os contatos que receberão a campanha ({filteredContacts.length} disponíveis)
+          Escolha os contatos que receberão a campanha ({filteredContacts.length} disponíveis) 
+          <Badge variant="outline" className="ml-2">
+            ⚡ Otimizado
+          </Badge>
         </CardDescription>
       </CardHeader>
       
@@ -269,8 +272,10 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
         <ScrollArea className="h-64 w-full border rounded-md">
           <div className="p-4 space-y-2">
             {isLoading ? (
-              <div className="text-center py-4 text-muted-foreground">
-                Carregando contatos...
+              <div className="text-center py-8 text-muted-foreground">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                <p>Carregando contatos otimizado...</p>
+                <p className="text-xs">Processamento rápido sem estatísticas de mensagens</p>
               </div>
             ) : filteredContacts.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
