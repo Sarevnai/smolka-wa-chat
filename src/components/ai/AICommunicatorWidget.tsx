@@ -39,19 +39,34 @@ const AICommunicatorWidget: React.FC<AICommunicatorWidgetProps> = ({ className =
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || isLoading) return;
+    if (!message.trim() || isLoading) {
+      console.log('Cannot send message:', { messageEmpty: !message.trim(), isLoading });
+      return;
+    }
 
-    const currentMessage = message;
+    const currentMessage = message.trim();
+    console.log('Sending message from widget:', currentMessage);
     setMessage('');
     
-    await sendMessage(currentMessage);
+    const response = await sendMessage(currentMessage);
+    if (!response) {
+      console.log('Message sending failed, restoring input');
+      setMessage(currentMessage);
+    }
   };
 
-  const handleToggle = () => {
-    if (!isConnected) {
-      startConversation();
+  const handleToggle = async () => {
+    console.log('Widget toggle clicked:', { isExpanded, isConnected });
+    
+    if (!isExpanded) {
+      setIsExpanded(true);
+      if (!isConnected && !isLoading) {
+        console.log('Starting conversation from widget toggle');
+        await startConversation();
+      }
+    } else {
+      setIsExpanded(false);
     }
-    setIsExpanded(!isExpanded);
   };
 
   const handleDisconnect = () => {
@@ -140,11 +155,16 @@ const AICommunicatorWidget: React.FC<AICommunicatorWidgetProps> = ({ className =
                   <Bot className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="font-medium mb-2">Assistente de IA</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Conecte-se para obter ajuda inteligente
+                    {isLoading ? 'Conectando com a IA...' : 'Conecte-se para obter ajuda inteligente'}
                   </p>
                   <Button onClick={startConversation} disabled={isLoading}>
                     {isLoading ? 'Conectando...' : 'Iniciar Conversa'}
                   </Button>
+                  {conversation && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Debug: Conversa existe mas não conectada
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (

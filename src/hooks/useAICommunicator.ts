@@ -28,9 +28,14 @@ export function useAICommunicator() {
 
   // Start new conversation
   const startConversation = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user available for starting conversation');
+      return;
+    }
 
     setIsLoading(true);
+    console.log('Starting AI conversation for user:', user.id);
+    
     try {
       const { data, error } = await supabase.functions.invoke('ai-communicator', {
         body: {
@@ -39,9 +44,15 @@ export function useAICommunicator() {
         }
       });
 
-      if (error) throw error;
+      console.log('Start conversation response:', { data, error });
 
-      if (data.success) {
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (data?.success && data?.conversation) {
+        console.log('Setting conversation:', data.conversation);
         setConversation(data.conversation);
         setIsConnected(true);
         
@@ -49,12 +60,16 @@ export function useAICommunicator() {
           title: "IA Conectada",
           description: "Assistente de IA está pronto para ajudar",
         });
+      } else {
+        throw new Error('Invalid response from AI communicator');
       }
     } catch (error) {
       console.error('Error starting AI conversation:', error);
+      setIsConnected(false);
+      setConversation(null);
       toast({
         title: "Erro de Conexão",
-        description: "Erro ao conectar com a IA",
+        description: `Erro ao conectar com a IA: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -64,41 +79,66 @@ export function useAICommunicator() {
 
   // Send message to AI
   const sendMessage = async (message: string, context?: any) => {
-    if (!user || !conversation) return;
+    if (!user) {
+      console.log('No user available for sending message');
+      return;
+    }
+    
+    if (!conversation) {
+      console.log('No active conversation, starting new one...');
+      await startConversation();
+      return;
+    }
+
+    if (!message.trim()) {
+      console.log('Empty message, skipping send');
+      return;
+    }
 
     setIsLoading(true);
+    console.log('Sending message to AI:', { message, conversationId: conversation.id });
+    
     try {
       const { data, error } = await supabase.functions.invoke('ai-communicator', {
         body: {
           action: 'send_message',
           userId: user.id,
-          message,
+          message: message.trim(),
           conversationId: conversation.id,
           context
         }
       });
 
-      if (error) throw error;
+      console.log('Send message response:', { data, error });
 
-      if (data.success) {
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (data?.success && data?.message) {
         // Update local conversation with new messages
         setConversation(prev => {
-          if (!prev) return null;
+          if (!prev) {
+            console.error('No conversation to update');
+            return null;
+          }
           
-          const newMessages = [
-            ...prev.messages,
-            {
-              role: 'user' as const,
-              content: message,
-              timestamp: new Date().toISOString()
-            },
-            {
-              role: 'assistant' as const,
-              content: data.message,
-              timestamp: new Date().toISOString(),
-              actions: data.actions || []
-            }
-          ];
+          const userMessage: AIMessage = {
+            role: 'user',
+            content: message,
+            timestamp: new Date().toISOString()
+          };
+
+          const assistantMessage: AIMessage = {
+            role: 'assistant',
+            content: data.message,
+            timestamp: new Date().toISOString(),
+            actions: data.actions || []
+          };
+
+          const newMessages = [...prev.messages, userMessage, assistantMessage];
+          console.log('Updated conversation with messages:', newMessages.length);
 
           return { ...prev, messages: newMessages };
         });
@@ -112,12 +152,14 @@ export function useAICommunicator() {
         }
 
         return data;
+      } else {
+        throw new Error('Invalid response from AI communicator');
       }
     } catch (error) {
       console.error('Error sending message to AI:', error);
       toast({
         title: "Erro de Comunicação",
-        description: "Erro ao enviar mensagem para a IA",
+        description: `Erro ao enviar mensagem para a IA: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -206,9 +248,14 @@ export function useAICommunicator() {
 
   // Load existing active conversation on mount
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      console.log('No user, skipping conversation load');
+      return;
+    }
 
     const loadActiveConversation = async () => {
+      console.log('Loading active conversation for user:', user.id);
+      
       try {
         const { data, error } = await supabase
           .from('ai_conversations')
@@ -220,17 +267,31 @@ export function useAICommunicator() {
           .limit(1)
           .maybeSingle();
 
-        if (error) throw error;
+        console.log('Load conversation result:', { data, error });
+
+        if (error) {
+          console.error('Error loading conversation:', error);
+          throw error;
+        }
 
         if (data) {
-          setConversation({
+          const conversationData = {
             ...data,
             messages: Array.isArray(data.messages) ? (data.messages as unknown as AIMessage[]) : []
-          });
+          };
+          
+          console.log('Setting loaded conversation:', conversationData);
+          setConversation(conversationData);
           setIsConnected(true);
+        } else {
+          console.log('No active conversation found');
+          setConversation(null);
+          setIsConnected(false);
         }
       } catch (error) {
         console.error('Error loading active conversation:', error);
+        setConversation(null);
+        setIsConnected(false);
       }
     };
 
