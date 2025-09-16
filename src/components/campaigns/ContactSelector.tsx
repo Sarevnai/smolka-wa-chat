@@ -158,17 +158,17 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
               {/* Status Filter */}
               <div>
                 <label className="text-sm font-medium">Status</label>
-                <Select
-                  value={filters.status.join(",")}
+                 <Select
+                  value={filters.status.join(",") || "all"}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, status: value ? value.split(",") : [] })
+                    setFilters({ ...filters, status: value === "all" ? [] : value.split(",") })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="ativo">Ativo</SelectItem>
                     <SelectItem value="inativo">Inativo</SelectItem>
                     <SelectItem value="bloqueado">Bloqueado</SelectItem>
@@ -179,17 +179,17 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
               {/* Contact Type Filter */}
               <div>
                 <label className="text-sm font-medium">Tipo</label>
-                <Select
-                  value={filters.contactType.join(",")}
+                 <Select
+                  value={filters.contactType.join(",") || "all"}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, contactType: value ? value.split(",") : [] })
+                    setFilters({ ...filters, contactType: value === "all" ? [] : value.split(",") })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="proprietario">Proprietário</SelectItem>
                     <SelectItem value="inquilino">Inquilino</SelectItem>
                   </SelectContent>
@@ -199,17 +199,17 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
               {/* Rating Filter */}
               <div>
                 <label className="text-sm font-medium">Avaliação Mín.</label>
-                <Select
-                  value={filters.rating?.toString() || ""}
+                 <Select
+                  value={filters.rating?.toString() || "any"}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, rating: value ? parseInt(value) : null })
+                    setFilters({ ...filters, rating: value === "any" ? null : parseInt(value) })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Qualquer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Qualquer</SelectItem>
+                    <SelectItem value="any">Qualquer</SelectItem>
                     <SelectItem value="1">1⭐</SelectItem>
                     <SelectItem value="2">2⭐</SelectItem>
                     <SelectItem value="3">3⭐</SelectItem>
@@ -222,12 +222,12 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
               {/* Has Contracts Filter */}
               <div>
                 <label className="text-sm font-medium">Contratos</label>
-                <Select
-                  value={filters.hasContracts?.toString() || ""}
+                 <Select
+                  value={filters.hasContracts?.toString() || "all"}
                   onValueChange={(value) =>
                     setFilters({ 
                       ...filters, 
-                      hasContracts: value === "" ? null : value === "true"
+                      hasContracts: value === "all" ? null : value === "true"
                     })
                   }
                 >
@@ -235,7 +235,7 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="true">Com contratos</SelectItem>
                     <SelectItem value="false">Sem contratos</SelectItem>
                   </SelectContent>
