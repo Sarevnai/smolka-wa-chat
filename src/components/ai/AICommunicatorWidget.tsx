@@ -92,7 +92,7 @@ const AICommunicatorWidget: React.FC<AICommunicatorWidgetProps> = ({ className =
         <Button
           size="icon"
           className={cn(
-            "fixed top-4 right-4 z-40 w-12 h-12 rounded-full shadow-lg",
+            "fixed top-1/2 right-4 -translate-y-1/2 z-40 w-12 h-12 rounded-full shadow-lg",
             "bg-primary hover:bg-primary/90 transition-all duration-300",
             "hover:scale-110",
             className
