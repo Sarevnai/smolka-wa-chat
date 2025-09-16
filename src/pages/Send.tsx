@@ -13,7 +13,7 @@ import CampaignPreview from "@/components/campaigns/CampaignPreview";
 import { useCampaigns, useCreateCampaign, useSendCampaign } from "@/hooks/useCampaigns";
 import { useTemplates } from "@/hooks/useTemplates";
 import { Campaign, MessageTemplate, BulkMessageRequest } from "@/types/campaign";
-import { useContacts } from "@/hooks/useContacts";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Send() {
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
@@ -25,7 +25,6 @@ export default function Send() {
   
   const { toast } = useToast();
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaigns();
-  const { data: contacts = [] } = useContacts();
   const createCampaign = useCreateCampaign();
   const sendCampaign = useSendCampaign();
 
@@ -76,8 +75,16 @@ export default function Send() {
       });
 
       if (!scheduledAt) {
-        // Send immediately
-        const selectedContactObjects = contacts.filter(c => selectedContacts.has(c.id));
+        // Send immediately - fetch selected contacts directly from database
+        const { data: selectedContactObjects, error: contactsError } = await supabase
+          .from('contacts')
+          .select('id, phone, name')
+          .in('id', Array.from(selectedContacts));
+
+        if (contactsError) {
+          throw contactsError;
+        }
+
         const bulkRequest: BulkMessageRequest = {
           contacts: selectedContactObjects.map(contact => ({
             phone: contact.phone,
@@ -229,11 +236,18 @@ export default function Send() {
                   onContactsChange={setSelectedContacts}
                 />
 
-                {/* Campaign Preview */}
+                {/* Campaign Preview - pass selected contact count */}
                 <CampaignPreview
                   message={getMessage()}
                   template={selectedTemplate}
-                  selectedContacts={contacts.filter(c => selectedContacts.has(c.id))}
+                  selectedContacts={Array.from(selectedContacts).map(id => ({ 
+                    id, 
+                    phone: `+55 11 9999-${id.slice(-4)}`, 
+                    name: `Contato ${id.slice(-4)}`,
+                    status: 'ativo' as const,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  }))}
                   scheduledAt={scheduledAt}
                   campaignName={campaignName}
                 />

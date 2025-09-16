@@ -3,49 +3,64 @@ import { supabase } from '@/integrations/supabase/client';
 import { Contact, Contract, ContactStats, CreateContactRequest } from '@/types/contact';
 import { ContactFiltersState } from '@/components/contacts/ContactFilters';
 
-// Optimized hook for contact selection (without message stats to improve performance)
-export const useContactsForSelection = (searchTerm?: string, filters?: ContactFiltersState, limit = 100) => {
+// Optimized hook for contact selection with pagination to load all contacts
+export const useContactsForSelection = (searchTerm?: string, filters?: ContactFiltersState, limit = 2000) => {
   return useQuery({
-    queryKey: ['contacts-selection', searchTerm, filters, limit],
+    queryKey: ['contacts-selection', searchTerm, filters],
     queryFn: async () => {
-      let query = supabase
-        .from('contacts')
-        .select(`
-          *,
-          contact_contracts (*)
-        `)
-        .order('updated_at', { ascending: false })
-        .limit(limit);
+      const allContacts = [];
+      const pageSize = 200;
+      let from = 0;
+      let hasMore = true;
 
-      // Apply search term - server-side search for better performance
-      if (searchTerm && searchTerm.trim()) {
-        const term = searchTerm.trim();
-        query = query.or(`
-          name.ilike.%${term}%,
-          phone.ilike.%${term}%,
-          email.ilike.%${term}%,
-          contact_contracts.contract_number.ilike.%${term}%
-        `);
+      while (hasMore && allContacts.length < limit) {
+        let query = supabase
+          .from('contacts')
+          .select(`
+            *,
+            contact_contracts (*)
+          `)
+          .order('updated_at', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        // Apply search term - server-side search for better performance
+        if (searchTerm && searchTerm.trim()) {
+          const term = searchTerm.trim();
+          query = query.or(`
+            name.ilike.%${term}%,
+            phone.ilike.%${term}%,
+            email.ilike.%${term}%,
+            contact_contracts.contract_number.ilike.%${term}%
+          `);
+        }
+
+        // Apply filters - server-side filtering
+        if (filters?.status && Array.isArray(filters.status) && filters.status.length > 0) {
+          query = query.in('status', filters.status);
+        }
+
+        if (filters?.contactType && Array.isArray(filters.contactType) && filters.contactType.length > 0) {
+          query = query.in('contact_type', filters.contactType);
+        }
+
+        if (filters?.rating) {
+          query = query.gte('rating', filters.rating);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          allContacts.push(...data);
+          from += pageSize;
+          hasMore = data.length === pageSize;
+        }
       }
-
-      // Apply filters - server-side filtering
-      if (filters?.status) {
-        query = query.eq('status', filters.status);
-      }
-
-      if (filters?.contactType) {
-        query = query.eq('contact_type', filters.contactType);
-      }
-
-      if (filters?.rating) {
-        query = query.gte('rating', filters.rating);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
 
       // Transform data without expensive message queries
-      let contacts = data.map(contact => ({
+      let contacts = allContacts.map(contact => ({
         ...contact,
         contracts: contact.contact_contracts || [],
         totalMessages: 0, // Skip for performance

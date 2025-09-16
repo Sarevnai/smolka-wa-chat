@@ -39,13 +39,18 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
     contactType: filters.contactType.length > 0 ? filters.contactType as any : undefined,
     rating: filters.rating,
     hasContracts: filters.hasContracts,
-  }, 500); // Load up to 500 contacts for selection
+  });
 
-  const filteredContacts = contacts.filter(contact => 
-    contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.phone.includes(searchTerm) ||
-    contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Apply client-side filtering for hasContracts since it's not server-side filtered
+  const filteredContacts = contacts.filter(contact => {
+    if (filters.hasContracts === true && (!contact.contracts || contact.contracts.length === 0)) {
+      return false;
+    }
+    if (filters.hasContracts === false && contact.contracts && contact.contracts.length > 0) {
+      return false;
+    }
+    return true;
+  });
 
   const handleSelectAll = () => {
     if (selectedContacts.size === filteredContacts.length) {
@@ -137,7 +142,7 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
         <CardDescription>
           Escolha os contatos que receberão a campanha ({filteredContacts.length} disponíveis) 
           <Badge variant="outline" className="ml-2">
-            ⚡ Otimizado
+            📄 Paginado
           </Badge>
         </CardDescription>
       </CardHeader>
@@ -274,8 +279,8 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                <p>Carregando contatos otimizado...</p>
-                <p className="text-xs">Processamento rápido sem estatísticas de mensagens</p>
+                <p>Carregando todos os contatos...</p>
+                <p className="text-xs">Usando paginação para carregar até 2000 contatos</p>
               </div>
             ) : filteredContacts.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">

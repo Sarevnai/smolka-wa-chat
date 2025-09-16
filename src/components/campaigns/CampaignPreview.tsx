@@ -22,15 +22,15 @@ export default function CampaignPreview({
   scheduledAt,
   campaignName 
 }: CampaignPreviewProps) {
-  const sampleContact = selectedContacts[0];
+  const sampleContact = selectedContacts?.[0];
   
   const replaceVariables = (content: string) => {
-    if (!template || !sampleContact) return content;
+    if (!template) return content;
     
     let result = content;
     const variableMap: Record<string, string> = {
-      nome: sampleContact.name || "Cliente",
-      contrato: sampleContact.contracts?.[0]?.contract_number || "12345",
+      nome: sampleContact?.name || "Cliente",
+      contrato: sampleContact?.contracts?.[0]?.contract_number || "12345",
       valor: "1.200,00",
       endereco: "Rua das Flores, 123",
       data: format(new Date(), "dd/MM/yyyy"),
@@ -38,7 +38,7 @@ export default function CampaignPreview({
       mensagem: "informação importante"
     };
 
-    template.variables.forEach(variable => {
+    template.variables?.forEach(variable => {
       const placeholder = `{{${variable}}}`;
       const value = variableMap[variable] || `[${variable}]`;
       result = result.replace(new RegExp(placeholder, 'g'), value);
@@ -121,7 +121,7 @@ export default function CampaignPreview({
               <Badge variant="outline">{template.name}</Badge>
             </div>
             
-            {template.variables.length > 0 && (
+            {template && template.variables?.length > 0 && (
               <div className="mb-3">
                 <p className="text-sm text-muted-foreground mb-2">
                   Variáveis que serão substituídas:
@@ -167,7 +167,7 @@ export default function CampaignPreview({
                 <p className="text-xs text-muted-foreground mb-1">
                   Exemplo com dados de: <strong>{sampleContact.name || sampleContact.phone}</strong>
                 </p>
-                {template && template.variables.length > 0 && (
+                {sampleContact && template && template.variables?.length > 0 && (
                   <p className="text-xs text-muted-foreground">
                     As variáveis serão substituídas automaticamente para cada contato
                   </p>
