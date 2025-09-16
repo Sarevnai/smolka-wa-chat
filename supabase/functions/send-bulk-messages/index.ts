@@ -25,6 +25,72 @@ serve(async (req) => {
   }
 
   try {
+    // Get authorization header and verify user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('❌ No authorization header');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Autorização necessária' 
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Initialize Supabase client with user context
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
+
+    // Verify user is authenticated and get user info
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      console.error('❌ Authentication failed:', authError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Falha na autenticação' 
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Check if user is admin
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || !profile || profile.role !== 'admin') {
+      console.error('❌ User not authorized for bulk messaging:', profileError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Privilégios de administrador necessários para envio em massa' 
+        }),
+        { 
+          status: 403, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('✅ User authenticated as admin:', user.email);
+
     const { contacts, message, template_id, campaign_id }: BulkMessageRequest = await req.json();
 
     console.log('Bulk message request:', { contactCount: contacts.length, messageLength: message.length });
@@ -48,6 +114,44 @@ serve(async (req) => {
         JSON.stringify({ 
           success: false, 
           error: 'Mensagem é obrigatória' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Validate phone numbers and rate limiting
+    const phoneRegex = /^\+?[\d\s-()]{10,15}$/;
+    const invalidContacts = contacts.filter(contact => 
+      !contact.phone || 
+      typeof contact.phone !== 'string' || 
+      !phoneRegex.test(contact.phone.replace(/\s/g, ''))
+    );
+
+    if (invalidContacts.length > 0) {
+      console.error('❌ Invalid phone numbers found:', invalidContacts);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Números de telefone inválidos encontrados',
+          invalid_contacts: invalidContacts
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Rate limiting - max 100 contacts per request
+    if (contacts.length > 100) {
+      console.error('❌ Too many contacts in single request:', contacts.length);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Máximo de 100 contatos permitidos por solicitação de envio em massa' 
         }),
         { 
           status: 400, 

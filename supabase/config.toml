@@ -4,7 +4,7 @@ project_id = "wpjxsgxxhogzkkuznyke"
 verify_jwt = false
 
 [functions.send-wa-message]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-bulk-messages]
 verify_jwt = true
