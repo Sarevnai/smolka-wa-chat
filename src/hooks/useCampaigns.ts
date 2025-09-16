@@ -41,14 +41,43 @@ export const useCampaignStats = () => {
   return useQuery({
     queryKey: ["campaign-stats"],
     queryFn: async () => {
-      // This would be implemented as a database function or computed query
-      // For now, return mock data structure
+      // Get total and active campaigns
+      const { data: campaigns, error: campaignsError } = await supabase
+        .from("campaigns")
+        .select("status, created_at, sent_count, response_count");
+      
+      if (campaignsError) throw campaignsError;
+
+      // Get campaign results for today and this month
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const thisMonth = new Date();
+      thisMonth.setDate(1);
+      thisMonth.setHours(0, 0, 0, 0);
+
+      const { data: resultsToday, error: todayError } = await supabase
+        .from("campaign_results")
+        .select("id")
+        .gte("sent_at", today.toISOString());
+
+      const { data: resultsThisMonth, error: monthError } = await supabase
+        .from("campaign_results")
+        .select("id")
+        .gte("sent_at", thisMonth.toISOString());
+
+      if (todayError) throw todayError;
+      if (monthError) throw monthError;
+
+      const totalSent = campaigns?.reduce((sum, c) => sum + (c.sent_count || 0), 0) || 0;
+      const totalResponses = campaigns?.reduce((sum, c) => sum + (c.response_count || 0), 0) || 0;
+
       const stats: CampaignStats = {
-        total_campaigns: 0,
-        active_campaigns: 0,
-        messages_sent_today: 0,
-        messages_sent_this_month: 0,
-        average_response_rate: 0,
+        total_campaigns: campaigns?.length || 0,
+        active_campaigns: campaigns?.filter(c => c.status === 'scheduled' || c.status === 'sending').length || 0,
+        messages_sent_today: resultsToday?.length || 0,
+        messages_sent_this_month: resultsThisMonth?.length || 0,
+        average_response_rate: totalSent > 0 ? (totalResponses / totalSent) * 100 : 0,
       };
       
       return stats;

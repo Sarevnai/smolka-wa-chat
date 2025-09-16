@@ -13,9 +13,11 @@ import CampaignPreview from "@/components/campaigns/CampaignPreview";
 import { useCampaigns, useCreateCampaign, useSendCampaign } from "@/hooks/useCampaigns";
 import { useTemplates } from "@/hooks/useTemplates";
 import { Campaign, MessageTemplate, BulkMessageRequest } from "@/types/campaign";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Send() {
+  const { profile } = useAuth();
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [customMessage, setCustomMessage] = useState("");
@@ -27,6 +29,8 @@ export default function Send() {
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaigns();
   const createCampaign = useCreateCampaign();
   const sendCampaign = useSendCampaign();
+
+  const isAdmin = profile?.role === 'admin';
 
   const getMessage = () => {
     if (selectedTemplate) {
@@ -136,6 +140,23 @@ export default function Send() {
     }
   };
 
+  if (!isAdmin) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-bold">Acesso Restrito</h2>
+            <p className="text-muted-foreground">
+              Você não tem permissão para acessar esta funcionalidade.
+              <br />
+              Entre em contato com um administrador.
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto">
@@ -236,18 +257,18 @@ export default function Send() {
                   onContactsChange={setSelectedContacts}
                 />
 
-                {/* Campaign Preview - pass selected contact count */}
+                {/* Campaign Preview - fetch and show actual contact data */}
                 <CampaignPreview
                   message={getMessage()}
                   template={selectedTemplate}
-                  selectedContacts={Array.from(selectedContacts).map(id => ({ 
-                    id, 
-                    phone: `+55 11 9999-${id.slice(-4)}`, 
-                    name: `Contato ${id.slice(-4)}`,
+                  selectedContacts={[{ 
+                    id: Array.from(selectedContacts)[0] || 'preview', 
+                    phone: 'Prévia', 
+                    name: `${selectedContacts.size} contato${selectedContacts.size !== 1 ? 's' : ''} selecionado${selectedContacts.size !== 1 ? 's' : ''}`,
                     status: 'ativo' as const,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
-                  }))}
+                  }]}
                   scheduledAt={scheduledAt}
                   campaignName={campaignName}
                 />

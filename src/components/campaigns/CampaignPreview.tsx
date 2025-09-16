@@ -30,11 +30,14 @@ export default function CampaignPreview({
     let result = content;
     const variableMap: Record<string, string> = {
       nome: sampleContact?.name || "Cliente",
-      contrato: sampleContact?.contracts?.[0]?.contract_number || "12345",
-      valor: "1.200,00",
-      endereco: "Rua das Flores, 123",
+      contrato: sampleContact?.contracts?.[0]?.contract_number || "N/A",
+      propriedade: sampleContact?.contracts?.[0]?.property_code || "N/A", 
+      tipo_contrato: sampleContact?.contracts?.[0]?.contract_type || "N/A",
+      status_contrato: sampleContact?.contracts?.[0]?.status || "N/A",
+      telefone: sampleContact?.phone || "N/A",
+      email: sampleContact?.email || "N/A",
       data: format(new Date(), "dd/MM/yyyy"),
-      horario: "14:00",
+      horario: format(new Date(), "HH:mm"),
       mensagem: "informação importante"
     };
 
