@@ -14,6 +14,119 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_automations: {
+        Row: {
+          action_config: Json
+          automation_type: string
+          created_at: string
+          failure_count: number | null
+          id: string
+          is_enabled: boolean | null
+          success_count: number | null
+          trigger_conditions: Json
+          updated_at: string
+        }
+        Insert: {
+          action_config: Json
+          automation_type: string
+          created_at?: string
+          failure_count?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          success_count?: number | null
+          trigger_conditions: Json
+          updated_at?: string
+        }
+        Update: {
+          action_config?: Json
+          automation_type?: string
+          created_at?: string
+          failure_count?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          success_count?: number | null
+          trigger_conditions?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_conversations: {
+        Row: {
+          context_data: Json | null
+          conversation_type: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          messages: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          context_data?: Json | null
+          conversation_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          messages?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          context_data?: Json | null
+          conversation_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          messages?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ai_suggestions: {
+        Row: {
+          confidence_score: number | null
+          contact_phone: string
+          created_at: string
+          id: string
+          is_used: boolean | null
+          message_id: number | null
+          suggestion_content: Json
+          suggestion_type: string
+          updated_at: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          contact_phone: string
+          created_at?: string
+          id?: string
+          is_used?: boolean | null
+          message_id?: number | null
+          suggestion_content: Json
+          suggestion_type: string
+          updated_at?: string
+        }
+        Update: {
+          confidence_score?: number | null
+          contact_phone?: string
+          created_at?: string
+          id?: string
+          is_used?: boolean | null
+          message_id?: number | null
+          suggestion_content?: Json
+          suggestion_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_suggestions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clickup_config: {
         Row: {
           api_token: string

@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useNewMessages } from "@/hooks/useNewMessages";
+import AICommunicatorWidget from "@/components/ai/AICommunicatorWidget";
 export default function Layout({
   children
 }: {
@@ -150,5 +151,8 @@ export default function Layout({
       <main className="container mx-auto px-4 py-8">
         {children}
       </main>
+      
+      {/* AI Communicator Widget - Always available */}
+      <AICommunicatorWidget />
     </div>;
 }
