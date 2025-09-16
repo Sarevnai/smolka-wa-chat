@@ -120,10 +120,10 @@ export default function Layout({
                 </Badge>}
             </Link>
 
-            {/* Enviar Mensagem */}
+            {/* Campanhas */}
             <Link to="/send" className={cn("flex items-center space-x-3 px-6 py-4 text-sm font-medium rounded-t-lg transition-all duration-200", location.pathname === "/send" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-accent/50")}>
               <Send className="h-5 w-5" />
-              <span>Enviar</span>
+              <span>Campanhas</span>
             </Link>
 
             {/* Contatos - Nova seção CRM */}
