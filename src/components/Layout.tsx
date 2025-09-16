@@ -152,7 +152,7 @@ export default function Layout({
         {children}
       </main>
       
-      {/* AI Communicator Widget - Always available */}
-      <AICommunicatorWidget />
+      {/* AI Communicator Widget - Available except on individual chat pages */}
+      {!location.pathname.startsWith('/chat/') && <AICommunicatorWidget />}
     </div>;
 }
