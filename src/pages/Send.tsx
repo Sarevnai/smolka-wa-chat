@@ -40,15 +40,34 @@ export default function Send() {
         // WhatsApp template - use the preview function
         const preview = getTemplatePreview(selectedTemplate);
         console.log('WhatsApp template preview:', preview);
-        return preview || selectedTemplate.template_name; // Fallback to template name
+        // More robust fallback: use template_name if preview is empty, or default message
+        return preview && preview.trim() ? preview : 
+               selectedTemplate.template_name || 
+               'Template WhatsApp selecionado';
       } else if ('content' in selectedTemplate) {
         // Regular template
         console.log('Regular template content:', selectedTemplate.content);
-        return selectedTemplate.content;
+        return selectedTemplate.content || '';
       }
     }
     console.log('Custom message:', customMessage);
-    return customMessage;
+    return customMessage || '';
+  };
+
+  // Helper function to check if we have valid message content
+  const hasValidMessage = () => {
+    const message = getMessage();
+    const isValid = message && message.trim().length > 0;
+    console.log('Debug - hasValidMessage:', {
+      selectedTemplate: selectedTemplate ? {
+        type: 'template_name' in selectedTemplate ? 'whatsapp' : 'regular',
+        name: 'template_name' in selectedTemplate ? selectedTemplate.template_name : selectedTemplate.name
+      } : null,
+      customMessage: customMessage,
+      message: message,
+      isValid: isValid
+    });
+    return isValid;
   };
 
   const handleCreateCampaign = async () => {
@@ -283,7 +302,7 @@ export default function Send() {
                   <CardContent className="pt-6">
                     <Button
                       onClick={handleCreateCampaign}
-                      disabled={createCampaign.isPending || sendCampaign.isPending || !campaignName.trim() || selectedContacts.size === 0 || (!selectedTemplate && !customMessage.trim())}
+                      disabled={createCampaign.isPending || sendCampaign.isPending || !campaignName.trim() || selectedContacts.size === 0 || !hasValidMessage()}
                       className="w-full"
                       size="lg"
                     >
