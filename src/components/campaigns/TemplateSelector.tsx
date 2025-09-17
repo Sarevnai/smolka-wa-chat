@@ -10,6 +10,7 @@ import { MessageTemplate } from "@/types/campaign";
 import { useTemplates, getBuiltInTemplates } from "@/hooks/useTemplates";
 import { WhatsAppTemplate, useWhatsAppTemplates, isOfficialWhatsAppTemplate, getTemplatePreview } from "@/hooks/useWhatsAppTemplates";
 import { cn } from "@/lib/utils";
+import SyncTemplatesButton from "./SyncTemplatesButton";
 
 interface TemplateSelectorProps {
   selectedTemplate?: MessageTemplate | WhatsAppTemplate;

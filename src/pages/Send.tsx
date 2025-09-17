@@ -13,12 +13,13 @@ import CampaignPreview from "@/components/campaigns/CampaignPreview";
 import { useCampaigns, useCreateCampaign, useSendCampaign } from "@/hooks/useCampaigns";
 import { useTemplates } from "@/hooks/useTemplates";
 import { Campaign, MessageTemplate, BulkMessageRequest } from "@/types/campaign";
+import { WhatsAppTemplate, getTemplatePreview } from "@/hooks/useWhatsAppTemplates";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Send() {
   const { profile } = useAuth();
-  const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | WhatsAppTemplate | null>(null);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [customMessage, setCustomMessage] = useState("");
   const [campaignName, setCampaignName] = useState("");
@@ -34,7 +35,14 @@ export default function Send() {
 
   const getMessage = () => {
     if (selectedTemplate) {
-      return selectedTemplate.content;
+      // Check if it's a WhatsApp template or regular template
+      if ('template_name' in selectedTemplate && 'components' in selectedTemplate) {
+        // WhatsApp template - use the preview function
+        return getTemplatePreview(selectedTemplate);
+      } else if ('content' in selectedTemplate) {
+        // Regular template
+        return selectedTemplate.content;
+      }
     }
     return customMessage;
   };
@@ -257,18 +265,11 @@ export default function Send() {
                   onContactsChange={setSelectedContacts}
                 />
 
-                {/* Campaign Preview - fetch and show actual contact data */}
+                {/* Campaign Preview */}
                 <CampaignPreview
                   message={getMessage()}
                   template={selectedTemplate}
-                  selectedContacts={[{ 
-                    id: Array.from(selectedContacts)[0] || 'preview', 
-                    phone: 'Prévia', 
-                    name: `${selectedContacts.size} contato${selectedContacts.size !== 1 ? 's' : ''} selecionado${selectedContacts.size !== 1 ? 's' : ''}`,
-                    status: 'ativo' as const,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  }]}
+                  selectedContacts={Array.from(selectedContacts)}
                   scheduledAt={scheduledAt}
                   campaignName={campaignName}
                 />

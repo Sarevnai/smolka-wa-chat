@@ -3,15 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MessageTemplate } from "@/types/campaign";
-import { Contact } from "@/types/contact";
-import { WhatsAppTemplate, isOfficialWhatsAppTemplate, getTemplatePreview } from "@/hooks/useWhatsAppTemplates";
+import { WhatsAppTemplate, getTemplatePreview, isOfficialWhatsAppTemplate } from "@/hooks/useWhatsAppTemplates";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface CampaignPreviewProps {
   message: string;
   template?: MessageTemplate | WhatsAppTemplate;
-  selectedContacts: Set<string>;
+  selectedContacts: string[];
   scheduledAt?: Date | null;
   campaignName?: string;
 }
@@ -23,7 +22,7 @@ export default function CampaignPreview({
   scheduledAt,
   campaignName 
 }: CampaignPreviewProps) {
-  const selectedContactsCount = selectedContacts.size;
+  const selectedContactsCount = selectedContacts.length;
   
   const replaceVariables = (content: string) => {
     if (!template) return content;
