@@ -71,13 +71,17 @@ export const useWhatsAppTemplateById = (templateId?: string) => {
 
 // Helper function to get template preview with sample data
 export const getTemplatePreview = (template: WhatsAppTemplate): string => {
+  console.log('Generating preview for template:', template.template_name, template.components);
+  
   if (!template.components || template.components.length === 0) {
-    return "Template sem conteúdo";
+    console.log('No components found, returning template name');
+    return template.template_name || "Template sem conteúdo";
   }
 
   const bodyComponent = template.components.find(c => c.type === 'BODY');
   if (!bodyComponent?.text) {
-    return "Template sem texto principal";
+    console.log('No body component found, returning template name');
+    return template.template_name || "Template sem texto principal";
   }
 
   let preview = bodyComponent.text;
@@ -97,6 +101,7 @@ export const getTemplatePreview = (template: WhatsAppTemplate): string => {
     return `[${sampleData[num as keyof typeof sampleData] || `Parâmetro ${num}`}]`;
   });
 
+  console.log('Generated preview:', preview);
   return preview;
 };
 

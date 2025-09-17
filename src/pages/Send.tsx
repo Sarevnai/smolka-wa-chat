@@ -38,12 +38,16 @@ export default function Send() {
       // Check if it's a WhatsApp template or regular template
       if ('template_name' in selectedTemplate && 'components' in selectedTemplate) {
         // WhatsApp template - use the preview function
-        return getTemplatePreview(selectedTemplate);
+        const preview = getTemplatePreview(selectedTemplate);
+        console.log('WhatsApp template preview:', preview);
+        return preview || selectedTemplate.template_name; // Fallback to template name
       } else if ('content' in selectedTemplate) {
         // Regular template
+        console.log('Regular template content:', selectedTemplate.content);
         return selectedTemplate.content;
       }
     }
+    console.log('Custom message:', customMessage);
     return customMessage;
   };
 
@@ -279,7 +283,7 @@ export default function Send() {
                   <CardContent className="pt-6">
                     <Button
                       onClick={handleCreateCampaign}
-                      disabled={createCampaign.isPending || sendCampaign.isPending || !campaignName.trim() || selectedContacts.size === 0 || !getMessage().trim()}
+                      disabled={createCampaign.isPending || sendCampaign.isPending || !campaignName.trim() || selectedContacts.size === 0 || (!selectedTemplate && !customMessage.trim())}
                       className="w-full"
                       size="lg"
                     >

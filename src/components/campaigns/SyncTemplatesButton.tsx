@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RefreshCw, Download } from "lucide-react";
+import { RefreshCw, Download, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,68 +14,75 @@ export default function SyncTemplatesButton() {
     setIsLoading(true);
     
     try {
-      console.log('Starting template sync...');
+      console.log('Iniciando sincronização de templates...');
+      
+      toast({
+        title: "Sincronização iniciada",
+        description: "Conectando com a Meta API...",
+      });
+
       const { data, error } = await supabase.functions.invoke('sync-whatsapp-templates');
 
-      console.log('Sync response:', { data, error });
+      console.log('Resposta da sincronização:', { data, error });
 
       if (error) {
-        console.error('Supabase function error:', error);
+        console.error('Erro na função Supabase:', error);
         throw error;
       }
 
       // Invalidate WhatsApp templates query to refresh the list
-      queryClient.invalidateQueries({ queryKey: ["whatsapp-templates"] });
+      await queryClient.invalidateQueries({ queryKey: ["whatsapp-templates"] });
 
-      // Show detailed success/error information
       if (data?.success) {
         toast({
-          title: "Sincronização concluída",
+          title: "Sincronização bem-sucedida! ✅",
           description: data.message,
         });
         
-        // Log debug info if available
-        if (data.debug) {
-          console.log('Sync debug info:', data.debug);
+        if (data.results?.synced > 0) {
+          console.log(`${data.results.synced} templates sincronizados:`, data.results.templates);
         }
         
-        // Show detailed results if available
-        if (data.results) {
-          console.log('Sync results:', data.results);
-          if (data.results.errors.length > 0) {
-            console.warn('Sync errors:', data.results.errors);
-          }
-        }
       } else {
-        throw new Error(data?.error || 'Resposta inválida da sincronização');
+        // Handle business logic errors
+        console.error('Erro de negócio:', data);
+        
+        toast({
+          title: "Problema na sincronização ⚠️",
+          description: data?.error || data?.message || 'Erro desconhecido na sincronização',
+          variant: "destructive",
+        });
+        
+        if (data?.details) {
+          console.error('Detalhes do erro:', data.details);
+        }
       }
 
     } catch (error: any) {
-      console.error('Sync error details:', error);
+      console.error('Erro crítico na sincronização:', error);
       
-      let errorMessage = 'Falha ao sincronizar templates da Meta.';
-      let errorDetails = '';
+      let errorMessage = 'Falha na comunicação com o servidor.';
+      let errorDescription = '';
       
       if (error.message) {
         errorMessage = error.message;
       }
       
-      // Try to extract more details from the error
       if (error.context?.body) {
         try {
           const body = JSON.parse(error.context.body);
-          if (body.debug) {
-            errorDetails = `Debug: ${JSON.stringify(body.debug, null, 2)}`;
-            console.log('Error debug info:', body.debug);
+          if (body.error) {
+            errorMessage = body.error;
+            errorDescription = body.details || '';
           }
         } catch (e) {
-          // Ignore parsing errors
+          console.log('Erro ao parsear contexto do erro');
         }
       }
       
       toast({
-        title: "Erro na sincronização",
-        description: errorDetails || errorMessage,
+        title: "Erro na sincronização ❌",
+        description: errorDescription || errorMessage,
         variant: "destructive",
       });
     } finally {

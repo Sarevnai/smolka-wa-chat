@@ -14,6 +14,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== WhatsApp Template Sync Started ===');
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -22,27 +24,31 @@ serve(async (req) => {
     const whatsappAccessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
     const whatsappBusinessAccountId = Deno.env.get('WHATSAPP_BUSINESS_ACCOUNT_ID');
 
-    // Enhanced validation and logging
-    console.log('=== WhatsApp Template Sync Debug ===');
-    console.log('Access Token exists:', !!whatsappAccessToken);
-    console.log('Business Account ID exists:', !!whatsappBusinessAccountId);
-    console.log('Business Account ID format:', whatsappBusinessAccountId?.length, 'characters');
-    console.log('Business Account ID value:', whatsappBusinessAccountId);
+    console.log('Environment check:', {
+      hasAccessToken: !!whatsappAccessToken,
+      hasBusinessAccountId: !!whatsappBusinessAccountId,
+      businessAccountIdLength: whatsappBusinessAccountId?.length,
+      businessAccountIdStartsWith: whatsappBusinessAccountId?.substring(0, 5)
+    });
 
-    if (!whatsappAccessToken || !whatsappBusinessAccountId) {
-      const missingVars = [];
-      if (!whatsappAccessToken) missingVars.push('WHATSAPP_ACCESS_TOKEN');
-      if (!whatsappBusinessAccountId) missingVars.push('WHATSAPP_BUSINESS_ACCOUNT_ID');
-      
-      console.error('Missing required environment variables:', missingVars);
+    if (!whatsappAccessToken) {
+      console.error('WHATSAPP_ACCESS_TOKEN is missing');
       return new Response(JSON.stringify({ 
-        error: 'Missing WhatsApp credentials',
-        details: `Missing: ${missingVars.join(', ')}`,
-        debug: {
-          hasAccessToken: !!whatsappAccessToken,
-          hasBusinessAccountId: !!whatsappBusinessAccountId,
-          businessAccountIdLength: whatsappBusinessAccountId?.length || 0
-        }
+        success: false,
+        error: 'WHATSAPP_ACCESS_TOKEN não configurado',
+        details: 'Configure o token de acesso do WhatsApp Business nas configurações do projeto'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!whatsappBusinessAccountId) {
+      console.error('WHATSAPP_BUSINESS_ACCOUNT_ID is missing');
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'WHATSAPP_BUSINESS_ACCOUNT_ID não configurado',
+        details: 'Configure o ID da conta de negócios do WhatsApp nas configurações do projeto'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -53,67 +59,71 @@ serve(async (req) => {
     if (!/^\d+$/.test(whatsappBusinessAccountId)) {
       console.error('Invalid Business Account ID format:', whatsappBusinessAccountId);
       return new Response(JSON.stringify({ 
-        error: 'Invalid Business Account ID format',
-        details: 'Business Account ID must be numeric (e.g., "123456789012345")',
-        debug: {
-          providedId: whatsappBusinessAccountId,
-          isNumeric: /^\d+$/.test(whatsappBusinessAccountId)
-        }
+        success: false,
+        error: 'Formato inválido do Business Account ID',
+        details: `O ID deve ser numérico. Recebido: ${whatsappBusinessAccountId}`,
+        debug: { providedId: whatsappBusinessAccountId }
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Fetch templates from Meta Graph API with enhanced logging
-    const apiUrl = `https://graph.facebook.com/v23.0/${whatsappBusinessAccountId}/message_templates?access_token=${whatsappAccessToken}`;
-    console.log('Making request to Meta API...');
-    console.log('API URL (token masked):', apiUrl.replace(/access_token=[^&]+/, 'access_token=***'));
+    // Fetch templates from Meta Graph API
+    const apiUrl = `https://graph.facebook.com/v23.0/${whatsappBusinessAccountId}/message_templates`;
+    console.log('Making request to Meta API:', apiUrl);
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
+        'Authorization': `Bearer ${whatsappAccessToken}`,
         'Content-Type': 'application/json',
       },
     });
 
-    console.log('Meta API Response Status:', response.status);
-    console.log('Meta API Response Headers:', Object.fromEntries(response.headers.entries()));
+    console.log('Meta API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Meta API Error Response:', errorData);
+      const errorText = await response.text();
+      console.error('Meta API Error Response:', errorText);
       
-      let parsedError;
+      let errorMessage = 'Erro ao conectar com a Meta API';
+      let details = errorText;
+      
       try {
-        parsedError = JSON.parse(errorData);
+        const parsedError = JSON.parse(errorText);
+        if (parsedError.error?.message) {
+          errorMessage = parsedError.error.message;
+        }
+        details = JSON.stringify(parsedError, null, 2);
       } catch (e) {
-        parsedError = { message: errorData };
+        // Keep original error text
       }
 
       return new Response(JSON.stringify({ 
-        error: 'Failed to fetch templates from Meta',
-        details: parsedError,
+        success: false,
+        error: errorMessage,
+        details: details,
         debug: {
           status: response.status,
-          businessAccountId: whatsappBusinessAccountId,
-          apiUrl: apiUrl.replace(/access_token=[^&]+/, 'access_token=***'),
-          responseHeaders: Object.fromEntries(response.headers.entries())
+          url: apiUrl,
+          timestamp: new Date().toISOString()
         }
       }), {
-        status: response.status,
+        status: response.status >= 400 ? response.status : 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const data = await response.json();
-    console.log('=== Meta API Response Data ===');
-    console.log('Full response:', JSON.stringify(data, null, 2));
-    console.log('Templates found:', data.data?.length || 0);
-    
-    if (data.data && data.data.length > 0) {
-      console.log('Template names:', data.data.map((t: any) => t.name));
-    }
+    console.log('Meta API Success Response:', {
+      templatesFound: data.data?.length || 0,
+      templateNames: data.data?.map((t: any) => t.name) || []
+    });
 
     const syncResults = {
       fetched: 0,
@@ -124,17 +134,18 @@ serve(async (req) => {
 
     if (data.data && Array.isArray(data.data)) {
       syncResults.fetched = data.data.length;
-      syncResults.templates = data.data.map((t: any) => ({
-        id: t.id,
-        name: t.name,
-        status: t.status,
-        category: t.category,
-        language: t.language
-      }));
-
+      
       for (const template of data.data) {
         try {
-          console.log(`Processing template: ${template.name} (${template.id})`);
+          console.log(`Syncing template: ${template.name} (ID: ${template.id})`);
+          
+          syncResults.templates.push({
+            id: template.id,
+            name: template.name,
+            status: template.status,
+            category: template.category,
+            language: template.language
+          });
           
           // Insert or update template in our database
           const { error } = await supabaseClient
@@ -142,10 +153,10 @@ serve(async (req) => {
             .upsert({
               template_id: template.id,
               template_name: template.name,
-              category: template.category,
+              category: template.category || 'UTILITY',
               language: template.language || 'pt_BR',
-              status: template.status,
-              components: template.components,
+              status: template.status || 'PENDING',
+              components: template.components || [],
               updated_at: new Date().toISOString()
             }, {
               onConflict: 'template_id',
@@ -165,24 +176,24 @@ serve(async (req) => {
         }
       }
     } else {
-      console.log('No templates found in API response');
+      console.log('No templates found in API response:', data);
     }
 
-    console.log('=== Sync Results ===');
-    console.log('Sync completed:', syncResults);
+    console.log('=== Sync Results ===', syncResults);
+
+    const message = syncResults.synced > 0 
+      ? `Sucesso! ${syncResults.synced}/${syncResults.fetched} templates sincronizados`
+      : syncResults.fetched > 0 
+        ? `Nenhum template sincronizado. ${syncResults.errors.length} erros encontrados.`
+        : 'Nenhum template encontrado na conta Meta.';
 
     return new Response(JSON.stringify({
-      success: true,
-      message: syncResults.synced > 0 
-        ? `Sincronização concluída: ${syncResults.synced}/${syncResults.fetched} templates sincronizados`
-        : syncResults.fetched > 0 
-          ? `Nenhum template foi sincronizado. ${syncResults.errors.length} erros encontrados.`
-          : 'Nenhum template encontrado na conta Meta.',
+      success: syncResults.synced > 0,
+      message: message,
       results: syncResults,
       debug: {
         timestamp: new Date().toISOString(),
         businessAccountId: whatsappBusinessAccountId,
-        apiResponseReceived: !!data,
         templatesInResponse: data.data?.length || 0
       }
     }), {
@@ -191,16 +202,16 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('=== Critical Error in sync-whatsapp-templates ===');
-    console.error('Error:', error);
-    console.error('Stack:', error.stack);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     
     return new Response(JSON.stringify({ 
-      error: 'Internal server error',
+      success: false,
+      error: 'Erro interno do servidor',
       details: error.message,
       debug: {
         timestamp: new Date().toISOString(),
-        errorType: error.constructor.name,
-        stack: error.stack
+        errorType: error.constructor.name
       }
     }), {
       status: 500,
