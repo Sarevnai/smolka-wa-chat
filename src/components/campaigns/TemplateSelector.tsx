@@ -313,6 +313,12 @@ export default function TemplateSelector({ selectedTemplate, onTemplateSelect, o
           </TabsContent>
           
           <TabsContent value="whatsapp" className="mt-4">
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-sm text-muted-foreground">
+                Templates oficiais aprovados pela Meta
+              </p>
+              <SyncTemplatesButton />
+            </div>
             {renderWhatsAppTemplates()}
           </TabsContent>
         </Tabs>
