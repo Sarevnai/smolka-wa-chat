@@ -147,6 +147,11 @@ serve(async (req) => {
             language: template.language
           });
           
+          // Map Meta status to our status
+          const mappedStatus = template.status === 'APPROVED' ? 'active' : 
+                               template.status === 'PENDING' ? 'pending' :
+                               template.status === 'REJECTED' ? 'rejected' : 'disabled';
+
           // Insert or update template in our database
           const { error } = await supabaseClient
             .from('whatsapp_templates')
@@ -155,7 +160,7 @@ serve(async (req) => {
               template_name: template.name,
               category: template.category || 'UTILITY',
               language: template.language || 'pt_BR',
-              status: template.status || 'PENDING',
+              status: mappedStatus,
               components: template.components || [],
               updated_at: new Date().toISOString()
             }, {
