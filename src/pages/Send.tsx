@@ -100,10 +100,24 @@ export default function Send() {
     }
 
     try {
+      // Only pass template_id for regular templates (message_templates table)
+      // For WhatsApp templates, pass null to avoid foreign key constraint
+      const templateId = selectedTemplate && 'content' in selectedTemplate 
+        ? selectedTemplate.id 
+        : null;
+
+      console.log('Creating campaign with:', {
+        templateId,
+        selectedTemplate: selectedTemplate ? {
+          type: 'template_name' in selectedTemplate ? 'whatsapp' : 'regular',
+          id: selectedTemplate.id
+        } : null
+      });
+
       const campaign = await createCampaign.mutateAsync({
         name: campaignName,
         message,
-        template_id: selectedTemplate?.id,
+        template_id: templateId,
         target_contacts: Array.from(selectedContacts),
         scheduled_at: scheduledAt?.toISOString(),
         status: scheduledAt ? "scheduled" : "draft",
