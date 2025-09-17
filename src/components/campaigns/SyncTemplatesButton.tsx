@@ -14,25 +14,68 @@ export default function SyncTemplatesButton() {
     setIsLoading(true);
     
     try {
+      console.log('Starting template sync...');
       const { data, error } = await supabase.functions.invoke('sync-whatsapp-templates');
 
+      console.log('Sync response:', { data, error });
+
       if (error) {
+        console.error('Supabase function error:', error);
         throw error;
       }
 
       // Invalidate WhatsApp templates query to refresh the list
       queryClient.invalidateQueries({ queryKey: ["whatsapp-templates"] });
 
-      toast({
-        title: "Templates sincronizados!",
-        description: data.message || "Templates da Meta foram atualizados com sucesso.",
-      });
+      // Show detailed success/error information
+      if (data?.success) {
+        toast({
+          title: "Sincronização concluída",
+          description: data.message,
+        });
+        
+        // Log debug info if available
+        if (data.debug) {
+          console.log('Sync debug info:', data.debug);
+        }
+        
+        // Show detailed results if available
+        if (data.results) {
+          console.log('Sync results:', data.results);
+          if (data.results.errors.length > 0) {
+            console.warn('Sync errors:', data.results.errors);
+          }
+        }
+      } else {
+        throw new Error(data?.error || 'Resposta inválida da sincronização');
+      }
 
-    } catch (error) {
-      console.error('Sync error:', error);
+    } catch (error: any) {
+      console.error('Sync error details:', error);
+      
+      let errorMessage = 'Falha ao sincronizar templates da Meta.';
+      let errorDetails = '';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Try to extract more details from the error
+      if (error.context?.body) {
+        try {
+          const body = JSON.parse(error.context.body);
+          if (body.debug) {
+            errorDetails = `Debug: ${JSON.stringify(body.debug, null, 2)}`;
+            console.log('Error debug info:', body.debug);
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+      
       toast({
         title: "Erro na sincronização",
-        description: error.message || "Falha ao sincronizar templates da Meta.",
+        description: errorDetails || errorMessage,
         variant: "destructive",
       });
     } finally {
