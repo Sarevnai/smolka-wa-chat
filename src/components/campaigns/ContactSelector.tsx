@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, Search, Filter, Check, X } from "lucide-react";
+import { Users, Search, Filter, Check, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Contact } from "@/types/contact";
 import { useContactsForSelection } from "@/hooks/useContacts";
+import { ContactFiltersState } from "@/components/contacts/ContactFilters";
 import { cn } from "@/lib/utils";
 
 interface ContactSelectorProps {
@@ -17,29 +19,12 @@ interface ContactSelectorProps {
   onContactsChange: (contacts: Set<string>) => void;
 }
 
-interface FilterState {
-  status: string[];
-  contactType: string[];
-  rating: number | null;
-  hasContracts: boolean | null;
-}
-
 export default function ContactSelector({ selectedContacts, onContactsChange }: ContactSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filters, setFilters] = useState<FilterState>({
-    status: [],
-    contactType: [],
-    rating: null,
-    hasContracts: null,
-  });
+  const [filters, setFilters] = useState<ContactFiltersState>({});
   const [showFilters, setShowFilters] = useState(false);
 
-  const { data: contacts = [], isLoading } = useContactsForSelection(searchTerm, {
-    status: filters.status.length > 0 ? filters.status as any : undefined,
-    contactType: filters.contactType.length > 0 ? filters.contactType as any : undefined,
-    rating: filters.rating,
-    hasContracts: filters.hasContracts,
-  });
+  const { data: contacts = [], isLoading, error } = useContactsForSelection(searchTerm, filters);
 
   // Apply client-side filtering for hasContracts since it's not server-side filtered
   const filteredContacts = contacts.filter(contact => {
@@ -71,21 +56,16 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
   };
 
   const clearFilters = () => {
-    setFilters({
-      status: [],
-      contactType: [],
-      rating: null,
-      hasContracts: null,
-    });
+    setFilters({});
     setSearchTerm("");
   };
 
   const hasActiveFilters = 
     searchTerm || 
-    filters.status.length > 0 || 
-    filters.contactType.length > 0 || 
-    filters.rating !== null || 
-    filters.hasContracts !== null;
+    filters.status || 
+    filters.contactType || 
+    filters.rating !== undefined || 
+    filters.hasContracts !== undefined;
 
   const getContactDisplayName = (contact: Contact) => {
     return contact.name || contact.phone;
@@ -148,6 +128,16 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Erro ao carregar contatos: {error.message}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -167,9 +157,9 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
               <div>
                 <label className="text-sm font-medium">Status</label>
                  <Select
-                  value={filters.status.join(",") || "all"}
+                  value={filters.status || "all"}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, status: value === "all" ? [] : value.split(",") })
+                    setFilters({ ...filters, status: value === "all" ? undefined : value as any })
                   }
                 >
                   <SelectTrigger>
@@ -188,9 +178,9 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
               <div>
                 <label className="text-sm font-medium">Tipo</label>
                  <Select
-                  value={filters.contactType.join(",") || "all"}
+                  value={filters.contactType || "all"}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, contactType: value === "all" ? [] : value.split(",") })
+                    setFilters({ ...filters, contactType: value === "all" ? undefined : value as any })
                   }
                 >
                   <SelectTrigger>
@@ -210,7 +200,7 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
                  <Select
                   value={filters.rating?.toString() || "any"}
                   onValueChange={(value) =>
-                    setFilters({ ...filters, rating: value === "any" ? null : parseInt(value) })
+                    setFilters({ ...filters, rating: value === "any" ? undefined : parseInt(value) })
                   }
                 >
                   <SelectTrigger>
@@ -235,7 +225,7 @@ export default function ContactSelector({ selectedContacts, onContactsChange }: 
                   onValueChange={(value) =>
                     setFilters({ 
                       ...filters, 
-                      hasContracts: value === "all" ? null : value === "true"
+                      hasContracts: value === "all" ? undefined : value === "true"
                     })
                   }
                 >

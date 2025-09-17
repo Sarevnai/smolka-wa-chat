@@ -217,7 +217,7 @@ export default function Send() {
                 {/* Template Selector */}
                 <TemplateSelector
                   selectedTemplate={selectedTemplate}
-                  onTemplateSelect={setSelectedTemplate}
+                  onTemplateSelect={(template) => setSelectedTemplate(template as MessageTemplate | WhatsAppTemplate | null)}
                 />
 
                 {/* Custom Message for non-template campaigns */}

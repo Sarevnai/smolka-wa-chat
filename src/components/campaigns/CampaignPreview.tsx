@@ -1,16 +1,17 @@
-import { Eye, MessageSquare, Users, Calendar, Send } from "lucide-react";
+import { Eye, MessageSquare, Users, Calendar, Send, Loader2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MessageTemplate } from "@/types/campaign";
 import { Contact } from "@/types/contact";
+import { WhatsAppTemplate, isOfficialWhatsAppTemplate, getTemplatePreview } from "@/hooks/useWhatsAppTemplates";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface CampaignPreviewProps {
   message: string;
-  template?: MessageTemplate;
-  selectedContacts: Contact[];
+  template?: MessageTemplate | WhatsAppTemplate;
+  selectedContacts: Set<string>;
   scheduledAt?: Date | null;
   campaignName?: string;
 }
@@ -22,20 +23,24 @@ export default function CampaignPreview({
   scheduledAt,
   campaignName 
 }: CampaignPreviewProps) {
-  const sampleContact = selectedContacts?.[0];
+  const selectedContactsCount = selectedContacts.size;
   
   const replaceVariables = (content: string) => {
     if (!template) return content;
     
+    if (isOfficialWhatsAppTemplate(template)) {
+      return getTemplatePreview(template);
+    }
+    
     let result = content;
     const variableMap: Record<string, string> = {
-      nome: sampleContact?.name || "Cliente",
-      contrato: sampleContact?.contracts?.[0]?.contract_number || "N/A",
-      propriedade: sampleContact?.contracts?.[0]?.property_code || "N/A", 
-      tipo_contrato: sampleContact?.contracts?.[0]?.contract_type || "N/A",
-      status_contrato: sampleContact?.contracts?.[0]?.status || "N/A",
-      telefone: sampleContact?.phone || "N/A",
-      email: sampleContact?.email || "N/A",
+      nome: "João Silva", // Sample data for preview
+      contrato: "12345",
+      propriedade: "PROP-001", 
+      tipo_contrato: "Aluguel",
+      status_contrato: "ativo",
+      telefone: "11999999999",
+      email: "joao@email.com",
       data: format(new Date(), "dd/MM/yyyy"),
       horario: format(new Date(), "HH:mm"),
       mensagem: "informação importante"
@@ -52,7 +57,7 @@ export default function CampaignPreview({
 
   const previewMessage = template ? replaceVariables(message) : message;
   const messageLength = previewMessage.length;
-  const estimatedCost = selectedContacts.length * 0.05; // Estimativa R$ 0,05 por mensagem
+  const estimatedCost = selectedContactsCount * 0.05; // Estimativa R$ 0,05 por mensagem
 
   return (
     <Card>
@@ -79,7 +84,7 @@ export default function CampaignPreview({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-muted rounded-md">
               <Users className="h-5 w-5 mx-auto mb-1 text-primary" />
-              <p className="text-2xl font-bold">{selectedContacts.length}</p>
+              <p className="text-2xl font-bold">{selectedContactsCount}</p>
               <p className="text-xs text-muted-foreground">Destinatários</p>
             </div>
             
@@ -121,22 +126,46 @@ export default function CampaignPreview({
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="font-medium">Template Selecionado:</p>
-              <Badge variant="outline">{template.name}</Badge>
+              <div className="flex gap-2">
+                <Badge variant="outline">
+                  {isOfficialWhatsAppTemplate(template) ? template.template_name : template.name}
+                </Badge>
+                {isOfficialWhatsAppTemplate(template) && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    WhatsApp Oficial
+                  </Badge>
+                )}
+              </div>
             </div>
             
-            {template && template.variables?.length > 0 && (
-              <div className="mb-3">
-                <p className="text-sm text-muted-foreground mb-2">
-                  Variáveis que serão substituídas:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {template.variables.map(variable => (
-                    <Badge key={variable} variant="secondary" className="text-xs">
-                      {`{{${variable}}}`}
-                    </Badge>
-                  ))}
+            {isOfficialWhatsAppTemplate(template) ? (
+              <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <p className="text-sm font-medium text-green-800">Template Aprovado pela Meta</p>
                 </div>
+                <p className="text-xs text-green-700">
+                  Este template foi aprovado pela Meta e pode ser usado para mensagens proativas.
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Categoria: {template.category} | Status: {template.status}
+                </p>
               </div>
+            ) : (
+              template.variables?.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Variáveis que serão substituídas:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {template.variables.map(variable => (
+                      <Badge key={variable} variant="secondary" className="text-xs">
+                        {`{{${variable}}}`}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )
             )}
           </div>
         )}
@@ -165,18 +194,21 @@ export default function CampaignPreview({
             </div>
             
             {/* Sample recipient info */}
-            {sampleContact && (
-              <div className="mt-3 p-3 bg-muted rounded-md">
-                <p className="text-xs text-muted-foreground mb-1">
-                  Exemplo com dados de: <strong>{sampleContact.name || sampleContact.phone}</strong>
+            <div className="mt-3 p-3 bg-muted rounded-md">
+              <p className="text-xs text-muted-foreground mb-1">
+                Preview com dados de exemplo para {selectedContactsCount} contato{selectedContactsCount !== 1 ? 's' : ''}
+              </p>
+              {template && !isOfficialWhatsAppTemplate(template) && template.variables?.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  As variáveis serão substituídas automaticamente para cada contato
                 </p>
-                {sampleContact && template && template.variables?.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    As variáveis serão substituídas automaticamente para cada contato
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+              {isOfficialWhatsAppTemplate(template) && (
+                <p className="text-xs text-muted-foreground">
+                  Template oficial do WhatsApp com parâmetros pré-definidos
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -191,24 +223,41 @@ export default function CampaignPreview({
         )}
 
         {/* Target audience preview */}
-        {selectedContacts.length > 0 && (
+        {selectedContactsCount > 0 && (
           <div>
-            <p className="font-medium mb-3">Destinatários ({selectedContacts.length}):</p>
-            <div className="max-h-32 overflow-y-auto space-y-1">
-              {selectedContacts.slice(0, 5).map(contact => (
-                <div key={contact.id} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
-                  <span>{contact.name || contact.phone}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {contact.status}
-                  </Badge>
-                </div>
-              ))}
-              
-              {selectedContacts.length > 5 && (
-                <div className="text-center p-2 text-sm text-muted-foreground">
-                  ... e mais {selectedContacts.length - 5} contatos
-                </div>
-              )}
+            <p className="font-medium mb-3">Resumo dos Destinatários:</p>
+            <div className="p-3 bg-muted rounded-md">
+              <div className="flex items-center justify-between">
+                <p className="text-sm">
+                  <strong>{selectedContactsCount}</strong> contatos selecionados receberão esta campanha
+                </p>
+                <Badge variant="outline" className="text-xs">
+                  Estimativa: {Math.ceil(selectedContactsCount * 2)}s para envio completo
+                </Badge>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Warnings */}
+        {selectedContactsCount === 0 && (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <p className="text-sm text-yellow-800">
+                Nenhum contato selecionado. Selecione pelo menos um contato para enviar a campanha.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!message && (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <p className="text-sm text-yellow-800">
+                Mensagem vazia. {template ? 'Selecione um template' : 'Digite uma mensagem'} antes de enviar.
+              </p>
             </div>
           </div>
         )}
