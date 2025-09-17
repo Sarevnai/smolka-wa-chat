@@ -140,7 +140,9 @@ export default function Send() {
             name: contact.name || undefined,
           })),
           message,
-          template_id: selectedTemplate?.id,
+          template_id: selectedTemplate && 'template_id' in selectedTemplate 
+            ? selectedTemplate.template_id  // Use Meta's template_id for WhatsApp templates
+            : undefined,
           campaign_id: campaign.id,
         };
 

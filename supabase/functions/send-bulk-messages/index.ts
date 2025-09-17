@@ -257,13 +257,86 @@ serve(async (req) => {
         const normalizedPhone = normalizePhoneNumber(contact.phone);
         console.log(`Sending message ${i + 1}/${contacts.length} to ${contact.phone} (normalized: ${normalizedPhone})`);
 
-        // Prepare WhatsApp API payload with normalized phone
-        const whatsappPayload = {
-          messaging_product: 'whatsapp',
-          to: normalizedPhone,
-          type: 'text',
-          text: { body: message }
-        };
+        // Prepare WhatsApp API payload - use template if provided, otherwise text
+        let whatsappPayload: any;
+        let useTemplate = false;
+
+        if (template_id) {
+          // Fetch WhatsApp template from database
+          const { data: template, error: templateError } = await supabase
+            .from('whatsapp_templates')
+            .select('*')
+            .eq('template_id', template_id)
+            .eq('status', 'active')
+            .single();
+
+          if (template && !templateError) {
+            console.log(`Using WhatsApp template: ${template.template_name}`);
+            useTemplate = true;
+
+            // Build template parameters using contact data
+            const templateParams = [];
+            
+            // Use contact name for first parameter, fallback to phone
+            if (contact.name) {
+              templateParams.push({
+                type: "text",
+                text: contact.name
+              });
+            }
+            
+            // Add additional parameters from contact.variables or use defaults
+            if (contact.variables) {
+              Object.values(contact.variables).forEach((value: any) => {
+                templateParams.push({
+                  type: "text",
+                  text: String(value)
+                });
+              });
+            } else {
+              // Add default parameters for common template slots
+              templateParams.push(
+                { type: "text", text: "-" },
+                { type: "text", text: "-" },
+                { type: "text", text: "-" }
+              );
+            }
+
+            whatsappPayload = {
+              messaging_product: 'whatsapp',
+              to: normalizedPhone,
+              type: 'template',
+              template: {
+                name: template.template_name,
+                language: {
+                  code: template.language || 'pt_BR'
+                },
+                components: [
+                  {
+                    type: "body",
+                    parameters: templateParams
+                  }
+                ]
+              }
+            };
+          } else {
+            console.log(`Template ${template_id} not found or inactive, falling back to text message`);
+            whatsappPayload = {
+              messaging_product: 'whatsapp',
+              to: normalizedPhone,
+              type: 'text',
+              text: { body: message }
+            };
+          }
+        } else {
+          // Use text message
+          whatsappPayload = {
+            messaging_product: 'whatsapp',
+            to: normalizedPhone,
+            type: 'text',
+            text: { body: message }
+          };
+        }
 
         // Send message via WhatsApp API
         const response = await fetch(whatsappUrl, {
@@ -279,6 +352,103 @@ serve(async (req) => {
         
         if (!response.ok) {
           console.error(`WhatsApp API error for ${contact.phone}:`, result);
+          
+          // Check for 24-hour window error and retry with template if available
+          const isReEngagementError = result.error?.code === 131047 || 
+                                    result.error?.error_data?.details?.includes('24 hours');
+          
+          if (isReEngagementError && template_id && !useTemplate) {
+            console.log(`24-hour window error detected, retrying with template for ${contact.phone}`);
+            
+            // Retry with template - fetch template again if not already done
+            const { data: template, error: templateError } = await supabase
+              .from('whatsapp_templates')
+              .select('*')
+              .eq('template_id', template_id)
+              .eq('status', 'active')
+              .single();
+
+            if (template && !templateError) {
+              const templateParams = [];
+              
+              if (contact.name) {
+                templateParams.push({ type: "text", text: contact.name });
+              }
+              
+              if (contact.variables) {
+                Object.values(contact.variables).forEach((value: any) => {
+                  templateParams.push({ type: "text", text: String(value) });
+                });
+              } else {
+                templateParams.push(
+                  { type: "text", text: "-" },
+                  { type: "text", text: "-" }
+                );
+              }
+
+              const templatePayload = {
+                messaging_product: 'whatsapp',
+                to: normalizedPhone,
+                type: 'template',
+                template: {
+                  name: template.template_name,
+                  language: { code: template.language || 'pt_BR' },
+                  components: [{
+                    type: "body",
+                    parameters: templateParams
+                  }]
+                }
+              };
+
+              // Retry with template
+              const retryResponse = await fetch(whatsappUrl, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(templatePayload)
+              });
+
+              const retryResult = await retryResponse.json();
+              
+              if (retryResponse.ok) {
+                console.log(`✅ Template fallback successful for ${contact.phone}`);
+                successful++;
+                
+                // Save successful template message to database
+                const messageData = {
+                  wa_message_id: retryResult.messages?.[0]?.id || null,
+                  wa_from: null,
+                  wa_to: normalizedPhone,
+                  wa_phone_number_id: phoneNumberId,
+                  direction: 'outbound',
+                  body: message,
+                  wa_timestamp: new Date().toISOString(),
+                  raw: retryResult,
+                  created_at: new Date().toISOString(),
+                  is_template: true
+                };
+
+                await supabase.from('messages').insert([messageData]);
+                
+                if (campaign_id) {
+                  await supabase.from('campaign_results').insert([{
+                    campaign_id,
+                    contact_id: null,
+                    phone: contact.phone,
+                    status: 'sent' as const,
+                    sent_at: new Date().toISOString(),
+                  }]);
+                }
+                
+                continue; // Skip to next contact
+              } else {
+                console.error(`Template fallback also failed for ${contact.phone}:`, retryResult);
+              }
+            }
+          }
+          
           failed++;
           errors.push({
             phone: contact.phone,
@@ -299,7 +469,7 @@ serve(async (req) => {
             wa_timestamp: new Date().toISOString(),
             raw: result,
             created_at: new Date().toISOString(),
-            is_template: !!template_id
+            is_template: useTemplate || !!template_id
           };
 
           const { error: dbError } = await supabase
