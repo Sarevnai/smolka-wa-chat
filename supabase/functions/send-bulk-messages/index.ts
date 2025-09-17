@@ -122,13 +122,75 @@ serve(async (req) => {
       );
     }
 
+    // Function to clean and validate Brazilian phone numbers
+    function cleanPhoneNumber(phone: string): string {
+      // Remove all non-numeric characters
+      return phone.replace(/\D/g, '');
+    }
+
+    function validateBrazilianPhone(phone: string): boolean {
+      const cleaned = cleanPhoneNumber(phone);
+      
+      // Brazilian phone patterns:
+      // - 13 digits: +55 XX 9 XXXX-XXXX (with country code and mobile 9)
+      // - 12 digits: +55 XX XXXX-XXXX (with country code, no mobile 9)
+      // - 11 digits: XX 9 XXXX-XXXX (no country code, with mobile 9)
+      // - 10 digits: XX XXXX-XXXX (no country code, no mobile 9)
+      
+      if (cleaned.length === 13 && cleaned.startsWith('55')) {
+        // +55 format with mobile 9
+        return true;
+      } else if (cleaned.length === 12 && cleaned.startsWith('55')) {
+        // +55 format without mobile 9
+        return true;
+      } else if (cleaned.length === 11) {
+        // Brazilian format with mobile 9 (no country code)
+        return true;
+      } else if (cleaned.length === 10) {
+        // Brazilian format without mobile 9 (no country code)
+        return true;
+      }
+      
+      return false;
+    }
+
+    function normalizePhoneNumber(phone: string): string {
+      const cleaned = cleanPhoneNumber(phone);
+      
+      // Normalize to WhatsApp format (with country code, no + sign)
+      if (cleaned.length === 13 && cleaned.startsWith('55')) {
+        // Already has country code
+        return cleaned;
+      } else if (cleaned.length === 12 && cleaned.startsWith('55')) {
+        // Has country code but missing mobile 9, add it
+        const areaCode = cleaned.slice(2, 4);
+        const number = cleaned.slice(4);
+        return `55${areaCode}9${number}`;
+      } else if (cleaned.length === 11) {
+        // No country code, add 55
+        return `55${cleaned}`;
+      } else if (cleaned.length === 10) {
+        // No country code and no mobile 9, add both
+        const areaCode = cleaned.slice(0, 2);
+        const number = cleaned.slice(2);
+        return `55${areaCode}9${number}`;
+      }
+      
+      return cleaned; // Return as-is if doesn't match patterns
+    }
+
     // Validate phone numbers and rate limiting
-    const phoneRegex = /^\+?[\d\s-()]{10,15}$/;
-    const invalidContacts = contacts.filter(contact => 
-      !contact.phone || 
-      typeof contact.phone !== 'string' || 
-      !phoneRegex.test(contact.phone.replace(/\s/g, ''))
-    );
+    const invalidContacts = contacts.filter(contact => {
+      if (!contact.phone || typeof contact.phone !== 'string') {
+        return true;
+      }
+      
+      const isValid = validateBrazilianPhone(contact.phone);
+      if (!isValid) {
+        console.log(`❌ Invalid phone format: ${contact.phone} (cleaned: ${cleanPhoneNumber(contact.phone)})`);
+      }
+      return !isValid;
+    });
 
     if (invalidContacts.length > 0) {
       console.error('❌ Invalid phone numbers found:', invalidContacts);
@@ -192,12 +254,13 @@ serve(async (req) => {
       const contact = contacts[i];
       
       try {
-        console.log(`Sending message ${i + 1}/${contacts.length} to ${contact.phone}`);
+        const normalizedPhone = normalizePhoneNumber(contact.phone);
+        console.log(`Sending message ${i + 1}/${contacts.length} to ${contact.phone} (normalized: ${normalizedPhone})`);
 
-        // Prepare WhatsApp API payload
+        // Prepare WhatsApp API payload with normalized phone
         const whatsappPayload = {
           messaging_product: 'whatsapp',
-          to: contact.phone,
+          to: normalizedPhone,
           type: 'text',
           text: { body: message }
         };
@@ -229,7 +292,7 @@ serve(async (req) => {
           const messageData = {
             wa_message_id: result.messages?.[0]?.id || null,
             wa_from: null, // Outbound message
-            wa_to: contact.phone,
+            wa_to: normalizedPhone, // Use normalized phone for consistency with API
             wa_phone_number_id: phoneNumberId,
             direction: 'outbound',
             body: message,
