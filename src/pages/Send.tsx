@@ -10,12 +10,14 @@ import TemplateSelector from "@/components/campaigns/TemplateSelector";
 import ContactSelector from "@/components/campaigns/ContactSelector";
 import CampaignScheduler from "@/components/campaigns/CampaignScheduler";
 import CampaignPreview from "@/components/campaigns/CampaignPreview";
+import SendConfirmationModal from "@/components/campaigns/SendConfirmationModal";
 import { useCampaigns, useCreateCampaign, useSendCampaign } from "@/hooks/useCampaigns";
 import { useTemplates } from "@/hooks/useTemplates";
 import { Campaign, MessageTemplate, BulkMessageRequest } from "@/types/campaign";
-import { WhatsAppTemplate, getTemplatePreview } from "@/hooks/useWhatsAppTemplates";
+import { WhatsAppTemplate, getTemplatePreview, isOfficialWhatsAppTemplate } from "@/hooks/useWhatsAppTemplates";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { validateFullCampaign, normalizePhoneNumber } from "@/lib/validation";
 
 export default function Send() {
   const { profile } = useAuth();
@@ -25,6 +27,8 @@ export default function Send() {
   const [campaignName, setCampaignName] = useState("");
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState("create");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   
   const { toast } = useToast();
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaigns();
@@ -35,84 +39,90 @@ export default function Send() {
 
   const getMessage = () => {
     if (selectedTemplate) {
-      // Check if it's a WhatsApp template or regular template
-      if ('template_name' in selectedTemplate && 'components' in selectedTemplate) {
+      if (isOfficialWhatsAppTemplate(selectedTemplate)) {
         // WhatsApp template - use the preview function
         const preview = getTemplatePreview(selectedTemplate);
-        console.log('WhatsApp template preview:', preview);
-        // More robust fallback: use template_name if preview is empty, or default message
-        return preview && preview.trim() ? preview : 
-               selectedTemplate.template_name || 
-               'Template WhatsApp selecionado';
+        return preview || selectedTemplate.template_name || 'Template WhatsApp';
       } else if ('content' in selectedTemplate) {
         // Regular template
-        console.log('Regular template content:', selectedTemplate.content);
         return selectedTemplate.content || '';
       }
     }
-    console.log('Custom message:', customMessage);
     return customMessage || '';
   };
 
-  // Helper function to check if we have valid message content
+  // Improved validation function
   const hasValidMessage = () => {
-    const message = getMessage();
-    const isValid = message && message.trim().length > 0;
-    console.log('Debug - hasValidMessage:', {
-      selectedTemplate: selectedTemplate ? {
-        type: 'template_name' in selectedTemplate ? 'whatsapp' : 'regular',
-        name: 'template_name' in selectedTemplate ? selectedTemplate.template_name : selectedTemplate.name
-      } : null,
-      customMessage: customMessage,
-      message: message,
-      isValid: isValid
-    });
-    return isValid;
+    if (selectedTemplate) {
+      if (isOfficialWhatsAppTemplate(selectedTemplate)) {
+        const preview = getTemplatePreview(selectedTemplate);
+        return preview && preview.trim().length > 0 && selectedTemplate.status === 'active';
+      } else if ('content' in selectedTemplate) {
+        return selectedTemplate.content && selectedTemplate.content.trim().length > 0;
+      }
+    }
+    return customMessage && customMessage.trim().length > 0;
   };
 
-  const handleCreateCampaign = async () => {
-    if (!campaignName.trim()) {
+  const handlePrepareCampaign = async () => {
+    // Fetch contact data for validation
+    const { data: contactsData, error: contactsError } = await supabase
+      .from('contacts')
+      .select('id, phone, name')
+      .in('id', Array.from(selectedContacts));
+
+    if (contactsError) {
       toast({
-        title: "Nome obrigatório",
-        description: "Por favor, defina um nome para a campanha.",
+        title: "Erro ao validar contatos",
+        description: contactsError.message,
         variant: "destructive",
       });
       return;
     }
 
-    if (selectedContacts.size === 0) {
+    // Comprehensive validation
+    const errors = validateFullCampaign({
+      campaignName,
+      template: selectedTemplate,
+      customMessage,
+      contactIds: Array.from(selectedContacts),
+      scheduledAt,
+      contactsData
+    });
+
+    setValidationErrors(errors);
+
+    if (errors.length > 0) {
+      // Show first few errors in toast
       toast({
-        title: "Contatos obrigatórios",
-        description: "Selecione pelo menos um contato.",
+        title: "Corrija os erros antes de continuar",
+        description: errors.slice(0, 2).join("; "),
         variant: "destructive",
       });
-      return;
     }
 
-    const message = getMessage();
-    if (!message.trim()) {
+    // Always show confirmation modal (even with errors for better UX)
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSend = async () => {
+    if (validationErrors.length > 0) {
       toast({
-        title: "Mensagem obrigatória",
-        description: "Defina uma mensagem ou selecione um template.",
+        title: "Existem erros na campanha",
+        description: "Corrija todos os erros antes de enviar.",
         variant: "destructive",
       });
       return;
     }
 
     try {
+      const message = getMessage();
+      
       // Only pass template_id for regular templates (message_templates table)
       // For WhatsApp templates, pass null to avoid foreign key constraint
-      const templateId = selectedTemplate && 'content' in selectedTemplate 
+      const templateId = selectedTemplate && !isOfficialWhatsAppTemplate(selectedTemplate) 
         ? selectedTemplate.id 
         : null;
-
-      console.log('Creating campaign with:', {
-        templateId,
-        selectedTemplate: selectedTemplate ? {
-          type: 'template_name' in selectedTemplate ? 'whatsapp' : 'regular',
-          id: selectedTemplate.id
-        } : null
-      });
 
       const campaign = await createCampaign.mutateAsync({
         name: campaignName,
@@ -124,7 +134,7 @@ export default function Send() {
       });
 
       if (!scheduledAt) {
-        // Send immediately - fetch selected contacts directly from database
+        // Send immediately - get contacts data
         const { data: selectedContactObjects, error: contactsError } = await supabase
           .from('contacts')
           .select('id, phone, name')
@@ -134,13 +144,19 @@ export default function Send() {
           throw contactsError;
         }
 
-        const bulkRequest: BulkMessageRequest = {
-          contacts: selectedContactObjects.map(contact => ({
-            phone: contact.phone,
+        // Normalize phone numbers and validate
+        const validContacts = selectedContactObjects
+          .filter(contact => contact.phone)
+          .map(contact => ({
+            phone: normalizePhoneNumber(contact.phone),
             name: contact.name || undefined,
-          })),
+            variables: {} // Template variables can be mapped here if needed
+          }));
+
+        const bulkRequest: BulkMessageRequest = {
+          contacts: validContacts,
           message,
-          template_id: selectedTemplate && 'template_id' in selectedTemplate 
+          template_id: selectedTemplate && isOfficialWhatsAppTemplate(selectedTemplate) 
             ? selectedTemplate.template_id  // Use Meta's template_id for WhatsApp templates
             : undefined,
           campaign_id: campaign.id,
@@ -152,16 +168,23 @@ export default function Send() {
         });
       }
 
-      // Reset form
+      // Reset form and close modal
       setCampaignName("");
       setCustomMessage("");
       setSelectedTemplate(null);
       setSelectedContacts(new Set());
       setScheduledAt(null);
+      setValidationErrors([]);
+      setShowConfirmModal(false);
       setActiveTab("history");
       
     } catch (error) {
       console.error("Error creating campaign:", error);
+      toast({
+        title: "Erro ao enviar campanha",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
     }
   };
 
@@ -317,8 +340,8 @@ export default function Send() {
                 <Card>
                   <CardContent className="pt-6">
                     <Button
-                      onClick={handleCreateCampaign}
-                      disabled={createCampaign.isPending || sendCampaign.isPending || !campaignName.trim() || selectedContacts.size === 0 || !hasValidMessage()}
+                      onClick={handlePrepareCampaign}
+                      disabled={createCampaign.isPending || sendCampaign.isPending || !campaignName.trim() || selectedContacts.size === 0}
                       className="w-full"
                       size="lg"
                     >
@@ -336,6 +359,20 @@ export default function Send() {
                     </Button>
                   </CardContent>
                 </Card>
+
+                {/* Send Confirmation Modal */}
+                <SendConfirmationModal
+                  open={showConfirmModal}
+                  onOpenChange={setShowConfirmModal}
+                  onConfirm={handleConfirmSend}
+                  isLoading={createCampaign.isPending || sendCampaign.isPending}
+                  campaignName={campaignName}
+                  message={getMessage()}
+                  template={selectedTemplate}
+                  selectedContacts={Array.from(selectedContacts)}
+                  scheduledAt={scheduledAt}
+                  validationErrors={validationErrors}
+                />
               </div>
             </div>
           </TabsContent>

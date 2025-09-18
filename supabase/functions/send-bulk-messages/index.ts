@@ -351,109 +351,94 @@ serve(async (req) => {
         const result = await response.json();
         
         if (!response.ok) {
-          console.error(`WhatsApp API error for ${contact.phone}:`, result);
+          console.log(`WhatsApp API error for ${contact.phone}:`, JSON.stringify(result, null, 2));
           
-          // Check for 24-hour window error and retry with template if available
-          const isReEngagementError = result.error?.code === 131047 || 
-                                    result.error?.error_data?.details?.includes('24 hours');
+          // Enhanced error handling with automatic template fallback
+          const isWindowError = result.error?.code === 131047 || 
+                               result.error?.code === 131053 ||
+                               result.error?.message?.includes('24 hour') ||
+                               result.error?.message?.includes('outside the support window');
           
-          if (isReEngagementError && template_id && !useTemplate) {
-            console.log(`24-hour window error detected, retrying with template for ${contact.phone}`);
+          let fallbackAttempted = false;
+          
+          if (isWindowError && !template_id) {
+            console.log(`24-hour window error detected for ${contact.phone}. Attempting template fallback...`);
             
-            // Retry with template - fetch template again if not already done
-            const { data: template, error: templateError } = await supabase
+            // Try multiple approved templates as fallback
+            const { data: availableTemplates } = await supabase
               .from('whatsapp_templates')
-              .select('*')
-              .eq('template_id', template_id)
+              .select('template_id, template_name, components, language')
               .eq('status', 'active')
-              .single();
-
-            if (template && !templateError) {
-              const templateParams = [];
-              
-              if (contact.name) {
-                templateParams.push({ type: "text", text: contact.name });
-              }
-              
-              if (contact.variables) {
-                Object.values(contact.variables).forEach((value: any) => {
-                  templateParams.push({ type: "text", text: String(value) });
-                });
-              } else {
-                templateParams.push(
-                  { type: "text", text: "-" },
-                  { type: "text", text: "-" }
-                );
-              }
-
-              const templatePayload = {
-                messaging_product: 'whatsapp',
-                to: normalizedPhone,
-                type: 'template',
-                template: {
-                  name: template.template_name,
-                  language: { code: template.language || 'pt_BR' },
-                  components: [{
-                    type: "body",
-                    parameters: templateParams
-                  }]
-                }
-              };
-
-              // Retry with template
-              const retryResponse = await fetch(whatsappUrl, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(templatePayload)
-              });
-
-              const retryResult = await retryResponse.json();
-              
-              if (retryResponse.ok) {
-                console.log(`✅ Template fallback successful for ${contact.phone}`);
-                successful++;
-                
-                // Save successful template message to database
-                const messageData = {
-                  wa_message_id: retryResult.messages?.[0]?.id || null,
-                  wa_from: null,
-                  wa_to: normalizedPhone,
-                  wa_phone_number_id: phoneNumberId,
-                  direction: 'outbound',
-                  body: message,
-                  wa_timestamp: new Date().toISOString(),
-                  raw: retryResult,
-                  created_at: new Date().toISOString(),
-                  is_template: true
+              .in('template_name', ['hello_world', 'triagem_1', 'att_pp'])
+              .order('template_name')
+              .limit(3);
+            
+            for (const fallbackTemplate of availableTemplates || []) {
+              try {
+                const templateMessage = {
+                  messaging_product: "whatsapp",
+                  to: normalizedPhone,
+                  type: "template",
+                  template: {
+                    name: fallbackTemplate.template_name,
+                    language: { code: fallbackTemplate.language || "pt_BR" },
+                    ...(fallbackTemplate.components && fallbackTemplate.components.length > 0 ? {
+                      components: fallbackTemplate.components
+                    } : {})
+                  }
                 };
-
-                await supabase.from('messages').insert([messageData]);
                 
-                if (campaign_id) {
-                  await supabase.from('campaign_results').insert([{
-                    campaign_id,
-                    contact_id: null,
-                    phone: contact.phone,
-                    status: 'sent' as const,
-                    sent_at: new Date().toISOString(),
-                  }]);
+                console.log(`Trying template "${fallbackTemplate.template_name}" for ${contact.phone}`);
+                
+                const templateResponse = await fetch(whatsappUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(templateMessage)
+                });
+                
+                if (templateResponse.ok) {
+                  const templateData = await templateResponse.json();
+                  console.log(`✅ Template fallback successful for ${contact.phone} using "${fallbackTemplate.template_name}"`);
+                  
+                  // Log successful template message
+                  await supabase.from('messages').insert({
+                    wa_message_id: templateData.messages?.[0]?.id,
+                    wa_from: null,
+                    wa_to: normalizedPhone,
+                    wa_phone_number_id: phoneNumberId,
+                    direction: 'outbound',
+                    body: `Template: ${fallbackTemplate.template_name} (Fallback)`,
+                    wa_timestamp: new Date().toISOString(),
+                    raw: templateData,
+                    is_template: true
+                  });
+                  
+                  successful++;
+                  fallbackAttempted = true;
+                  break; // Success, exit the template loop
+                } else {
+                  const templateError = await templateResponse.json();
+                  console.log(`Template "${fallbackTemplate.template_name}" failed:`, templateError);
                 }
-                
-                continue; // Skip to next contact
-              } else {
-                console.error(`Template fallback also failed for ${contact.phone}:`, retryResult);
+              } catch (templateErr) {
+                console.log(`Error trying template "${fallbackTemplate.template_name}":`, templateErr);
               }
             }
           }
           
-          failed++;
-          errors.push({
-            phone: contact.phone,
-            error: result.error?.message || 'Erro na API do WhatsApp'
-          });
+          if (!fallbackAttempted) {
+            failed++;
+            const errorMsg = isWindowError ? 
+              `${contact.phone}: Fora da janela de 24h (nenhum template aprovado funcionou)` :
+              `${contact.phone}: ${result.error?.message || 'Erro desconhecido'}`;
+            errors.push({
+              phone: contact.phone,
+              error: errorMsg
+            });
+          }
           continue;
         }
 
