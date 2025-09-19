@@ -59,18 +59,45 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         }
       });
 
-      // Convert to conversation objects
+      // Get all unique phone numbers
+      const phoneNumbers = Array.from(conversationMap.keys());
+      
+      // Fetch contact names for all phone numbers in a single query
+      const { data: contacts, error: contactsError } = await supabase
+        .from("contacts")
+        .select("phone, name, contact_type")
+        .in("phone", phoneNumbers);
+
+      if (contactsError) {
+        console.error("Error loading contacts:", contactsError);
+      }
+
+      // Create a map of phone numbers to contact names
+      const contactMap = new Map<string, { name?: string; contact_type?: string }>();
+      contacts?.forEach((contact) => {
+        if (contact.phone) {
+          contactMap.set(contact.phone, {
+            name: contact.name,
+            contact_type: contact.contact_type
+          });
+        }
+      });
+
+      // Convert to conversation objects with contact names
       const conversationList: Conversation[] = Array.from(conversationMap.entries()).map(([phoneNumber, messages]) => {
         const sortedMessages = messages.sort((a, b) => 
           new Date(b.wa_timestamp || b.created_at || "").getTime() - 
           new Date(a.wa_timestamp || a.created_at || "").getTime()
         );
         
+        const contactInfo = contactMap.get(phoneNumber);
+        
         return {
           phoneNumber,
           lastMessage: sortedMessages[0],
           messageCount: messages.length,
-          unreadCount: 0 // TODO: Implement unread count logic
+          unreadCount: 0, // TODO: Implement unread count logic
+          contactName: contactInfo?.name
         };
       });
 
