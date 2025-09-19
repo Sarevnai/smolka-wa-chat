@@ -14,13 +14,21 @@ import { toast } from "@/hooks/use-toast";
 interface MessageComposerProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
 }
 
-export function MessageComposer({ onSendMessage, disabled = false }: MessageComposerProps) {
+export function MessageComposer({ 
+  onSendMessage, 
+  disabled = false, 
+  onTypingStart, 
+  onTypingStop 
+}: MessageComposerProps) {
   const [message, setMessage] = useState("");
   const [selectedAttendant, setSelectedAttendant] = useState("none");
   const [isSending, setIsSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
   
   const { profile } = useAuth();
   const { profiles } = useUserProfiles();
@@ -127,6 +135,36 @@ export function MessageComposer({ onSendMessage, disabled = false }: MessageComp
     }
   };
 
+  const handleMessageChange = (value: string) => {
+    setMessage(value);
+    
+    // Handle typing indicators
+    if (onTypingStart && value.length > 0) {
+      onTypingStart();
+      
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Set timeout to stop typing
+      typingTimeoutRef.current = setTimeout(() => {
+        onTypingStop?.();
+      }, 1000);
+    } else if (onTypingStop && value.length === 0) {
+      onTypingStop();
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleEmojiSelect = (emoji: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -213,7 +251,7 @@ export function MessageComposer({ onSendMessage, disabled = false }: MessageComp
           <Textarea
             ref={textareaRef}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => handleMessageChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Digite uma mensagem..."
             className={cn(

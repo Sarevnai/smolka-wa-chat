@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,6 +8,10 @@ import { MessageBubble } from "./MessageBubble";
 import { MessageComposer } from "./MessageComposer";
 import { DateSeparator } from "./DateSeparator";
 import { TypingIndicator } from "./TypingIndicator";
+import { OnlineStatus } from "./OnlineStatus";
+import { MessageSearch } from "./MessageSearch";
+import { ReplyPreview } from "./MessageReply";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
@@ -34,8 +38,11 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [showNewContact, setShowNewContact] = useState(false);
   const [showDemandClassification, setShowDemandClassification] = useState(false);
   const [showCreateTicket, setShowCreateTicket] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [replyTo, setReplyTo] = useState<MessageRow | null>(null);
   const { toast } = useToast();
   const { data: contact } = useContactByPhone(phoneNumber);
+  const { isTyping: contactIsTyping, startTyping, stopTyping } = useTypingIndicator(phoneNumber);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -130,12 +137,23 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
     try {
       setSending(true);
+      stopTyping(); // Stop typing indicator when sending
 
       // Get current session for authorization
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
         throw new Error("Sessão expirada. Faça login novamente.");
+      }
+
+      let messageText = text.trim();
+      
+      // Add reply context if replying to a message
+      if (replyTo) {
+        const replyText = replyTo.body || '[Mídia]';
+        const truncatedReply = replyText.length > 50 ? replyText.substring(0, 50) + '...' : replyText;
+        messageText = `_Respondendo a: "${truncatedReply}"_\n\n${messageText}`;
+        setReplyTo(null); // Clear reply
       }
 
       const response = await fetch(`${SUPABASE_PROJECT_URL}/functions/v1/send-wa-message`, {
@@ -146,7 +164,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         },
         body: JSON.stringify({
           to: phoneNumber,
-          text: text.trim(),
+          text: messageText,
         }),
       });
 
@@ -213,27 +231,14 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const displayName = contact?.name || formatPhoneNumber(phoneNumber);
   const displayInitials = getInitials(contact?.name, phoneNumber);
 
-  // Simulate typing indicator (you can connect this to real typing events)
-  useEffect(() => {
-    let typingTimeout: NodeJS.Timeout;
-    
-    // Simulate random typing for demo purposes (remove in production)
-    const simulateTyping = () => {
-      if (Math.random() > 0.95 && messages.length > 0) { // 5% chance when there are messages
-        setIsTyping(true);
-        typingTimeout = setTimeout(() => {
-          setIsTyping(false);
-        }, 2000 + Math.random() * 3000); // 2-5 seconds
-      }
-    };
+  const handleMessageSelect = (messageId: number) => {
+    const element = document.querySelector(`[data-message-id="${messageId}"]`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
-    const interval = setInterval(simulateTyping, 10000); // Check every 10 seconds
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(typingTimeout);
-    };
-  }, [messages.length]);
+  const handleReply = (message: MessageRow) => {
+    setReplyTo(message);
+  };
 
   const getContactTypeInfo = (type?: string) => {
     switch (type) {
@@ -281,12 +286,24 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">
-            {contact?.name ? 'Última vez online recentemente' : formatPhoneNumber(phoneNumber)}
-          </p>
+          {contact?.name ? (
+            <OnlineStatus phoneNumber={phoneNumber} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {formatPhoneNumber(phoneNumber)}
+            </p>
+          )}
         </div>
         
         <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowSearch(true)}
+            className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted rounded-full">
             <Phone className="h-4 w-4" />
           </Button>
@@ -296,9 +313,17 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         </div>
       </div>
 
+      {/* Search */}
+      <MessageSearch
+        messages={messages}
+        isOpen={showSearch}
+        onClose={() => setShowSearch(false)}
+        onMessageSelect={handleMessageSelect}
+      />
+
       {/* Messages */}
       <div 
-        className="flex-1 px-4 py-2 overflow-y-auto"
+        className="flex-1 px-4 py-2 overflow-y-auto relative"
         style={{
           background: `hsl(var(--chat-background))`,
           backgroundImage: `var(--chat-pattern)`
@@ -325,25 +350,41 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
                 {item.type === 'date' ? (
                   <DateSeparator date={item.content} />
                 ) : (
-                  <MessageBubble
-                    message={item.content}
-                    isLast={index === groupedMessages.length - 1}
-                  />
+                  <div data-message-id={item.content.id}>
+                    <MessageBubble
+                      message={item.content}
+                      isLast={index === groupedMessages.length - 1}
+                      onReply={handleReply}
+                    />
+                  </div>
                 )}
               </div>
             ))}
             
             {/* Typing indicator */}
-            {isTyping && <TypingIndicator />}
+            {contactIsTyping && <TypingIndicator />}
             
             <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
+      {/* Reply Preview */}
+      {replyTo && (
+        <ReplyPreview
+          replyTo={replyTo}
+          onClose={() => setReplyTo(null)}
+        />
+      )}
+
       {/* Input */}
       <div className="bg-card">
-        <MessageComposer onSendMessage={sendMessage} disabled={sending} />
+        <MessageComposer 
+          onSendMessage={sendMessage} 
+          disabled={sending}
+          onTypingStart={startTyping}
+          onTypingStop={stopTyping}
+        />
       </div>
 
       <ContactProfile

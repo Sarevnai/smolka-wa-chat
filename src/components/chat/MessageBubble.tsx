@@ -1,18 +1,27 @@
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Check, CheckCheck } from "lucide-react";
+import { useState } from "react";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { MediaMessage } from "./MediaMessage";
 import { InteractiveMessage } from "./InteractiveMessage";
+import { MessageStatusIndicator } from "./MessageStatusIndicator";
+import { MessageContextMenu } from "./MessageContextMenu";
+import { EmojiReactions } from "./EmojiReactions";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 interface MessageBubbleProps {
   message: MessageRow;
   isLast?: boolean;
+  onReply?: (message: MessageRow) => void;
 }
 
-export function MessageBubble({ message, isLast }: MessageBubbleProps) {
+export function MessageBubble({ message, isLast, onReply }: MessageBubbleProps) {
+  const [reactions, setReactions] = useState([
+    { emoji: "👍", count: 0, users: [], hasUserReacted: false }
+  ]);
+  const { toast } = useToast();
   const isOutbound = message.direction === "outbound";
   const hasMedia = message.media_type && message.media_type !== 'text';
   const isTemplate = message.is_template;
@@ -29,11 +38,42 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
     }
   };
 
-  const getStatusIcon = () => {
+  // Simulate message status (in production, this would come from real data)
+  const getMessageStatus = () => {
     if (!isOutbound) return null;
-    
-    // WhatsApp-style status icons
-    return <CheckCheck className="h-3 w-3 text-white/80 ml-1" />;
+    // Random status for demo (replace with real logic)
+    const statuses = ['sent', 'delivered', 'read'] as const;
+    return statuses[Math.floor(Math.random() * statuses.length)];
+  };
+
+  const handleCopy = (message: MessageRow) => {
+    if (message.body) {
+      navigator.clipboard.writeText(message.body);
+      toast({
+        title: "Texto copiado",
+        description: "O texto foi copiado para a área de transferência.",
+      });
+    }
+  };
+
+  const handleReply = (message: MessageRow) => {
+    onReply?.(message);
+  };
+
+  const handleAddReaction = (messageId: string, emoji: string) => {
+    setReactions(prev => prev.map(r => 
+      r.emoji === emoji 
+        ? { ...r, count: r.count + 1, hasUserReacted: true }
+        : r
+    ));
+  };
+
+  const handleRemoveReaction = (messageId: string, emoji: string) => {
+    setReactions(prev => prev.map(r => 
+      r.emoji === emoji 
+        ? { ...r, count: Math.max(0, r.count - 1), hasUserReacted: false }
+        : r
+    ));
   };
 
   return (
@@ -41,13 +81,18 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
       "flex mb-2",
       isOutbound ? "justify-end" : "justify-start"
     )}>
-      <div className={cn(
-        "max-w-[80%] relative group",
-        hasMedia ? "rounded-lg overflow-hidden" : "rounded-lg",
-        isOutbound 
-          ? "bg-green-500 text-white ml-16 rounded-br-sm shadow-sm" 
-          : "bg-white border border-border/20 mr-16 rounded-bl-sm shadow-sm"
-      )}>
+      <MessageContextMenu
+        message={message}
+        onReply={handleReply}
+        onCopy={handleCopy}
+      >
+        <div className={cn(
+          "max-w-[80%] relative group",
+          hasMedia ? "rounded-lg overflow-hidden" : "rounded-lg",
+          isOutbound 
+            ? "bg-green-500 text-white ml-16 rounded-br-sm shadow-sm" 
+            : "bg-white border border-border/20 mr-16 rounded-bl-sm shadow-sm"
+        )}>
         {/* Template badge */}
         {isTemplate && (
           <div className={cn("px-3 pt-2", hasMedia && "px-2")}>
@@ -93,18 +138,31 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
           </div>
         )}
         
-        {/* Timestamp and Status */}
-        <div className={cn(
-          "flex items-center justify-end gap-1 px-3 pb-2 pt-1",
-          hasMedia && "px-2",
-          isOutbound ? "text-white/70" : "text-gray-500"
-        )}>
-          <span className="text-xs">
-            {formatTime(message.wa_timestamp || message.created_at || "")}
-          </span>
-          {getStatusIcon()}
+          {/* Timestamp and Status */}
+          <div className={cn(
+            "flex items-center justify-end gap-1 px-3 pb-2 pt-1",
+            hasMedia && "px-2",
+            isOutbound ? "text-white/70" : "text-gray-500"
+          )}>
+            <span className="text-xs">
+              {formatTime(message.wa_timestamp || message.created_at || "")}
+            </span>
+            {isOutbound && (
+              <MessageStatusIndicator status={getMessageStatus() || 'sent'} />
+            )}
+          </div>
+
+          {/* Emoji Reactions */}
+          <div className="px-3 pb-2">
+            <EmojiReactions
+              messageId={message.id.toString()}
+              reactions={reactions.filter(r => r.count > 0)}
+              onAddReaction={handleAddReaction}
+              onRemoveReaction={handleRemoveReaction}
+            />
+          </div>
         </div>
-      </div>
+      </MessageContextMenu>
     </div>
   );
 }
