@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageBubble } from "./MessageBubble";
-import { ChatInput } from "./ChatInput";
+import { MessageComposer } from "./MessageComposer";
 import { DateSeparator } from "./DateSeparator";
 import { TypingIndicator } from "./TypingIndicator";
 import { useToast } from "@/hooks/use-toast";
@@ -343,7 +343,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
       {/* Input */}
       <div className="bg-card">
-        <ChatInput onSendMessage={sendMessage} disabled={sending} />
+        <MessageComposer onSendMessage={sendMessage} disabled={sending} />
       </div>
 
       <ContactProfile
