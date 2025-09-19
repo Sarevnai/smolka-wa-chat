@@ -127,10 +127,18 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     try {
       setSending(true);
 
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+
       const response = await fetch(`${SUPABASE_PROJECT_URL}/functions/v1/send-wa-message`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           to: phoneNumber,
