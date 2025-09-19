@@ -103,23 +103,28 @@ export function ConversationItem({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-muted/50 group",
-        isSelected && "bg-primary/10 border border-primary/20"
+        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 cursor-pointer group border-b border-border/30 last:border-b-0",
+        isSelected && "bg-muted/70"
       )}
+      onClick={onClick}
     >
-      <div onClick={onClick} className="flex items-center gap-3 flex-1 cursor-pointer min-w-0">
-      <Avatar className="h-12 w-12">
-        <AvatarFallback className="bg-primary/10 text-primary font-medium">
-          {displayInitials}
-        </AvatarFallback>
-      </Avatar>
+      {/* Online status indicator */}
+      <div className="relative">
+        <Avatar className="h-14 w-14">
+          <AvatarFallback className="bg-muted text-foreground font-medium text-base">
+            {displayInitials}
+          </AvatarFallback>
+        </Avatar>
+        {/* Online indicator - simulated for now */}
+        <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 bg-green-500 border-2 border-background rounded-full" />
+      </div>
       
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 py-1">
         <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <p className="font-medium text-foreground truncate">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <h3 className="font-medium text-foreground truncate text-base">
               {displayName}
-            </p>
+            </h3>
             {isAutoDetectedName && (
               <SparklesIcon className="h-3 w-3 text-primary/60 flex-shrink-0" />
             )}
@@ -129,37 +134,38 @@ export function ConversationItem({
                 <span className="hidden sm:inline">{typeInfo.label}</span>
               </Badge>
             )}
-            {contact?.contracts && contact.contracts.length > 0 && (
-              <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5">
-                <FileText className="h-3 w-3" />
-                <span>{contact.contracts[0].contract_number}</span>
-              </Badge>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs text-muted-foreground">
+              {formatLastMessageTime(lastMessage.wa_timestamp || lastMessage.created_at)}
+            </span>
+            {unreadCount > 0 && (
+              <div className="bg-green-500 text-white text-xs font-medium rounded-full h-5 min-w-5 flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </div>
             )}
           </div>
-          <span className="text-xs text-muted-foreground flex-shrink-0">
-            {formatLastMessageTime(lastMessage.wa_timestamp || lastMessage.created_at)}
-          </span>
         </div>
         
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground truncate">
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-muted-foreground truncate flex-1">
             {lastMessage.direction === "outbound" && "Você: "}
             {truncateMessage(lastMessage.body)}
           </p>
           
-          {unreadCount > 0 && (
-            <Badge variant="default" className="ml-2 h-5 min-w-5 text-xs">
-              {unreadCount}
+          {contact?.contracts && contact.contracts.length > 0 && (
+            <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5">
+              <FileText className="h-3 w-3" />
+              <span>{contact.contracts[0].contract_number}</span>
             </Badge>
           )}
         </div>
         
         {contact?.name && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {formatPhoneNumber(phoneNumber)}
           </p>
         )}
-      </div>
       </div>
 
       <DropdownMenu>
@@ -168,6 +174,7 @@ export function ConversationItem({
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 sm:opacity-100"
+            onClick={(e) => e.stopPropagation()}
           >
             <MoreVertical className="h-4 w-4" />
             <span className="sr-only">Abrir menu</span>

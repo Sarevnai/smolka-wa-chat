@@ -32,27 +32,26 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
   const getStatusIcon = () => {
     if (!isOutbound) return null;
     
-    // For now, all outbound messages show as delivered (double check)
-    // In a real implementation, you'd track message status from WhatsApp API
-    return <CheckCheck className="h-3 w-3 text-primary ml-1" />;
+    // WhatsApp-style status icons
+    return <CheckCheck className="h-3 w-3 text-white/80 ml-1" />;
   };
 
   return (
     <div className={cn(
-      "flex",
+      "flex mb-1",
       isOutbound ? "justify-end" : "justify-start"
     )}>
       <div className={cn(
-        "max-w-[75%] rounded-2xl shadow-sm",
-        hasMedia ? "p-2" : "px-4 py-2",
+        "max-w-[75%] relative group",
+        hasMedia ? "rounded-lg overflow-hidden" : "rounded-lg",
         isOutbound 
-          ? "bg-primary text-primary-foreground rounded-br-md" 
-          : "bg-card border border-border rounded-bl-md"
+          ? "bg-green-500 text-white ml-12 rounded-br-sm" 
+          : "bg-white border border-border/20 mr-12 rounded-bl-sm shadow-sm"
       )}>
         {/* Template badge */}
         {isTemplate && (
-          <div className={hasMedia ? "px-2 pt-2" : "mb-2"}>
-            <Badge variant="secondary" className="text-xs">
+          <div className={cn("px-3 pt-2", hasMedia && "px-2")}>
+            <Badge variant="secondary" className="text-xs mb-1">
               Mensagem de template
             </Badge>
           </div>
@@ -60,7 +59,7 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
 
         {/* Media Content */}
         {hasMedia && (
-          <div className="mb-2">
+          <div className="mb-1">
             <MediaMessage
               mediaType={message.media_type!}
               mediaUrl={message.media_url}
@@ -74,7 +73,7 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
         
         {/* Interactive Message */}
         {interactive && (
-          <div className={hasMedia ? "px-2 mb-2" : "mb-2"}>
+          <div className={cn("mb-1", hasMedia ? "px-2" : "px-3")}>
             <InteractiveMessage
               interactive={interactive}
               isOutbound={isOutbound}
@@ -82,12 +81,12 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
           </div>
         )}
         
-        {/* Text Content - Only show if there's text content or no media */}
+        {/* Text Content */}
         {(!hasMedia || (message.body && message.body.trim() !== message.media_caption?.trim())) && (
-          <div className={hasMedia ? "px-2" : ""}>
+          <div className={cn(hasMedia ? "px-2 pb-1" : "px-3 py-2")}>
             <p className={cn(
               "text-sm leading-relaxed whitespace-pre-wrap break-words",
-              isOutbound ? "text-primary-foreground" : "text-foreground"
+              isOutbound ? "text-white" : "text-gray-900"
             )}>
               {message.body || "Mensagem sem conteúdo"}
             </p>
@@ -96,9 +95,9 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
         
         {/* Timestamp and Status */}
         <div className={cn(
-          "flex items-center justify-end gap-1 mt-1",
-          hasMedia ? "px-2" : "",
-          isOutbound ? "text-primary-foreground/70" : "text-muted-foreground"
+          "flex items-center justify-end gap-1 px-3 pb-2 pt-1",
+          hasMedia && "px-2",
+          isOutbound ? "text-white/80" : "text-gray-500"
         )}>
           <span className="text-xs">
             {formatTime(message.wa_timestamp || message.created_at || "")}

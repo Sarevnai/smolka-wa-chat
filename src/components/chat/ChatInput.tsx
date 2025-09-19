@@ -104,7 +104,7 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
   };
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="p-3 bg-card space-y-3">
       {/* Attendant Selector */}
       <div className="flex items-center gap-3">
         <User className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -113,7 +113,7 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
           onValueChange={setSelectedAttendant} 
           disabled={disabled || (profile?.role !== 'admin' && Boolean(profile?.full_name))}
         >
-          <SelectTrigger className="w-48 h-8">
+          <SelectTrigger className="w-48 h-8 bg-muted/30 border-muted">
             <SelectValue placeholder="Selecionar atendente" />
           </SelectTrigger>
           <SelectContent>
@@ -138,12 +138,12 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
       </div>
 
       {/* Message Input */}
-      <div className="flex items-end gap-3">
+      <div className="flex items-end gap-3 bg-muted/30 rounded-3xl p-2">
         {/* Attachment button */}
         <Button
           variant="ghost"
           size="sm"
-          className="h-10 w-10 p-0 shrink-0"
+          className="h-8 w-8 p-0 shrink-0 hover:bg-muted rounded-full"
           disabled={disabled}
         >
           <Paperclip className="h-4 w-4 text-muted-foreground" />
@@ -157,23 +157,22 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
             onKeyDown={handleKeyDown}
             placeholder="Digite uma mensagem..."
             className={cn(
-              "min-h-[40px] max-h-[100px] resize-none rounded-2xl pr-12 py-3",
-              "border border-border bg-background",
-              "focus:ring-1 focus:ring-primary focus:border-primary"
+              "min-h-[36px] max-h-[100px] resize-none border-0 bg-transparent py-2 px-0",
+              "focus:ring-0 focus:border-0 placeholder:text-muted-foreground/70"
             )}
             disabled={disabled}
           />
-          
-          {/* Emoji button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-            disabled={disabled}
-          >
-            <Smile className="h-4 w-4 text-muted-foreground" />
-          </Button>
         </div>
+        
+        {/* Emoji button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+          disabled={disabled}
+        >
+          <Smile className="h-4 w-4 text-muted-foreground" />
+        </Button>
 
         {/* Send button */}
         <Button
@@ -181,13 +180,13 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
           disabled={!message.trim() || disabled}
           size="sm"
           className={cn(
-            "h-10 w-10 p-0 shrink-0 rounded-full",
-            "bg-primary hover:bg-primary/90 text-primary-foreground",
+            "h-8 w-8 p-0 shrink-0 rounded-full",
+            "bg-green-500 hover:bg-green-600 text-white",
             (!message.trim() || disabled) && "opacity-50"
           )}
         >
           {disabled ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           ) : (
             <Send className="h-4 w-4" />
           )}

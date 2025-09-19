@@ -196,22 +196,22 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-border bg-card">
+      <div className="flex items-center gap-3 px-4 py-4 bg-card border-b border-border">
         {onBack && (
-          <Button variant="ghost" size="sm" onClick={onBack}>
+          <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         )}
         
         <Avatar className="h-10 w-10">
-          <AvatarFallback className="bg-primary/10 text-primary font-medium">
+          <AvatarFallback className="bg-muted text-foreground font-medium">
             {displayInitials}
           </AvatarFallback>
         </Avatar>
         
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-medium text-foreground">{displayName}</h3>
+          <div className="flex items-center gap-2 mb-0.5">
+            <h3 className="font-medium text-foreground text-base">{displayName}</h3>
             {typeInfo && TypeIcon && (
               <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs">
                 <TypeIcon className="h-3 w-3" />
@@ -226,7 +226,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {contact?.name ? 'WhatsApp' : formatPhoneNumber(phoneNumber)}
+            {contact?.name ? 'Última vez online recentemente' : formatPhoneNumber(phoneNumber)}
           </p>
         </div>
         

@@ -154,25 +154,25 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   };
 
   return (
-    <div className="h-full flex flex-col bg-card border-r border-border">
+    <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="p-4 border-b border-border">
+      <div className="px-4 py-5 bg-card border-b border-border">
         <div className="flex items-center gap-3 mb-4">
           {onBack && (
-            <Button variant="ghost" size="sm" onClick={onBack}>
+            <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
-          <h2 className="text-xl font-semibold text-foreground">Conversas</h2>
+          <h1 className="text-xl font-medium text-foreground">Conversas</h1>
         </div>
         
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar conversas..."
+            placeholder="Pesquisar ou começar uma nova conversa"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-muted/30 border-muted rounded-lg h-9"
           />
         </div>
       </div>
@@ -191,7 +191,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
             </p>
           </div>
         ) : (
-          <div className="p-2">
+          <div className="space-y-0">
             {filteredConversations.map((conversation) => (
               <ConversationItem
                 key={conversation.phoneNumber}
