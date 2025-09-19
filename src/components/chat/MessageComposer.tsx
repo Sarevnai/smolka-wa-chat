@@ -10,19 +10,24 @@ import { EmojiPicker } from "./EmojiPicker";
 import { AttachmentUploader } from "./AttachmentUploader";
 import { AudioRecorder } from "./AudioRecorder";
 import { toast } from "@/hooks/use-toast";
+import { MessageRow } from "@/lib/messages";
 
 interface MessageComposerProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
+  replyTo?: MessageRow | null;
+  onVoiceRecord?: () => void;
 }
 
 export function MessageComposer({ 
   onSendMessage, 
   disabled = false, 
   onTypingStart, 
-  onTypingStop 
+  onTypingStop,
+  replyTo,
+  onVoiceRecord 
 }: MessageComposerProps) {
   const [message, setMessage] = useState("");
   const [selectedAttendant, setSelectedAttendant] = useState("none");

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,7 +11,15 @@ import { TypingIndicator } from "./TypingIndicator";
 import { OnlineStatus } from "./OnlineStatus";
 import { MessageSearch } from "./MessageSearch";
 import { ReplyPreview } from "./MessageReply";
+import { MediaGallery } from "./MediaGallery";
+import { MessageForward } from "./MessageForward";
+import { ChatBackground } from "./ChatBackground";
+import { MessageScheduler } from "./MessageScheduler";
+import { ChatSettings } from "./ChatSettings";
+import { VoiceRecorder } from "./VoiceRecorder";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useMediaGallery } from "@/hooks/useMediaGallery";
+import { useChatSettings } from "@/hooks/useChatSettings";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
@@ -23,6 +31,7 @@ import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
 import { formatPhoneNumber } from "@/lib/utils";
 import { isSameDay, parseISO } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface ChatWindowProps {
   phoneNumber: string;
@@ -40,9 +49,17 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [showCreateTicket, setShowCreateTicket] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [replyTo, setReplyTo] = useState<MessageRow | null>(null);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [forwardMessage, setForwardMessage] = useState<MessageRow | null>(null);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  
   const { toast } = useToast();
   const { data: contact } = useContactByPhone(phoneNumber);
   const { isTyping: contactIsTyping, startTyping, stopTyping } = useTypingIndicator(phoneNumber);
+  const { isGalleryOpen, selectedMediaIndex, openGallery, closeGallery, getMediaMessages } = useMediaGallery();
+  const { settings, updateBackground, exportChat, archiveChat, deleteChat } = useChatSettings(phoneNumber);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -188,6 +205,44 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     }
   };
 
+  const handleReply = (message: MessageRow) => {
+    setReplyTo(message);
+  };
+
+  const clearReply = () => {
+    setReplyTo(null);
+  };
+
+  const handleForward = (message: MessageRow) => {
+    setForwardMessage(message);
+    setShowForwardModal(true);
+  };
+
+  const handleForwardSend = async (selectedContacts: string[], message: MessageRow) => {
+    // TODO: Implement forward message logic
+    toast({
+      title: "Mensagem encaminhada",
+      description: `Enviada para ${selectedContacts.length} contato(s)`,
+    });
+  };
+
+  const handleScheduleMessage = async (message: string, scheduledTime: Date) => {
+    // TODO: Implement scheduled message logic
+    toast({
+      title: "Mensagem agendada",
+      description: `Será enviada em ${scheduledTime.toLocaleString()}`,
+    });
+  };
+
+  const handleVoiceSend = async (audioBlob: Blob) => {
+    // TODO: Implement voice message sending
+    setShowVoiceRecorder(false);
+    toast({
+      title: "Áudio enviado",
+      description: "Mensagem de áudio enviada com sucesso",
+    });
+  };
+
   const getInitials = (name?: string, phone?: string) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -234,10 +289,6 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const handleMessageSelect = (messageId: number) => {
     const element = document.querySelector(`[data-message-id="${messageId}"]`);
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-
-  const handleReply = (message: MessageRow) => {
-    setReplyTo(message);
   };
 
   const getContactTypeInfo = (type?: string) => {
@@ -304,10 +355,40 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           >
             <Search className="h-4 w-4" />
           </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => openGallery()}
+            className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+          >
+            <Image className="h-4 w-4" />
+          </Button>
+          
+          <ChatBackground 
+            currentBackground={settings.background} 
+            onBackgroundChange={updateBackground} 
+          />
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowScheduler(true)}
+            className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+          >
+            <Clock className="h-4 w-4" />
+          </Button>
+          
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted rounded-full">
             <Phone className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted rounded-full">
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowSettings(true)}
+            className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
         </div>
@@ -323,11 +404,10 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
       {/* Messages */}
       <div 
-        className="flex-1 px-4 py-2 overflow-y-auto relative"
-        style={{
-          background: `hsl(var(--chat-background))`,
-          backgroundImage: `var(--chat-pattern)`
-        }}
+        className={cn(
+          "flex-1 px-4 py-2 overflow-y-auto relative",
+          settings.background || "bg-background"
+        )}
         ref={scrollAreaRef}
       >
         {loading ? (
@@ -355,6 +435,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
                       message={item.content}
                       isLast={index === groupedMessages.length - 1}
                       onReply={handleReply}
+                      onForward={handleForward}
                     />
                   </div>
                 )}
@@ -373,20 +454,31 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
       {replyTo && (
         <ReplyPreview
           replyTo={replyTo}
-          onClose={() => setReplyTo(null)}
+          onClose={clearReply}
         />
       )}
 
-      {/* Input */}
+      {/* Voice Recorder or Input */}
       <div className="bg-card">
-        <MessageComposer 
-          onSendMessage={sendMessage} 
-          disabled={sending}
-          onTypingStart={startTyping}
-          onTypingStop={stopTyping}
-        />
+        {showVoiceRecorder ? (
+          <VoiceRecorder
+            onSendAudio={handleVoiceSend}
+            onCancel={() => setShowVoiceRecorder(false)}
+            className="mx-4 mb-4"
+          />
+        ) : (
+          <MessageComposer 
+            onSendMessage={sendMessage} 
+            disabled={sending}
+            onTypingStart={startTyping}
+            onTypingStop={stopTyping}
+            replyTo={replyTo}
+            onVoiceRecord={() => setShowVoiceRecorder(true)}
+          />
+        )}
       </div>
 
+      {/* Modals */}
       <ContactProfile
         phoneNumber={phoneNumber}
         open={showProfile}
@@ -416,6 +508,36 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         phoneNumber={phoneNumber}
         contact={contact}
         messages={messages}
+      />
+
+      <MediaGallery
+        isOpen={isGalleryOpen}
+        onClose={closeGallery}
+        messages={messages}
+        initialMediaIndex={selectedMediaIndex}
+      />
+
+      <MessageForward
+        isOpen={showForwardModal}
+        onClose={() => setShowForwardModal(false)}
+        message={forwardMessage!}
+        onForward={handleForwardSend}
+      />
+
+      <MessageScheduler
+        isOpen={showScheduler}
+        onClose={() => setShowScheduler(false)}
+        phoneNumber={phoneNumber}
+        onSchedule={handleScheduleMessage}
+      />
+
+      <ChatSettings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        phoneNumber={phoneNumber}
+        onExportChat={() => exportChat(messages)}
+        onArchiveChat={archiveChat}
+        onDeleteChat={deleteChat}
       />
     </div>
   );

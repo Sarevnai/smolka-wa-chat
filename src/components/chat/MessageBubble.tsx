@@ -15,9 +15,10 @@ interface MessageBubbleProps {
   message: MessageRow;
   isLast?: boolean;
   onReply?: (message: MessageRow) => void;
+  onForward?: (message: MessageRow) => void;
 }
 
-export function MessageBubble({ message, isLast, onReply }: MessageBubbleProps) {
+export function MessageBubble({ message, isLast, onReply, onForward }: MessageBubbleProps) {
   const [reactions, setReactions] = useState([
     { emoji: "👍", count: 0, users: [], hasUserReacted: false }
   ]);
