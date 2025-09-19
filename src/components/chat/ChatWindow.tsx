@@ -350,8 +350,11 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => setShowSearch(true)}
-            className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+            onClick={() => setShowSearch(!showSearch)}
+            className={cn(
+              "h-8 w-8 p-0 hover:bg-muted rounded-full transition-colors",
+              showSearch && "bg-muted"
+            )}
           >
             <Search className="h-4 w-4" />
           </Button>
@@ -394,13 +397,15 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         </div>
       </div>
 
-      {/* Search */}
-      <MessageSearch
-        messages={messages}
-        isOpen={showSearch}
-        onClose={() => setShowSearch(false)}
-        onMessageSelect={handleMessageSelect}
-      />
+      {/* Search - positioned right after header */}
+      {showSearch && (
+        <MessageSearch
+          messages={messages}
+          isOpen={showSearch}
+          onClose={() => setShowSearch(false)}
+          onMessageSelect={handleMessageSelect}
+        />
+      )}
 
       {/* Messages */}
       <div 

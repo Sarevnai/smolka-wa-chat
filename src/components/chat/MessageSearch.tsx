@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,16 @@ export function MessageSearch({
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState<MessageRow[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      // Small delay to ensure animation starts, then focus
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!searchTerm.trim()) {
@@ -61,61 +71,83 @@ export function MessageSearch({
     onClose();
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      handleClose();
+    } else if (e.key === "Enter") {
+      if (e.shiftKey) {
+        goToPrevious();
+      } else {
+        goToNext();
+      }
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className={cn(
-      "absolute top-0 left-0 right-0 z-10 bg-card border-b border-border",
-      "animate-slide-down",
+      "flex items-center gap-2 px-3 py-2 bg-card border-b border-border relative z-10",
+      isOpen ? "animate-slide-in-from-left" : "animate-slide-out-to-right",
       className
     )}>
-      <div className="flex items-center gap-2 p-3">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar nas mensagens..."
-            className="pl-10 pr-4"
-            autoFocus
-          />
-        </div>
+      {/* Search input container */}
+      <div className="flex-1 relative min-w-0">
+        <Input
+          ref={inputRef}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Buscar nas mensagens..."
+          className="pr-12 text-sm"
+        />
         
+        {/* Results counter inside input */}
         {results.length > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-sm text-muted-foreground">
-              {currentIndex + 1} de {results.length}
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <span className="text-xs text-muted-foreground bg-background px-2 py-1 rounded">
+              {currentIndex + 1}/{results.length}
             </span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={goToPrevious}
-              disabled={results.length === 0}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronUp className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={goToNext}
-              disabled={results.length === 0}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </Button>
           </div>
         )}
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleClose}
-          className="h-8 w-8 p-0"
-        >
-          <X className="h-4 w-4" />
-        </Button>
       </div>
+      
+      {/* Navigation buttons */}
+      {results.length > 0 && (
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={goToPrevious}
+            disabled={results.length === 0}
+            className="h-8 w-8 p-0 hover:bg-muted/50"
+            title="Anterior (Shift+Enter)"
+          >
+            <ChevronUp className="h-3 w-3" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={goToNext}
+            disabled={results.length === 0}
+            className="h-8 w-8 p-0 hover:bg-muted/50"
+            title="Próximo (Enter)"
+          >
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+      
+      {/* Close button */}
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={handleClose}
+        className="h-8 w-8 p-0 hover:bg-muted/50"
+        title="Fechar (Esc)"
+      >
+        <X className="h-3 w-3" />
+      </Button>
     </div>
   );
 }
