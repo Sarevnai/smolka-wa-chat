@@ -200,6 +200,15 @@ export default function TemplateSelector({ selectedTemplate, onTemplateSelect, o
     </div>
   );
 
+  // Function to count placeholders in template
+  const countTemplatePlaceholders = (template: WhatsAppTemplate): number => {
+    const bodyComponent = template.components?.find(c => c.type === 'BODY');
+    if (!bodyComponent?.text) return 0;
+    
+    const placeholders = bodyComponent.text.match(/\{\{\d+\}\}/g);
+    return placeholders ? placeholders.length : 0;
+  };
+
   const renderWhatsAppTemplates = () => (
     <div className="space-y-4">
       {isLoadingWhatsApp ? (
@@ -215,7 +224,9 @@ export default function TemplateSelector({ selectedTemplate, onTemplateSelect, o
         </div>
       ) : (
         <div className="space-y-3">
-          {whatsappTemplates.map((template) => (
+          {whatsappTemplates.map((template) => {
+            const placeholderCount = countTemplatePlaceholders(template);
+            return (
             <Card 
               key={template.id}
               className={cn(
@@ -235,9 +246,13 @@ export default function TemplateSelector({ selectedTemplate, onTemplateSelect, o
                         <Zap className="h-3 w-3 mr-1" />
                         Oficial
                       </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        <Globe className="h-3 w-3 mr-1" />
+                        {template.language}
+                      </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Categoria: {template.category} | Status: {template.status}
+                      Categoria: {template.category} | {placeholderCount} parâmetros | ID: {template.template_id}
                     </p>
                   </div>
                 </div>
@@ -260,19 +275,25 @@ export default function TemplateSelector({ selectedTemplate, onTemplateSelect, o
                       {getTemplatePreview(template)}
                     </p>
                     
-                    <div className="mt-3 pt-3 border-t border-border">
-                      <p className="text-xs font-medium text-green-700 mb-1">
-                        ✓ Aprovado pela Meta para uso proativo
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Este template pode ser usado para iniciar conversas com clientes.
-                      </p>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </CardContent>
-            </Card>
-          ))}
+                     <div className="mt-3 pt-3 border-t border-border">
+                       <p className="text-xs font-medium text-green-700 mb-1">
+                         ✓ Aprovado pela Meta para uso proativo
+                       </p>
+                       <p className="text-xs text-muted-foreground">
+                         Este template pode ser usado para iniciar conversas com clientes.
+                       </p>
+                       {placeholderCount > 0 && (
+                         <p className="text-xs text-amber-600 mt-1">
+                           ⚠️ Template requer {placeholderCount} parâmetros - dados do contato serão usados automaticamente
+                         </p>
+                       )}
+                     </div>
+                   </CollapsibleContent>
+                 </Collapsible>
+               </CardContent>
+             </Card>
+            );
+          })}
         </div>
       )}
     </div>

@@ -274,32 +274,44 @@ serve(async (req) => {
             console.log(`Using WhatsApp template: ${template.template_name}`);
             useTemplate = true;
 
-            // Build template parameters using contact data
+            // Count required parameters by analyzing BODY component
+            const bodyComponent = template.components?.find(c => c.type === 'BODY');
+            const bodyText = bodyComponent?.text || '';
+            const placeholderMatches = bodyText.match(/\{\{\d+\}\}/g);
+            const requiredParams = placeholderMatches ? placeholderMatches.length : 0;
+            
+            console.log(`Template "${template.template_name}" requires ${requiredParams} parameters`);
+            
+            // Build exact number of template parameters
             const templateParams = [];
             
-            // Use contact name for first parameter, fallback to phone
-            if (contact.name) {
+            // Use contact data for parameters
+            if (contact.name && requiredParams > 0) {
               templateParams.push({
                 type: "text",
                 text: contact.name
               });
             }
             
-            // Add additional parameters from contact.variables or use defaults
-            if (contact.variables) {
-              Object.values(contact.variables).forEach((value: any) => {
+            // Add parameters from contact.variables if available
+            if (contact.variables && Object.keys(contact.variables).length > 0) {
+              const variableValues = Object.values(contact.variables);
+              for (let i = templateParams.length; i < requiredParams && i < variableValues.length; i++) {
                 templateParams.push({
                   type: "text",
-                  text: String(value)
+                  text: String(variableValues[i - templateParams.length])
                 });
+              }
+            }
+            
+            // Fill remaining slots with fallback data
+            const fallbackData = ["-", "-", "-", "-", "-"];
+            while (templateParams.length < requiredParams) {
+              const fallbackIndex = templateParams.length - (contact.name ? 1 : 0);
+              templateParams.push({
+                type: "text",
+                text: fallbackData[fallbackIndex] || "-"
               });
-            } else {
-              // Add default parameters for common template slots
-              templateParams.push(
-                { type: "text", text: "-" },
-                { type: "text", text: "-" },
-                { type: "text", text: "-" }
-              );
             }
 
             whatsappPayload = {
@@ -311,12 +323,14 @@ serve(async (req) => {
                 language: {
                   code: template.language || 'pt_BR'
                 },
-                components: [
-                  {
-                    type: "body",
-                    parameters: templateParams
-                  }
-                ]
+                ...(requiredParams > 0 ? {
+                  components: [
+                    {
+                      type: "body",
+                      parameters: templateParams
+                    }
+                  ]
+                } : {})
               }
             };
           } else {
@@ -352,6 +366,12 @@ serve(async (req) => {
         
         if (!response.ok) {
           console.log(`WhatsApp API error for ${contact.phone}:`, JSON.stringify(result, null, 2));
+          
+          // Check for specific template errors
+          const isTemplateNotFound = result.error?.code === 132001;
+          const isInvalidTemplate = result.error?.message?.includes('Template name does not exist') ||
+                                  result.error?.message?.includes('template name') ||
+                                  result.error?.message?.includes('does not exist in the translation');
           
           // Enhanced error handling with automatic template fallback
           const isWindowError = result.error?.code === 131047 || 
@@ -431,9 +451,16 @@ serve(async (req) => {
           
           if (!fallbackAttempted) {
             failed++;
-            const errorMsg = isWindowError ? 
-              `${contact.phone}: Fora da janela de 24h (nenhum template aprovado funcionou)` :
-              `${contact.phone}: ${result.error?.message || 'Erro desconhecido'}`;
+            let errorMsg = '';
+            
+            if (isTemplateNotFound || isInvalidTemplate) {
+              errorMsg = `${contact.phone}: Template inválido ou não encontrado (ID: ${template_id})`;
+            } else if (isWindowError) {
+              errorMsg = `${contact.phone}: Fora da janela de 24h (nenhum template aprovado funcionou)`;
+            } else {
+              errorMsg = `${contact.phone}: ${result.error?.message || 'Erro desconhecido'}`;
+            }
+            
             errors.push({
               phone: contact.phone,
               error: errorMsg

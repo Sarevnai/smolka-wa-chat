@@ -33,6 +33,11 @@ export interface WhatsAppTemplateRequest {
   }>;
 }
 
+// Helper function to validate if template_id is numeric (valid)
+const isValidTemplateId = (templateId: string): boolean => {
+  return /^\d+$/.test(templateId);
+};
+
 export const useWhatsAppTemplates = () => {
   return useQuery({
     queryKey: ["whatsapp-templates"],
@@ -44,7 +49,13 @@ export const useWhatsAppTemplates = () => {
         .order("template_name", { ascending: true });
 
       if (error) throw error;
-      return data as WhatsAppTemplate[];
+      
+      // Filter out templates with invalid template_ids on frontend
+      const validTemplates = (data || []).filter(template => 
+        isValidTemplateId(template.template_id)
+      );
+      
+      return validTemplates as WhatsAppTemplate[];
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes since templates don't change often
   });
