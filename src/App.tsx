@@ -14,6 +14,7 @@ import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
 import ClickUpConfig from "./pages/ClickUpConfig";
+import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
 
 // Create QueryClient outside component to avoid recreating on hot reload
@@ -74,6 +75,11 @@ const App = () => (
             <Route path="/clickup" element={
               <ProtectedRoute>
                 <ClickUpConfig />
+              </ProtectedRoute>
+            } />
+            <Route path="/integrations" element={
+              <ProtectedRoute>
+                <Integrations />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
