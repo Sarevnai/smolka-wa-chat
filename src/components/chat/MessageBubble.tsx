@@ -88,11 +88,11 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
         onCopy={handleCopy}
       >
         <div className={cn(
-          "max-w-[80%] relative group",
-          hasMedia ? "rounded-lg overflow-hidden" : "rounded-lg",
+          "max-w-[65%] relative group",
+          hasMedia ? "rounded-lg overflow-hidden" : "",
           isOutbound 
-            ? "bg-green-500 text-white ml-16 rounded-br-sm shadow-sm" 
-            : "bg-white border border-border/20 mr-16 rounded-bl-sm shadow-sm"
+            ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-lg rounded-br-none" 
+            : "bg-message-inbound text-message-text-inbound mr-auto shadow-sm rounded-lg rounded-bl-none border border-gray-200"
         )}>
         {/* Template badge */}
         {isTemplate && (
@@ -132,7 +132,7 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
           <div className={cn(hasMedia ? "px-2 pb-1" : "px-3 py-2")}>
             <p className={cn(
               "text-sm leading-relaxed whitespace-pre-wrap break-words",
-              isOutbound ? "text-white" : "text-gray-900"
+              isOutbound ? "text-gray-900" : "text-gray-900"
             )}>
               {message.body || "Mensagem sem conteúdo"}
             </p>
@@ -143,13 +143,13 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
           <div className={cn(
             "flex items-center justify-end gap-1 px-3 pb-2 pt-1",
             hasMedia && "px-2",
-            isOutbound ? "text-white/70" : "text-gray-500"
+            "text-gray-500"
           )}>
             <span className="text-xs">
               {formatTime(message.wa_timestamp || message.created_at || "")}
             </span>
             {isOutbound && (
-              <MessageStatusIndicator status={getMessageStatus() || 'sent'} />
+              <span className="text-xs ml-1 text-blue-600">✓✓</span>
             )}
           </div>
 

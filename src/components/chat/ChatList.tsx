@@ -154,26 +154,49 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   };
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="px-4 py-5 bg-card border-b border-border">
-        <div className="flex items-center gap-3 mb-4">
+    <div className="h-full flex flex-col bg-sidebar">
+      {/* WhatsApp Header */}
+      <div className="px-4 py-3 bg-sidebar-header text-sidebar-primary-foreground">
+        <div className="flex items-center justify-between mb-3">
           {onBack && (
-            <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0">
+            <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0 text-white hover:bg-white/10">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
-          <h1 className="text-xl font-medium text-foreground">Conversas</h1>
+          <h1 className="text-xl font-medium">WhatsApp</h1>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white hover:bg-white/10">
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             placeholder="Pesquisar ou começar uma nova conversa"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-muted/30 border-muted rounded-lg h-9"
+            className="pl-10 bg-white/90 border-0 rounded-lg h-9 text-gray-900 placeholder:text-gray-500"
           />
+        </div>
+      </div>
+      
+      {/* Filter Tabs */}
+      <div className="px-4 py-2 bg-sidebar border-b border-sidebar-border">
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" className="text-xs h-7 px-3 bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80">
+            Todas
+          </Button>
+          <Button variant="ghost" size="sm" className="text-xs h-7 px-3 text-muted-foreground hover:bg-sidebar-accent/50">
+            Não lidas
+          </Button>
+          <Button variant="ghost" size="sm" className="text-xs h-7 px-3 text-muted-foreground hover:bg-sidebar-accent/50">
+            Favoritas
+          </Button>
+          <Button variant="ghost" size="sm" className="text-xs h-7 px-3 text-muted-foreground hover:bg-sidebar-accent/50">
+            Grupos
+          </Button>
         </div>
       </div>
 

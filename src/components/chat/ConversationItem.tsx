@@ -103,26 +103,24 @@ export function ConversationItem({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50 cursor-pointer group border-b border-border/30 last:border-b-0",
-        isSelected && "bg-muted/70"
+        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-sidebar-accent cursor-pointer group",
+        isSelected && "bg-sidebar-accent"
       )}
       onClick={onClick}
     >
-      {/* Online status indicator */}
-      <div className="relative">
-        <Avatar className="h-14 w-14">
-          <AvatarFallback className="bg-muted text-foreground font-medium text-base">
+      {/* Avatar */}
+      <div className="relative flex-shrink-0">
+        <Avatar className="h-12 w-12">
+          <AvatarFallback className="bg-gray-400 text-white font-medium text-sm">
             {displayInitials}
           </AvatarFallback>
         </Avatar>
-        {/* Online indicator - simulated for now */}
-        <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 bg-green-500 border-2 border-background rounded-full" />
       </div>
       
       <div className="flex-1 min-w-0 py-1">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <h3 className="font-medium text-foreground truncate text-base">
+            <h3 className="font-medium text-gray-900 truncate text-base">
               {displayName}
             </h3>
             {isAutoDetectedName && (
@@ -136,11 +134,11 @@ export function ConversationItem({
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-gray-500">
               {formatLastMessageTime(lastMessage.wa_timestamp || lastMessage.created_at)}
             </span>
             {unreadCount > 0 && (
-              <div className="bg-green-500 text-white text-xs font-medium rounded-full h-5 min-w-5 flex items-center justify-center px-1">
+              <div className="bg-primary text-white text-xs font-medium rounded-full h-5 min-w-5 flex items-center justify-center px-1">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </div>
             )}
@@ -148,8 +146,10 @@ export function ConversationItem({
         </div>
         
         <div className="flex items-center gap-2">
-          <p className="text-sm text-muted-foreground truncate flex-1">
-            {lastMessage.direction === "outbound" && "Você: "}
+          <p className="text-sm text-gray-600 truncate flex-1">
+            {lastMessage.direction === "outbound" && (
+              <span className="text-gray-500">✓✓ </span>
+            )}
             {truncateMessage(lastMessage.body)}
           </p>
           
@@ -162,7 +162,7 @@ export function ConversationItem({
         </div>
         
         {contact?.name && (
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-gray-500 mt-0.5">
             {formatPhoneNumber(phoneNumber)}
           </p>
         )}

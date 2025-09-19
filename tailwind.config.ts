@@ -49,11 +49,13 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         // WhatsApp specific colors
-        inbound: "hsl(var(--inbound))",
-        outbound: "hsl(var(--outbound))",
-        "live-indicator": "hsl(var(--live-indicator))",
+        "message-outbound": "hsl(var(--message-outbound))",
+        "message-inbound": "hsl(var(--message-inbound))", 
+        "message-text-outbound": "hsl(var(--message-text-outbound))",
+        "message-text-inbound": "hsl(var(--message-text-inbound))",
         chat: {
           background: "hsl(var(--chat-background))",
+          header: "hsl(var(--chat-header))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
@@ -64,6 +66,7 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+          header: "hsl(var(--sidebar-header))",
         },
       },
       borderRadius: {

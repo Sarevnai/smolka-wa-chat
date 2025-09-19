@@ -306,24 +306,24 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const TypeIcon = typeInfo?.icon;
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-4 bg-card border-b border-border">
+    <div className="h-full flex flex-col">
+      {/* WhatsApp Chat Header */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-chat-header border-b border-border shadow-sm">
         {onBack && (
-          <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0">
+          <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         )}
         
         <Avatar className="h-10 w-10">
-          <AvatarFallback className="bg-muted text-foreground font-medium">
+          <AvatarFallback className="bg-gray-400 text-white font-medium">
             {displayInitials}
           </AvatarFallback>
         </Avatar>
         
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="font-medium text-foreground text-base">{displayName}</h3>
+            <h3 className="font-medium text-gray-900 text-base">{displayName}</h3>
             {typeInfo && TypeIcon && (
               <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs">
                 <TypeIcon className="h-3 w-3" />
@@ -340,59 +340,54 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           {contact?.name ? (
             <OnlineStatus phoneNumber={phoneNumber} />
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-600">
               {formatPhoneNumber(phoneNumber)}
             </p>
           )}
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setShowSearch(!showSearch)}
             className={cn(
-              "h-8 w-8 p-0 hover:bg-muted rounded-full transition-colors",
-              showSearch && "bg-muted"
+              "h-10 w-10 p-0 hover:bg-gray-100 rounded-full transition-colors text-gray-600",
+              showSearch && "bg-gray-100"
             )}
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-5 w-5" />
           </Button>
           
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => openGallery()}
-            className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+            className="h-10 w-10 p-0 hover:bg-gray-100 rounded-full text-gray-600"
           >
-            <Image className="h-4 w-4" />
+            <Image className="h-5 w-5" />
           </Button>
-          
-          <ChatBackground 
-            currentBackground={settings.background} 
-            onBackgroundChange={updateBackground} 
-          />
           
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setShowScheduler(true)}
-            className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+            className="h-10 w-10 p-0 hover:bg-gray-100 rounded-full text-gray-600"
           >
-            <Clock className="h-4 w-4" />
+            <Clock className="h-5 w-5" />
           </Button>
           
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted rounded-full">
-            <Phone className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 hover:bg-gray-100 rounded-full text-gray-600">
+            <Phone className="h-5 w-5" />
           </Button>
           
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setShowSettings(true)}
-            className="h-8 w-8 p-0 hover:bg-muted rounded-full"
+            className="h-10 w-10 p-0 hover:bg-gray-100 rounded-full text-gray-600"
           >
-            <MoreVertical className="h-4 w-4" />
+            <MoreVertical className="h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -409,10 +404,8 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
       {/* Messages */}
       <div 
-        className={cn(
-          "flex-1 px-4 py-2 overflow-y-auto relative",
-          settings.background || "bg-background"
-        )}
+        className="flex-1 px-16 py-4 overflow-y-auto relative bg-chat-background"
+        style={{ backgroundImage: 'var(--chat-pattern)' }}
         ref={scrollAreaRef}
       >
         {loading ? (
@@ -464,7 +457,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
       )}
 
       {/* Voice Recorder or Input */}
-      <div className="bg-card">
+      <div className="bg-chat-header px-4 py-3">
         {showVoiceRecorder ? (
           <VoiceRecorder
             onSendAudio={handleVoiceSend}

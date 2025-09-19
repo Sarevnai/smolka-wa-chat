@@ -8,121 +8,115 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 15% 98%;
-    --foreground: 220 15% 5%;
+    --background: 0 0% 100%;
+    --foreground: 211 10% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 5%;
+    --card-foreground: 211 10% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 5%;
+    --popover-foreground: 211 10% 11%;
 
-    /* WhatsApp inspired primary colors */
-    --primary: 142 70% 49%;
+    /* WhatsApp Web exact colors */
+    --primary: 144 79% 33%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 142 70% 55%;
+    --primary-glow: 144 79% 38%;
 
-    --secondary: 220 15% 95%;
-    --secondary-foreground: 220 15% 15%;
+    --secondary: 200 20% 95%;
+    --secondary-foreground: 211 10% 11%;
 
-    --muted: 220 15% 96%;
-    --muted-foreground: 220 15% 45%;
+    --muted: 200 20% 94%;
+    --muted-foreground: 211 10% 40%;
 
-    --accent: 142 70% 96%;
-    --accent-foreground: 142 70% 25%;
+    --accent: 144 79% 96%;
+    --accent-foreground: 144 79% 15%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 90%;
-    --input: 220 15% 92%;
-    --ring: 142 70% 49%;
+    --border: 200 20% 91%;
+    --input: 200 20% 94%;
+    --ring: 144 79% 33%;
 
-    /* Message status colors */
-    --inbound: 142 70% 49%;
-    --outbound: 220 15% 60%;
-    --live-indicator: 120 100% 40%;
+    /* WhatsApp Web message colors */
+    --message-outbound: 82 59% 85%;
+    --message-inbound: 0 0% 100%;
+    --message-text-outbound: 0 0% 0%;
+    --message-text-inbound: 0 0% 0%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(var(--secondary)));
+    /* WhatsApp Web sidebar */
+    --sidebar-background: 200 20% 94%;
+    --sidebar-header: 144 79% 33%;
+    --sidebar-foreground: 211 10% 11%;
+    --sidebar-primary: 144 79% 33%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 200 20% 90%;
+    --sidebar-accent-foreground: 211 10% 11%;
+    --sidebar-border: 200 20% 89%;
+    --sidebar-ring: 144 79% 33%;
 
-    /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* WhatsApp Web chat area */
+    --chat-background: 45 8% 93%;
+    --chat-header: 0 0% 100%;
+    --chat-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e5ddd5' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-
-    /* WhatsApp-style chat background */
-    --chat-background: 229 35% 95%;
-    --chat-pattern: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23e5ddd5' fill-opacity='0.3' fill-rule='evenodd'%3E%3Cpath d='m0 40l40-40h-40v40zm40 0v-40h-40l40 40z'/%3E%3C/g%3E%3C/svg%3E");
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 220 15% 8%;
-    --foreground: 220 15% 95%;
+    --background: 17 20% 9%;
+    --foreground: 0 0% 85%;
 
-    --card: 220 15% 10%;
-    --card-foreground: 220 15% 95%;
+    --card: 17 20% 11%;
+    --card-foreground: 0 0% 85%;
 
-    --popover: 220 15% 10%;
-    --popover-foreground: 220 15% 95%;
+    --popover: 17 20% 11%;
+    --popover-foreground: 0 0% 85%;
 
-    --primary: 142 70% 49%;
+    --primary: 144 79% 38%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 142 70% 45%;
+    --primary-glow: 144 79% 43%;
 
-    --secondary: 220 15% 15%;
-    --secondary-foreground: 220 15% 85%;
+    --secondary: 17 20% 15%;
+    --secondary-foreground: 0 0% 75%;
 
-    --muted: 220 15% 12%;
-    --muted-foreground: 220 15% 55%;
+    --muted: 17 20% 13%;
+    --muted-foreground: 0 0% 55%;
 
-    --accent: 142 70% 15%;
-    --accent-foreground: 142 70% 75%;
+    --accent: 144 79% 15%;
+    --accent-foreground: 144 79% 75%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 20%;
-    --input: 220 15% 15%;
-    --ring: 142 70% 49%;
+    --border: 17 20% 20%;
+    --input: 17 20% 15%;
+    --ring: 144 79% 38%;
 
-    /* Message status colors - dark mode */
-    --inbound: 142 70% 55%;
-    --outbound: 220 15% 70%;
-    --live-indicator: 120 100% 50%;
+    /* WhatsApp Web Dark message colors */
+    --message-outbound: 144 79% 15%;
+    --message-inbound: 17 20% 11%;
+    --message-text-outbound: 0 0% 100%;
+    --message-text-inbound: 0 0% 85%;
 
-    /* Gradients - dark mode */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(var(--secondary)));
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    /* WhatsApp Web Dark sidebar */
+    --sidebar-background: 17 20% 11%;
+    --sidebar-header: 144 79% 38%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 144 79% 38%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    
-    /* Dark mode chat background */
-    --chat-background: 217 32% 10%;
-    --chat-pattern: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.05' fill-rule='evenodd'%3E%3Cpath d='m0 40l40-40h-40v40zm40 0v-40h-40l40 40z'/%3E%3C/g%3E%3C/svg%3E");
+    --sidebar-accent: 17 20% 15%;
+    --sidebar-accent-foreground: 0 0% 85%;
+    --sidebar-border: 17 20% 18%;
+    --sidebar-ring: 144 79% 38%;
+
+    /* WhatsApp Web Dark chat area */
+    --chat-background: 17 20% 7%;
+    --chat-header: 17 20% 11%;
+    --chat-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
 }
 

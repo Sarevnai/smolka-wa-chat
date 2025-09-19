@@ -210,7 +210,7 @@ export function MessageComposer({
   const isTextMessage = message.trim().length > 0;
 
   return (
-    <div className="p-3 bg-card space-y-3 border-t border-border">
+    <div className="space-y-3">
       {/* Attendant Selector */}
       <div className="flex items-center gap-3">
         <User className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -219,7 +219,7 @@ export function MessageComposer({
           onValueChange={setSelectedAttendant} 
           disabled={disabled || (profile?.role !== 'admin' && Boolean(profile?.full_name))}
         >
-          <SelectTrigger className="w-48 h-8 bg-muted/30 border-muted">
+          <SelectTrigger className="w-48 h-8 bg-gray-100 border-gray-200 rounded-lg">
             <SelectValue placeholder="Selecionar atendente" />
           </SelectTrigger>
           <SelectContent>
@@ -243,8 +243,8 @@ export function MessageComposer({
         )}
       </div>
 
-      {/* Message Input */}
-      <div className="flex items-end gap-3 bg-muted/30 rounded-3xl p-2">
+      {/* WhatsApp Message Input */}
+      <div className="flex items-end gap-3 bg-white rounded-3xl p-2 shadow-sm border border-gray-200">
         {/* Attachment uploader */}
         <AttachmentUploader
           onFileSelect={handleFileSelect}
@@ -288,8 +288,8 @@ export function MessageComposer({
             disabled={!message.trim() || disabled || isSending}
             size="sm"
             className={cn(
-              "h-8 w-8 p-0 shrink-0 rounded-full",
-              "bg-green-500 hover:bg-green-600 text-white",
+              "h-9 w-9 p-0 shrink-0 rounded-full",
+              "bg-primary hover:bg-primary/90 text-white",
               "transition-all duration-200 animate-scale-in",
               (!message.trim() || disabled || isSending) && "opacity-50"
             )}
