@@ -52,6 +52,9 @@ export default {
         inbound: "hsl(var(--inbound))",
         outbound: "hsl(var(--outbound))",
         "live-indicator": "hsl(var(--live-indicator))",
+        chat: {
+          background: "hsl(var(--chat-background))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

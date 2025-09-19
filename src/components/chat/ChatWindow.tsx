@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
+import { DateSeparator } from "./DateSeparator";
+import { TypingIndicator } from "./TypingIndicator";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
@@ -16,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
 import { formatPhoneNumber } from "@/lib/utils";
+import { isSameDay, parseISO } from "date-fns";
 
 interface ChatWindowProps {
   phoneNumber: string;
@@ -26,6 +29,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showNewContact, setShowNewContact] = useState(false);
   const [showDemandClassification, setShowDemandClassification] = useState(false);
@@ -176,8 +180,60 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     return '??';
   };
 
+  // Group messages by date for date separators
+  const groupMessagesByDate = (messages: MessageRow[]) => {
+    const grouped: Array<{ type: 'date' | 'message'; content: any; date?: string }> = [];
+    let currentDate = '';
+
+    messages.forEach((message, index) => {
+      const messageDate = message.wa_timestamp || message.created_at || '';
+      const messageDateOnly = messageDate.split('T')[0]; // Get date part only
+
+      if (messageDateOnly !== currentDate) {
+        currentDate = messageDateOnly;
+        grouped.push({
+          type: 'date',
+          content: messageDate,
+          date: messageDate
+        });
+      }
+
+      grouped.push({
+        type: 'message',
+        content: message,
+        date: messageDate
+      });
+    });
+
+    return grouped;
+  };
+
+  const groupedMessages = groupMessagesByDate(messages);
+
   const displayName = contact?.name || formatPhoneNumber(phoneNumber);
   const displayInitials = getInitials(contact?.name, phoneNumber);
+
+  // Simulate typing indicator (you can connect this to real typing events)
+  useEffect(() => {
+    let typingTimeout: NodeJS.Timeout;
+    
+    // Simulate random typing for demo purposes (remove in production)
+    const simulateTyping = () => {
+      if (Math.random() > 0.95 && messages.length > 0) { // 5% chance when there are messages
+        setIsTyping(true);
+        typingTimeout = setTimeout(() => {
+          setIsTyping(false);
+        }, 2000 + Math.random() * 3000); // 2-5 seconds
+      }
+    };
+
+    const interval = setInterval(simulateTyping, 10000); // Check every 10 seconds
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(typingTimeout);
+    };
+  }, [messages.length]);
 
   const getContactTypeInfo = (type?: string) => {
     switch (type) {
@@ -230,40 +286,25 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           </p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted rounded-full">
             <Phone className="h-4 w-4" />
           </Button>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => setShowDemandClassification(true)}
-            title="Classificar demanda"
-          >
-            <Tags className="h-4 w-4" />
-          </Button>
-          {!contact && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => setShowNewContact(true)}
-              title="Adicionar contato"
-            >
-              <UserPlus className="h-4 w-4" />
-            </Button>
-          )}
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => setShowProfile(true)}
-          >
-            <User className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted rounded-full">
+            <MoreVertical className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+      <div 
+        className="flex-1 px-4 py-2 overflow-y-auto"
+        style={{
+          background: `hsl(var(--chat-background))`,
+          backgroundImage: `var(--chat-pattern)`
+        }}
+        ref={scrollAreaRef}
+      >
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -278,21 +319,30 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {messages.map((message, index) => (
-              <MessageBubble
-                key={`${message.id}-${index}`}
-                message={message}
-                isLast={index === messages.length - 1}
-              />
+          <div className="py-2">
+            {groupedMessages.map((item, index) => (
+              <div key={`${item.type}-${index}`}>
+                {item.type === 'date' ? (
+                  <DateSeparator date={item.content} />
+                ) : (
+                  <MessageBubble
+                    message={item.content}
+                    isLast={index === groupedMessages.length - 1}
+                  />
+                )}
+              </div>
             ))}
+            
+            {/* Typing indicator */}
+            {isTyping && <TypingIndicator />}
+            
             <div ref={messagesEndRef} />
           </div>
         )}
-      </ScrollArea>
+      </div>
 
       {/* Input */}
-      <div className="border-t border-border bg-card">
+      <div className="bg-card">
         <ChatInput onSendMessage={sendMessage} disabled={sending} />
       </div>
 

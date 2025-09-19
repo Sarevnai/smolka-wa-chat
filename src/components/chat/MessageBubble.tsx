@@ -38,15 +38,15 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
 
   return (
     <div className={cn(
-      "flex mb-1",
+      "flex mb-2",
       isOutbound ? "justify-end" : "justify-start"
     )}>
       <div className={cn(
-        "max-w-[75%] relative group",
+        "max-w-[80%] relative group",
         hasMedia ? "rounded-lg overflow-hidden" : "rounded-lg",
         isOutbound 
-          ? "bg-green-500 text-white ml-12 rounded-br-sm" 
-          : "bg-white border border-border/20 mr-12 rounded-bl-sm shadow-sm"
+          ? "bg-green-500 text-white ml-16 rounded-br-sm shadow-sm" 
+          : "bg-white border border-border/20 mr-16 rounded-bl-sm shadow-sm"
       )}>
         {/* Template badge */}
         {isTemplate && (
@@ -97,7 +97,7 @@ export function MessageBubble({ message, isLast }: MessageBubbleProps) {
         <div className={cn(
           "flex items-center justify-end gap-1 px-3 pb-2 pt-1",
           hasMedia && "px-2",
-          isOutbound ? "text-white/80" : "text-gray-500"
+          isOutbound ? "text-white/70" : "text-gray-500"
         )}>
           <span className="text-xs">
             {formatTime(message.wa_timestamp || message.created_at || "")}
