@@ -98,6 +98,7 @@ const Index = () => {
                 description="Todas as mensagens processadas"
                 icon={MessageCircle}
                 trend={{ value: 12, isPositive: true }}
+                className="animate-fade-in"
               />
               
               <StatsCard
@@ -106,6 +107,7 @@ const Index = () => {
                 description="Mensagens enviadas e recebidas hoje"
                 icon={Activity}
                 trend={{ value: 8, isPositive: true }}
+                className="animate-fade-in [animation-delay:0.1s]"
               />
               
               <StatsCard
@@ -114,6 +116,7 @@ const Index = () => {
                 description="Conversas nos últimos 7 dias"
                 icon={Users}
                 trend={{ value: 23, isPositive: true }}
+                className="animate-fade-in [animation-delay:0.2s]"
               />
               
               <StatsCard
@@ -122,6 +125,7 @@ const Index = () => {
                 description="Percentual de respostas recebidas"
                 icon={Target}
                 trend={{ value: -2, isPositive: false }}
+                className="animate-fade-in [animation-delay:0.3s]"
               />
             </div>
 
@@ -150,7 +154,7 @@ const Index = () => {
             </div>
 
             {/* Main Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in [animation-delay:0.6s]">
               <RecentActivity activities={stats.recentActivity} />
               <QuickActions />
             </div>

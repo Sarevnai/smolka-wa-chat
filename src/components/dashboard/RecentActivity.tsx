@@ -82,9 +82,9 @@ export function RecentActivity({ activities }: RecentActivityProps) {
             {activities.map((activity) => {
               const Icon = getActivityIcon(activity.type);
               return (
-                <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-colors">
+                <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-all duration-200 hover-scale">
                   <div className={cn(
-                    "p-2 rounded-lg",
+                    "p-2 rounded-lg transition-colors",
                     activity.type === 'message' && "bg-blue-100 dark:bg-blue-900/20",
                     activity.type === 'campaign' && "bg-purple-100 dark:bg-purple-900/20",
                     activity.type === 'contact' && "bg-green-100 dark:bg-green-900/20",

@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { LogOut, User, Crown, Settings, Puzzle } from "lucide-react";
+import { LogOut, User, Crown, Settings, Puzzle, Keyboard } from "lucide-react";
 import monogramaLogo from "@/assets/monograma-logo.png";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -8,6 +8,10 @@ import { useAuth } from "@/hooks/useAuth";
 import AICommunicatorWidget from "@/components/ai/AICommunicatorWidget";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { BreadcrumbNav } from "@/components/navigation/BreadcrumbNav";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 export default function Layout({
   children
 }: {
@@ -19,6 +23,9 @@ export default function Layout({
     profile,
     signOut
   } = useAuth();
+  
+  // Initialize keyboard shortcuts
+  useKeyboardShortcuts();
   const handleSignOut = async () => {
     await signOut();
   };
@@ -45,12 +52,18 @@ export default function Layout({
                 </div>
               </div>
               
-              {/* Live indicator and User Menu */}
-              <div className="flex items-center space-x-4">
+              {/* Live indicator, Theme Toggle, Notifications and User Menu */}
+              <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-1">
                   <div className="h-2 w-2 rounded-full bg-live-indicator animate-pulse" />
                   <span className="text-sm font-medium text-muted-foreground hidden sm:inline">Live</span>
                 </div>
+
+                {/* Theme Toggle */}
+                <ThemeToggle />
+
+                {/* Notifications */}
+                {user && <NotificationCenter />}
 
                 {/* Settings Menu */}
                 <DropdownMenu>
@@ -67,6 +80,14 @@ export default function Layout({
                         <Puzzle className="mr-2 h-4 w-4" />
                         Integrações
                       </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      // Trigger keyboard shortcuts help
+                      const event = new KeyboardEvent('keydown', { key: '/' });
+                      window.dispatchEvent(event);
+                    }}>
+                      <Keyboard className="mr-2 h-4 w-4" />
+                      Atalhos de Teclado
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -116,8 +137,14 @@ export default function Layout({
           </header>
 
           {/* Main content */}
-          <main className="flex-1 overflow-auto p-6">
-            {children}
+          <main className="flex-1 overflow-auto">
+            <div className="p-6">
+              {/* Breadcrumbs */}
+              <BreadcrumbNav />
+              
+              {/* Page Content */}
+              {children}
+            </div>
           </main>
           
           {/* AI Communicator Widget - Available except on individual chat pages */}

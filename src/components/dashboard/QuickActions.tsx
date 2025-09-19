@@ -86,7 +86,7 @@ export function QuickActions() {
             <Button
               key={action.title}
               asChild
-              className={`h-auto p-4 justify-start ${action.color} text-white shadow-lg hover:shadow-xl transition-all duration-200`}
+              className="w-full justify-start h-auto p-4 hover-scale shadow-lg hover:shadow-xl transition-all duration-200"
             >
               <Link to={action.href}>
                 <div className="flex items-center space-x-3">
@@ -119,7 +119,7 @@ export function QuickActions() {
               key={action.title}
               asChild
               variant="ghost"
-              className="w-full justify-start h-auto p-3"
+              className="w-full justify-start h-auto p-3 hover:bg-accent/50 transition-colors story-link"
             >
               <Link to={action.href}>
                 <div className="flex items-center space-x-3">
