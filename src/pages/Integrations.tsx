@@ -1,174 +1,113 @@
 import Layout from "@/components/Layout";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Settings, ExternalLink, CheckCircle, XCircle, Clock } from "lucide-react";
-import { Link } from "react-router-dom";
-
-const integrations = [
-  {
-    id: 'clickup',
-    name: 'ClickUp',
-    description: 'Sincronize tickets automaticamente com suas listas do ClickUp para melhor gestão de tarefas',
-    icon: Settings,
-    status: 'connected', // connected | disconnected | pending
-    configPath: '/clickup',
-    features: [
-      'Criação automática de tasks',
-      'Sincronização de status',
-      'Campos customizados',
-      'Webhooks bidirecionais'
-    ]
-  },
-  {
-    id: 'whatsapp',
-    name: 'WhatsApp Business API',
-    description: 'Integração nativa com WhatsApp Business API para envio e recebimento de mensagens',
-    icon: Settings,
-    status: 'connected',
-    configPath: '/whatsapp-config',
-    features: [
-      'Envio de mensagens',
-      'Templates aprovados',
-      'Webhooks em tempo real',
-      'Mídia e documentos'
-    ]
-  },
-  {
-    id: 'zapier',
-    name: 'Zapier',
-    description: 'Conecte com centenas de aplicações através do Zapier para automações avançadas',
-    icon: Settings,
-    status: 'disconnected',
-    configPath: '/zapier-config',
-    features: [
-      'Automações personalizadas',
-      'Triggers por eventos',
-      'Integração com CRM',
-      'Sincronização de dados'
-    ]
-  },
-  {
-    id: 'google-sheets',
-    name: 'Google Sheets',
-    description: 'Exporte e sincronize dados de contatos e relatórios com planilhas do Google',
-    icon: Settings,
-    status: 'pending',
-    configPath: '/google-sheets-config',
-    features: [
-      'Export automático',
-      'Sincronização bidirecional',
-      'Relatórios dinâmicos',
-      'Backup de dados'
-    ]
-  }
-];
-
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case 'connected':
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
-    case 'disconnected':
-      return <XCircle className="h-4 w-4 text-red-500" />;
-    case 'pending':
-      return <Clock className="h-4 w-4 text-yellow-500" />;
-    default:
-      return null;
-  }
-};
-
-const getStatusText = (status: string) => {
-  switch (status) {
-    case 'connected':
-      return 'Conectado';
-    case 'disconnected':
-      return 'Desconectado';
-    case 'pending':
-      return 'Pendente';
-    default:
-      return '';
-  }
-};
-
-const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status) {
-    case 'connected':
-      return 'default';
-    case 'disconnected':
-      return 'destructive';
-    case 'pending':
-      return 'secondary';
-    default:
-      return 'outline';
-  }
-};
+import { Skeleton } from "@/components/ui/skeleton";
+import { Settings, RefreshCw, Plus, TrendingUp } from "lucide-react";
+import { useIntegrations } from "@/hooks/useIntegrations";
+import { IntegrationCard } from "@/components/integrations/IntegrationCard";
 
 export default function Integrations() {
+  const { integrations, loading, testConnection, disconnectIntegration, refreshStatus } = useIntegrations();
+
+  const connectedCount = integrations.filter(i => i.status === 'connected').length;
+  const totalCount = integrations.length;
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-8">
+            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-80" />
+            ))}
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto">
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Integrações</h1>
-          <p className="text-muted-foreground mt-2">
-            Configure e gerencie todas as integrações do sistema em um só lugar
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Integrações</h1>
+              <p className="text-muted-foreground mt-2">
+                Configure e gerencie todas as integrações do sistema em um só lugar
+              </p>
+            </div>
+            <Button onClick={refreshStatus} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Atualizar Status
+            </Button>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Integrações Ativas</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{connectedCount}/{totalCount}</div>
+                <p className="text-xs text-muted-foreground">
+                  {((connectedCount / totalCount) * 100).toFixed(0)}% do total
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Status Geral</CardTitle>
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {connectedCount === totalCount ? "🟢" : connectedCount > 0 ? "🟡" : "🔴"}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {connectedCount === totalCount 
+                    ? "Todas conectadas" 
+                    : connectedCount > 0 
+                      ? "Parcialmente conectado" 
+                      : "Desconectado"
+                  }
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Novas Integrações</CardTitle>
+                <Plus className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">Em Breve</div>
+                <p className="text-xs text-muted-foreground">
+                  Solicite novas integrações
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
+        {/* Integrations Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {integrations.map((integration) => (
-            <Card key={integration.id} className="relative h-full flex flex-col">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <integration.icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{integration.name}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        {getStatusIcon(integration.status)}
-                        <Badge variant={getStatusVariant(integration.status)} className="text-xs">
-                          {getStatusText(integration.status)}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <CardDescription className="mt-3">
-                  {integration.description}
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="flex-1">
-                <div>
-                  <h4 className="text-sm font-medium mb-3 text-foreground">Recursos:</h4>
-                  <ul className="space-y-2">
-                    {integration.features.map((feature, index) => (
-                      <li key={index} className="text-sm text-muted-foreground flex items-center">
-                        <CheckCircle className="h-3 w-3 text-green-500 mr-2 flex-shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </CardContent>
-
-              <CardFooter className="pt-4">
-                <div className="flex gap-2 w-full">
-                  <Button asChild className="flex-1" variant="outline">
-                    <Link to={integration.configPath}>
-                      <Settings className="h-4 w-4 mr-2" />
-                      Configurar
-                    </Link>
-                  </Button>
-                  {integration.status === 'connected' && (
-                    <Button size="sm" variant="ghost">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </CardFooter>
-            </Card>
+            <IntegrationCard
+              key={integration.id}
+              integration={integration}
+              onTestConnection={testConnection}
+              onDisconnect={disconnectIntegration}
+            />
           ))}
         </div>
 
