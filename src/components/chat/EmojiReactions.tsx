@@ -28,7 +28,7 @@ export function EmojiReactions({
   onRemoveReaction, 
   className 
 }: EmojiReactionsProps) {
-  const [showPicker, setShowPicker] = useState(false);
+  const [showAllReactions, setShowAllReactions] = useState(false);
 
   const handleReactionClick = (emoji: string, hasUserReacted: boolean) => {
     if (hasUserReacted) {
@@ -45,38 +45,82 @@ export function EmojiReactions({
     } else {
       onAddReaction(messageId, emoji);
     }
-    setShowPicker(false);
+    setShowAllReactions(false);
   };
+
+  // Show up to 3 reactions, then "+X more" 
+  const visibleReactions = reactions.slice(0, 3);
+  const hiddenCount = reactions.length - 3;
+
+  if (reactions.length === 0) return null;
 
   return (
     <div className={cn("flex items-center gap-1 mt-1", className)}>
-      {/* Existing reactions */}
-      {reactions.map((reaction) => (
+      {/* Visible reactions (up to 3) */}
+      {visibleReactions.map((reaction) => (
         <button
           key={reaction.emoji}
           onClick={() => handleReactionClick(reaction.emoji, reaction.hasUserReacted)}
           className={cn(
             "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs",
-            "border transition-colors duration-200",
+            "border transition-all duration-200 hover:scale-105",
             reaction.hasUserReacted
-              ? "bg-primary text-primary-foreground border-primary"
-              : "bg-background border-border hover:bg-muted"
+              ? "bg-blue-500 text-white border-blue-500 shadow-sm"
+              : "bg-white border-gray-300 hover:bg-gray-50 shadow-sm"
           )}
         >
-          <span>{reaction.emoji}</span>
-          <span>{reaction.count}</span>
+          <span className="text-sm">{reaction.emoji}</span>
+          <span className="font-medium">{reaction.count}</span>
         </button>
       ))}
 
-      {/* Add reaction button */}
-      <Popover open={showPicker} onOpenChange={setShowPicker}>
+      {/* "+X more" button if there are hidden reactions */}
+      {hiddenCount > 0 && (
+        <Popover open={showAllReactions} onOpenChange={setShowAllReactions}>
+          <PopoverTrigger asChild>
+            <button
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 border border-gray-300 hover:bg-gray-150 transition-colors"
+            >
+              <span className="text-gray-600 font-medium">+{hiddenCount}</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-4" side="top" align="start">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground border-b pb-2">
+                <Smile className="h-4 w-4" />
+                Todas as reações
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {reactions.map((reaction) => (
+                  <button
+                    key={reaction.emoji}
+                    onClick={() => handleReactionClick(reaction.emoji, reaction.hasUserReacted)}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-lg transition-colors text-left",
+                      reaction.hasUserReacted
+                        ? "bg-blue-500 text-white"
+                        : "hover:bg-gray-100"
+                    )}
+                  >
+                    <span className="text-lg">{reaction.emoji}</span>
+                    <span className="text-sm font-medium">{reaction.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
+
+      {/* Add new reaction button */}
+      <Popover>
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 rounded-full bg-background/50 hover:bg-background border border-border/50"
+            className="h-7 w-7 p-0 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-colors"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-3 w-3 text-gray-500" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-64 p-3" side="top" align="start">
@@ -93,8 +137,8 @@ export function EmojiReactions({
                     key={emoji}
                     onClick={() => handleQuickReaction(emoji)}
                     className={cn(
-                      "p-2 rounded-md text-lg hover:bg-muted transition-colors",
-                      existingReaction?.hasUserReacted && "bg-primary/20"
+                      "p-2 rounded-md text-lg hover:bg-gray-100 transition-colors",
+                      existingReaction?.hasUserReacted && "bg-blue-100"
                     )}
                   >
                     {emoji}

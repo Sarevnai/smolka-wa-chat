@@ -67,8 +67,8 @@ export function AudioPlayer({ audioUrl, duration, className, isOutbound }: Audio
 
   return (
     <div className={cn(
-      "flex items-center gap-3 p-3 rounded-lg min-w-[250px]",
-      isOutbound ? "bg-primary/10" : "bg-muted",
+      "flex items-center gap-3 p-3 rounded-xl min-w-[280px]",
+      isOutbound ? "bg-white/10" : "bg-gray-100",
       className
     )}>
       <audio ref={audioRef} src={audioUrl} />
@@ -77,45 +77,57 @@ export function AudioPlayer({ audioUrl, duration, className, isOutbound }: Audio
         variant="ghost"
         size="sm"
         onClick={togglePlay}
-        className="h-8 w-8 p-0"
+        className={cn(
+          "h-10 w-10 p-0 rounded-full flex-shrink-0",
+          isOutbound ? "bg-white/20 hover:bg-white/30 text-white" : "bg-primary hover:bg-primary/90 text-white"
+        )}
       >
         {isPlaying ? (
-          <Pause className="h-4 w-4" />
+          <Pause className="h-5 w-5" />
         ) : (
-          <Play className="h-4 w-4" />
+          <Play className="h-5 w-5 ml-0.5" />
         )}
       </Button>
 
-      <div className="flex-1 space-y-1">
-        <Slider
-          value={[progress]}
-          onValueChange={handleSeek}
-          max={100}
-          step={1}
-          className="w-full"
-        />
-        
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(audioDuration)}</span>
+      <div className="flex-1 space-y-2">
+        <div className="relative h-1 bg-white/20 rounded-full overflow-hidden">
+          <div 
+            className={cn(
+              "absolute left-0 top-0 h-full rounded-full transition-all duration-300",
+              isOutbound ? "bg-white/60" : "bg-primary"
+            )}
+            style={{ width: `${progress}%` }}
+          />
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={progress}
+            onChange={(e) => handleSeek([Number(e.target.value)])}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
         </div>
-      </div>
-
-      <div className="flex items-center gap-1">
-        <Volume2 className="h-3 w-3 text-muted-foreground" />
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          onClick={() => {
-            const link = document.createElement('a');
-            link.href = audioUrl;
-            link.download = 'audio.mp3';
-            link.click();
-          }}
-        >
-          <Download className="h-3 w-3" />
-        </Button>
+        
+        <div className="flex justify-between items-center">
+          <span className={cn(
+            "text-xs font-medium",
+            isOutbound ? "text-white/80" : "text-gray-600"
+          )}>
+            {formatTime(currentTime)}
+          </span>
+          <div className="flex items-center gap-1">
+            <Volume2 className={cn(
+              "h-3 w-3",
+              isOutbound ? "text-white/60" : "text-gray-500"
+            )} />
+          </div>
+          <span className={cn(
+            "text-xs font-medium",
+            isOutbound ? "text-white/80" : "text-gray-600"
+          )}>
+            {formatTime(audioDuration)}
+          </span>
+        </div>
       </div>
     </div>
   );

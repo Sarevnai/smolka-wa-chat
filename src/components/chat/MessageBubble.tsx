@@ -79,7 +79,7 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
 
   return (
     <div className={cn(
-      "flex mb-2",
+      "flex mb-3 animate-fade-in",
       isOutbound ? "justify-end" : "justify-start"
     )}>
       <MessageContextMenu
@@ -88,12 +88,25 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
         onCopy={handleCopy}
       >
         <div className={cn(
-          "max-w-[65%] relative group",
+          "max-w-[65%] relative group animate-slide-in-from-left",
           hasMedia ? "rounded-lg overflow-hidden" : "",
           isOutbound 
             ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-lg rounded-br-none" 
             : "bg-message-inbound text-message-text-inbound mr-auto shadow-sm rounded-lg rounded-bl-none border border-gray-200"
         )}>
+        
+        {/* Reply Context Display */}
+        {message.body && message.body.includes('_Respondendo a:') && (
+          <div className="px-3 pt-2 border-l-4 border-blue-400 bg-blue-50/50 rounded-tl-lg">
+            <div className="text-xs text-blue-600 font-medium mb-1">
+              Em resposta a:
+            </div>
+            <p className="text-xs text-gray-600 italic">
+              {message.body.split('\n\n')[0].replace('_Respondendo a: "', '').replace('"_', '')}
+            </p>
+          </div>
+        )}
+        
         {/* Template badge */}
         {isTemplate && (
           <div className={cn("px-3 pt-2", hasMedia && "px-2")}>
@@ -134,7 +147,10 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
               "text-sm leading-relaxed whitespace-pre-wrap break-words",
               isOutbound ? "text-gray-900" : "text-gray-900"
             )}>
-              {message.body || "Mensagem sem conteúdo"}
+              {/* Filter out reply context from displayed text */}
+              {message.body && message.body.includes('_Respondendo a:') 
+                ? message.body.split('\n\n').slice(1).join('\n\n') || "Mensagem sem conteúdo"
+                : message.body || "Mensagem sem conteúdo"}
             </p>
           </div>
         )}
@@ -154,14 +170,16 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
           </div>
 
           {/* Emoji Reactions */}
-          <div className="px-3 pb-2">
-            <EmojiReactions
-              messageId={message.id.toString()}
-              reactions={reactions.filter(r => r.count > 0)}
-              onAddReaction={handleAddReaction}
-              onRemoveReaction={handleRemoveReaction}
-            />
-          </div>
+          {reactions.filter(r => r.count > 0).length > 0 && (
+            <div className="px-3 pb-2">
+              <EmojiReactions
+                messageId={message.id.toString()}
+                reactions={reactions.filter(r => r.count > 0)}
+                onAddReaction={handleAddReaction}
+                onRemoveReaction={handleRemoveReaction}
+              />
+            </div>
+          )}
         </div>
       </MessageContextMenu>
     </div>

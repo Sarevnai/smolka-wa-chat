@@ -33,26 +33,26 @@ export function MessageReply({ message, onReply, className }: MessageReplyProps)
 
 export function ReplyPreview({ replyTo, onClose, className }: ReplyPreviewProps) {
   const isOutbound = replyTo.direction === "outbound";
-  const displayText = replyTo.body || (replyTo.media_type ? `[${replyTo.media_type}]` : "Mensagem sem conteúdo");
+  const displayText = replyTo.body || (replyTo.media_type ? `[${replyTo.media_type?.toUpperCase()}]` : "Mensagem sem conteúdo");
   const truncatedText = displayText.length > 50 ? displayText.substring(0, 50) + "..." : displayText;
 
   return (
     <div className={cn(
-      "flex items-center gap-3 px-4 py-3 bg-muted/50 border-l-4 border-primary",
+      "flex items-center gap-3 px-6 py-3 mx-4 mb-2 bg-gray-50 border-l-4 border-primary rounded-r-lg animate-slide-in-from-left",
       className
     )}>
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
           <Reply className="h-3 w-3 text-primary" />
           <span className="text-xs font-medium text-primary">
-            Respondendo a {isOutbound ? "você" : "contato"}
+            {isOutbound ? "Você" : "Contato"}
           </span>
         </div>
-        <p className="text-sm text-muted-foreground">{truncatedText}</p>
+        <p className="text-sm text-gray-600 leading-relaxed">{truncatedText}</p>
       </div>
       <button
         onClick={onClose}
-        className="h-6 w-6 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        className="h-7 w-7 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors text-lg font-medium"
       >
         ×
       </button>

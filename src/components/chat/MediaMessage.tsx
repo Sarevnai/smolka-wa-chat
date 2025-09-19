@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AudioPlayer } from "./AudioPlayer";
 import { Download, FileText, MapPin, Volume2, Image, Video, Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -86,17 +87,12 @@ export function MediaMessage({
       case 'audio':
       case 'voice':
         return (
-          <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-            <Volume2 className="h-5 w-5 opacity-70" />
-            <div className="flex-1">
-              <audio 
-                src={mediaUrl || ''} 
-                controls 
-                className="w-full"
-                onPlay={() => setAudioPlaying(true)}
-                onPause={() => setAudioPlaying(false)}
-              />
-            </div>
+          <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg min-w-[280px]">
+            <AudioPlayer 
+              audioUrl={mediaUrl || ''} 
+              isOutbound={isOutbound}
+              className="w-full"
+            />
           </div>
         );
 
