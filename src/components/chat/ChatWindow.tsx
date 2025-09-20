@@ -307,7 +307,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
   return (
     <div className="h-full flex flex-col">
-      {/* WhatsApp Chat Header */}
+      {/* Chat Header */}
       <div className="flex items-center gap-3 px-4 py-2 bg-chat-header border-b border-sidebar-border shadow-sm h-[59px]">
         {onBack && (
           <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100">
