@@ -81,7 +81,7 @@ export default {
       transitionTimingFunction: {
         smooth: "var(--transition-smooth)",
       },
-      keyframes: {
+        keyframes: {
         "accordion-down": {
           from: {
             height: "0",
@@ -146,14 +146,22 @@ export default {
         },
         "slide-in-from-left": {
           "0%": { 
-            transform: "translateX(-100%) scale(0.8)", 
             opacity: "0", 
-            width: "0" 
+            transform: "translateX(-20px)"
           },
           "100%": { 
-            transform: "translateX(0) scale(1)", 
             opacity: "1", 
-            width: "auto" 
+            transform: "translateX(0)"
+          }
+        },
+        "slide-down": {
+          "0%": {
+            opacity: "0",
+            transform: "translateY(-10px)"
+          },
+          "100%": {
+            opacity: "1",
+            transform: "translateY(0)"
           }
         },
         "slide-out-to-right": {
@@ -179,8 +187,8 @@ export default {
         "slide-in-right": "slide-in-right 0.3s ease-out",
         "slide-out-right": "slide-out-right 0.3s ease-out",
         "slide-in-from-left": "slide-in-from-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        "slide-down": "slide-down 0.2s ease-out",
         "slide-out-to-right": "slide-out-to-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        "scale-in": "scale-in 0.2s ease-out",
         "enter": "fade-in 0.3s ease-out, scale-in 0.2s ease-out",
         "exit": "fade-out 0.3s ease-out, scale-out 0.2s ease-out"
       },

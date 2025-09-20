@@ -156,8 +156,8 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   return (
     <div className="h-full flex flex-col bg-sidebar">
       {/* WhatsApp Header */}
-      <div className="px-4 py-3 bg-sidebar-header text-sidebar-primary-foreground">
-        <div className="flex items-center justify-between mb-3">
+      <div className="px-4 py-3 bg-sidebar-header text-sidebar-primary-foreground h-[60px] flex flex-col justify-center">
+        <div className="flex items-center justify-between mb-4">
           {onBack && (
             <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0 text-white hover:bg-white/10">
               <ArrowLeft className="h-4 w-4" />
@@ -177,7 +177,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
             placeholder="Pesquisar ou começar uma nova conversa"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white/90 border-0 rounded-lg h-9 text-gray-900 placeholder:text-gray-500"
+            className="pl-10 bg-white/90 border-0 rounded-lg h-8 text-sm text-gray-900 placeholder:text-gray-500"
           />
         </div>
       </div>
@@ -207,10 +207,18 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : filteredConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4">
-            <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-sm text-muted-foreground text-center">
-              {searchQuery ? "Nenhuma conversa encontrada" : "Sem conversas ainda"}
+          <div className="flex flex-col items-center justify-center py-16 px-6 animate-fade-in">
+            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+              <MessageSquare className="h-8 w-8 text-muted-foreground/60" />
+            </div>
+            <h3 className="text-base font-medium text-foreground mb-2">
+              {searchQuery ? "Nenhuma conversa encontrada" : "Sem conversas"}
+            </h3>
+            <p className="text-sm text-muted-foreground text-center max-w-xs">
+              {searchQuery 
+                ? "Tente usar outros termos de busca"
+                : "As conversas aparecerão aqui quando você receber mensagens"
+              }
             </p>
           </div>
         ) : (

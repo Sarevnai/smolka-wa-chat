@@ -308,7 +308,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   return (
     <div className="h-full flex flex-col">
       {/* WhatsApp Chat Header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-chat-header border-b border-border shadow-sm">
+      <div className="flex items-center gap-3 px-4 py-3 bg-chat-header border-b border-sidebar-border shadow-sm h-[60px]">
         {onBack && (
           <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100">
             <ArrowLeft className="h-4 w-4" />
@@ -404,7 +404,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
       {/* Messages */}
       <div 
-        className="flex-1 px-16 py-4 overflow-y-auto relative bg-chat-background"
+        className="flex-1 px-8 py-2 overflow-y-auto relative bg-chat-background"
         style={{ backgroundImage: 'var(--chat-pattern)' }}
         ref={scrollAreaRef}
       >
@@ -413,22 +413,25 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Phone className="h-8 w-8 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
+            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+              <Phone className="h-10 w-10 text-muted-foreground/60" />
             </div>
-            <p className="text-center text-muted-foreground">
-              Inicie uma conversa enviando uma mensagem
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              Inicie uma conversa
+            </h3>
+            <p className="text-center text-muted-foreground max-w-xs">
+              Envie uma mensagem para começar uma nova conversa com este contato
             </p>
           </div>
         ) : (
-          <div className="py-2">
+          <div className="py-2 px-1">
             {groupedMessages.map((item, index) => (
-              <div key={`${item.type}-${index}`}>
+              <div key={`${item.type}-${index}`} className="animate-fade-in">
                 {item.type === 'date' ? (
                   <DateSeparator date={item.content} />
                 ) : (
-                  <div data-message-id={item.content.id}>
+                  <div data-message-id={item.content.id} className="mb-1">
                     <MessageBubble
                       message={item.content}
                       isLast={index === groupedMessages.length - 1}
@@ -441,7 +444,11 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             ))}
             
             {/* Typing indicator */}
-            {contactIsTyping && <TypingIndicator />}
+            {contactIsTyping && (
+              <div className="animate-fade-in">
+                <TypingIndicator />
+              </div>
+            )}
             
             <div ref={messagesEndRef} />
           </div>

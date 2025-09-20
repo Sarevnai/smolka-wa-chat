@@ -103,14 +103,14 @@ export function ConversationItem({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-sidebar-accent cursor-pointer group",
+        "flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-sidebar-accent cursor-pointer group border-b border-sidebar-border/30",
         isSelected && "bg-sidebar-accent"
       )}
       onClick={onClick}
     >
       {/* Avatar */}
       <div className="relative flex-shrink-0">
-        <Avatar className="h-12 w-12">
+        <Avatar className="h-11 w-11">
           <AvatarFallback className="bg-gray-400 text-white font-medium text-sm">
             {displayInitials}
           </AvatarFallback>

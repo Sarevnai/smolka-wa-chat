@@ -32,7 +32,7 @@ export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps
   // Desktop: Split screen layout
   return (
     <div className="h-screen flex">
-      <div className="w-[400px] flex-shrink-0 border-r border-border bg-sidebar">
+      <div className="w-[420px] flex-shrink-0 border-r border-sidebar-border bg-sidebar">
         <ChatList onContactSelect={onContactSelect} selectedContact={selectedContact} />
       </div>
       

@@ -89,10 +89,10 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
       >
         <div className={cn(
           "max-w-[65%] relative group animate-slide-in-from-left",
-          hasMedia ? "rounded-lg overflow-hidden" : "",
+          hasMedia ? "rounded-xl overflow-hidden" : "",
           isOutbound 
-            ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-lg rounded-br-none" 
-            : "bg-message-inbound text-message-text-inbound mr-auto shadow-sm rounded-lg rounded-bl-none border border-gray-200"
+            ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-xl rounded-br-md" 
+            : "bg-message-inbound text-message-text-inbound mr-auto shadow-sm rounded-xl rounded-bl-md border border-gray-200/60"
         )}>
         
         {/* Reply Context Display */}
@@ -161,11 +161,11 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
             hasMedia && "px-2",
             "text-gray-500"
           )}>
-            <span className="text-xs">
+            <span className="text-xs opacity-80">
               {formatTime(message.wa_timestamp || message.created_at || "")}
             </span>
             {isOutbound && (
-              <span className="text-xs ml-1 text-blue-600">✓✓</span>
+              <MessageStatusIndicator status={getMessageStatus()} />
             )}
           </div>
 
