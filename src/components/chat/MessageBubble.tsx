@@ -79,7 +79,7 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
 
   return (
     <div className={cn(
-      "flex mb-3 animate-fade-in",
+      "flex mb-1 animate-fade-in",
       isOutbound ? "justify-end" : "justify-start"
     )}>
       <MessageContextMenu
@@ -88,7 +88,7 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
         onCopy={handleCopy}
       >
         <div className={cn(
-          "max-w-[65%] relative group animate-slide-in-from-left",
+          "max-w-[45%] md:max-w-[65%] relative group animate-slide-in-from-left",
           hasMedia ? "rounded-xl overflow-hidden" : "",
           isOutbound 
             ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-xl rounded-br-md" 
@@ -142,7 +142,7 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
         
         {/* Text Content */}
         {(!hasMedia || (message.body && message.body.trim() !== message.media_caption?.trim())) && (
-          <div className={cn(hasMedia ? "px-2 pb-1" : "px-3 py-2")}>
+          <div className={cn(hasMedia ? "px-2 pb-1" : "px-3 py-1.5")}>
             <p className={cn(
               "text-sm leading-relaxed whitespace-pre-wrap break-words",
               isOutbound ? "text-gray-900" : "text-gray-900"

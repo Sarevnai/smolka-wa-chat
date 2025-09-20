@@ -210,41 +210,37 @@ export function MessageComposer({
   const isTextMessage = message.trim().length > 0;
 
   return (
-    <div className="space-y-3">
-      {/* Attendant Selector */}
-      <div className="flex items-center gap-3">
-        <User className="h-4 w-4 text-muted-foreground shrink-0" />
-        <Select 
-          value={selectedAttendant} 
-          onValueChange={setSelectedAttendant} 
-          disabled={disabled || (profile?.role !== 'admin' && Boolean(profile?.full_name))}
-        >
-          <SelectTrigger className="w-48 h-8 bg-gray-100 border-gray-200 rounded-lg">
-            <SelectValue placeholder="Selecionar atendente" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableAttendants.map((attendant) => (
-              <SelectItem key={attendant.value} value={attendant.value}>
-                <div className="flex items-center gap-2">
-                  <span>{attendant.label}</span>
-                  {attendant.role === 'admin' && (
-                    <Crown className="h-3 w-3 text-yellow-500" />
-                  )}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {selectedAttendant && selectedAttendant !== "none" && (
-          <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-xs">
-            <User className="h-3 w-3" />
-            <span>{selectedAttendant}</span>
-          </div>
-        )}
-      </div>
+    <div className="flex flex-col gap-2">
+      {/* Compact Attendant Selector - Only show for admins or when needed */}
+      {(profile?.role === 'admin' || availableAttendants.length > 1) && (
+        <div className="flex items-center gap-2 px-1">
+          <User className="h-3 w-3 text-muted-foreground shrink-0" />
+          <Select 
+            value={selectedAttendant} 
+            onValueChange={setSelectedAttendant} 
+            disabled={disabled || (profile?.role !== 'admin' && Boolean(profile?.full_name))}
+          >
+            <SelectTrigger className="h-6 w-36 text-xs bg-muted/50 border-muted-foreground/20 rounded-md">
+              <SelectValue placeholder="Atendente" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableAttendants.map((attendant) => (
+                <SelectItem key={attendant.value} value={attendant.value}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">{attendant.label}</span>
+                    {attendant.role === 'admin' && (
+                      <Crown className="h-2 w-2 text-yellow-500" />
+                    )}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
-      {/* WhatsApp Message Input */}
-      <div className="flex items-end gap-3 bg-white rounded-3xl p-2 shadow-sm border border-gray-200">
+      {/* WhatsApp Message Input - Fixed Height */}
+      <div className="flex items-end gap-2 bg-white rounded-3xl p-2 shadow-sm border border-gray-200 min-h-[44px]">
         {/* Attachment uploader */}
         <AttachmentUploader
           onFileSelect={handleFileSelect}
@@ -260,8 +256,8 @@ export function MessageComposer({
             onKeyDown={handleKeyDown}
             placeholder="Digite uma mensagem..."
             className={cn(
-              "min-h-[36px] max-h-[100px] resize-none border-0 bg-transparent py-2 px-0",
-              "focus:ring-0 focus:border-0 placeholder:text-muted-foreground/70",
+              "min-h-[28px] max-h-[80px] resize-none border-0 bg-transparent py-1.5 px-0",
+              "focus:ring-0 focus:border-0 placeholder:text-muted-foreground/70 text-sm",
               "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/20"
             )}
             disabled={disabled}
@@ -288,16 +284,16 @@ export function MessageComposer({
             disabled={!message.trim() || disabled || isSending}
             size="sm"
             className={cn(
-              "h-9 w-9 p-0 shrink-0 rounded-full",
+              "h-8 w-8 p-0 shrink-0 rounded-full",
               "bg-primary hover:bg-primary/90 text-white",
               "transition-all duration-200 animate-scale-in",
               (!message.trim() || disabled || isSending) && "opacity-50"
             )}
           >
             {isSending ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
             ) : (
-              <Send className="h-4 w-4" />
+              <Send className="h-3 w-3" />
             )}
           </Button>
         )}

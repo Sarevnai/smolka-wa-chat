@@ -308,7 +308,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   return (
     <div className="h-full flex flex-col">
       {/* WhatsApp Chat Header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-chat-header border-b border-sidebar-border shadow-sm h-[60px]">
+      <div className="flex items-center gap-3 px-4 py-2 bg-chat-header border-b border-sidebar-border shadow-sm h-[59px]">
         {onBack && (
           <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100">
             <ArrowLeft className="h-4 w-4" />
@@ -404,7 +404,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
       {/* Messages */}
       <div 
-        className="flex-1 px-8 py-2 overflow-y-auto relative bg-chat-background"
+        className="flex-1 px-4 py-2 overflow-y-auto relative bg-chat-background"
         style={{ backgroundImage: 'var(--chat-pattern)' }}
         ref={scrollAreaRef}
       >
