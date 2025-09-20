@@ -155,29 +155,24 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
 
   return (
     <div className="h-full flex flex-col bg-sidebar">
-      {/* WhatsApp Header */}
-      <div className="px-4 py-2 bg-sidebar-header text-sidebar-primary-foreground h-[59px] flex flex-col justify-center">
-        <div className="flex items-center justify-between mb-2">
+      {/* Chat Header */}
+      <div className="px-4 py-2 bg-sidebar-header text-sidebar-primary-foreground h-[59px] flex items-center justify-between">
+        <div className="flex items-center gap-3">
           {onBack && (
             <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0 text-white hover:bg-white/10">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
           <h1 className="text-lg font-medium">Chat</h1>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white hover:bg-white/10">
-              <MessageSquare className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
         
-        <div className="relative">
+        <div className="relative flex-1 max-w-xs ml-4">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             placeholder="Pesquisar ou começar uma nova conversa"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white/90 border-0 rounded-lg h-7 text-sm text-gray-900 placeholder:text-gray-500"
+            className="pl-10 bg-white/90 border-0 rounded-lg h-8 text-sm text-gray-900 placeholder:text-gray-500"
           />
         </div>
       </div>
