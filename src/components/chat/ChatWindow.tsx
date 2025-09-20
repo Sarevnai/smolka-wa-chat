@@ -425,13 +425,13 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             </p>
           </div>
         ) : (
-          <div className="py-2 px-1">
+          <div className="py-1 px-1">
             {groupedMessages.map((item, index) => (
               <div key={`${item.type}-${index}`} className="animate-fade-in">
                 {item.type === 'date' ? (
                   <DateSeparator date={item.content} />
                 ) : (
-                  <div data-message-id={item.content.id} className="mb-1">
+                  <div data-message-id={item.content.id}>
                     <MessageBubble
                       message={item.content}
                       isLast={index === groupedMessages.length - 1}
@@ -464,7 +464,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
       )}
 
       {/* Voice Recorder or Input */}
-      <div className="bg-chat-header px-4 py-3">
+      <div className="bg-chat-header px-4 py-2">
         {showVoiceRecorder ? (
           <VoiceRecorder
             onSendAudio={handleVoiceSend}

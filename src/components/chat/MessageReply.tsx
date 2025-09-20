@@ -38,7 +38,7 @@ export function ReplyPreview({ replyTo, onClose, className }: ReplyPreviewProps)
 
   return (
     <div className={cn(
-      "flex items-center gap-3 px-6 py-3 mx-4 mb-2 bg-gray-50 border-l-4 border-primary rounded-r-lg animate-slide-in-from-left",
+      "flex items-center gap-3 px-4 py-2 mx-4 mb-1 bg-gray-50 border-l-4 border-primary rounded-r-lg animate-slide-in-from-left",
       className
     )}>
       <div className="flex-1">

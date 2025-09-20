@@ -23,8 +23,8 @@ export function DateSeparator({ date }: DateSeparatorProps) {
   };
 
   return (
-    <div className="flex justify-center my-4">
-      <div className="bg-muted/80 backdrop-blur-sm px-3 py-1 rounded-lg">
+    <div className="flex justify-center my-2">
+      <div className="bg-muted/80 backdrop-blur-sm px-2 py-0.5 rounded-md">
         <span className="text-xs text-muted-foreground font-medium">
           {formatDateLabel(date)}
         </span>
