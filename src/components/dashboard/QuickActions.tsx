@@ -86,14 +86,14 @@ export function QuickActions() {
             <Button
               key={action.title}
               asChild
-              className="w-full justify-start h-auto p-4 hover-scale shadow-lg hover:shadow-xl transition-all duration-200"
+              className="w-full justify-start h-auto p-4 hover-scale shadow-lg hover:shadow-xl transition-all duration-200 whitespace-normal"
             >
               <Link to={action.href}>
-                <div className="flex items-center space-x-3">
-                  <action.icon className="h-6 w-6" />
-                  <div className="text-left">
-                    <div className="font-medium">{action.title}</div>
-                    <div className="text-xs opacity-90">{action.description}</div>
+                <div className="flex items-start space-x-3 w-full">
+                  <action.icon className="h-6 w-6 flex-shrink-0 mt-0.5" />
+                  <div className="text-left flex-1 min-w-0">
+                    <div className="font-medium text-sm leading-tight mb-1 break-words">{action.title}</div>
+                    <div className="text-xs opacity-90 leading-tight break-words">{action.description}</div>
                   </div>
                 </div>
               </Link>
@@ -119,14 +119,14 @@ export function QuickActions() {
               key={action.title}
               asChild
               variant="ghost"
-              className="w-full justify-start h-auto p-3 hover:bg-accent/50 transition-colors story-link"
+              className="w-full justify-start h-auto p-3 hover:bg-accent/50 transition-colors story-link whitespace-normal"
             >
               <Link to={action.href}>
-                <div className="flex items-center space-x-3">
-                  <action.icon className={`h-5 w-5 ${action.color}`} />
-                  <div className="text-left">
-                    <div className="font-medium text-sm">{action.title}</div>
-                    <div className="text-xs text-muted-foreground">{action.description}</div>
+                <div className="flex items-start space-x-3 w-full">
+                  <action.icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${action.color}`} />
+                  <div className="text-left flex-1 min-w-0">
+                    <div className="font-medium text-sm leading-tight mb-1 break-words">{action.title}</div>
+                    <div className="text-xs text-muted-foreground leading-tight break-words">{action.description}</div>
                   </div>
                 </div>
               </Link>
