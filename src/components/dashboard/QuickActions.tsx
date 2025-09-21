@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Send, 
   MessageCircle, 
@@ -69,71 +70,75 @@ const systemActions = [
 
 export function QuickActions() {
   return (
-    <div className="space-y-6">
-      {/* Main Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Ações Rápidas
-          </CardTitle>
-          <CardDescription>
-            Acesse as funcionalidades principais
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {quickActions.map((action) => (
-            <Button
-              key={action.title}
-              asChild
-              className="w-full justify-start h-auto p-4 hover-scale shadow-lg hover:shadow-xl transition-all duration-200 whitespace-normal"
-            >
-              <Link to={action.href}>
-                <div className="flex items-start space-x-3 w-full">
-                  <action.icon className="h-6 w-6 flex-shrink-0 mt-0.5" />
-                  <div className="text-left flex-1 min-w-0">
-                    <div className="font-medium text-sm leading-tight mb-1 break-words">{action.title}</div>
-                    <div className="text-xs opacity-90 leading-tight break-words">{action.description}</div>
-                  </div>
-                </div>
-              </Link>
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* Main Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Ações Rápidas
+            </CardTitle>
+            <CardDescription>
+              Acesse as funcionalidades principais
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {quickActions.map((action) => (
+              <Tooltip key={action.title}>
+                <TooltipTrigger asChild>
+                  <Button
+                    asChild
+                    className="h-20 p-3 flex-col gap-2 hover-scale shadow-md hover:shadow-lg transition-all duration-200"
+                  >
+                    <Link to={action.href}>
+                      <action.icon className="h-6 w-6" />
+                      <span className="text-xs font-medium text-center leading-tight">{action.title}</span>
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{action.description}</p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </CardContent>
+        </Card>
 
-      {/* System Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Configurações
-          </CardTitle>
-          <CardDescription>
-            Configurar e personalizar o sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {systemActions.map((action) => (
-            <Button
-              key={action.title}
-              asChild
-              variant="ghost"
-              className="w-full justify-start h-auto p-3 hover:bg-accent/50 transition-colors story-link whitespace-normal"
-            >
-              <Link to={action.href}>
-                <div className="flex items-start space-x-3 w-full">
-                  <action.icon className={`h-5 w-5 flex-shrink-0 mt-0.5 ${action.color}`} />
-                  <div className="text-left flex-1 min-w-0">
-                    <div className="font-medium text-sm leading-tight mb-1 break-words">{action.title}</div>
-                    <div className="text-xs text-muted-foreground leading-tight break-words">{action.description}</div>
-                  </div>
-                </div>
-              </Link>
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
+        {/* System Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configurações
+            </CardTitle>
+            <CardDescription>
+              Configurar e personalizar o sistema
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {systemActions.map((action) => (
+              <Tooltip key={action.title}>
+                <TooltipTrigger asChild>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    className="w-full justify-start h-12 p-3 hover:bg-accent/50 transition-colors"
+                  >
+                    <Link to={action.href}>
+                      <action.icon className={`h-5 w-5 mr-3 ${action.color}`} />
+                      <span className="font-medium text-sm">{action.title}</span>
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{action.description}</p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   );
 }
