@@ -11,6 +11,7 @@ import { AttachmentUploader } from "./AttachmentUploader";
 import { AudioRecorder } from "./AudioRecorder";
 import { toast } from "@/hooks/use-toast";
 import { MessageRow } from "@/lib/messages";
+import { useParams } from "react-router-dom";
 
 interface MessageComposerProps {
   onSendMessage: (message: string) => void;
@@ -32,8 +33,10 @@ export function MessageComposer({
   const [message, setMessage] = useState("");
   const [selectedAttendant, setSelectedAttendant] = useState("none");
   const [isSending, setIsSending] = useState(false);
+  const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const { phone } = useParams<{ phone: string }>();
   
   const { profile } = useAuth();
   const { profiles } = useUserProfiles();
@@ -189,13 +192,66 @@ export function MessageComposer({
     }, 0);
   };
 
-  const handleFileSelect = (file: File) => {
-    toast({
-      title: "Arquivo selecionado",
-      description: `${file.name} foi anexado com sucesso.`,
-    });
-    // Here you would typically upload the file and send it as a message
-    // onSendMessage(`[Arquivo: ${file.name}]`);
+  const handleFileSelect = async (file: any) => {
+    if (!file.uploadedUrl) {
+      toast({
+        title: "Erro no anexo",
+        description: "Falha no upload do arquivo. Tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!phone) {
+      toast({
+        title: "Erro",
+        description: "Número do telefone não encontrado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSending(true);
+      
+      // Send media message via WhatsApp
+      const response = await fetch('https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/send-wa-media', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: phone,
+          mediaUrl: file.uploadedUrl,
+          mediaType: file.type,
+          caption: message.trim() || undefined,
+          filename: file.name,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to send media: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Clear the message input
+        setMessage("");
+        onSendMessage?.(`📎 ${file.name}`); // Notify parent with file indicator
+      } else {
+        throw new Error(result.error || 'Failed to send media');
+      }
+    } catch (error) {
+      console.error('Error sending media:', error);
+      toast({
+        title: "Erro ao enviar anexo",
+        description: "Não foi possível enviar o arquivo. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleAudioReady = (audioBlob: Blob, duration: number) => {
@@ -244,7 +300,7 @@ export function MessageComposer({
         {/* Attachment uploader */}
         <AttachmentUploader
           onFileSelect={handleFileSelect}
-          disabled={disabled}
+          disabled={disabled || sending}
         />
 
         {/* Message input */}
@@ -274,16 +330,16 @@ export function MessageComposer({
         {isTextMessage && (
           <Button
             onClick={handleSend}
-            disabled={!message.trim() || disabled || isSending}
+            disabled={!message.trim() || disabled || isSending || sending}
             size="sm"
             className={cn(
               "h-8 w-8 p-0 shrink-0 rounded-full",
               "bg-primary hover:bg-primary/90 text-white",
               "transition-all duration-200 animate-scale-in",
-              (!message.trim() || disabled || isSending) && "opacity-50"
+              (!message.trim() || disabled || isSending || sending) && "opacity-50"
             )}
           >
-            {isSending ? (
+            {(isSending || sending) ? (
               <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
             ) : (
               <Send className="h-3 w-3" />

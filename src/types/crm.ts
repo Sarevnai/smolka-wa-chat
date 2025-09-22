@@ -17,7 +17,7 @@ export interface Ticket {
   assignedTo?: string;
   lastContact: string;
   source: string;
-  type: "proprietario" | "inquilino";
+  type: "gerente" | "auxiliar";
   createdAt: string;
   value?: number; // Para casos que envolvem valores
 }
@@ -29,14 +29,14 @@ export interface Stage {
 }
 
 export const CATEGORIES = {
-  proprietario: [
+  gerente: [
     { id: "manutencao-preventiva", name: "🔧 Manutenção Preventiva", color: "bg-blue-100 text-blue-700" },
     { id: "gestao-contratual", name: "📋 Gestão Contratual", color: "bg-purple-100 text-purple-700" },
     { id: "questoes-financeiras", name: "💰 Questões Financeiras", color: "bg-green-100 text-green-700" },
     { id: "melhorias-imovel", name: "🏠 Melhorias no Imóvel", color: "bg-orange-100 text-orange-700" },
-    { id: "solicitacoes-inquilino", name: "📞 Solicitações do Inquilino", color: "bg-yellow-100 text-yellow-700" }
+    { id: "solicitacoes-auxiliar", name: "📞 Solicitações do Auxiliar", color: "bg-yellow-100 text-yellow-700" }
   ],
-  inquilino: [
+  auxiliar: [
     { id: "manutencao-corretiva", name: "🔨 Manutenção Corretiva", color: "bg-red-100 text-red-700" },
     { id: "pagamentos-boletos", name: "💳 Pagamentos/Boletos", color: "bg-green-100 text-green-700" },
     { id: "seguro-garantias", name: "🛡️ Seguro e Garantias", color: "bg-blue-100 text-blue-700" },

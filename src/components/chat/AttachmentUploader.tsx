@@ -6,8 +6,13 @@ import { toast } from "@/hooks/use-toast";
 import { Paperclip, Image, FileText, Camera, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface UploadedFile extends File {
+  uploadedUrl?: string;
+  uploadedFilename?: string;
+}
+
 interface AttachmentUploaderProps {
-  onFileSelect: (file: File) => void;
+  onFileSelect: (file: UploadedFile) => void;
   disabled?: boolean;
 }
 
@@ -23,10 +28,10 @@ export function AttachmentUploader({ onFileSelect, disabled }: AttachmentUploade
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = useCallback((files: FileList | null) => {
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach(file => {
+    Array.from(files).forEach(async (file) => {
       // Validate file size (20MB max)
       if (file.size > 20 * 1024 * 1024) {
         toast({
@@ -56,28 +61,66 @@ export function AttachmentUploader({ onFileSelect, disabled }: AttachmentUploade
 
       setUploadingFiles(prev => [...prev, uploadingFile]);
 
-      // Simulate upload progress
-      const interval = setInterval(() => {
-        setUploadingFiles(prev => 
-          prev.map(f => {
-            if (f.file === file) {
-              const newProgress = Math.min(f.progress + Math.random() * 30, 100);
-              if (newProgress >= 100) {
-                clearInterval(interval);
-                onFileSelect(file);
-                // Remove from uploading after a delay
-                setTimeout(() => {
-                  setUploadingFiles(p => p.filter(uf => uf.file !== file));
-                }, 1000);
+      try {
+        // Real upload using edge function
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Simulate progress during upload
+        const progressInterval = setInterval(() => {
+          setUploadingFiles(prev => 
+            prev.map(f => {
+              if (f.file === file && f.progress < 90) {
+                return { ...f, progress: Math.min(f.progress + Math.random() * 20, 90) };
               }
-              return { ...f, progress: newProgress };
-            }
-            return f;
-          })
+              return f;
+            })
+          );
+        }, 300);
+
+        const response = await fetch('https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/upload-media', {
+          method: 'POST',
+          body: formData,
+        });
+
+        clearInterval(progressInterval);
+
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        // Complete progress
+        setUploadingFiles(prev => 
+          prev.map(f => f.file === file ? { ...f, progress: 100 } : f)
         );
-      }, 200);
+
+        // Pass the uploaded file info to parent
+        onFileSelect({
+          ...file,
+          uploadedUrl: result.url,
+          uploadedFilename: result.filename,
+        } as any);
+
+        // Remove from uploading after a delay
+        setTimeout(() => {
+          setUploadingFiles(p => p.filter(uf => uf.file !== file));
+        }, 1000);
+
+      } catch (error) {
+        console.error('Upload failed:', error);
+        toast({
+          title: "Erro no upload",
+          description: `Falha ao enviar ${file.name}. Tente novamente.`,
+          variant: "destructive",
+        });
+
+        // Remove from uploading list
+        setUploadingFiles(prev => prev.filter(f => f.file !== file));
+      }
     });
-  }, [onFileSelect]);
+  }, [onFileSelect, toast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

@@ -1,15 +1,15 @@
 import { Ticket, Stage } from "@/types/crm";
 
 export const mockTickets: Ticket[] = [
-  // Tickets de Proprietários
+  // Tickets de Gerentes
   {
     id: "P001",
     title: "Vazamento na cozinha - Apto 302",
-    description: "Inquilino reportou vazamento no encanamento da pia da cozinha. Água está escorrendo pelo teto do apartamento de baixo.",
+    description: "Auxiliar reportou vazamento no encanamento da pia da cozinha. Água está escorrendo pelo teto do apartamento de baixo.",
     phone: "+55 11 99999-1234",
     email: "joao.silva@email.com",
     stage: "recebido",
-    category: "solicitacoes-inquilino",
+    category: "solicitacoes-auxiliar",
     priority: "alta",
     property: {
       code: "ED001-302",
@@ -19,13 +19,13 @@ export const mockTickets: Ticket[] = [
     assignedTo: "Carlos Santos",
     lastContact: "2024-01-10T09:30:00",
     source: "WhatsApp",
-    type: "proprietario",
+    type: "gerente",
     createdAt: "2024-01-10T08:15:00"
   },
   {
     id: "P002", 
     title: "Renovação de contrato - Casa Jardim América",
-    description: "Contrato do inquilino vence em 30 dias. Proprietário solicitou revisão do valor do aluguel e claúsulas contratuais.",
+    description: "Contrato do auxiliar vence em 30 dias. Gerente solicitou revisão do valor do aluguel e claúsulas contratuais.",
     phone: "+55 11 88888-5678",
     email: "maria.santos@email.com",
     stage: "em-analise",
@@ -39,13 +39,13 @@ export const mockTickets: Ticket[] = [
     assignedTo: "Ana Costa",
     lastContact: "2024-01-09T14:20:00",
     source: "Telefone",
-    type: "proprietario",
+    type: "gerente",
     createdAt: "2024-01-05T10:30:00"
   },
   {
     id: "P003",
     title: "Instalação de ar condicionado",
-    description: "Proprietário deseja instalar ar condicionado split no imóvel para aumentar valor do aluguel.",
+    description: "Gerente deseja instalar ar condicionado split no imóvel para aumentar valor do aluguel.",
     phone: "+55 11 77777-9012",
     stage: "em-andamento", 
     category: "melhorias-imovel",
@@ -58,14 +58,14 @@ export const mockTickets: Ticket[] = [
     assignedTo: "Pedro Lima",
     lastContact: "2024-01-08T16:45:00",
     source: "WhatsApp",
-    type: "proprietario",
+    type: "gerente",
     createdAt: "2024-01-01T11:00:00",
     value: 3500
   },
   {
     id: "P004",
     title: "Atraso no repasse do aluguel",
-    description: "Proprietário questionando atraso no repasse do aluguel de dezembro. Verificar status do pagamento do inquilino.",
+    description: "Gerente questionando atraso no repasse do aluguel de dezembro. Verificar status do pagamento do auxiliar.",
     phone: "+55 11 66666-3456",
     email: "roberto.oliveira@email.com",
     stage: "aguardando",
@@ -79,12 +79,12 @@ export const mockTickets: Ticket[] = [
     assignedTo: "Fernanda Silva",
     lastContact: "2024-01-07T11:30:00",
     source: "E-mail",
-    type: "proprietario",
+    type: "gerente",
     createdAt: "2024-01-07T09:15:00",
     value: 2800
   },
 
-  // Tickets de Inquilinos
+  // Tickets de Auxiliares
   {
     id: "I001",
     title: "Problema no chuveiro elétrico",
@@ -102,7 +102,7 @@ export const mockTickets: Ticket[] = [
     assignedTo: "João Técnico",
     lastContact: "2024-01-10T07:45:00",
     source: "WhatsApp",
-    type: "inquilino",
+    type: "auxiliar",
     createdAt: "2024-01-10T07:30:00"
   },
   {
@@ -122,7 +122,7 @@ export const mockTickets: Ticket[] = [
     assignedTo: "Juliana Financeiro",
     lastContact: "2024-01-09T13:20:00",
     source: "Portal do Cliente",
-    type: "inquilino",
+    type: "auxiliar",
     createdAt: "2024-01-09T12:45:00"
   },
   {
@@ -141,7 +141,7 @@ export const mockTickets: Ticket[] = [
     assignedTo: "Ricardo Seguros",
     lastContact: "2024-01-08T15:10:00",
     source: "Telefone",
-    type: "inquilino", 
+    type: "auxiliar", 
     createdAt: "2024-01-06T14:30:00"
   },
   {
@@ -161,7 +161,7 @@ export const mockTickets: Ticket[] = [
     assignedTo: "Marcos Financeiro", 
     lastContact: "2024-01-05T10:20:00",
     source: "WhatsApp",
-    type: "inquilino",
+    type: "auxiliar",
     createdAt: "2024-01-05T09:00:00",
     value: 150
   },
@@ -181,20 +181,20 @@ export const mockTickets: Ticket[] = [
     assignedTo: "Carla Documentos",
     lastContact: "2024-01-04T16:30:00", 
     source: "E-mail",
-    type: "inquilino",
+    type: "auxiliar",
     createdAt: "2024-01-02T11:20:00"
   }
 ];
 
 export const stages = {
-  proprietario: [
+  gerente: [
     { id: "recebido", name: "Recebido", color: "hsl(var(--primary))" },
     { id: "em-analise", name: "Em Análise", color: "hsl(221 83% 53%)" },
     { id: "em-andamento", name: "Em Andamento", color: "hsl(38 92% 50%)" },
     { id: "aguardando", name: "Aguardando", color: "hsl(48 96% 53%)" },
     { id: "resolvido", name: "Resolvido", color: "hsl(142 76% 36%)" }
   ] as Stage[],
-  inquilino: [
+  auxiliar: [
     { id: "recebido", name: "Recebido", color: "hsl(var(--primary))" },
     { id: "triagem", name: "Triagem", color: "hsl(221 83% 53%)" },
     { id: "em-execucao", name: "Em Execução", color: "hsl(38 92% 50%)" },
