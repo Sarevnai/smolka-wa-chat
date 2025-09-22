@@ -141,19 +141,34 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
         )}
         
         {/* Text Content */}
-        {(!hasMedia || (message.body && message.body.trim() !== message.media_caption?.trim())) && (
-          <div className={cn(hasMedia ? "px-2 pb-1" : "px-3 py-1.5")}>
-            <p className={cn(
-              "text-sm leading-relaxed whitespace-pre-wrap break-words",
-              isOutbound ? "text-gray-900" : "text-gray-900"
-            )}>
-              {/* Filter out reply context from displayed text */}
-              {message.body && message.body.includes('_Respondendo a:') 
-                ? message.body.split('\n\n').slice(1).join('\n\n') || "Mensagem sem conteúdo"
-                : message.body || "Mensagem sem conteúdo"}
-            </p>
-          </div>
-        )}
+          {(() => {
+            const body = message.body?.trim();
+            const caption = message.media_caption?.trim();
+            const mediaType = message.media_type?.toLowerCase();
+            const mime = message.media_mime_type?.toLowerCase();
+            const forbidden = ['image','video','audio','voice','sticker','document','file','arquivo','imagem','vídeo','áudio'];
+            const isRedundant =
+              hasMedia &&
+              body &&
+              (body.toLowerCase() === mediaType ||
+                (mime && body.toLowerCase() === mime) ||
+                forbidden.includes(body.toLowerCase()));
+            const shouldShow = !hasMedia || (!!body && body !== caption && !isRedundant);
+            return shouldShow ? (
+              <div className={cn(hasMedia ? "px-2 pb-1" : "px-3 py-1.5")}> 
+                <p className={cn(
+                  "text-sm leading-relaxed whitespace-pre-wrap break-words",
+                  isOutbound ? "text-gray-900" : "text-gray-900"
+                )}>
+                  {/* Filter out reply context from displayed text */}
+                  {message.body && message.body.includes('_Respondendo a:') 
+                    ? message.body.split('\n\n').slice(1).join('\n\n') || "Mensagem sem conteúdo"
+                    : message.body || "Mensagem sem conteúdo"}
+                </p>
+              </div>
+            ) : null;
+          })()}
+
         
           {/* Timestamp and Status */}
           <div className={cn(
