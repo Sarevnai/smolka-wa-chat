@@ -113,14 +113,11 @@ export function MediaMessage({
 
       case 'document':
         return (
-          <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg max-w-xs">
+          <div className="flex items-center gap-3 p-2 bg-muted/20 rounded-lg max-w-xs">
             <FileText className="h-8 w-8 opacity-70 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">
                 {filename || 'Documento'}
-              </p>
-              <p className="text-xs opacity-70">
-                {mimeType || 'Arquivo'}
               </p>
             </div>
             <Button 
@@ -148,22 +145,84 @@ export function MediaMessage({
         );
 
       default:
+        // Detectar tipo de mídia baseado no mimeType se disponível
+        if (mimeType?.startsWith('image/')) {
+          return (
+            <div className="relative group cursor-pointer" onClick={() => setShowImageDialog(true)}>
+              <img 
+                src={mediaUrl || ''} 
+                alt={caption || 'Imagem'} 
+                className="rounded-lg max-w-full h-auto max-h-64 object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = '/placeholder-image.png';
+                  e.currentTarget.alt = 'Imagem não disponível';
+                }}
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                <Image className="h-8 w-8 text-white opacity-0 group-hover:opacity-70 transition-opacity" />
+              </div>
+            </div>
+          );
+        }
+        
+        if (mimeType?.startsWith('video/')) {
+          return (
+            <div className="relative">
+              <video 
+                src={mediaUrl || ''} 
+                className="rounded-lg max-w-full h-auto max-h-64"
+                controls
+                preload="metadata"
+                onPlay={() => setVideoPlaying(true)}
+                onPause={() => setVideoPlaying(false)}
+              >
+                Seu navegador não suporta vídeos.
+              </video>
+            </div>
+          );
+        }
+        
+        if (mimeType?.startsWith('audio/')) {
+          return (
+            <div className="flex items-center gap-3 p-2 bg-white/5 rounded-lg min-w-[280px]">
+              <AudioPlayer 
+                audioUrl={mediaUrl || ''} 
+                isOutbound={isOutbound}
+                className="w-full"
+              />
+            </div>
+          );
+        }
+        
+        // Fallback para outros tipos de arquivo
         return (
-          <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
-            <FileText className="h-5 w-5 opacity-70" />
-            <span className="text-sm">Tipo de mídia não suportado: {mediaType}</span>
+          <div className="flex items-center gap-3 p-2 bg-muted/20 rounded-lg max-w-xs">
+            <FileText className="h-8 w-8 opacity-70 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">
+                {filename || 'Arquivo'}
+              </p>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleDownload}
+              className="flex-shrink-0"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
           </div>
         );
     }
   };
 
   return (
-    <div className="space-y-2">
+    <div>
       {renderMediaContent()}
       
       {/* Caption for images (shown below the image) */}
-      {mediaType === 'image' && caption && (
-        <p className="text-sm opacity-80">{caption}</p>
+      {(mediaType === 'image' || mimeType?.startsWith('image/')) && caption && (
+        <p className="text-sm opacity-80 mt-1 px-1">{caption}</p>
       )}
 
       {/* Image preview dialog */}

@@ -118,7 +118,7 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
 
         {/* Media Content */}
         {hasMedia && (
-          <div className="mb-1">
+          <div>
             <MediaMessage
               mediaType={message.media_type!}
               mediaUrl={message.media_url}
