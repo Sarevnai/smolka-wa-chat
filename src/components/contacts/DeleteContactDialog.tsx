@@ -64,15 +64,7 @@ export function DeleteContactDialog({ contact, children, open, onOpenChange }: D
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>
-        {children || (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
+        {children}
       </AlertDialogTrigger>
       <AlertDialogContent className="max-w-md">
         <AlertDialogHeader>
