@@ -32,12 +32,9 @@ export function CreateTicketModal({
 }: CreateTicketModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedType, setSelectedType] = useState<'gerente' | 'auxiliar'>(() => {
-    // Map old contact types to new ticket types
-    if (contact?.contact_type === 'proprietario') return 'gerente';
-    if (contact?.contact_type === 'inquilino') return 'auxiliar';
-    return 'auxiliar'; // default
-  });
+  const [selectedType, setSelectedType] = useState<'proprietario' | 'inquilino'>(
+    contact?.contact_type || 'inquilino'
+  );
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPriority, setSelectedPriority] = useState<'baixa' | 'media' | 'alta' | 'critica'>('media');
   const [selectedStage, setSelectedStage] = useState<string>('');
@@ -184,21 +181,21 @@ export function CreateTicketModal({
 
             <div className="space-y-2">
               <Label htmlFor="type">Tipo de Demanda *</Label>
-              <Select value={selectedType} onValueChange={(value: 'gerente' | 'auxiliar') => setSelectedType(value)}>
+              <Select value={selectedType} onValueChange={(value: 'proprietario' | 'inquilino') => setSelectedType(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="gerente">
+                  <SelectItem value="proprietario">
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
-                      Gerente
+                      Proprietário
                     </div>
                   </SelectItem>
-                  <SelectItem value="auxiliar">
+                  <SelectItem value="inquilino">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      Auxiliar
+                      Inquilino
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -212,7 +209,7 @@ export function CreateTicketModal({
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(CATEGORIES[selectedType] ?? []).map((category) => (
+                  {CATEGORIES[selectedType].map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>

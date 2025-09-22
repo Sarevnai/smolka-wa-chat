@@ -95,12 +95,12 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
         throw new Error('ClickUp não configurado. Acesse a página ClickUp para configurar.');
       }
 
-      const listId = ticket.type === 'gerente' 
+      const listId = ticket.type === 'proprietario' 
         ? config.proprietariosListId 
         : config.inquilinosListId;
 
       if (!listId) {
-        throw new Error(`Lista do ClickUp não configurada para ${ticket.type === 'gerente' ? 'gerentes' : 'auxiliares'}`);
+        throw new Error(`Lista do ClickUp não configurada para ${ticket.type === 'proprietario' ? 'proprietários' : 'inquilinos'}`);
       }
 
       console.log('Syncing ticket to ClickUp:', {

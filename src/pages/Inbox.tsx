@@ -25,10 +25,10 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 export default function Inbox() {
-  const { data: gerenteTickets = [], isLoading: loadingGerente } = useTickets("gerente");
-  const { data: auxiliarTickets = [], isLoading: loadingAuxiliar } = useTickets("auxiliar");
-  const { data: gerenteStages = [] } = useTicketStages("gerente");
-  const { data: auxiliarStages = [] } = useTicketStages("auxiliar");
+  const { data: proprietarioTickets = [], isLoading: loadingProprietario } = useTickets("proprietario");
+  const { data: inquilinoTickets = [], isLoading: loadingInquilino } = useTickets("inquilino");
+  const { data: proprietarioStages = [] } = useTicketStages("proprietario");
+  const { data: inquilinoStages = [] } = useTicketStages("inquilino");
   const updateTicketMutation = useUpdateTicket();
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
 
@@ -41,7 +41,7 @@ export default function Inbox() {
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    const allTickets = [...gerenteTickets, ...auxiliarTickets];
+    const allTickets = [...proprietarioTickets, ...inquilinoTickets];
     const ticket = allTickets.find(t => t.id === event.active.id);
     setActiveTicket(ticket || null);
   };
@@ -64,8 +64,8 @@ export default function Inbox() {
     setActiveTicket(null);
   };
 
-  const getTicketsByStageAndType = (stage: string, type: "gerente" | "auxiliar") => {
-    const tickets = type === "gerente" ? gerenteTickets : auxiliarTickets;
+  const getTicketsByStageAndType = (stage: string, type: "proprietario" | "inquilino") => {
+    const tickets = type === "proprietario" ? proprietarioTickets : inquilinoTickets;
     return tickets.filter(ticket => ticket.stage === stage);
   };
 
@@ -94,7 +94,7 @@ export default function Inbox() {
     });
   };
 
-  const getCategoryInfo = (type: "gerente" | "auxiliar", categoryId: string) => {
+  const getCategoryInfo = (type: "proprietario" | "inquilino", categoryId: string) => {
     const categories = CATEGORIES[type];
     return categories.find(cat => cat.id === categoryId) || categories[0];
   };
@@ -223,7 +223,7 @@ export default function Inbox() {
     );
   };
 
-  const PipelineColumn = ({ stage, type }: { stage: TicketStage, type: "gerente" | "auxiliar" }) => {
+  const PipelineColumn = ({ stage, type }: { stage: TicketStage, type: "proprietario" | "inquilino" }) => {
     const stageTickets = getTicketsByStageAndType(stage.name, type);
     const urgentTickets = stageTickets.filter(ticket => ticket.priority === "critica" || ticket.priority === "alta");
     
@@ -296,7 +296,7 @@ export default function Inbox() {
             <Card className="p-6">
               <div className="text-center">
                 <div className="text-3xl font-bold text-foreground">
-                  {gerenteTickets.length + auxiliarTickets.length}
+                  {proprietarioTickets.length + inquilinoTickets.length}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">Total de Tickets</p>
               </div>
@@ -304,7 +304,7 @@ export default function Inbox() {
             <Card className="p-6">
               <div className="text-center">
                 <div className="text-3xl font-bold text-orange-600">
-                  {[...gerenteTickets, ...auxiliarTickets].filter(t => t.priority === 'alta' || t.priority === 'critica').length}
+                  {[...proprietarioTickets, ...inquilinoTickets].filter(t => t.priority === 'alta' || t.priority === 'critica').length}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">Tickets Urgentes</p>
               </div>
@@ -320,24 +320,24 @@ export default function Inbox() {
         >
           <Tabs defaultValue="proprietarios" className="w-full">
             <TabsList className="mb-8">
-              <TabsTrigger value="gerentes" className="flex items-center space-x-2">
+              <TabsTrigger value="proprietarios" className="flex items-center space-x-2">
                 <Building className="h-4 w-4" />
-                <span>Gerentes</span>
+                <span>Proprietários</span>
                 <Badge variant="secondary" className="ml-2">
-                  {gerenteTickets.length}
+                  {proprietarioTickets.length}
                 </Badge>
               </TabsTrigger>
-              <TabsTrigger value="auxiliares" className="flex items-center space-x-2">
+              <TabsTrigger value="inquilinos" className="flex items-center space-x-2">
                 <Users className="h-4 w-4" />
-                <span>Auxiliares</span>
+                <span>Inquilinos</span>
                 <Badge variant="secondary" className="ml-2">
-                  {auxiliarTickets.length}
+                  {inquilinoTickets.length}
                 </Badge>
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="gerentes">
-              {loadingGerente ? (
+            <TabsContent value="proprietarios">
+              {loadingProprietario ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground text-lg">Carregando tickets...</p>
                 </div>
@@ -349,24 +349,24 @@ export default function Inbox() {
                       <div className="flex space-x-6 text-sm text-muted-foreground">
                         <div className="flex items-center space-x-2">
                           <AlertTriangle className="h-4 w-4" />
-                           <span>Urgentes: {gerenteTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
+                          <span>Urgentes: {proprietarioTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
                         </div>
-                        <span>Valor total: {formatCurrency(gerenteTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
+                        <span>Valor total: {formatCurrency(proprietarioTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
                       </div>
                     </div>
                   </div>
                   
                   <div className="flex gap-8 overflow-x-auto pb-6">
-                    {gerenteStages.map((stage) => (
-                      <PipelineColumn key={stage.id} stage={stage} type="gerente" />
+                    {proprietarioStages.map((stage) => (
+                      <PipelineColumn key={stage.id} stage={stage} type="proprietario" />
                     ))}
                   </div>
                 </>
               )}
             </TabsContent>
 
-            <TabsContent value="auxiliares">
-              {loadingAuxiliar ? (
+            <TabsContent value="inquilinos">
+              {loadingInquilino ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground text-lg">Carregando tickets...</p>
                 </div>
@@ -378,16 +378,16 @@ export default function Inbox() {
                       <div className="flex space-x-6 text-sm text-muted-foreground">
                         <div className="flex items-center space-x-2">
                           <AlertTriangle className="h-4 w-4" />
-                           <span>Urgentes: {auxiliarTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
+                          <span>Urgentes: {inquilinoTickets.filter(t => t.priority === 'alta' || t.priority === 'critica').length}</span>
                         </div>
-                        <span>Valor envolvido: {formatCurrency(auxiliarTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
+                        <span>Valor envolvido: {formatCurrency(inquilinoTickets.reduce((sum, ticket) => sum + (ticket.value || 0), 0))}</span>
                       </div>
                     </div>
                   </div>
                   
                   <div className="flex gap-8 overflow-x-auto pb-6">
-                    {auxiliarStages.map((stage) => (
-                      <PipelineColumn key={stage.id} stage={stage} type="auxiliar" />
+                    {inquilinoStages.map((stage) => (
+                      <PipelineColumn key={stage.id} stage={stage} type="inquilino" />
                     ))}
                   </div>
                 </>

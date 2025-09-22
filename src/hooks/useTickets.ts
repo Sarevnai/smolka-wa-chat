@@ -18,7 +18,7 @@ export interface Ticket {
   assigned_to: string | null;
   last_contact: string;
   source: string;
-  type: "gerente" | "auxiliar";
+  type: "proprietario" | "inquilino";
   value: number | null;
   contact_id: string | null;
   created_at: string;
@@ -29,7 +29,7 @@ export interface TicketStage {
   id: string;
   name: string;
   color: string;
-  ticket_type: "gerente" | "auxiliar";
+  ticket_type: "proprietario" | "inquilino";
   order_index: number;
   created_at: string;
   updated_at: string;
@@ -48,12 +48,12 @@ export interface CreateTicketData {
   property_type?: "apartamento" | "casa" | "comercial" | "terreno";
   assigned_to?: string;
   source?: string;
-  type: "gerente" | "auxiliar";
+  type: "proprietario" | "inquilino";
   value?: number;
   contact_id?: string;
 }
 
-export const useTickets = (type?: "gerente" | "auxiliar") => {
+export const useTickets = (type?: "proprietario" | "inquilino") => {
   return useQuery({
     queryKey: ["tickets", type],
     queryFn: async () => {
@@ -75,7 +75,7 @@ export const useTickets = (type?: "gerente" | "auxiliar") => {
   });
 };
 
-export const useTicketStages = (type?: "gerente" | "auxiliar") => {
+export const useTicketStages = (type?: "proprietario" | "inquilino") => {
   return useQuery({
     queryKey: ["ticket_stages", type],
     queryFn: async () => {
