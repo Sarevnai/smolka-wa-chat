@@ -212,7 +212,7 @@ export function CreateTicketModal({
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES[selectedType].map((category) => (
+                  {(CATEGORIES[selectedType] ?? []).map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>
