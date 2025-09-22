@@ -502,6 +502,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
               onTypingStop={stopTyping}
               replyTo={replyTo}
               onVoiceRecord={() => setShowVoiceRecorder(true)}
+              selectedContact={phoneNumber}
             />
           </div>
         )}

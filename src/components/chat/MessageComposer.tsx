@@ -11,6 +11,7 @@ import { AttachmentUploader } from "./AttachmentUploader";
 import { AudioRecorder } from "./AudioRecorder";
 import { toast } from "@/hooks/use-toast";
 import { MessageRow } from "@/lib/messages";
+import { useMediaUpload } from "@/hooks/useMediaUpload";
 
 interface MessageComposerProps {
   onSendMessage: (message: string) => void;
@@ -19,6 +20,7 @@ interface MessageComposerProps {
   onTypingStop?: () => void;
   replyTo?: MessageRow | null;
   onVoiceRecord?: () => void;
+  selectedContact?: string;
 }
 
 export function MessageComposer({ 
@@ -27,7 +29,8 @@ export function MessageComposer({
   onTypingStart, 
   onTypingStop,
   replyTo,
-  onVoiceRecord 
+  onVoiceRecord,
+  selectedContact 
 }: MessageComposerProps) {
   const [message, setMessage] = useState("");
   const [selectedAttendant, setSelectedAttendant] = useState("none");
@@ -37,6 +40,7 @@ export function MessageComposer({
   
   const { profile } = useAuth();
   const { profiles } = useUserProfiles();
+  const { sendMediaMessage } = useMediaUpload();
 
   // Get available attendants based on user role
   const getAvailableAttendants = () => {
@@ -189,13 +193,44 @@ export function MessageComposer({
     }, 0);
   };
 
-  const handleFileSelect = (file: File) => {
-    toast({
-      title: "Arquivo selecionado",
-      description: `${file.name} foi anexado com sucesso.`,
-    });
-    // Here you would typically upload the file and send it as a message
-    // onSendMessage(`[Arquivo: ${file.name}]`);
+  const handleFileUpload = async (uploadResult: { publicUrl: string; fileName: string; mimeType: string }) => {
+    if (!selectedContact) {
+      toast({
+        title: "Erro",
+        description: "Nenhum contato selecionado para envio.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      // Add attendant prefix to caption if needed
+      let caption = message.trim();
+      if (selectedAttendant && selectedAttendant !== "none") {
+        caption = `*${selectedAttendant}*\n\n${caption}`;
+      }
+
+      const success = await sendMediaMessage(
+        selectedContact,
+        uploadResult.publicUrl,
+        uploadResult.mimeType,
+        caption || undefined,
+        uploadResult.fileName
+      );
+
+      if (success) {
+        setMessage("");
+        toast({
+          title: "Arquivo enviado",
+          description: `${uploadResult.fileName} foi enviado com sucesso.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error sending media:', error);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleAudioReady = (audioBlob: Blob, duration: number) => {
@@ -243,8 +278,8 @@ export function MessageComposer({
       <div className="flex items-end gap-2 bg-white rounded-3xl p-2 shadow-sm border border-gray-200 min-h-[44px]">
         {/* Attachment uploader */}
         <AttachmentUploader
-          onFileSelect={handleFileSelect}
-          disabled={disabled}
+          onFileUpload={handleFileUpload}
+          disabled={disabled || isSending}
         />
 
         {/* Message input */}

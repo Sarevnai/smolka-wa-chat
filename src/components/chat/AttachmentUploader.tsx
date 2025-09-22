@@ -5,9 +5,10 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import { Paperclip, Image, FileText, Camera, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMediaUpload } from "@/hooks/useMediaUpload";
 
 interface AttachmentUploaderProps {
-  onFileSelect: (file: File) => void;
+  onFileUpload: (result: { publicUrl: string; fileName: string; mimeType: string }) => void;
   disabled?: boolean;
 }
 
@@ -17,16 +18,17 @@ interface UploadingFile {
   preview?: string;
 }
 
-export function AttachmentUploader({ onFileSelect, disabled }: AttachmentUploaderProps) {
+export function AttachmentUploader({ onFileUpload, disabled }: AttachmentUploaderProps) {
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const { uploadFile, isUploading } = useMediaUpload();
 
-  const handleFileSelect = useCallback((files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0 || isUploading) return;
 
-    Array.from(files).forEach(file => {
+    Array.from(files).forEach(async (file) => {
       // Validate file size (20MB max)
       if (file.size > 20 * 1024 * 1024) {
         toast({
@@ -56,28 +58,42 @@ export function AttachmentUploader({ onFileSelect, disabled }: AttachmentUploade
 
       setUploadingFiles(prev => [...prev, uploadingFile]);
 
-      // Simulate upload progress
-      const interval = setInterval(() => {
-        setUploadingFiles(prev => 
-          prev.map(f => {
-            if (f.file === file) {
-              const newProgress = Math.min(f.progress + Math.random() * 30, 100);
-              if (newProgress >= 100) {
-                clearInterval(interval);
-                onFileSelect(file);
-                // Remove from uploading after a delay
-                setTimeout(() => {
-                  setUploadingFiles(p => p.filter(uf => uf.file !== file));
-                }, 1000);
-              }
-              return { ...f, progress: newProgress };
-            }
-            return f;
-          })
-        );
-      }, 200);
+      try {
+        // Real upload to Supabase
+        const result = await uploadFile(file);
+        
+        if (result) {
+          // Update progress to 100%
+          setUploadingFiles(prev => 
+            prev.map(f => f.file === file ? { ...f, progress: 100 } : f)
+          );
+          
+          // Call success callback
+          onFileUpload({
+            publicUrl: result.publicUrl,
+            fileName: result.fileName,
+            mimeType: result.mimeType
+          });
+
+          toast({
+            title: "Arquivo enviado",
+            description: `${file.name} foi carregado com sucesso.`,
+          });
+
+          // Remove from uploading after delay
+          setTimeout(() => {
+            setUploadingFiles(p => p.filter(uf => uf.file !== file));
+          }, 2000);
+        } else {
+          // Remove failed upload
+          setUploadingFiles(p => p.filter(uf => uf.file !== file));
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        setUploadingFiles(p => p.filter(uf => uf.file !== file));
+      }
     });
-  }, [onFileSelect]);
+  }, [uploadFile, onFileUpload, isUploading]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
