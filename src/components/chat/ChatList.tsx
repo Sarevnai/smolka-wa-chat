@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, MessageSquare, ArrowLeft } from "lucide-react";
+import { Search, MessageSquare, ArrowLeft, Volume2, VolumeX } from "lucide-react";
 import { format, parseISO, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { usePinnedConversations } from "@/hooks/usePinnedConversations";
+import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
+import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 interface Conversation {
   phoneNumber: string;
@@ -36,6 +38,17 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const [activeFilter, setActiveFilter] = useState<'all' | 'inquilino' | 'proprietario'>('all');
   const { toast } = useToast();
   const { pinnedConversations } = usePinnedConversations();
+  const { soundEnabled, toggleSound } = useNotificationSound();
+  
+  // Setup realtime message notifications
+  useRealtimeMessages({
+    onNewMessage: (message) => {
+      console.log('New message received in ChatList:', message);
+      // Reload conversations when new message arrives
+      loadConversations();
+    },
+    currentConversation: selectedContact
+  });
 
   const loadConversations = async () => {
     try {
@@ -191,14 +204,27 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
           <h1 className="text-lg font-medium">Chat</h1>
         </div>
         
-        <div className="relative flex-1 max-w-xs ml-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-          <Input
-            placeholder="Pesquisar ou começar uma nova conversa"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white/90 border-0 rounded-lg h-8 text-sm text-gray-900 placeholder:text-gray-500"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <Input
+              placeholder="Pesquisar ou começar uma nova conversa"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-white/90 border-0 rounded-lg h-8 text-sm text-gray-900 placeholder:text-gray-500"
+            />
+          </div>
+          
+          {/* Sound toggle button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSound}
+            className="h-8 w-8 p-0 text-white hover:bg-white/10"
+            title={soundEnabled ? "Desativar notificações sonoras" : "Ativar notificações sonoras"}
+          >
+            {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
         </div>
       </div>
       
