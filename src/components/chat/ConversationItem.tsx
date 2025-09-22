@@ -9,8 +9,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { useDeleteConversation } from "@/hooks/useDeleteConversation";
+import { usePinnedConversations } from "@/hooks/usePinnedConversations";
 import { cn, formatPhoneNumber } from "@/lib/utils";
-import { SparklesIcon, Building2, Key, FileText, MoreVertical, Trash2 } from "lucide-react";
+import { SparklesIcon, Building2, Key, FileText, MoreVertical, Trash2, Pin, PinOff } from "lucide-react";
 import { DeleteConversationDialog } from "./DeleteConversationDialog";
 import { useState } from "react";
 
@@ -38,6 +39,7 @@ export function ConversationItem({
 }: ConversationItemProps) {
   const { data: contact } = useContactByPhone(phoneNumber);
   const { deleteConversation, isDeleting } = useDeleteConversation();
+  const { togglePin, isPinned } = usePinnedConversations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleDeleteConversation = async () => {
@@ -77,14 +79,19 @@ export function ConversationItem({
     return '??';
   };
 
-  const truncateMessage = (text: string | null, maxLength: number = 50) => {
+  const truncateMessage = (text: string | null, maxLength: number = 35) => {
     if (!text) return "Sem conteúdo";
     return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
+  
+  const truncateName = (name: string, maxLength: number = 20) => {
+    return name.length > maxLength ? `${name.substring(0, maxLength)}...` : name;
+  };
 
-  const displayName = contact?.name || formatPhoneNumber(phoneNumber);
+  const displayName = truncateName(contact?.name || formatPhoneNumber(phoneNumber));
   const displayInitials = getInitials(contact?.name, phoneNumber);
   const isAutoDetectedName = contact?.name && contact.name !== phoneNumber && !contact.name.includes('@');
+  const conversationIsPinned = isPinned(phoneNumber);
 
   const getContactTypeInfo = (type?: string) => {
     switch (type) {
@@ -115,26 +122,29 @@ export function ConversationItem({
             {displayInitials}
           </AvatarFallback>
         </Avatar>
+        {conversationIsPinned && (
+          <Pin className="absolute -top-1 -right-1 h-3 w-3 text-primary fill-current" />
+        )}
       </div>
       
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-0.5">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <h3 className="font-medium text-gray-900 truncate text-sm">
+            <h3 className="font-medium text-gray-900 text-sm overflow-hidden text-ellipsis whitespace-nowrap">
               {displayName}
             </h3>
             {isAutoDetectedName && (
               <SparklesIcon className="h-3 w-3 text-primary/60 flex-shrink-0" />
             )}
             {typeInfo && TypeIcon && (
-              <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs px-1.5 py-0.5">
+              <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0">
                 <TypeIcon className="h-3 w-3" />
                 <span className="hidden sm:inline">{typeInfo.label}</span>
               </Badge>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 whitespace-nowrap">
               {formatLastMessageTime(lastMessage.wa_timestamp || lastMessage.created_at)}
             </span>
             {unreadCount > 0 && (
@@ -146,7 +156,7 @@ export function ConversationItem({
         </div>
         
         <div className="flex items-center gap-2">
-          <p className="text-xs text-gray-600 truncate flex-1">
+          <p className="text-xs text-gray-600 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
             {lastMessage.direction === "outbound" && (
               <span className="text-gray-500">✓✓ </span>
             )}
@@ -154,18 +164,12 @@ export function ConversationItem({
           </p>
           
           {contact?.contracts && contact.contracts.length > 0 && (
-            <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5">
+            <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0">
               <FileText className="h-3 w-3" />
               <span>{contact.contracts[0].contract_number}</span>
             </Badge>
           )}
         </div>
-        
-        {contact?.name && (
-          <p className="text-xs text-gray-500 mt-0.5">
-            {formatPhoneNumber(phoneNumber)}
-          </p>
-        )}
       </div>
 
       <DropdownMenu>
@@ -181,6 +185,24 @@ export function ConversationItem({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePin(phoneNumber);
+            }}
+          >
+            {conversationIsPinned ? (
+              <>
+                <PinOff className="mr-2 h-4 w-4" />
+                Desafixar conversa
+              </>
+            ) : (
+              <>
+                <Pin className="mr-2 h-4 w-4" />
+                Fixar conversa
+              </>
+            )}
+          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();

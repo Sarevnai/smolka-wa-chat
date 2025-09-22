@@ -12,6 +12,7 @@ import { ConversationItem } from "./ConversationItem";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
+import { usePinnedConversations } from "@/hooks/usePinnedConversations";
 
 interface Conversation {
   phoneNumber: string;
@@ -19,6 +20,7 @@ interface Conversation {
   messageCount: number;
   unreadCount: number;
   contactName?: string;
+  contactType?: string;
 }
 
 interface ChatListProps {
@@ -31,7 +33,9 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<'all' | 'inquilino' | 'proprietario'>('all');
   const { toast } = useToast();
+  const { pinnedConversations } = usePinnedConversations();
 
   const loadConversations = async () => {
     try {
@@ -97,15 +101,24 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
           lastMessage: sortedMessages[0],
           messageCount: messages.length,
           unreadCount: 0, // TODO: Implement unread count logic
-          contactName: contactInfo?.name
+          contactName: contactInfo?.name,
+          contactType: contactInfo?.contact_type
         };
       });
 
-      // Sort conversations by last message timestamp
-      conversationList.sort((a, b) => 
-        new Date(b.lastMessage.wa_timestamp || b.lastMessage.created_at || "").getTime() - 
-        new Date(a.lastMessage.wa_timestamp || a.lastMessage.created_at || "").getTime()
-      );
+      // Sort conversations: pinned first, then by last message timestamp
+      conversationList.sort((a, b) => {
+        const aIsPinned = pinnedConversations.includes(a.phoneNumber);
+        const bIsPinned = pinnedConversations.includes(b.phoneNumber);
+        
+        // Pinned conversations first
+        if (aIsPinned && !bIsPinned) return -1;
+        if (!aIsPinned && bIsPinned) return 1;
+        
+        // Then sort by last message timestamp
+        return new Date(b.lastMessage.wa_timestamp || b.lastMessage.created_at || "").getTime() - 
+               new Date(a.lastMessage.wa_timestamp || a.lastMessage.created_at || "").getTime();
+      });
 
       setConversations(conversationList);
     } catch (error) {
@@ -124,10 +137,22 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
     loadConversations();
   }, []);
 
-  const filteredConversations = conversations.filter(conversation =>
-    conversation.phoneNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (conversation.contactName && conversation.contactName.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredConversations = conversations.filter(conversation => {
+    // Apply search filter
+    const matchesSearch = conversation.phoneNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (conversation.contactName && conversation.contactName.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    if (!matchesSearch) return false;
+    
+    // Apply contact type filter
+    if (activeFilter === 'inquilino') {
+      return conversation.contactType === 'inquilino';
+    } else if (activeFilter === 'proprietario') {
+      return conversation.contactType === 'proprietario';
+    }
+    
+    return true; // 'all' filter
+  });
 
   const formatLastMessageTime = (dateString: string) => {
     try {
@@ -180,17 +205,44 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
       {/* Filter Tabs */}
       <div className="px-4 py-1.5 bg-sidebar border-b border-sidebar-border">
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" className="text-xs h-6 px-2 bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/80">
-            Todas
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className={cn(
+              "text-xs h-6 px-2 transition-colors",
+              activeFilter === 'all' 
+                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                : "text-muted-foreground hover:bg-sidebar-accent/50"
+            )}
+            onClick={() => setActiveFilter('all')}
+          >
+            Todos
           </Button>
-          <Button variant="ghost" size="sm" className="text-xs h-6 px-2 text-muted-foreground hover:bg-sidebar-accent/50">
-            Não lidas
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className={cn(
+              "text-xs h-6 px-2 transition-colors",
+              activeFilter === 'inquilino' 
+                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                : "text-muted-foreground hover:bg-sidebar-accent/50"
+            )}
+            onClick={() => setActiveFilter('inquilino')}
+          >
+            Inquilinos
           </Button>
-          <Button variant="ghost" size="sm" className="text-xs h-6 px-2 text-muted-foreground hover:bg-sidebar-accent/50">
-            Favoritas
-          </Button>
-          <Button variant="ghost" size="sm" className="text-xs h-6 px-2 text-muted-foreground hover:bg-sidebar-accent/50">
-            Grupos
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className={cn(
+              "text-xs h-6 px-2 transition-colors",
+              activeFilter === 'proprietario' 
+                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                : "text-muted-foreground hover:bg-sidebar-accent/50"
+            )}
+            onClick={() => setActiveFilter('proprietario')}
+          >
+            Proprietários
           </Button>
         </div>
       </div>
