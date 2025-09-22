@@ -32,9 +32,12 @@ export function CreateTicketModal({
 }: CreateTicketModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedType, setSelectedType] = useState<'proprietario' | 'inquilino'>(
-    contact?.contact_type || 'inquilino'
-  );
+  const [selectedType, setSelectedType] = useState<'gerente' | 'auxiliar'>(() => {
+    // Map old contact types to new ticket types
+    if (contact?.contact_type === 'proprietario') return 'gerente';
+    if (contact?.contact_type === 'inquilino') return 'auxiliar';
+    return 'auxiliar'; // default
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPriority, setSelectedPriority] = useState<'baixa' | 'media' | 'alta' | 'critica'>('media');
   const [selectedStage, setSelectedStage] = useState<string>('');
@@ -181,21 +184,21 @@ export function CreateTicketModal({
 
             <div className="space-y-2">
               <Label htmlFor="type">Tipo de Demanda *</Label>
-              <Select value={selectedType} onValueChange={(value: 'proprietario' | 'inquilino') => setSelectedType(value)}>
+              <Select value={selectedType} onValueChange={(value: 'gerente' | 'auxiliar') => setSelectedType(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="proprietario">
+                  <SelectItem value="gerente">
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
-                      Proprietário
+                      Gerente
                     </div>
                   </SelectItem>
-                  <SelectItem value="inquilino">
+                  <SelectItem value="auxiliar">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      Inquilino
+                      Auxiliar
                     </div>
                   </SelectItem>
                 </SelectContent>
