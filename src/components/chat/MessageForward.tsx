@@ -65,7 +65,7 @@ export function MessageForward({ isOpen, onClose, message, onForward }: MessageF
         <div className="border rounded-lg p-3 bg-muted/50">
           <div className="text-sm text-muted-foreground mb-2">Mensagem selecionada:</div>
           <div className="text-sm line-clamp-3">
-            {message.body || (message.media_type && `[${message.media_type}]`) || "Mensagem"}
+            {message.body || (message.media_type && "Arquivo anexado") || "Mensagem"}
           </div>
         </div>
 

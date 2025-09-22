@@ -33,7 +33,7 @@ export function MessageReply({ message, onReply, className }: MessageReplyProps)
 
 export function ReplyPreview({ replyTo, onClose, className }: ReplyPreviewProps) {
   const isOutbound = replyTo.direction === "outbound";
-  const displayText = replyTo.body || (replyTo.media_type ? `[${replyTo.media_type?.toUpperCase()}]` : "Mensagem sem conteúdo");
+  const displayText = replyTo.body || (replyTo.media_type ? "Arquivo anexado" : "Mensagem sem conteúdo");
   const truncatedText = displayText.length > 50 ? displayText.substring(0, 50) + "..." : displayText;
 
   return (
