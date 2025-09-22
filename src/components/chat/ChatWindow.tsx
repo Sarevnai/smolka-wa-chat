@@ -17,6 +17,9 @@ import { ChatBackground } from "./ChatBackground";
 import { MessageScheduler } from "./MessageScheduler";
 import { ChatSettings } from "./ChatSettings";
 import { VoiceRecorder } from "./VoiceRecorder";
+import { QuickActionsMenu } from "./QuickActionsMenu";
+import { DeleteConversationDialog } from "./DeleteConversationDialog";
+import { useDeleteConversation } from "@/hooks/useDeleteConversation";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useMediaGallery } from "@/hooks/useMediaGallery";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -54,12 +57,14 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [showScheduler, setShowScheduler] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   const { toast } = useToast();
   const { data: contact } = useContactByPhone(phoneNumber);
   const { isTyping: contactIsTyping, startTyping, stopTyping } = useTypingIndicator(phoneNumber);
   const { isGalleryOpen, selectedMediaIndex, openGallery, closeGallery, getMediaMessages } = useMediaGallery();
   const { settings, updateBackground, exportChat, archiveChat, deleteChat } = useChatSettings(phoneNumber);
+  const { deleteConversation, isDeleting } = useDeleteConversation();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -241,6 +246,14 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
       title: "Áudio enviado",
       description: "Mensagem de áudio enviada com sucesso",
     });
+  };
+
+  const handleDeleteConversation = async () => {
+    await deleteConversation(phoneNumber);
+    setShowDeleteDialog(false);
+    if (onBack) {
+      onBack();
+    }
   };
 
   const getInitials = (name?: string, phone?: string) => {
@@ -463,7 +476,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         />
       )}
 
-      {/* Voice Recorder or Input */}
+      {/* Quick Actions Menu and Input */}
       <div className="bg-chat-header px-4 py-2">
         {showVoiceRecorder ? (
           <VoiceRecorder
@@ -472,14 +485,25 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             className="mx-4 mb-4"
           />
         ) : (
-          <MessageComposer 
-            onSendMessage={sendMessage} 
-            disabled={sending}
-            onTypingStart={startTyping}
-            onTypingStop={stopTyping}
-            replyTo={replyTo}
-            onVoiceRecord={() => setShowVoiceRecorder(true)}
-          />
+          <div className="space-y-2">
+            {/* Quick Actions Menu */}
+            <QuickActionsMenu
+              onCreateTicket={() => setShowCreateTicket(true)}
+              onViewProfile={() => setShowProfile(true)}
+              onDeleteConversation={() => setShowDeleteDialog(true)}
+              disabled={sending}
+            />
+            
+            {/* Message Composer */}
+            <MessageComposer 
+              onSendMessage={sendMessage} 
+              disabled={sending}
+              onTypingStart={startTyping}
+              onTypingStop={stopTyping}
+              replyTo={replyTo}
+              onVoiceRecord={() => setShowVoiceRecorder(true)}
+            />
+          </div>
         )}
       </div>
 
@@ -543,6 +567,15 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         onExportChat={() => exportChat(messages)}
         onArchiveChat={archiveChat}
         onDeleteChat={deleteChat}
+      />
+
+      <DeleteConversationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        phoneNumber={phoneNumber}
+        contactName={contact?.name}
+        onConfirm={handleDeleteConversation}
+        isDeleting={isDeleting}
       />
     </div>
   );

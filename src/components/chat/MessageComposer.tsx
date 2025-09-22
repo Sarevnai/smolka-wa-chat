@@ -264,18 +264,11 @@ export function MessageComposer({
           />
         </div>
         
-        {/* Emoji picker or Audio recorder */}
-        {isTextMessage ? (
-          <EmojiPicker
-            onEmojiSelect={handleEmojiSelect}
-            disabled={disabled}
-          />
-        ) : (
-          <AudioRecorder
-            onAudioReady={handleAudioReady}
-            disabled={disabled}
-          />
-        )}
+        {/* Emoji picker */}
+        <EmojiPicker
+          onEmojiSelect={handleEmojiSelect}
+          disabled={disabled}
+        />
 
         {/* Send button - only show when there's text */}
         {isTextMessage && (
