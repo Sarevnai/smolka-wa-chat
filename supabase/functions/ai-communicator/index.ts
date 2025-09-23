@@ -140,26 +140,63 @@ async function processMessage(userId: string, message: string, conversationId: s
 }
 
 async function generateCommunicatorResponse(apiKey: string, userMessage: string, history: any[], businessContext: any, context: any) {
-  const systemPrompt = `Você é um assistente de IA avançado para a administradora de imóveis Smolka.
+  const systemPrompt = `Você é um assistente de IA avançado para a administradora de imóveis Smolka com ACESSO COMPLETO À PLATAFORMA.
 
-CAPACIDADES:
-- Criar e gerenciar tickets
-- Gerar relatórios e insights
-- Executar comandos no CRM
-- Fornecer análises de dados
-- Automatizar tarefas repetitivas
+🎯 CAPACIDADES PRINCIPAIS:
+- Análise completa de conversas e mensagens
+- Gestão completa de tickets e demandas
+- Relatórios detalhados em tempo real
+- Gestão de contatos e relacionamentos
+- Automação de processos
+- Insights preditivos e recomendações
 
-CONTEXTO DO NEGÓCIO:
+📊 DADOS DISPONÍVEIS EM TEMPO REAL:
 ${JSON.stringify(businessContext, null, 2)}
 
-COMANDOS DISPONÍVEIS:
-- "criar ticket para [telefone]" - Cria ticket automaticamente
-- "relatório de hoje" - Gera relatório do dia
-- "status do pipeline" - Mostra status dos tickets
-- "contatos ativos" - Lista contatos ativos
-- "análise de sentimento" - Analisa satisfação dos clientes
+🔧 COMANDOS E AÇÕES DISPONÍVEIS:
+RELATÓRIOS E ANÁLISES:
+- "relatório completo" - Dashboard com todas as métricas
+- "análise de conversas" - Padrões de comunicação
+- "performance de atendimento" - Tempos de resposta e qualidade
+- "relatório de tickets" - Status e distribuição
+- "resumo do dia/semana/mês" - Período específico
+- "top contatos" - Clientes mais ativos
+- "análise de sentimento" - Satisfação dos clientes
 
-Seja conversacional, útil e proativo. Quando identificar uma oportunidade de automatizar algo, sugira ações concretas.`;
+GESTÃO DE TICKETS:
+- "criar ticket para [telefone]" - Novo chamado
+- "status dos tickets" - Pipeline completo
+- "tickets pendentes" - Demandas em aberto
+- "resumir ticket [ID]" - Detalhes específicos
+- "priorizar tickets" - Organização por urgência
+
+GESTÃO DE CONTATOS:
+- "perfil do contato [telefone]" - Histórico completo
+- "contatos ativos hoje" - Atividade recente
+- "segmentação de clientes" - Grupos e categorias
+- "oportunidades de vendas" - Leads potenciais
+
+AUTOMAÇÃO:
+- "automatizar resposta para [situação]"
+- "criar template para [categoria]"
+- "configurar alerta para [condição]"
+- "agendar campanha"
+
+INSIGHTS E RECOMENDAÇÕES:
+- "oportunidades de melhoria"
+- "alertas importantes"
+- "previsões de demanda"
+- "recomendações estratégicas"
+
+🤖 PERSONALIDADE:
+Seja proativo, analítico e estratégico. Não apenas responda perguntas, mas:
+- Identifique padrões e tendências
+- Sugira melhorias e otimizações
+- Antecipe necessidades do usuário
+- Forneça contexto e insights acionáveis
+- Use os dados para recomendar ações concretas
+
+Quando o usuário pedir qualquer informação, consulte os dados disponíveis e forneça respostas detalhadas e úteis.`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -195,15 +232,60 @@ Seja conversacional, útil e proativo. Quando identificar uma oportunidade de au
         },
         {
           name: 'generate_report',
-          description: 'Gerar relatório de dados',
+          description: 'Gerar relatório de dados específicos',
           parameters: {
             type: 'object',
             properties: {
-              type: { type: 'string' },
-              period: { type: 'string' },
+              type: { type: 'string', enum: ['messages', 'tickets', 'contacts', 'performance', 'complete'] },
+              period: { type: 'string', enum: ['today', 'week', 'month', 'custom'] },
               filters: { type: 'object' }
             },
             required: ['type']
+          }
+        },
+        {
+          name: 'get_conversation_summary',
+          description: 'Obter resumo de conversas de um contato',
+          parameters: {
+            type: 'object',
+            properties: {
+              phone: { type: 'string' },
+              limit: { type: 'number' }
+            },
+            required: ['phone']
+          }
+        },
+        {
+          name: 'get_contact_profile',
+          description: 'Obter perfil completo de um contato',
+          parameters: {
+            type: 'object',
+            properties: {
+              phone: { type: 'string' }
+            },
+            required: ['phone']
+          }
+        },
+        {
+          name: 'analyze_sentiment',
+          description: 'Analisar sentimento de conversas recentes',
+          parameters: {
+            type: 'object',
+            properties: {
+              phone: { type: 'string' },
+              period: { type: 'string' }
+            }
+          }
+        },
+        {
+          name: 'get_ticket_status',
+          description: 'Obter status detalhado de tickets',
+          parameters: {
+            type: 'object',
+            properties: {
+              stage: { type: 'string' },
+              priority: { type: 'string' }
+            }
           }
         },
         {
@@ -250,26 +332,98 @@ async function getBusinessContext(userId: string) {
   // Get current stats and data
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const todayISO = today.toISOString();
+
+  // Data da semana para análises mais amplas
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoISO = weekAgo.toISOString();
 
   const [
     { count: todayMessages },
+    { count: weekMessages },
     { count: activeTickets },
+    { count: completedTickets },
     { count: totalContacts },
-    { data: recentTickets }
+    { count: activeContacts },
+    { data: recentTickets },
+    { data: recentMessages },
+    { data: ticketsByStage },
+    { data: messagesByDirection },
+    { data: topContactsWithMessages },
+    { data: campaigns },
+    { data: templates }
   ] = await Promise.all([
-    supabase.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+    // Mensagens hoje
+    supabase.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', todayISO),
+    
+    // Mensagens da semana
+    supabase.from('messages').select('*', { count: 'exact', head: true }).gte('created_at', weekAgoISO),
+    
+    // Tickets ativos
     supabase.from('tickets').select('*', { count: 'exact', head: true }).neq('stage', 'concluido'),
+    
+    // Tickets concluídos
+    supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('stage', 'concluido'),
+    
+    // Total de contatos
+    supabase.from('contacts').select('*', { count: 'exact', head: true }),
+    
+    // Contatos ativos
     supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('status', 'ativo'),
-    supabase.from('tickets').select('*').order('created_at', { ascending: false }).limit(5)
+    
+    // Tickets recentes com detalhes
+    supabase.from('tickets').select('*').order('created_at', { ascending: false }).limit(10),
+    
+    // Mensagens recentes
+    supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(20),
+    
+    // Distribuição de tickets por estágio
+    supabase.from('tickets').select('stage, count(*)', { count: 'exact' }),
+    
+    // Mensagens por direção (entrada/saída)
+    supabase.from('messages').select('direction, count(*)', { count: 'exact' }).gte('created_at', todayISO),
+    
+    // Top contatos com mais mensagens
+    supabase.from('messages').select('wa_from, count(*) as message_count').gte('created_at', weekAgoISO).not('wa_from', 'is', null).limit(10),
+    
+    // Campanhas
+    supabase.from('campaigns').select('*').order('created_at', { ascending: false }).limit(5),
+    
+    // Templates disponíveis
+    supabase.from('message_templates').select('*').limit(10)
   ]);
+
+  // Calcular conversas ativas únicas
+  const uniqueNumbers = new Set();
+  recentMessages?.forEach(msg => {
+    if (msg.direction === 'inbound' && msg.wa_from) {
+      uniqueNumbers.add(msg.wa_from);
+    }
+  });
 
   return {
     stats: {
       todayMessages: todayMessages || 0,
+      weekMessages: weekMessages || 0,
       activeTickets: activeTickets || 0,
-      totalContacts: totalContacts || 0
+      completedTickets: completedTickets || 0,
+      totalContacts: totalContacts || 0,
+      activeContacts: activeContacts || 0,
+      activeConversations: uniqueNumbers.size
     },
-    recentActivity: recentTickets || []
+    recentActivity: {
+      tickets: recentTickets || [],
+      messages: recentMessages || []
+    },
+    analytics: {
+      ticketsByStage: ticketsByStage || [],
+      messagesByDirection: messagesByDirection || [],
+      topContacts: topContactsWithMessages || []
+    },
+    campaigns: campaigns || [],
+    templates: templates || [],
+    currentDateTime: new Date().toISOString()
   };
 }
 
@@ -282,6 +436,18 @@ async function executeActions(userId: string, actions: any[], context: any) {
           break;
         case 'generate_report':
           await generateReportAction(action.parameters);
+          break;
+        case 'get_conversation_summary':
+          await getConversationSummaryAction(action.parameters);
+          break;
+        case 'get_contact_profile':
+          await getContactProfileAction(action.parameters);
+          break;
+        case 'analyze_sentiment':
+          await analyzeSentimentAction(action.parameters);
+          break;
+        case 'get_ticket_status':
+          await getTicketStatusAction(action.parameters);
           break;
         case 'send_message':
           await sendMessageAction(action.parameters);
@@ -311,13 +477,140 @@ async function createTicketAction(params: any) {
 }
 
 async function generateReportAction(params: any) {
-  // Implementation for generating reports
-  console.log('Generating report:', params);
+  const { type, period, filters } = params;
+  
+  // Generate specific reports based on type
+  switch (type) {
+    case 'messages':
+      return await generateMessagesReport(period, filters);
+    case 'tickets':
+      return await generateTicketsReport(period, filters);
+    case 'contacts':
+      return await generateContactsReport(period, filters);
+    case 'performance':
+      return await generatePerformanceReport(period, filters);
+    case 'complete':
+      return await generateCompleteReport(period, filters);
+    default:
+      console.log('Generating general report:', params);
+  }
+}
+
+async function getConversationSummaryAction(params: any) {
+  const { phone, limit = 20 } = params;
+  
+  const { data: messages } = await supabase
+    .from('messages')
+    .select('*')
+    .or(`wa_from.eq.${phone},wa_to.eq.${phone}`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+    
+  return messages;
+}
+
+async function getContactProfileAction(params: any) {
+  const { phone } = params;
+  
+  const [
+    { data: contact },
+    { data: messages },
+    { data: tickets },
+    { data: contracts }
+  ] = await Promise.all([
+    supabase.from('contacts').select('*').eq('phone', phone).single(),
+    supabase.from('messages').select('*').or(`wa_from.eq.${phone},wa_to.eq.${phone}`).order('created_at', { ascending: false }).limit(10),
+    supabase.from('tickets').select('*').eq('phone', phone).order('created_at', { ascending: false }),
+    supabase.from('contact_contracts').select('*').eq('contact_id', contact?.id || '')
+  ]);
+  
+  return { contact, messages, tickets, contracts };
+}
+
+async function analyzeSentimentAction(params: any) {
+  const { phone, period = 'week' } = params;
+  
+  let dateFilter = new Date();
+  if (period === 'week') dateFilter.setDate(dateFilter.getDate() - 7);
+  if (period === 'month') dateFilter.setMonth(dateFilter.getMonth() - 1);
+  
+  const { data: messages } = await supabase
+    .from('messages')
+    .select('body, direction, created_at')
+    .or(`wa_from.eq.${phone},wa_to.eq.${phone}`)
+    .gte('created_at', dateFilter.toISOString())
+    .not('body', 'is', null);
+    
+  return messages;
+}
+
+async function getTicketStatusAction(params: any) {
+  const { stage, priority } = params;
+  
+  let query = supabase.from('tickets').select('*');
+  
+  if (stage) query = query.eq('stage', stage);
+  if (priority) query = query.eq('priority', priority);
+  
+  const { data: tickets } = await query.order('created_at', { ascending: false });
+  
+  return tickets;
 }
 
 async function sendMessageAction(params: any) {
   // Implementation for sending WhatsApp messages
   console.log('Sending message:', params);
+}
+
+// Helper functions for detailed reports
+async function generateMessagesReport(period: string, filters: any) {
+  const today = new Date();
+  let startDate = new Date();
+  
+  switch (period) {
+    case 'today':
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case 'week':
+      startDate.setDate(today.getDate() - 7);
+      break;
+    case 'month':
+      startDate.setMonth(today.getMonth() - 1);
+      break;
+  }
+  
+  const { data: messages, count } = await supabase
+    .from('messages')
+    .select('*', { count: 'exact' })
+    .gte('created_at', startDate.toISOString());
+    
+  return { total: count, messages, period };
+}
+
+async function generateTicketsReport(period: string, filters: any) {
+  const { data: tickets, count } = await supabase
+    .from('tickets')
+    .select('*', { count: 'exact' });
+    
+  return { total: count, tickets, period };
+}
+
+async function generateContactsReport(period: string, filters: any) {
+  const { data: contacts, count } = await supabase
+    .from('contacts')
+    .select('*', { count: 'exact' });
+    
+  return { total: count, contacts, period };
+}
+
+async function generatePerformanceReport(period: string, filters: any) {
+  const businessContext = await getBusinessContext('system');
+  return { performance: businessContext.stats, period };
+}
+
+async function generateCompleteReport(period: string, filters: any) {
+  const businessContext = await getBusinessContext('system');
+  return { complete: businessContext, period };
 }
 
 async function generateInsights(userId: string, context: any, apiKey: string) {
