@@ -38,21 +38,21 @@ export function ReplyPreview({ replyTo, onClose, className }: ReplyPreviewProps)
 
   return (
     <div className={cn(
-      "flex items-center gap-3 px-4 py-2 mx-4 mb-1 bg-gray-50 border-l-4 border-primary rounded-r-lg animate-slide-in-from-left",
+      "flex items-center gap-3 px-4 py-3 mx-4 mb-2 bg-card border border-border rounded-lg shadow-sm animate-slide-in-from-left",
       className
     )}>
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <Reply className="h-3 w-3 text-primary" />
+          <Reply className="h-3 w-3 text-primary shrink-0" />
           <span className="text-xs font-medium text-primary">
-            {isOutbound ? "Você" : "Contato"}
+            Respondendo {isOutbound ? "a você" : `a ${replyTo.wa_from?.split('@')[0] || "contato"}`}
           </span>
         </div>
-        <p className="text-sm text-gray-600 leading-relaxed">{truncatedText}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed truncate">{truncatedText}</p>
       </div>
       <button
         onClick={onClose}
-        className="h-7 w-7 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors text-lg font-medium"
+        className="h-8 w-8 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
       >
         ×
       </button>

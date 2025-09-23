@@ -97,11 +97,15 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
         
         {/* Reply Context Display */}
         {message.body && message.body.includes('_Respondendo a:') && (
-          <div className="px-3 pt-2 border-l-4 border-blue-400 bg-blue-50/50 rounded-tl-lg">
-            <div className="text-xs text-blue-600 font-medium mb-1">
+          <div className={cn(
+            "px-3 pt-2 border-l-4 border-primary/60 rounded-tl-lg",
+            isOutbound ? "bg-white/20" : "bg-primary/5"
+          )}>
+            <div className="text-xs text-primary font-medium mb-1 flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-primary/60"></div>
               Em resposta a:
             </div>
-            <p className="text-xs text-gray-600 italic">
+            <p className="text-xs text-muted-foreground italic line-clamp-2">
               {message.body.split('\n\n')[0].replace('_Respondendo a: "', '').replace('"_', '')}
             </p>
           </div>
