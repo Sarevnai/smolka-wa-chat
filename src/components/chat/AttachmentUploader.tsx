@@ -75,11 +75,6 @@ export function AttachmentUploader({ onFileUpload, disabled }: AttachmentUploade
             mimeType: result.mimeType
           });
 
-          toast({
-            title: "Arquivo enviado",
-            description: `${file.name} foi carregado com sucesso.`,
-          });
-
           // Remove from uploading after delay
           setTimeout(() => {
             setUploadingFiles(p => p.filter(uf => uf.file !== file));

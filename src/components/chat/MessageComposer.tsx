@@ -1,5 +1,5 @@
 import { useState, KeyboardEvent, useEffect, useRef } from "react";
-import { Send, User, Crown } from "lucide-react";
+import { Send, User, Crown, X, FileText, Image as ImageIcon, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,13 @@ import { AudioRecorder } from "./AudioRecorder";
 import { toast } from "@/hooks/use-toast";
 import { MessageRow } from "@/lib/messages";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
+
+interface AttachedFile {
+  publicUrl: string;
+  fileName: string;
+  mimeType: string;
+  preview?: string;
+}
 
 interface MessageComposerProps {
   onSendMessage: (message: string) => void;
@@ -35,6 +42,7 @@ export function MessageComposer({
   const [message, setMessage] = useState("");
   const [selectedAttendant, setSelectedAttendant] = useState("none");
   const [isSending, setIsSending] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   
@@ -107,7 +115,7 @@ export function MessageComposer({
   }, [selectedAttendant]);
 
   const handleSend = async () => {
-    if (message.trim() && !disabled && !isSending) {
+    if ((message.trim() || attachedFiles.length > 0) && !disabled && !isSending && selectedContact) {
       setIsSending(true);
       
       try {
@@ -118,8 +126,25 @@ export function MessageComposer({
           formattedMessage = `*${selectedAttendant}*\n\n${formattedMessage}`;
         }
         
-        await onSendMessage(formattedMessage);
+        // Send attached files first
+        for (const file of attachedFiles) {
+          await sendMediaMessage(
+            selectedContact,
+            file.publicUrl,
+            file.mimeType,
+            formattedMessage || undefined,
+            file.fileName
+          );
+        }
+        
+        // If there are no files but there's a message, send text message
+        if (attachedFiles.length === 0 && formattedMessage) {
+          await onSendMessage(formattedMessage);
+        }
+        
+        // Clear message and attachments
         setMessage("");
+        setAttachedFiles([]);
         
         // Focus back to textarea
         setTimeout(() => textareaRef.current?.focus(), 100);
@@ -194,43 +219,27 @@ export function MessageComposer({
   };
 
   const handleFileUpload = async (uploadResult: { publicUrl: string; fileName: string; mimeType: string }) => {
-    if (!selectedContact) {
-      toast({
-        title: "Erro",
-        description: "Nenhum contato selecionado para envio.",
-        variant: "destructive",
-      });
-      return;
+    const newFile: AttachedFile = {
+      publicUrl: uploadResult.publicUrl,
+      fileName: uploadResult.fileName,
+      mimeType: uploadResult.mimeType,
+    };
+
+    // Create preview for images
+    if (uploadResult.mimeType.startsWith('image/')) {
+      newFile.preview = uploadResult.publicUrl;
     }
 
-    setIsSending(true);
-    try {
-      // Add attendant prefix to caption if needed
-      let caption = message.trim();
-      if (selectedAttendant && selectedAttendant !== "none") {
-        caption = `*${selectedAttendant}*\n\n${caption}`;
-      }
+    setAttachedFiles(prev => [...prev, newFile]);
+    
+    toast({
+      title: "Arquivo anexado",
+      description: `${uploadResult.fileName} foi anexado. Pressione Enter para enviar.`,
+    });
+  };
 
-      const success = await sendMediaMessage(
-        selectedContact,
-        uploadResult.publicUrl,
-        uploadResult.mimeType,
-        caption || undefined,
-        uploadResult.fileName
-      );
-
-      if (success) {
-        setMessage("");
-        toast({
-          title: "Arquivo enviado",
-          description: `${uploadResult.fileName} foi enviado com sucesso.`,
-        });
-      }
-    } catch (error) {
-      console.error('Error sending media:', error);
-    } finally {
-      setIsSending(false);
-    }
+  const removeAttachedFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleAudioReady = (audioBlob: Blob, duration: number) => {
@@ -242,7 +251,12 @@ export function MessageComposer({
     // onSendMessage(`[Áudio: ${Math.floor(duration)}s]`);
   };
 
-  const isTextMessage = message.trim().length > 0;
+  const hasContent = message.trim().length > 0 || attachedFiles.length > 0;
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) return ImageIcon;
+    return FileText;
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -274,6 +288,44 @@ export function MessageComposer({
         </div>
       )}
 
+      {/* Attached Files Preview */}
+      {attachedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-2">
+          {attachedFiles.map((file, index) => {
+            const FileIcon = getFileIcon(file.mimeType);
+            return (
+              <div
+                key={index}
+                className="flex items-center gap-2 bg-muted rounded-lg p-2 pr-1 animate-slide-in-from-left"
+              >
+                {file.preview ? (
+                  <img
+                    src={file.preview}
+                    alt={file.fileName}
+                    className="w-8 h-8 object-cover rounded"
+                  />
+                ) : (
+                  <div className="w-8 h-8 bg-muted-foreground/10 rounded flex items-center justify-center">
+                    <FileIcon className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
+                <span className="text-xs font-medium max-w-[120px] truncate">
+                  {file.fileName}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => removeAttachedFile(index)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* WhatsApp Message Input - Fixed Height */}
       <div className="flex items-end gap-2 bg-white rounded-3xl p-2 shadow-sm border border-gray-200 min-h-[44px]">
         {/* Attachment uploader */}
@@ -289,7 +341,7 @@ export function MessageComposer({
             value={message}
             onChange={(e) => handleMessageChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Digite uma mensagem..."
+            placeholder={attachedFiles.length > 0 ? "Adicione uma legenda (opcional)..." : "Digite uma mensagem..."}
             className={cn(
               "min-h-[28px] max-h-[80px] resize-none border-0 bg-transparent py-1.5 px-0",
               "focus:ring-0 focus:border-0 placeholder:text-muted-foreground/70 text-sm",
@@ -305,17 +357,17 @@ export function MessageComposer({
           disabled={disabled}
         />
 
-        {/* Send button - only show when there's text */}
-        {isTextMessage && (
+        {/* Send button - show when there's content */}
+        {hasContent && (
           <Button
             onClick={handleSend}
-            disabled={!message.trim() || disabled || isSending}
+            disabled={!hasContent || disabled || isSending}
             size="sm"
             className={cn(
               "h-8 w-8 p-0 shrink-0 rounded-full",
               "bg-primary hover:bg-primary/90 text-white",
               "transition-all duration-200 animate-scale-in",
-              (!message.trim() || disabled || isSending) && "opacity-50"
+              (!hasContent || disabled || isSending) && "opacity-50"
             )}
           >
             {isSending ? (
