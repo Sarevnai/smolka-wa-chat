@@ -32,6 +32,8 @@ import { CreateTicketModal } from "./CreateTicketModal";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
+import { MessageFlagsFilter } from "./MessageFlagsFilter";
+import { type FlagType } from "@/hooks/useMessageFlags";
 import { formatPhoneNumber } from "@/lib/utils";
 import { isSameDay, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -58,6 +60,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedFlags, setSelectedFlags] = useState<FlagType[]>([]);
   
   const { toast } = useToast();
   const { data: contact } = useContactByPhone(phoneNumber);
@@ -405,14 +408,23 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         </div>
       </div>
 
-      {/* Search - positioned right after header */}
-      {showSearch && (
-        <MessageSearch
-          messages={messages}
-          isOpen={showSearch}
-          onClose={() => setShowSearch(false)}
-          onMessageSelect={handleMessageSelect}
-        />
+      {/* Search and Flags Filter - positioned right after header */}
+      {(showSearch || selectedFlags.length > 0) && (
+        <div className="border-b border-sidebar-border bg-background p-2 space-y-2">
+          {showSearch && (
+            <MessageSearch
+              messages={messages}
+              isOpen={showSearch}
+              onClose={() => setShowSearch(false)}
+              onMessageSelect={handleMessageSelect}
+            />
+          )}
+          
+          <MessageFlagsFilter
+            phoneNumber={phoneNumber}
+            onFilterChange={setSelectedFlags}
+          />
+        </div>
       )}
 
       {/* Messages */}

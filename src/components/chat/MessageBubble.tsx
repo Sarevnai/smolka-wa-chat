@@ -8,6 +8,7 @@ import { InteractiveMessage } from "./InteractiveMessage";
 import { MessageStatusIndicator } from "./MessageStatusIndicator";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { EmojiReactions } from "./EmojiReactions";
+import { MessageFlags } from "./MessageFlags";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
@@ -176,16 +177,19 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
         
           {/* Timestamp and Status */}
           <div className={cn(
-            "flex items-center justify-end gap-1 px-3 pb-2 pt-1",
+            "flex items-center justify-between px-3 pb-2 pt-1",
             hasMedia && "px-2",
             "text-gray-500"
           )}>
-            <span className="text-xs opacity-80">
-              {formatTime(message.wa_timestamp || message.created_at || "")}
-            </span>
-            {isOutbound && (
-              <MessageStatusIndicator status={getMessageStatus()} />
-            )}
+            <MessageFlags messageId={message.id} />
+            <div className="flex items-center gap-1">
+              <span className="text-xs opacity-80">
+                {formatTime(message.wa_timestamp || message.created_at || "")}
+              </span>
+              {isOutbound && (
+                <MessageStatusIndicator status={getMessageStatus()} />
+              )}
+            </div>
           </div>
 
           {/* Emoji Reactions */}
