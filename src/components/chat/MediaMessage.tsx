@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { AudioPlayer } from "./AudioPlayer";
+import { ImageZoom } from "./ImageZoom";
 import { Download, FileText, MapPin, Volume2, Image, Video, Play, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface MediaMessageProps {
@@ -22,7 +22,7 @@ export function MediaMessage({
   mimeType,
   isOutbound 
 }: MediaMessageProps) {
-  const [showImageDialog, setShowImageDialog] = useState(false);
+  const [showImageZoom, setShowImageZoom] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
 
@@ -49,7 +49,7 @@ export function MediaMessage({
     switch (mediaType) {
       case 'image':
         return (
-          <div className="relative group cursor-pointer" onClick={() => setShowImageDialog(true)}>
+          <div className="relative group cursor-pointer" onClick={() => setShowImageZoom(true)}>
             <img 
               src={mediaUrl || ''} 
               alt={caption || 'Imagem'} 
@@ -148,7 +148,7 @@ export function MediaMessage({
         // Detectar tipo de mídia baseado no mimeType se disponível
         if (mimeType?.startsWith('image/')) {
           return (
-            <div className="relative group cursor-pointer" onClick={() => setShowImageDialog(true)}>
+            <div className="relative group cursor-pointer" onClick={() => setShowImageZoom(true)}>
               <img 
                 src={mediaUrl || ''} 
                 alt={caption || 'Imagem'} 
@@ -225,21 +225,14 @@ export function MediaMessage({
         <p className="text-sm opacity-80 mt-1 px-1">{caption}</p>
       )}
 
-      {/* Image preview dialog */}
-      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
-        <DialogContent className="max-w-4xl w-full p-0">
-          <img 
-            src={mediaUrl || ''} 
-            alt={caption || 'Imagem'} 
-            className="w-full h-auto max-h-[90vh] object-contain"
-          />
-          {caption && (
-            <div className="p-4">
-              <p className="text-sm text-muted-foreground">{caption}</p>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Image zoom */}
+      <ImageZoom
+        isOpen={showImageZoom}
+        onClose={() => setShowImageZoom(false)}
+        imageUrl={mediaUrl || ''}
+        caption={caption || undefined}
+        filename={filename || undefined}
+      />
     </div>
   );
 }

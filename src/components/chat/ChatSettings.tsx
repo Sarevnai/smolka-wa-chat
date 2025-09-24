@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, Bell, Shield, Download, Trash2, Archive, Moon, Sun } from "lucide-react";
+import { Settings, Bell, Shield, Download, Trash2, Archive, Moon, Sun, Sliders } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useTheme } from "@/components/ui/theme-provider";
+import { AdvancedNotificationSettings } from "./AdvancedNotificationSettings";
+import { useAdvancedNotifications } from "@/hooks/useAdvancedNotifications";
 
 interface ChatSettingsProps {
   isOpen: boolean;
@@ -25,11 +27,11 @@ export function ChatSettings({
   onArchiveChat, 
   onDeleteChat 
 }: ChatSettingsProps) {
-  const [notifications, setNotifications] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showAdvancedNotifications, setShowAdvancedNotifications] = useState(false);
   const [readReceipts, setReadReceipts] = useState(true);
   const [mediaAutoDownload, setMediaAutoDownload] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { settings: notificationSettings } = useAdvancedNotifications();
 
   if (!isOpen) return null;
 
@@ -60,27 +62,27 @@ export function ChatSettings({
             </h3>
             
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="notifications" className="text-sm">
-                  Ativar notificações
-                </Label>
-                <Switch
-                  id="notifications"
-                  checked={notifications}
-                  onCheckedChange={setNotifications}
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <Label htmlFor="sound" className="text-sm">
-                  Som das notificações
-                </Label>
-                <Switch
-                  id="sound"
-                  checked={soundEnabled}
-                  onCheckedChange={setSoundEnabled}
-                  disabled={!notifications}
-                />
+              <div className="p-3 border rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-medium">Status atual</Label>
+                  <div className="text-xs text-muted-foreground">
+                    {notificationSettings.newChats ? 'Ativas' : 'Desativadas'}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Volume: {Math.round(notificationSettings.volume * 100)}% • 
+                  Som: {notificationSettings.soundType === 'default' ? 'Padrão' : 
+                       notificationSettings.soundType === 'subtle' ? 'Sutil' : 'Urgente'}
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowAdvancedNotifications(true)}
+                  className="w-full"
+                >
+                  <Sliders className="h-4 w-4 mr-2" />
+                  Configurações Avançadas
+                </Button>
               </div>
             </div>
           </div>
@@ -215,6 +217,12 @@ export function ChatSettings({
             </div>
           </div>
         </div>
+
+        {/* Advanced Notifications Modal */}
+        <AdvancedNotificationSettings
+          isOpen={showAdvancedNotifications}
+          onClose={() => setShowAdvancedNotifications(false)}
+        />
       </DialogContent>
     </Dialog>
   );
