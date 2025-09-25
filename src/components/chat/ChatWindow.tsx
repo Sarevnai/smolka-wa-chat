@@ -20,6 +20,9 @@ import { VoiceRecorder } from "./VoiceRecorder";
 import { QuickActionsMenu } from "./QuickActionsMenu";
 import { DeleteConversationDialog } from "./DeleteConversationDialog";
 import { useDeleteConversation } from "@/hooks/useDeleteConversation";
+import { useDeleteMessage } from "@/hooks/useDeleteMessage";
+import { DeleteMessageConfirmation } from "./DeleteMessageConfirmation";
+import { DeletedMessagesTrash } from "./DeletedMessagesTrash";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useMediaGallery } from "@/hooks/useMediaGallery";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -68,6 +71,12 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const { isGalleryOpen, selectedMediaIndex, openGallery, closeGallery, getMediaMessages } = useMediaGallery();
   const { settings, updateBackground, exportChat, archiveChat, deleteChat } = useChatSettings(phoneNumber);
   const { deleteConversation, isDeleting } = useDeleteConversation();
+  const { deleteMessage, isDeleting: isDeletingMessage } = useDeleteMessage();
+  
+  // Message deletion states
+  const [messageToDelete, setMessageToDelete] = useState<MessageRow | null>(null);
+  const [deletionType, setDeletionType] = useState<'for_me' | 'for_everyone'>('for_me');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -259,6 +268,30 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     }
   };
 
+  const handleDeleteForMe = (message: MessageRow) => {
+    setMessageToDelete(message);
+    setDeletionType('for_me');
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteForEveryone = (message: MessageRow) => {
+    setMessageToDelete(message);
+    setDeletionType('for_everyone');
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmMessageDeletion = async () => {
+    if (!messageToDelete) return;
+
+    const result = await deleteMessage(messageToDelete, deletionType);
+    if (result.success) {
+      setShowDeleteConfirm(false);
+      setMessageToDelete(null);
+      // Refresh messages
+      loadMessages();
+    }
+  };
+
   const getInitials = (name?: string, phone?: string) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -397,14 +430,16 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             <Phone className="h-5 w-5" />
           </Button>
           
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setShowSettings(true)}
-            className="h-10 w-10 p-0 hover:bg-gray-100 rounded-full text-gray-600"
-          >
-            <MoreVertical className="h-5 w-5" />
-          </Button>
+          <DeletedMessagesTrash>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setShowSettings(true)}
+              className="h-10 w-10 p-0 hover:bg-gray-100 rounded-full text-gray-600"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </DeletedMessagesTrash>
         </div>
       </div>
 
@@ -462,6 +497,8 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
                       isLast={index === groupedMessages.length - 1}
                       onReply={handleReply}
                       onForward={handleForward}
+                      onDeleteForMe={handleDeleteForMe}
+                      onDeleteForEveryone={handleDeleteForEveryone}
                     />
                   </div>
                 )}
@@ -589,6 +626,15 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         contactName={contact?.name}
         onConfirm={handleDeleteConversation}
         isDeleting={isDeleting}
+      />
+
+      <DeleteMessageConfirmation
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        message={messageToDelete}
+        deletionType={deletionType}
+        onConfirm={confirmMessageDeletion}
+        isDeleting={isDeletingMessage}
       />
     </div>
   );

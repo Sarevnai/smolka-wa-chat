@@ -5,7 +5,8 @@ import {
   Star, 
   Trash2, 
   Download,
-  Info
+  Info,
+  UserX
 } from "lucide-react";
 import {
   ContextMenu,
@@ -24,6 +25,8 @@ interface MessageContextMenuProps {
   onForward?: (message: MessageRow) => void;
   onStar?: (message: MessageRow) => void;
   onDelete?: (message: MessageRow) => void;
+  onDeleteForMe?: (message: MessageRow) => void;
+  onDeleteForEveryone?: (message: MessageRow) => void;
   onDownload?: (message: MessageRow) => void;
   onInfo?: (message: MessageRow) => void;
 }
@@ -36,6 +39,8 @@ export function MessageContextMenu({
   onForward,
   onStar,
   onDelete,
+  onDeleteForMe,
+  onDeleteForEveryone,
   onDownload,
   onInfo
 }: MessageContextMenuProps) {
@@ -93,16 +98,40 @@ export function MessageContextMenu({
           </ContextMenuItem>
         )}
         
-        {isOutbound && onDelete && (
+        {(onDeleteForMe || onDeleteForEveryone || onDelete) && (
           <>
             <ContextMenuSeparator />
-            <ContextMenuItem 
-              onClick={() => onDelete(message)}
-              className="text-red-600 focus:text-red-600"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Apagar mensagem
-            </ContextMenuItem>
+            
+            {onDeleteForMe && (
+              <ContextMenuItem 
+                onClick={() => onDeleteForMe(message)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <UserX className="mr-2 h-4 w-4" />
+                Excluir só para mim
+              </ContextMenuItem>
+            )}
+            
+            {onDeleteForEveryone && isOutbound && (
+              <ContextMenuItem 
+                onClick={() => onDeleteForEveryone(message)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir para todos
+              </ContextMenuItem>
+            )}
+
+            {/* Legacy delete option for backward compatibility */}
+            {onDelete && !onDeleteForMe && !onDeleteForEveryone && isOutbound && (
+              <ContextMenuItem 
+                onClick={() => onDelete(message)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Apagar mensagem
+              </ContextMenuItem>
+            )}
           </>
         )}
       </ContextMenuContent>

@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          new_data: Json | null
+          old_data: Json | null
+          target_id: string
+          target_table: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_data?: Json | null
+          old_data?: Json | null
+          target_id: string
+          target_table: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_data?: Json | null
+          old_data?: Json | null
+          target_id?: string
+          target_table?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_automations: {
         Row: {
           action_config: Json
@@ -422,6 +458,36 @@ export type Database = {
           rating?: number | null
           status?: Database["public"]["Enums"]["contact_status"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      deleted_messages: {
+        Row: {
+          can_restore: boolean
+          deleted_at: string
+          deleted_by: string
+          deletion_type: string
+          id: string
+          message_id: number
+          original_message_data: Json
+        }
+        Insert: {
+          can_restore?: boolean
+          deleted_at?: string
+          deleted_by: string
+          deletion_type: string
+          id?: string
+          message_id: number
+          original_message_data: Json
+        }
+        Update: {
+          can_restore?: boolean
+          deleted_at?: string
+          deleted_by?: string
+          deletion_type?: string
+          id?: string
+          message_id?: number
+          original_message_data?: Json
         }
         Relationships: []
       }

@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { MediaMessage } from "./MediaMessage";
@@ -9,24 +9,76 @@ import { MessageStatusIndicator } from "./MessageStatusIndicator";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { EmojiReactions } from "./EmojiReactions";
 import { MessageFlags } from "./MessageFlags";
+import { DeletedMessageBubble } from "./DeletedMessageBubble";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface MessageBubbleProps {
   message: MessageRow;
   isLast?: boolean;
   onReply?: (message: MessageRow) => void;
   onForward?: (message: MessageRow) => void;
+  onDeleteForMe?: (message: MessageRow) => void;
+  onDeleteForEveryone?: (message: MessageRow) => void;
 }
 
-export function MessageBubble({ message, isLast, onReply, onForward }: MessageBubbleProps) {
+export function MessageBubble({ 
+  message, 
+  isLast, 
+  onReply, 
+  onForward, 
+  onDeleteForMe, 
+  onDeleteForEveryone 
+}: MessageBubbleProps) {
   const [reactions, setReactions] = useState([
     { emoji: "👍", count: 0, users: [], hasUserReacted: false }
   ]);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [deletionInfo, setDeletionInfo] = useState<{
+    isDeleted: boolean;
+    deletionType?: 'for_me' | 'for_everyone';
+  }>({ isDeleted: false });
+
+  // Check if message is deleted
+  useEffect(() => {
+    if (!user) return;
+
+    const checkIfDeleted = async () => {
+      const { data } = await supabase
+        .from('deleted_messages')
+        .select('deletion_type')
+        .eq('message_id', message.id)
+        .eq('deleted_by', user.id)
+        .maybeSingle();
+
+      if (data) {
+        setDeletionInfo({
+          isDeleted: true,
+          deletionType: data.deletion_type as 'for_me' | 'for_everyone'
+        });
+      }
+    };
+
+    checkIfDeleted();
+  }, [message.id, user]);
+
   const isOutbound = message.direction === "outbound";
   const hasMedia = message.media_type && message.media_type !== 'text';
   const isTemplate = message.is_template;
+
+  // Handle deleted messages
+  if (deletionInfo.isDeleted) {
+    return (
+      <DeletedMessageBubble
+        message={message}
+        isDeleted={true}
+        deletionType={deletionInfo.deletionType}
+      />
+    );
+  }
   
   // Try to parse interactive content from raw data
   const interactive = message.raw?.interactive || null;
@@ -87,6 +139,8 @@ export function MessageBubble({ message, isLast, onReply, onForward }: MessageBu
         message={message}
         onReply={handleReply}
         onCopy={handleCopy}
+        onDeleteForMe={onDeleteForMe}
+        onDeleteForEveryone={onDeleteForEveryone}
       >
         <div className={cn(
           "max-w-[45%] md:max-w-[65%] relative group animate-slide-in-from-left",
