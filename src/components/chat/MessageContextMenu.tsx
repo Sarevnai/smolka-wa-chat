@@ -46,6 +46,14 @@ export function MessageContextMenu({
 }: MessageContextMenuProps) {
   const isOutbound = message.direction === "outbound";
   const hasMedia = message.media_type && message.media_type !== 'text';
+  
+  // Debug log
+  console.log('MessageContextMenu:', { 
+    messageId: message.id, 
+    direction: message.direction, 
+    isOutbound, 
+    hasDeleteForEveryone: !!onDeleteForEveryone 
+  });
 
   return (
     <ContextMenu>
