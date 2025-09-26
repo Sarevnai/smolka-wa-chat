@@ -6,14 +6,17 @@ import { cn } from "@/lib/utils";
 import { MediaMessage } from "./MediaMessage";
 import { InteractiveMessage } from "./InteractiveMessage";
 import { MessageStatusIndicator } from "./MessageStatusIndicator";
-import { MessageContextMenu } from "./MessageContextMenu";
+import { MessageOptionsDialog } from "./MessageOptionsDialog";
 import { EmojiReactions } from "./EmojiReactions";
 import { MessageFlags } from "./MessageFlags";
-import { DeletedMessageBubble } from "./DeletedMessageBubble";
+import { WhatsAppDeletedPlaceholder } from "./WhatsAppDeletedPlaceholder";
+import { MoreVertical } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useMessageActions } from "@/hooks/useMessageActions";
 
 interface MessageBubbleProps {
   message: MessageRow;
@@ -37,6 +40,14 @@ export function MessageBubble({
   ]);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { 
+    handleReact, 
+    handleStar, 
+    handlePin, 
+    handleCopy: handleCopyMessage, 
+    handleReport, 
+    handleSelectMessage 
+  } = useMessageActions();
   const [deletionInfo, setDeletionInfo] = useState<{
     isDeleted: boolean;
     deletionType?: 'for_me' | 'for_everyone';
@@ -69,13 +80,12 @@ export function MessageBubble({
   const hasMedia = message.media_type && message.media_type !== 'text';
   const isTemplate = message.is_template;
 
-  // Handle deleted messages
+  // Handle deleted messages with WhatsApp-like behavior
   if (deletionInfo.isDeleted) {
     return (
-      <DeletedMessageBubble
+      <WhatsAppDeletedPlaceholder
         message={message}
-        isDeleted={true}
-        deletionType={deletionInfo.deletionType}
+        deletionType={deletionInfo.deletionType!}
       />
     );
   }
@@ -98,16 +108,6 @@ export function MessageBubble({
     // Random status for demo (replace with real logic)
     const statuses = ['sent', 'delivered', 'read'] as const;
     return statuses[Math.floor(Math.random() * statuses.length)];
-  };
-
-  const handleCopy = (message: MessageRow) => {
-    if (message.body) {
-      navigator.clipboard.writeText(message.body);
-      toast({
-        title: "Texto copiado",
-        description: "O texto foi copiado para a área de transferência.",
-      });
-    }
   };
 
   const handleReply = (message: MessageRow) => {
@@ -135,71 +135,92 @@ export function MessageBubble({
       "flex mb-1 animate-fade-in",
       isOutbound ? "justify-end" : "justify-start"
     )}>
-      <MessageContextMenu
+      <MessageOptionsDialog
         message={message}
-        onReply={handleReply}
-        onCopy={handleCopy}
+        onReply={onReply}
+        onReact={handleReact}
+        onStar={handleStar}
+        onPin={handlePin}
+        onForward={onForward}
+        onCopy={handleCopyMessage}
+        onReport={handleReport}
         onDeleteForMe={onDeleteForMe}
         onDeleteForEveryone={onDeleteForEveryone}
+        onSelectMessage={handleSelectMessage}
       >
-        <div className={cn(
-          "max-w-[45%] md:max-w-[65%] relative group animate-slide-in-from-left",
-          hasMedia ? "rounded-xl overflow-hidden" : "",
-          isOutbound 
-            ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-xl rounded-br-md" 
-            : "bg-message-inbound text-message-text-inbound mr-auto shadow-sm rounded-xl rounded-bl-md border border-gray-200/60"
-        )}>
+        <div className="relative group">
+          {/* Message Options Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10",
+              "h-6 w-6 p-0 rounded-full bg-background/80 hover:bg-background shadow-sm",
+              "focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            )}
+            aria-label="Opções da mensagem"
+          >
+            <MoreVertical className="h-3 w-3" />
+          </Button>
         
-        {/* Reply Context Display */}
-        {message.body && message.body.includes('_Respondendo a:') && (
           <div className={cn(
-            "px-3 pt-2 border-l-4 border-primary/60 rounded-tl-lg",
-            isOutbound ? "bg-white/20" : "bg-primary/5"
+            "max-w-[45%] md:max-w-[65%] relative animate-slide-in-from-left",
+            hasMedia ? "rounded-xl overflow-hidden" : "",
+            isOutbound 
+              ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-xl rounded-br-md" 
+              : "bg-message-inbound text-message-text-inbound mr-auto shadow-sm rounded-xl rounded-bl-md border border-gray-200/60"
           )}>
-            <div className="text-xs text-primary font-medium mb-1 flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-primary/60"></div>
-              Em resposta a:
+          
+          {/* Reply Context Display */}
+          {message.body && message.body.includes('_Respondendo a:') && (
+            <div className={cn(
+              "px-3 pt-2 border-l-4 border-primary/60 rounded-tl-lg",
+              isOutbound ? "bg-white/20" : "bg-primary/5"
+            )}>
+              <div className="text-xs text-primary font-medium mb-1 flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-primary/60"></div>
+                Em resposta a:
+              </div>
+              <p className="text-xs text-muted-foreground italic line-clamp-2">
+                {message.body.split('\n\n')[0].replace('_Respondendo a: "', '').replace('"_', '')}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground italic line-clamp-2">
-              {message.body.split('\n\n')[0].replace('_Respondendo a: "', '').replace('"_', '')}
-            </p>
-          </div>
-        )}
-        
-        {/* Template badge */}
-        {isTemplate && (
-          <div className={cn("px-3 pt-2", hasMedia && "px-2")}>
-            <Badge variant="secondary" className="text-xs mb-1">
-              Mensagem de template
-            </Badge>
-          </div>
-        )}
+          )}
+          
+          {/* Template badge */}
+          {isTemplate && (
+            <div className={cn("px-3 pt-2", hasMedia && "px-2")}>
+              <Badge variant="secondary" className="text-xs mb-1">
+                Mensagem de template
+              </Badge>
+            </div>
+          )}
 
-        {/* Media Content */}
-        {hasMedia && (
-          <div>
-            <MediaMessage
-              mediaType={message.media_type!}
-              mediaUrl={message.media_url}
-              caption={message.media_caption}
-              filename={message.media_filename}
-              mimeType={message.media_mime_type}
-              isOutbound={isOutbound}
-            />
-          </div>
-        )}
-        
-        {/* Interactive Message */}
-        {interactive && (
-          <div className={cn("mb-1", hasMedia ? "px-2" : "px-3")}>
-            <InteractiveMessage
-              interactive={interactive}
-              isOutbound={isOutbound}
-            />
-          </div>
-        )}
-        
-        {/* Text Content */}
+          {/* Media Content */}
+          {hasMedia && (
+            <div>
+              <MediaMessage
+                mediaType={message.media_type!}
+                mediaUrl={message.media_url}
+                caption={message.media_caption}
+                filename={message.media_filename}
+                mimeType={message.media_mime_type}
+                isOutbound={isOutbound}
+              />
+            </div>
+          )}
+          
+          {/* Interactive Message */}
+          {interactive && (
+            <div className={cn("mb-1", hasMedia ? "px-2" : "px-3")}>
+              <InteractiveMessage
+                interactive={interactive}
+                isOutbound={isOutbound}
+              />
+            </div>
+          )}
+          
+          {/* Text Content */}
           {(() => {
             const body = message.body?.trim();
             const caption = message.media_caption?.trim();
@@ -228,7 +249,6 @@ export function MessageBubble({
             ) : null;
           })()}
 
-        
           {/* Timestamp and Status */}
           <div className={cn(
             "flex items-center justify-between px-3 pb-2 pt-1",
@@ -257,8 +277,9 @@ export function MessageBubble({
               />
             </div>
           )}
+          </div>
         </div>
-      </MessageContextMenu>
+      </MessageOptionsDialog>
     </div>
   );
 }
