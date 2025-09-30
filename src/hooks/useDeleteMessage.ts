@@ -18,51 +18,21 @@ export function useDeleteMessage() {
         throw new Error('Usuário não autenticado');
       }
 
-      // Store original message data for potential restoration
-      const originalData = {
-        id: message.id,
-        body: message.body,
-        media_type: message.media_type,
-        media_url: message.media_url,
-        media_caption: message.media_caption,
-        wa_timestamp: message.wa_timestamp,
-        direction: message.direction,
-        wa_from: message.wa_from,
-        wa_to: message.wa_to
-      };
-
-      // Insert into deleted_messages table
-      const { error: deleteError } = await supabase
-        .from('deleted_messages')
-        .insert({
+      // Call the delete-message edge function
+      const { data, error } = await supabase.functions.invoke('delete-message', {
+        body: {
           message_id: message.id,
-          deleted_by: user.id,
-          deletion_type: deletionType,
-          original_message_data: originalData
-        });
+          deletion_type: deletionType
+        }
+      });
 
-      if (deleteError) throw deleteError;
-
-      // Log the action
-      const { error: logError } = await supabase
-        .from('activity_logs')
-        .insert({
-          user_id: user.id,
-          action_type: 'delete_message',
-          target_table: 'messages',
-          target_id: message.id.toString(),
-          old_data: originalData,
-          metadata: {
-            deletion_type: deletionType,
-            phone_number: message.wa_from || message.wa_to
-          }
-        });
-
-      if (logError) console.warn('Failed to log activity:', logError);
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Failed to delete message');
 
       // Invalidate queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['messages'] });
       queryClient.invalidateQueries({ queryKey: ['deleted-messages'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
 
       toast({
         title: deletionType === 'for_everyone' ? 'Mensagem excluída para todos' : 'Mensagem excluída para você',
@@ -94,46 +64,20 @@ export function useDeleteMessage() {
         throw new Error('Usuário não autenticado');
       }
 
-      // Get deleted message data
-      const { data: deletedMessage, error: fetchError } = await supabase
-        .from('deleted_messages')
-        .select('*')
-        .eq('id', deletedMessageId)
-        .eq('deleted_by', user.id)
-        .single();
+      // Call the restore-message edge function
+      const { data, error } = await supabase.functions.invoke('restore-message', {
+        body: {
+          deleted_message_id: deletedMessageId
+        }
+      });
 
-      if (fetchError || !deletedMessage) {
-        throw new Error('Mensagem excluída não encontrada');
-      }
-
-      // Remove from deleted_messages
-      const { error: removeError } = await supabase
-        .from('deleted_messages')
-        .delete()
-        .eq('id', deletedMessageId);
-
-      if (removeError) throw removeError;
-
-      // Log the restoration
-      const { error: logError } = await supabase
-        .from('activity_logs')
-        .insert({
-          user_id: user.id,
-          action_type: 'restore_message',
-          target_table: 'messages',
-          target_id: deletedMessage.message_id.toString(),
-          new_data: deletedMessage.original_message_data,
-          metadata: {
-            deletion_type: deletedMessage.deletion_type,
-            restored_at: new Date().toISOString()
-          }
-        });
-
-      if (logError) console.warn('Failed to log activity:', logError);
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Failed to restore message');
 
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['messages'] });
       queryClient.invalidateQueries({ queryKey: ['deleted-messages'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
 
       toast({
         title: "Mensagem restaurada",

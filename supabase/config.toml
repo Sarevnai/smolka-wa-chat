@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.import-contacts]
 verify_jwt = true
+
+[functions.delete-message]
+verify_jwt = true
+
+[functions.restore-message]
+verify_jwt = true

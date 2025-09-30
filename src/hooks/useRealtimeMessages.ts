@@ -51,6 +51,22 @@ export function useRealtimeMessages({
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          console.log('Message updated:', payload);
+          
+          const updatedMessage = payload.new as MessageRow;
+          
+          // Call the callback to refresh UI
+          onNewMessage?.(updatedMessage);
+        }
+      )
       .subscribe();
 
     return () => {

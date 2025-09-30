@@ -57,24 +57,35 @@ export function MessageBubble({
   useEffect(() => {
     if (!user) return;
 
+    // Check if message is deleted for everyone (global deletion)
+    if (message.deleted_for_everyone) {
+      setDeletionInfo({
+        isDeleted: true,
+        deletionType: 'for_everyone'
+      });
+      return;
+    }
+
+    // Check if message is deleted only for current user (local deletion)
     const checkIfDeleted = async () => {
       const { data } = await supabase
         .from('deleted_messages')
         .select('deletion_type')
         .eq('message_id', message.id)
         .eq('deleted_by', user.id)
+        .eq('deletion_type', 'for_me')
         .maybeSingle();
 
       if (data) {
         setDeletionInfo({
           isDeleted: true,
-          deletionType: data.deletion_type as 'for_me' | 'for_everyone'
+          deletionType: 'for_me'
         });
       }
     };
 
     checkIfDeleted();
-  }, [message.id, user]);
+  }, [message.id, message.deleted_for_everyone, user]);
 
   const isOutbound = message.direction === "outbound";
   const hasMedia = message.media_type && message.media_type !== 'text';

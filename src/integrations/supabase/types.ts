@@ -555,6 +555,9 @@ export type Database = {
         Row: {
           body: string | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          deleted_for_everyone: boolean | null
           direction: string | null
           id: number
           is_template: boolean | null
@@ -573,6 +576,9 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_for_everyone?: boolean | null
           direction?: string | null
           id?: number
           is_template?: boolean | null
@@ -591,6 +597,9 @@ export type Database = {
         Update: {
           body?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          deleted_for_everyone?: boolean | null
           direction?: string | null
           id?: number
           is_template?: boolean | null
