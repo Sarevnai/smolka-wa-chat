@@ -9,7 +9,8 @@ import {
   Flag, 
   Trash2, 
   CheckSquare,
-  UserX
+  UserX,
+  AlertCircle
 } from "lucide-react";
 import {
   Dialog,
@@ -137,13 +138,15 @@ export function MessageOptionsDialog({
       icon: UserX,
       label: "Excluir só para mim",
       action: onDeleteForMe ? () => handleAction(() => onDeleteForMe(message)) : undefined,
-      show: deletionPermissions.canDeleteForMe && !!onDeleteForMe
+      show: deletionPermissions.canDeleteForMe && !!onDeleteForMe,
+      description: undefined
     },
     {
       icon: Trash2,
-      label: "Excluir para todos",
+      label: "Excluir da plataforma",
       action: onDeleteForEveryone ? () => handleAction(() => onDeleteForEveryone(message)) : undefined,
-      show: deletionPermissions.canDeleteForEveryone && !!onDeleteForEveryone
+      show: deletionPermissions.canDeleteForEveryone && !!onDeleteForEveryone,
+      description: "Remove da plataforma. O contato ainda verá no WhatsApp dele."
     }
   ];
 
@@ -185,6 +188,17 @@ export function MessageOptionsDialog({
                 <h3 className="text-lg font-medium text-foreground">Apagar mensagem</h3>
               </div>
               <Separator />
+              {isOutbound && deletionPermissions.canDeleteForEveryone && (
+                <div className="px-6 py-3 text-xs text-muted-foreground bg-muted/30 border-l-4 border-blue-400">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-400" />
+                    <div>
+                      <p className="font-medium text-foreground mb-1">⚠️ Limitação da API do WhatsApp</p>
+                      <p>Mensagens enviadas via API não podem ser excluídas do WhatsApp do destinatário. A exclusão só afeta a visualização na plataforma.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {!deletionPermissions.canDeleteForEveryone && deletionPermissions.reasonForEveryone && (
                 <div className="px-6 py-2 text-xs text-muted-foreground border-l-4 border-yellow-400 bg-yellow-50/20 rounded-r">
                   ⚠️ {deletionPermissions.reasonForEveryone}
@@ -196,12 +210,17 @@ export function MessageOptionsDialog({
                   <div key={option.label}>
                     <Button
                       variant="ghost"
-                      className="w-full justify-start h-12 px-6 rounded-none text-destructive hover:bg-destructive/10 focus:bg-destructive/10 transition-colors focus:outline-none focus:ring-2 focus:ring-destructive/20"
+                      className="w-full justify-start h-auto min-h-12 px-6 py-3 rounded-none text-destructive hover:bg-destructive/10 focus:bg-destructive/10 transition-colors focus:outline-none focus:ring-2 focus:ring-destructive/20"
                       aria-label={option.label}
                       onClick={option.action}
                     >
-                      <option.icon className="mr-4 h-5 w-5" />
-                      <span className="text-base">{option.label}</span>
+                      <option.icon className="mr-4 h-5 w-5 flex-shrink-0" />
+                      <div className="flex flex-col items-start text-left">
+                        <span className="text-base">{option.label}</span>
+                        {option.description && (
+                          <span className="text-xs text-muted-foreground mt-0.5">{option.description}</span>
+                        )}
+                      </div>
                     </Button>
                     {index < filteredOptions.length - 1 && (
                       <Separator className="mx-6" />
