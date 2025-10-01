@@ -1,9 +1,8 @@
-import { useState } from "react";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { MessageSquare, SparklesIcon } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ChatList } from "./ChatList";
 import { ChatWindow } from "./ChatWindow";
 import { NameSuggestionsPanel } from "@/components/contacts/NameSuggestionsPanel";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ChatLayoutProps {
   selectedContact?: string;
@@ -13,59 +12,58 @@ interface ChatLayoutProps {
 export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps) {
   const isMobile = useIsMobile();
 
-  // On mobile, show only chat list if no contact selected, otherwise show chat window
   if (isMobile) {
     return (
-      <div className="h-screen flex flex-col">
-        {!selectedContact ? (
-          <ChatList onContactSelect={onContactSelect} selectedContact={selectedContact} />
+      <div className="h-screen w-full">
+        {selectedContact ? (
+          <ChatWindow phoneNumber={selectedContact} onBack={() => onContactSelect("")} />
         ) : (
-          <ChatWindow 
-            phoneNumber={selectedContact} 
-            onBack={() => onContactSelect("")}
-          />
+          <ChatList selectedContact={selectedContact} onContactSelect={onContactSelect} />
         )}
       </div>
     );
   }
 
-  // Desktop: Split screen layout
   return (
-    <div className="h-screen flex">
-      <div className="w-[340px] flex-shrink-0 border-r border-sidebar-border bg-sidebar">
-        <ChatList onContactSelect={onContactSelect} selectedContact={selectedContact} />
+    <div className="h-screen w-full flex">
+      {/* Responsive sidebar with min/max widths */}
+      <div className="w-full sm:w-[340px] lg:w-[380px] xl:w-[420px] max-w-[480px] min-w-[280px] border-r border-sidebar-border bg-sidebar flex-shrink-0">
+        <ChatList 
+          selectedContact={selectedContact} 
+          onContactSelect={onContactSelect}
+        />
       </div>
-      
-      <div className="flex-1 bg-chat-background" style={{ backgroundImage: 'var(--chat-pattern)' }}>
+      <div className="flex-1 flex flex-col items-center justify-center min-w-0">
         {selectedContact ? (
           <ChatWindow phoneNumber={selectedContact} />
         ) : (
-          <div className="h-full flex items-center justify-center p-6">
-            <div className="max-w-md w-full space-y-6 text-center">
-              <NameSuggestionsPanel />
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 bg-chat-background">
+            <div className="flex flex-col items-center max-w-2xl w-full animate-fade-in">
+              {/* Icon and heading */}
+              <div className="w-28 h-28 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mb-6 shadow-sm">
+                <MessageSquare className="h-14 w-14 text-primary/70" />
+              </div>
               
-              <div className="text-center">
-                <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                  <svg
-                    className="w-12 h-12 text-muted-foreground"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
+              <h2 className="text-2xl sm:text-3xl font-semibold text-foreground mb-3 text-center">
+                Selecione uma conversa
+              </h2>
+              
+              <p className="text-muted-foreground text-center max-w-md mb-8 text-sm sm:text-base px-4">
+                Escolha uma conversa da lista à esquerda para começar ou visualize sugestões de nomes abaixo
+              </p>
+              
+              {/* Name suggestions with better integration */}
+              <div className="w-full max-w-3xl">
+                <div className="mb-4 px-4">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                    <SparklesIcon className="h-4 w-4" />
+                    Sugestões de Nomes Detectados
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Estes contatos foram identificados automaticamente em suas conversas
+                  </p>
                 </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">
-                  Selecione uma conversa
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Escolha um contato da lista para iniciar ou continuar a conversa
-                </p>
+                <NameSuggestionsPanel />
               </div>
             </div>
           </div>

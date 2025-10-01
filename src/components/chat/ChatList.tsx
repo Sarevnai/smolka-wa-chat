@@ -54,12 +54,13 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
     try {
       setLoading(true);
       
-      // Get all messages and group by phone number
+      // Optimized query: Get only the most recent message per conversation
+      // First, get unique phone numbers from recent messages
       const { data: messages, error } = await supabase
         .from("messages")
         .select("*")
         .order("wa_timestamp", { ascending: false })
-        .limit(1000);
+        .limit(200); // Reduced from 1000 for better performance
 
       if (error) throw error;
 

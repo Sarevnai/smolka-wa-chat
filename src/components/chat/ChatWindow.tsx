@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,11 +80,11 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, []);
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -109,7 +109,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [phoneNumber, scrollToBottom, toast]);
 
   useEffect(() => {
     loadMessages();
@@ -166,7 +166,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     };
   }, [phoneNumber]);
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || sending) return;
 
     try {
@@ -220,67 +220,67 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     } finally {
       setSending(false);
     }
-  };
+  }, [sending, replyTo, phoneNumber, stopTyping, toast]);
 
-  const handleReply = (message: MessageRow) => {
+  const handleReply = useCallback((message: MessageRow) => {
     setReplyTo(message);
-  };
+  }, []);
 
-  const clearReply = () => {
+  const clearReply = useCallback(() => {
     setReplyTo(null);
-  };
+  }, []);
 
-  const handleForward = (message: MessageRow) => {
+  const handleForward = useCallback((message: MessageRow) => {
     setForwardMessage(message);
     setShowForwardModal(true);
-  };
+  }, []);
 
-  const handleForwardSend = async (selectedContacts: string[], message: MessageRow) => {
+  const handleForwardSend = useCallback(async (selectedContacts: string[], message: MessageRow) => {
     // TODO: Implement forward message logic
     toast({
       title: "Mensagem encaminhada",
       description: `Enviada para ${selectedContacts.length} contato(s)`,
     });
-  };
+  }, [toast]);
 
-  const handleScheduleMessage = async (message: string, scheduledTime: Date) => {
+  const handleScheduleMessage = useCallback(async (message: string, scheduledTime: Date) => {
     // TODO: Implement scheduled message logic
     toast({
       title: "Mensagem agendada",
       description: `Será enviada em ${scheduledTime.toLocaleString()}`,
     });
-  };
+  }, [toast]);
 
-  const handleVoiceSend = async (audioBlob: Blob) => {
+  const handleVoiceSend = useCallback(async (audioBlob: Blob) => {
     // TODO: Implement voice message sending
     setShowVoiceRecorder(false);
     toast({
       title: "Áudio enviado",
       description: "Mensagem de áudio enviada com sucesso",
     });
-  };
+  }, [toast]);
 
-  const handleDeleteConversation = async () => {
+  const handleDeleteConversation = useCallback(async () => {
     await deleteConversation(phoneNumber);
     setShowDeleteDialog(false);
     if (onBack) {
       onBack();
     }
-  };
+  }, [phoneNumber, deleteConversation, onBack]);
 
-  const handleDeleteForMe = (message: MessageRow) => {
+  const handleDeleteForMe = useCallback((message: MessageRow) => {
     setMessageToDelete(message);
     setDeletionType('for_me');
     setShowDeleteConfirm(true);
-  };
+  }, []);
 
-  const handleDeleteForEveryone = (message: MessageRow) => {
+  const handleDeleteForEveryone = useCallback((message: MessageRow) => {
     setMessageToDelete(message);
     setDeletionType('for_everyone');
     setShowDeleteConfirm(true);
-  };
+  }, []);
 
-  const confirmMessageDeletion = async () => {
+  const confirmMessageDeletion = useCallback(async () => {
     if (!messageToDelete) return;
 
     const result = await deleteMessage(messageToDelete, deletionType);
@@ -290,7 +290,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
       // Refresh messages
       loadMessages();
     }
-  };
+  }, [messageToDelete, deletionType, deleteMessage, loadMessages]);
 
   const getInitials = (name?: string, phone?: string) => {
     if (name) {
@@ -330,15 +330,16 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     return grouped;
   };
 
-  const groupedMessages = groupMessagesByDate(messages);
+  // Memoize grouped messages to avoid recalculation on every render
+  const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages]);
 
   const displayName = contact?.name || formatPhoneNumber(phoneNumber);
   const displayInitials = getInitials(contact?.name, phoneNumber);
 
-  const handleMessageSelect = (messageId: number) => {
+  const handleMessageSelect = useCallback((messageId: number) => {
     const element = document.querySelector(`[data-message-id="${messageId}"]`);
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
+  }, []);
 
   const getContactTypeInfo = (type?: string) => {
     switch (type) {

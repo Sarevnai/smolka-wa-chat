@@ -7,6 +7,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { useDeleteConversation } from "@/hooks/useDeleteConversation";
 import { usePinnedConversations } from "@/hooks/usePinnedConversations";
@@ -79,9 +85,22 @@ export function ConversationItem({
     return '??';
   };
 
-  const truncateMessage = (text: string | null, maxLength: number = 35) => {
+  // Intelligent truncation - preserve words
+  const truncateMessage = (text: string | null, maxLength: number = 50) => {
     if (!text) return "Sem conteúdo";
-    return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+    if (text.length <= maxLength) return text;
+    
+    // Find the last space before maxLength
+    const truncated = text.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    
+    // If there's a space, cut at the last complete word
+    if (lastSpace > maxLength * 0.6) {
+      return `${text.substring(0, lastSpace)}...`;
+    }
+    
+    // Otherwise, cut at maxLength
+    return `${truncated}...`;
   };
   
   const truncateName = (name: string, maxLength: number = 20) => {
@@ -134,13 +153,31 @@ export function ConversationItem({
               {displayName}
             </h3>
             {isAutoDetectedName && (
-              <SparklesIcon className="h-3 w-3 text-primary/60 flex-shrink-0" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <SparklesIcon className="h-3 w-3 text-primary/60 flex-shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Nome detectado automaticamente</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
             {typeInfo && TypeIcon && (
-              <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0">
-                <TypeIcon className="h-3 w-3" />
-                <span className="hidden sm:inline">{typeInfo.label}</span>
-              </Badge>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0">
+                      <TypeIcon className="h-3 w-3" />
+                      <span className="hidden sm:inline">{typeInfo.label}</span>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="sm:hidden">
+                    <p>{typeInfo.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

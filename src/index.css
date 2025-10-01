@@ -41,8 +41,8 @@ All colors MUST be HSL.
     /* WhatsApp Web message colors */
     --message-outbound: 82 59% 85%;
     --message-inbound: 0 0% 100%;
-    --message-text-outbound: 0 0% 0%;
-    --message-text-inbound: 0 0% 0%;
+    --message-text-outbound: 0 0% 13%;
+    --message-text-inbound: 0 0% 13%;
 
     /* WhatsApp Web sidebar */
     --sidebar-background: 200 20% 94%;
@@ -87,7 +87,7 @@ All colors MUST be HSL.
     --secondary-foreground: 0 0% 75%;
 
     --muted: 17 20% 13%;
-    --muted-foreground: 0 0% 55%;
+    --muted-foreground: 0 0% 60%;
 
     --accent: 144 79% 15%;
     --accent-foreground: 144 79% 75%;
@@ -102,8 +102,8 @@ All colors MUST be HSL.
     /* WhatsApp Web Dark message colors */
     --message-outbound: 144 79% 15%;
     --message-inbound: 17 20% 11%;
-    --message-text-outbound: 0 0% 100%;
-    --message-text-inbound: 0 0% 85%;
+    --message-text-outbound: 0 0% 90%;
+    --message-text-inbound: 0 0% 90%;
 
     /* WhatsApp Web Dark sidebar */
     --sidebar-background: 17 20% 11%;
