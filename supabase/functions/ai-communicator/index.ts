@@ -22,9 +22,9 @@ serve(async (req) => {
     
     console.log('AI Communicator action:', action);
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    if (!lovableApiKey) {
+      throw new Error('Lovable AI API key not configured');
     }
 
     switch (action) {
@@ -32,13 +32,13 @@ serve(async (req) => {
         return await startConversation(userId);
       
       case 'send_message':
-        return await processMessage(userId, message, conversationId, context, openAIApiKey);
+        return await processMessage(userId, message, conversationId, context, lovableApiKey);
       
       case 'get_insights':
-        return await generateInsights(userId, context, openAIApiKey);
+        return await generateInsights(userId, context, lovableApiKey);
       
       case 'execute_command':
-        return await executeCommand(userId, message, context, openAIApiKey);
+        return await executeCommand(userId, message, context, lovableApiKey);
       
       default:
         throw new Error(`Unknown action: ${action}`);
@@ -204,16 +204,15 @@ Quando o usuário pedir qualquer informação, consulte os dados disponíveis e 
     { role: 'user', content: userMessage }
   ];
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'google/gemini-2.5-flash',
       messages,
-      temperature: 0.7,
       functions: [
         {
           name: 'create_ticket',
@@ -629,16 +628,15 @@ Forneça:
 
 Seja específico e prático.`;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7
+      model: 'google/gemini-2.5-flash',
+      messages: [{ role: 'user', content: prompt }]
     }),
   });
 
