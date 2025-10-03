@@ -9,6 +9,7 @@ interface MessageFlagsProps {
   messageId: number;
   className?: string;
   showLabels?: boolean;
+  compact?: boolean;
 }
 
 const flagConfig = {
@@ -38,7 +39,7 @@ const flagConfig = {
   },
 };
 
-export function MessageFlags({ messageId, className, showLabels = false }: MessageFlagsProps) {
+export function MessageFlags({ messageId, className, showLabels = false, compact = false }: MessageFlagsProps) {
   const { getMessageFlags, hasFlag, toggleFlag } = useMessageFlags();
   const messageFlags = getMessageFlags(messageId);
 
@@ -47,11 +48,17 @@ export function MessageFlags({ messageId, className, showLabels = false }: Messa
   };
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className={cn(
+      "flex items-center gap-1 overflow-x-auto scrollbar-hide max-w-full",
+      className
+    )}>
       <TooltipProvider>
         {Object.entries(flagConfig).map(([flagType, config]) => {
           const isActive = hasFlag(messageId, flagType as FlagType);
           const Icon = config.icon;
+          
+          // Em modo compacto (mobile), só mostra ícones ativos
+          if (compact && !isActive) return null;
           
           return (
             <Tooltip key={flagType}>
@@ -60,7 +67,7 @@ export function MessageFlags({ messageId, className, showLabels = false }: Messa
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-6 w-6 p-0 hover:bg-accent",
+                    "h-6 w-6 p-0 hover:bg-accent transition-all duration-200 flex-shrink-0",
                     isActive && config.color
                   )}
                   onClick={() => handleToggleFlag(flagType as FlagType)}
@@ -77,7 +84,7 @@ export function MessageFlags({ messageId, className, showLabels = false }: Messa
       </TooltipProvider>
       
       {showLabels && messageFlags.length > 0 && (
-        <div className="flex gap-1 ml-2">
+        <div className="flex gap-1 ml-2 flex-shrink-0">
           {messageFlags.map((flagType) => (
             <Badge
               key={flagType}

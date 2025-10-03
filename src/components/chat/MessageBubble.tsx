@@ -260,21 +260,23 @@ export function MessageBubble({
             ) : null;
           })()}
 
+          {/* Message Flags - Area dedicada */}
+          <div className={cn("px-3 pt-1", hasMedia && "px-2")}>
+            <MessageFlags messageId={message.id} compact />
+          </div>
+
           {/* Timestamp and Status */}
           <div className={cn(
-            "flex items-center justify-between px-3 pb-2 pt-1",
+            "flex items-center justify-end px-3 pb-2 pt-1 gap-1",
             hasMedia && "px-2",
             "text-gray-500"
           )}>
-            <MessageFlags messageId={message.id} />
-            <div className="flex items-center gap-1">
-              <span className="text-xs opacity-80">
-                {formatTime(message.wa_timestamp || message.created_at || "")}
-              </span>
-              {isOutbound && (
-                <MessageStatusIndicator status={getMessageStatus()} />
-              )}
-            </div>
+            <span className="text-xs opacity-80">
+              {formatTime(message.wa_timestamp || message.created_at || "")}
+            </span>
+            {isOutbound && (
+              <MessageStatusIndicator status={getMessageStatus()} />
+            )}
           </div>
 
           {/* Emoji Reactions */}
