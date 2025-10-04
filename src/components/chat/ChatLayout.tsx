@@ -26,8 +26,8 @@ export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps
 
   return (
     <div className="h-screen w-full flex">
-      {/* Responsive sidebar with min/max widths */}
-      <div className="w-full sm:w-[340px] lg:w-[380px] xl:w-[420px] max-w-[480px] min-w-[280px] border-r border-sidebar-border bg-sidebar flex-shrink-0">
+      {/* Responsive sidebar */}
+      <div className="w-full sm:w-80 lg:w-96 xl:w-[28rem] border-r border-sidebar-border bg-sidebar flex-shrink-0">
         <ChatList 
           selectedContact={selectedContact} 
           onContactSelect={onContactSelect}

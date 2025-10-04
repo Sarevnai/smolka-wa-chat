@@ -1,3 +1,4 @@
+import React from 'react';
 import { Star, AlertCircle, Flag, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +40,7 @@ const flagConfig = {
   },
 };
 
-export function MessageFlags({ messageId, className, showLabels = false, compact = false }: MessageFlagsProps) {
+export const MessageFlags = React.memo(function MessageFlags({ messageId, className, showLabels = false, compact = false }: MessageFlagsProps) {
   const { getMessageFlags, hasFlag, toggleFlag } = useMessageFlags();
   const messageFlags = getMessageFlags(messageId);
 
@@ -49,8 +50,7 @@ export function MessageFlags({ messageId, className, showLabels = false, compact
 
   return (
     <div className={cn(
-      "flex items-center gap-0.5 sm:gap-1 overflow-x-auto scrollbar-hide max-w-full",
-      "animate-in fade-in slide-in-from-bottom-2 duration-200",
+      "flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-hide max-w-full",
       className
     )}>
       <TooltipProvider>
@@ -65,8 +65,9 @@ export function MessageFlags({ messageId, className, showLabels = false, compact
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-5 w-5 sm:h-6 sm:w-6 p-0 hover:bg-accent transition-all duration-200 flex-shrink-0",
-                    isActive ? config.color : compact ? "opacity-30 hover:opacity-60" : "opacity-50 hover:opacity-100"
+                    "h-5 w-5 sm:h-6 sm:w-6 p-0 hover:bg-accent/50 transition-all duration-200 flex-shrink-0",
+                    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    isActive ? config.color : compact ? "opacity-45 hover:opacity-75" : "opacity-50 hover:opacity-100"
                   )}
                   onClick={() => handleToggleFlag(flagType as FlagType)}
                 >
@@ -96,4 +97,4 @@ export function MessageFlags({ messageId, className, showLabels = false, compact
       )}
     </div>
   );
-}
+});

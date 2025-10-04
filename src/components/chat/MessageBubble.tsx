@@ -175,7 +175,7 @@ export function MessageBubble({
           </Button>
         
           <div className={cn(
-            "max-w-[65%] md:max-w-[75%] lg:max-w-[70%] relative animate-slide-in-from-left",
+            "max-w-[70%] md:max-w-[75%] lg:max-w-[80%] xl:max-w-[75%] relative animate-slide-in-from-left",
             hasMedia ? "rounded-xl overflow-hidden" : "",
             isOutbound 
               ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-xl rounded-br-md" 
@@ -260,20 +260,21 @@ export function MessageBubble({
             ) : null;
           })()}
 
-          {/* Timestamp, Flags and Status - Layout unificado */}
+          {/* Message Flags - Linha separada */}
+          <div className="px-3 pt-2 pb-1">
+            <MessageFlags messageId={message.id} compact />
+          </div>
+
+          {/* Timestamp and Status */}
           <div className={cn(
-            "flex items-center justify-between px-3 pb-2 pt-1 gap-2",
-            hasMedia && "px-2"
+            "flex items-center justify-end px-3 pb-2 gap-1.5 text-gray-500"
           )}>
-            <MessageFlags messageId={message.id} compact className="flex-shrink-0" />
-            <div className="flex items-center gap-1 flex-shrink-0 text-gray-500">
-              <span className="text-xs opacity-60">
-                {formatTime(message.wa_timestamp || message.created_at || "")}
-              </span>
-              {isOutbound && (
-                <MessageStatusIndicator status={getMessageStatus()} />
-              )}
-            </div>
+            <span className="text-xs opacity-75">
+              {formatTime(message.wa_timestamp || message.created_at || "")}
+            </span>
+            {isOutbound && (
+              <MessageStatusIndicator status={getMessageStatus()} />
+            )}
           </div>
 
           {/* Emoji Reactions */}
