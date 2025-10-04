@@ -175,7 +175,7 @@ export function MessageBubble({
           </Button>
         
           <div className={cn(
-            "max-w-[70%] md:max-w-[75%] lg:max-w-[80%] xl:max-w-[75%] relative animate-slide-in-from-left",
+            "max-w-[85%] sm:max-w-[80%] md:max-w-[75%] lg:max-w-[65%] relative animate-slide-in-from-left",
             hasMedia ? "rounded-xl overflow-hidden" : "",
             isOutbound 
               ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-xl rounded-br-md" 
@@ -261,13 +261,13 @@ export function MessageBubble({
           })()}
 
           {/* Message Flags - Linha separada */}
-          <div className="px-3 pt-2 pb-1">
+          <div className="px-3 sm:px-4 md:px-5 pt-2 pb-1">
             <MessageFlags messageId={message.id} compact />
           </div>
 
           {/* Timestamp and Status */}
           <div className={cn(
-            "flex items-center justify-end px-3 pb-2 gap-1.5 text-gray-500"
+            "flex items-center justify-end px-3 sm:px-4 md:px-5 pb-2 gap-1.5 text-gray-500"
           )}>
             <span className="text-xs opacity-75">
               {formatTime(message.wa_timestamp || message.created_at || "")}

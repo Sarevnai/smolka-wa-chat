@@ -27,13 +27,13 @@ export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps
   return (
     <div className="h-screen w-full flex">
       {/* Responsive sidebar */}
-      <div className="w-full sm:w-80 lg:w-96 xl:w-[28rem] border-r border-sidebar-border bg-sidebar flex-shrink-0">
+      <div className="w-full sm:w-80 md:w-[22rem] lg:w-96 xl:w-[26rem] 2xl:w-[28rem] border-r border-sidebar-border bg-sidebar flex-shrink-0">
         <ChatList 
           selectedContact={selectedContact} 
           onContactSelect={onContactSelect}
         />
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center min-w-0">
+      <div className="flex-1 flex flex-col items-center justify-center min-w-0 max-w-[1400px] mx-auto w-full">
         {selectedContact ? (
           <ChatWindow phoneNumber={selectedContact} />
         ) : (

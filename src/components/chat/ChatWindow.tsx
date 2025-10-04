@@ -356,7 +356,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const TypeIcon = typeInfo?.icon;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="w-full h-full flex flex-col border-x border-border/30">
       {/* Chat Header */}
       <div className="flex items-center gap-3 px-4 py-2 bg-chat-header border-b border-sidebar-border shadow-sm h-[59px]">
         {onBack && (
@@ -486,7 +486,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             </p>
           </div>
         ) : (
-          <div className="py-1 px-1">
+          <div className="py-1 px-1 space-y-1 sm:space-y-1.5 md:space-y-2">
             {groupedMessages.map((item, index) => (
               <div key={`${item.type}-${index}`} className="animate-fade-in">
                 {item.type === 'date' ? (
