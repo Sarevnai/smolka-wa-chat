@@ -8,7 +8,6 @@ import { InteractiveMessage } from "./InteractiveMessage";
 import { MessageStatusIndicator } from "./MessageStatusIndicator";
 import { MessageOptionsDialog } from "./MessageOptionsDialog";
 import { EmojiReactions } from "./EmojiReactions";
-import { MessageFlags } from "./MessageFlags";
 import { WhatsAppDeletedPlaceholder } from "./WhatsAppDeletedPlaceholder";
 import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -260,14 +259,9 @@ export function MessageBubble({
             ) : null;
           })()}
 
-          {/* Message Flags - Linha separada */}
-          <div className="px-3 sm:px-4 md:px-5 pt-2 pb-1">
-            <MessageFlags messageId={message.id} compact />
-          </div>
-
           {/* Timestamp and Status */}
           <div className={cn(
-            "flex items-center justify-end px-3 sm:px-4 md:px-5 pb-2 gap-1.5 text-gray-500"
+            "flex items-center justify-end px-3 pt-1 pb-2 gap-1.5 text-gray-500"
           )}>
             <span className="text-xs opacity-75">
               {formatTime(message.wa_timestamp || message.created_at || "")}
