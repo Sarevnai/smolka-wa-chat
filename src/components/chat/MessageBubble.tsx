@@ -142,7 +142,7 @@ export function MessageBubble({
 
   return (
     <div className={cn(
-      "flex mb-1 animate-fade-in",
+      "flex mb-2 px-2 sm:px-3 md:px-4 animate-fade-in",
       isOutbound ? "justify-end" : "justify-start"
     )}>
       <MessageOptionsDialog
@@ -158,40 +158,42 @@ export function MessageBubble({
         onDeleteForEveryone={onDeleteForEveryone}
         onSelectMessage={handleSelectMessage}
       >
-        <div className="relative group">
+        <div className="relative group max-w-full">
           {/* Message Options Button */}
           <Button
             variant="ghost"
             size="sm"
             className={cn(
-              "absolute -top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10",
-              "h-6 w-6 p-0 rounded-full bg-background/80 hover:bg-background shadow-sm",
-              "focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              "absolute -top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10",
+              "h-6 w-6 p-0 rounded-full bg-background/90 hover:bg-background shadow-sm",
+              "focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-primary/20",
+              isOutbound ? "right-1" : "left-1"
             )}
             aria-label="Opções da mensagem"
           >
-            <MoreVertical className="h-3 w-3" />
+            <MoreVertical className="h-3.5 w-3.5" />
           </Button>
         
           <div className={cn(
-            "max-w-[85%] sm:max-w-[80%] md:max-w-[75%] lg:max-w-[65%] relative animate-slide-in-from-left",
-            hasMedia ? "rounded-xl overflow-hidden" : "",
+            "min-w-[120px] max-w-[min(450px,85vw)] sm:max-w-[min(500px,75vw)] md:max-w-[min(550px,65vw)] lg:max-w-[600px]",
+            "relative animate-slide-in-from-left",
+            hasMedia ? "rounded-2xl overflow-hidden" : "rounded-2xl",
             isOutbound 
-              ? "bg-message-outbound text-message-text-outbound ml-auto shadow-sm rounded-xl rounded-br-md" 
-              : "bg-message-inbound text-message-text-inbound mr-auto shadow-sm rounded-xl rounded-bl-md border border-gray-200/60"
+              ? "bg-message-outbound text-message-text-outbound rounded-br-sm shadow-sm" 
+              : "bg-message-inbound text-message-text-inbound rounded-bl-sm shadow-sm border border-border/40"
           )}>
           
           {/* Reply Context Display */}
           {message.body && message.body.includes('_Respondendo a:') && (
             <div className={cn(
-              "px-3 pt-2 border-l-4 border-primary/60 rounded-tl-lg",
-              isOutbound ? "bg-white/20" : "bg-primary/5"
+              "mx-3 mt-3 mb-2 px-3 py-2 border-l-4 border-primary/60 rounded-md",
+              isOutbound ? "bg-white/15" : "bg-primary/5"
             )}>
-              <div className="text-xs text-primary font-medium mb-1 flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-primary/60"></div>
+              <div className="text-xs text-primary font-semibold mb-1 flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/70"></div>
                 Em resposta a:
               </div>
-              <p className="text-xs text-muted-foreground italic line-clamp-2">
+              <p className="text-xs text-muted-foreground italic line-clamp-2 leading-snug">
                 {message.body.split('\n\n')[0].replace('_Respondendo a: "', '').replace('"_', '')}
               </p>
             </div>
@@ -199,8 +201,8 @@ export function MessageBubble({
           
           {/* Template badge */}
           {isTemplate && (
-            <div className={cn("px-3 pt-2", hasMedia && "px-2")}>
-              <Badge variant="secondary" className="text-xs mb-1">
+            <div className={cn("px-3 pt-3", hasMedia && "px-3 pt-2")}>
+              <Badge variant="secondary" className="text-xs">
                 Mensagem de template
               </Badge>
             </div>
@@ -222,7 +224,7 @@ export function MessageBubble({
           
           {/* Interactive Message */}
           {interactive && (
-            <div className={cn("mb-1", hasMedia ? "px-2" : "px-3")}>
+            <div className={cn("mb-2", hasMedia ? "px-3" : "px-3 mt-1")}>
               <InteractiveMessage
                 interactive={interactive}
                 isOutbound={isOutbound}
@@ -245,9 +247,12 @@ export function MessageBubble({
                 forbidden.includes(body.toLowerCase()));
             const shouldShow = !hasMedia || (!!body && body !== caption && !isRedundant);
             return shouldShow ? (
-              <div className={cn(hasMedia ? "px-2 pb-1" : "px-3 py-1.5")}> 
+              <div className={cn(
+                hasMedia ? "px-3 pb-2 pt-1" : "px-3 py-2",
+                !hasMedia && !isTemplate && !message.body?.includes('_Respondendo a:') && "pt-3"
+              )}> 
                 <p className={cn(
-                  "text-sm leading-relaxed whitespace-pre-wrap break-words",
+                  "text-[14px] leading-[1.5] whitespace-pre-wrap break-words",
                   isOutbound ? "text-gray-900" : "text-gray-900"
                 )}>
                   {/* Filter out reply context from displayed text */}
@@ -261,9 +266,10 @@ export function MessageBubble({
 
           {/* Timestamp and Status */}
           <div className={cn(
-            "flex items-center justify-end px-3 pt-1 pb-2 gap-1.5 text-gray-500"
+            "flex items-center justify-end gap-1.5 px-3 pb-2 mt-1",
+            "text-muted-foreground/70"
           )}>
-            <span className="text-xs opacity-75">
+            <span className="text-[11px] font-medium">
               {formatTime(message.wa_timestamp || message.created_at || "")}
             </span>
             {isOutbound && (
@@ -273,7 +279,7 @@ export function MessageBubble({
 
           {/* Emoji Reactions */}
           {reactions.filter(r => r.count > 0).length > 0 && (
-            <div className="px-3 pb-2">
+            <div className="px-3 pb-3">
               <EmojiReactions
                 messageId={message.id.toString()}
                 reactions={reactions.filter(r => r.count > 0)}
