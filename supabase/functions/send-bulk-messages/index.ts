@@ -274,45 +274,115 @@ serve(async (req) => {
             console.log(`Using WhatsApp template: ${template.template_name}`);
             useTemplate = true;
 
-            // Count required parameters by analyzing BODY component
+            // Analyze template components
+            const headerComponent = template.components?.find(c => c.type === 'HEADER');
             const bodyComponent = template.components?.find(c => c.type === 'BODY');
+            
+            // Build components array for WhatsApp API
+            const templateComponents: any[] = [];
+
+            // Handle HEADER component (images, videos, documents)
+            if (headerComponent) {
+              const headerFormat = headerComponent.format;
+              const headerExample = headerComponent.example;
+              
+              console.log(`Template has HEADER component: format=${headerFormat}`);
+              
+              if (headerFormat === 'IMAGE' && headerExample?.header_handle?.[0]) {
+                const imageUrl = headerExample.header_handle[0];
+                console.log(`Adding IMAGE header with URL: ${imageUrl}`);
+                
+                templateComponents.push({
+                  type: "header",
+                  parameters: [
+                    {
+                      type: "image",
+                      image: {
+                        link: imageUrl
+                      }
+                    }
+                  ]
+                });
+              } else if (headerFormat === 'VIDEO' && headerExample?.header_handle?.[0]) {
+                const videoUrl = headerExample.header_handle[0];
+                console.log(`Adding VIDEO header with URL: ${videoUrl}`);
+                
+                templateComponents.push({
+                  type: "header",
+                  parameters: [
+                    {
+                      type: "video",
+                      video: {
+                        link: videoUrl
+                      }
+                    }
+                  ]
+                });
+              } else if (headerFormat === 'DOCUMENT' && headerExample?.header_handle?.[0]) {
+                const documentUrl = headerExample.header_handle[0];
+                console.log(`Adding DOCUMENT header with URL: ${documentUrl}`);
+                
+                templateComponents.push({
+                  type: "header",
+                  parameters: [
+                    {
+                      type: "document",
+                      document: {
+                        link: documentUrl
+                      }
+                    }
+                  ]
+                });
+              }
+            }
+
+            // Handle BODY component with parameters
             const bodyText = bodyComponent?.text || '';
             const placeholderMatches = bodyText.match(/\{\{\d+\}\}/g);
             const requiredParams = placeholderMatches ? placeholderMatches.length : 0;
             
-            console.log(`Template "${template.template_name}" requires ${requiredParams} parameters`);
+            console.log(`Template "${template.template_name}" BODY requires ${requiredParams} parameters`);
             
-            // Build exact number of template parameters
-            const templateParams = [];
-            
-            // Use contact data for parameters
-            if (contact.name && requiredParams > 0) {
-              templateParams.push({
-                type: "text",
-                text: contact.name
-              });
-            }
-            
-            // Add parameters from contact.variables if available
-            if (contact.variables && Object.keys(contact.variables).length > 0) {
-              const variableValues = Object.values(contact.variables);
-              for (let i = templateParams.length; i < requiredParams && i < variableValues.length; i++) {
+            if (requiredParams > 0) {
+              // Build exact number of template parameters
+              const templateParams = [];
+              
+              // Use contact data for parameters
+              if (contact.name) {
                 templateParams.push({
                   type: "text",
-                  text: String(variableValues[i - templateParams.length])
+                  text: contact.name
                 });
               }
-            }
-            
-            // Fill remaining slots with fallback data
-            const fallbackData = ["-", "-", "-", "-", "-"];
-            while (templateParams.length < requiredParams) {
-              const fallbackIndex = templateParams.length - (contact.name ? 1 : 0);
-              templateParams.push({
-                type: "text",
-                text: fallbackData[fallbackIndex] || "-"
+              
+              // Add parameters from contact.variables if available
+              if (contact.variables && Object.keys(contact.variables).length > 0) {
+                const variableValues = Object.values(contact.variables);
+                for (let i = templateParams.length; i < requiredParams && i < variableValues.length; i++) {
+                  templateParams.push({
+                    type: "text",
+                    text: String(variableValues[i - templateParams.length])
+                  });
+                }
+              }
+              
+              // Fill remaining slots with fallback data
+              const fallbackData = ["-", "-", "-", "-", "-"];
+              while (templateParams.length < requiredParams) {
+                const fallbackIndex = templateParams.length - (contact.name ? 1 : 0);
+                templateParams.push({
+                  type: "text",
+                  text: fallbackData[fallbackIndex] || "-"
+                });
+              }
+
+              templateComponents.push({
+                type: "body",
+                parameters: templateParams
               });
             }
+
+            console.log(`Template components array:`, JSON.stringify(templateComponents, null, 2));
 
             whatsappPayload = {
               messaging_product: 'whatsapp',
@@ -323,13 +393,8 @@ serve(async (req) => {
                 language: {
                   code: template.language || 'pt_BR'
                 },
-                ...(requiredParams > 0 ? {
-                  components: [
-                    {
-                      type: "body",
-                      parameters: templateParams
-                    }
-                  ]
+                ...(templateComponents.length > 0 ? {
+                  components: templateComponents
                 } : {})
               }
             };
