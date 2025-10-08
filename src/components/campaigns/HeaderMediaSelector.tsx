@@ -96,28 +96,45 @@ export function HeaderMediaSelector({ mediaType, onMediaSelect, selectedMedia }:
   };
 
   return (
-    <Card>
+    <Card className="border-destructive/50">
       <CardContent className="pt-6 space-y-4">
-        <div className="flex items-center gap-2">
-          {getIcon()}
-          <Label className="text-sm font-medium">
-            Mídia do Cabeçalho ({mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : 'Documento'})
-          </Label>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {getIcon()}
+            <Label className="text-sm font-medium">
+              Mídia do Cabeçalho ({mediaType === 'image' ? 'Imagem' : mediaType === 'video' ? 'Vídeo' : 'Documento'})
+            </Label>
+          </div>
+          <span className="text-xs font-bold text-destructive uppercase">Obrigatório</span>
         </div>
 
         {selectedMedia ? (
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-            <div className="flex-1 text-sm truncate">
-              {selectedMedia.filename || selectedMedia.url || 'Mídia selecionada'}
+          <div className="space-y-3">
+            {/* Preview for images */}
+            {selectedMedia.type === 'image' && selectedMedia.url && (
+              <div className="relative w-full h-40 rounded-md overflow-hidden bg-muted">
+                <img 
+                  src={selectedMedia.url} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            
+            {/* File info */}
+            <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+              <div className="flex-1 text-sm truncate">
+                {selectedMedia.filename || selectedMedia.url || 'Mídia selecionada'}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleClear}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
         ) : (
           <div className="space-y-3">

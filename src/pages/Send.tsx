@@ -98,6 +98,18 @@ export default function Send() {
       contactsData
     });
 
+    // CRITICAL: Validate header media for WhatsApp templates
+    if (selectedTemplate && isOfficialWhatsAppTemplate(selectedTemplate)) {
+      const headerComponent = selectedTemplate.components?.find(c => c.type === 'HEADER');
+      const requiresMedia = headerComponent?.format === 'IMAGE' || 
+                           headerComponent?.format === 'VIDEO' || 
+                           headerComponent?.format === 'DOCUMENT';
+      
+      if (requiresMedia && (!headerMedia || (!headerMedia.id && !headerMedia.url))) {
+        errors.push("O template selecionado requer uma mídia no cabeçalho. Faça upload ou forneça uma URL pública.");
+      }
+    }
+
     setValidationErrors(errors);
 
     if (errors.length > 0) {

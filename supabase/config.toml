@@ -9,6 +9,9 @@ verify_jwt = true
 [functions.send-bulk-messages]
 verify_jwt = true
 
+[functions.process-scheduled-campaigns]
+verify_jwt = false
+
 [functions.whatsapp-webhook]
 verify_jwt = false
 
