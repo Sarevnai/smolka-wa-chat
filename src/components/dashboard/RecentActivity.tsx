@@ -62,10 +62,10 @@ const getStatusVariant = (status?: string): "default" | "secondary" | "destructi
 
 export function RecentActivity({ activities }: RecentActivityProps) {
   return (
-    <Card className="col-span-1 lg:col-span-2 flex flex-col">
+    <Card className="col-span-1 lg:col-span-2 flex flex-col animate-fade-in">
       <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
+          <Clock className="h-5 w-5 transition-transform duration-200 hover:rotate-12" />
           Atividade Recente
         </CardTitle>
         <CardDescription>

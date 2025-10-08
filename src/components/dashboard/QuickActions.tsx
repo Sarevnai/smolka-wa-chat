@@ -73,10 +73,10 @@ export function QuickActions() {
     <TooltipProvider>
       <div className="space-y-6">
         {/* Main Actions */}
-        <Card>
+        <Card className="animate-fade-in">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
+              <Zap className="h-5 w-5 transition-transform duration-200 hover:scale-110" />
               Ações Rápidas
             </CardTitle>
             <CardDescription>
@@ -108,10 +108,10 @@ export function QuickActions() {
         </Card>
 
         {/* System Actions */}
-        <Card>
+        <Card className="animate-fade-in [animation-delay:0.1s]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
+              <Settings className="h-5 w-5 transition-transform duration-200 hover:scale-110 hover:rotate-45" />
               Configurações
             </CardTitle>
             <CardDescription>
