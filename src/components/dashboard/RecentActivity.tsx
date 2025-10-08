@@ -81,19 +81,23 @@ export function RecentActivity({ activities }: RecentActivityProps) {
         ) : (
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-2">
-              {activities.slice(0, 15).map((activity) => {
+              {activities.slice(0, 15).map((activity, index) => {
                 const Icon = getActivityIcon(activity.type);
                 return (
-                  <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-all duration-200 hover-scale">
+                  <div 
+                    key={activity.id} 
+                    className="flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-[colors,transform] duration-200 hover-scale active:scale-[0.98] animate-fade-in will-change-transform"
+                    style={{ animationDelay: `${index * 30}ms` }}
+                  >
                     <div className={cn(
-                      "p-2 rounded-lg transition-colors flex-shrink-0",
+                      "p-2 rounded-lg transition-[colors,transform] duration-200 flex-shrink-0 hover:scale-110",
                       activity.type === 'message' && "bg-blue-100 dark:bg-blue-900/20",
                       activity.type === 'campaign' && "bg-purple-100 dark:bg-purple-900/20",
                       activity.type === 'contact' && "bg-green-100 dark:bg-green-900/20",
                       activity.type === 'integration' && "bg-orange-100 dark:bg-orange-900/20"
                     )}>
                       <Icon className={cn(
-                        "h-4 w-4",
+                        "h-4 w-4 transition-transform duration-200",
                         activity.type === 'message' && "text-blue-600 dark:text-blue-400",
                         activity.type === 'campaign' && "text-purple-600 dark:text-purple-400",
                         activity.type === 'contact' && "text-green-600 dark:text-green-400",

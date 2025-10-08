@@ -84,13 +84,14 @@ export function QuickActions() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {quickActions.map((action) => (
+            {quickActions.map((action, index) => (
               <Tooltip key={action.title}>
                 <TooltipTrigger asChild>
                   <Button
                     asChild
                     variant="gold"
-                    className="h-16 w-16 rounded-full hover-scale shadow-md hover:shadow-lg transition-all duration-200 mx-auto"
+                    className="h-16 w-16 rounded-full hover-scale shadow-md hover:shadow-lg transition-[transform,box-shadow] duration-200 active:scale-95 mx-auto animate-scale-in will-change-transform"
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <Link to={action.href} className="flex items-center justify-center">
                       <action.icon className="h-7 w-7 flex-shrink-0" />

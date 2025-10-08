@@ -18,15 +18,15 @@ interface StatsCardProps {
 export function StatsCard({ title, value, description, icon: Icon, trend, className }: StatsCardProps) {
   return (
     <Card className={cn(
-      "transition-all duration-200 hover:shadow-gold-md hover-scale border-gold-primary/20",
-      "bg-surface-elevated shadow-elevation-2",
+      "transition-[transform,box-shadow] duration-200 hover:shadow-gold-md hover-scale border-gold-primary/20",
+      "bg-surface-elevated shadow-elevation-2 animate-fade-in will-change-transform",
       className
     )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-neutral-600">
           {title}
         </CardTitle>
-        <div className="p-2 rounded-lg bg-gold-light">
+        <div className="p-2 rounded-lg bg-gold-light transition-transform duration-200 hover:scale-110">
           <Icon className="h-5 w-5 text-gold-primary" />
         </div>
       </CardHeader>
