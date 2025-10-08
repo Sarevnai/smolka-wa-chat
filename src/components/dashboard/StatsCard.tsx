@@ -39,7 +39,7 @@ export function StatsCard({ title, value, description, icon: Icon, trend, classN
           <div className="flex items-center gap-2 mt-3">
             <Badge 
               variant={trend.isPositive ? "success" : "error"}
-              className="text-xs transition-transform duration-200 hover:scale-110 animate-pulse"
+              className="text-xs transition-transform duration-200 hover:scale-110"
             >
               {trend.isPositive ? "+" : ""}{trend.value}%
             </Badge>
