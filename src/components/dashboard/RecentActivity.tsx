@@ -86,18 +86,18 @@ export function RecentActivity({ activities }: RecentActivityProps) {
                 return (
                   <div 
                     key={activity.id} 
-                    className="flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-[colors,transform] duration-200 hover-scale active:scale-[0.98] animate-fade-in will-change-transform"
+                    className="group flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 hover:border-l-2 hover:border-gold-primary/50 hover:pl-[10px] transition-[colors,transform,padding,border] duration-200 hover-scale active:scale-[0.98] animate-fade-in will-change-transform cursor-pointer"
                     style={{ animationDelay: `${index * 30}ms` }}
                   >
                     <div className={cn(
-                      "p-2 rounded-lg transition-[colors,transform] duration-200 flex-shrink-0 hover:scale-110",
-                      activity.type === 'message' && "bg-blue-100 dark:bg-blue-900/20",
-                      activity.type === 'campaign' && "bg-purple-100 dark:bg-purple-900/20",
-                      activity.type === 'contact' && "bg-green-100 dark:bg-green-900/20",
-                      activity.type === 'integration' && "bg-orange-100 dark:bg-orange-900/20"
+                      "p-2 rounded-lg transition-[colors,transform,rotate] duration-200 flex-shrink-0 group-hover:scale-110 group-hover:rotate-3",
+                      activity.type === 'message' && "bg-blue-100 dark:bg-blue-900/20 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/30",
+                      activity.type === 'campaign' && "bg-purple-100 dark:bg-purple-900/20 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/30",
+                      activity.type === 'contact' && "bg-green-100 dark:bg-green-900/20 group-hover:bg-green-200 dark:group-hover:bg-green-900/30",
+                      activity.type === 'integration' && "bg-orange-100 dark:bg-orange-900/20 group-hover:bg-orange-200 dark:group-hover:bg-orange-900/30"
                     )}>
                       <Icon className={cn(
-                        "h-4 w-4 transition-transform duration-200",
+                        "h-4 w-4 transition-[transform,colors] duration-200 group-hover:scale-110",
                         activity.type === 'message' && "text-blue-600 dark:text-blue-400",
                         activity.type === 'campaign' && "text-purple-600 dark:text-purple-400",
                         activity.type === 'contact' && "text-green-600 dark:text-green-400",
@@ -107,13 +107,20 @@ export function RecentActivity({ activities }: RecentActivityProps) {
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-foreground truncate">
+                        <p className="text-sm font-medium text-foreground truncate transition-transform duration-200 group-hover:translate-x-1">
                           {activity.title}
                         </p>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {activity.status && getStatusIcon(activity.status)}
                           {activity.status && (
-                            <Badge variant={getStatusVariant(activity.status)} className="text-xs whitespace-nowrap">
+                            <div className="transition-transform duration-200 group-hover:scale-110">
+                              {getStatusIcon(activity.status)}
+                            </div>
+                          )}
+                          {activity.status && (
+                            <Badge 
+                              variant={getStatusVariant(activity.status)} 
+                              className="text-xs whitespace-nowrap transition-transform duration-200 hover:scale-110"
+                            >
                               {activity.status === 'success' && 'Sucesso'}
                               {activity.status === 'pending' && 'Pendente'}
                               {activity.status === 'error' && 'Erro'}
@@ -121,10 +128,10 @@ export function RecentActivity({ activities }: RecentActivityProps) {
                           )}
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1 truncate">
+                      <p className="text-xs text-muted-foreground mt-1 truncate transition-colors duration-200 group-hover:text-foreground/70">
                         {activity.description}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground mt-1 transition-colors duration-200 group-hover:text-gold-primary">
                         {formatDistanceToNow(new Date(activity.timestamp), { 
                           addSuffix: true,
                           locale: ptBR 

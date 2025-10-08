@@ -90,15 +90,15 @@ export function QuickActions() {
                   <Button
                     asChild
                     variant="gold"
-                    className="h-16 w-16 rounded-full hover-scale shadow-md hover:shadow-lg transition-[transform,box-shadow] duration-200 active:scale-95 mx-auto animate-scale-in will-change-transform"
+                    className="group h-16 w-16 rounded-full hover-scale shadow-md hover:shadow-xl hover:shadow-gold-primary/20 transition-[transform,box-shadow] duration-200 active:scale-90 mx-auto animate-scale-in will-change-transform"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <Link to={action.href} className="flex items-center justify-center">
-                      <action.icon className="h-7 w-7 flex-shrink-0" />
+                      <action.icon className="h-7 w-7 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3 group-active:rotate-0" />
                     </Link>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
+                <TooltipContent className="animate-scale-in">
                   <p className="font-semibold">{action.title}</p>
                   <p className="text-xs text-muted-foreground">{action.description}</p>
                 </TooltipContent>
@@ -119,21 +119,21 @@ export function QuickActions() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
-            {systemActions.map((action) => (
+            {systemActions.map((action, index) => (
               <Tooltip key={action.title}>
                 <TooltipTrigger asChild>
                   <Button
                     asChild
                     variant="ghost"
-                    className="w-full justify-start h-12 p-3 hover:bg-accent/50 transition-colors"
+                    className="group w-full justify-start h-12 p-3 hover:bg-accent/50 hover:border-l-2 hover:border-gold-primary hover:pl-[10px] transition-[colors,padding,border] duration-200 active:scale-[0.98]"
                   >
-                    <Link to={action.href}>
-                      <action.icon className={`h-5 w-5 mr-3 ${action.color}`} />
-                      <span className="font-medium text-sm">{action.title}</span>
+                    <Link to={action.href} className="flex items-center">
+                      <action.icon className={`h-5 w-5 mr-3 transition-[transform,colors] duration-200 group-hover:scale-110 group-hover:text-gold-primary ${action.color}`} />
+                      <span className="font-medium text-sm transition-transform duration-200 group-hover:translate-x-1">{action.title}</span>
                     </Link>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
+                <TooltipContent className="animate-scale-in">
                   <p>{action.description}</p>
                 </TooltipContent>
               </Tooltip>
