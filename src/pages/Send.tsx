@@ -11,6 +11,7 @@ import ContactSelector from "@/components/campaigns/ContactSelector";
 import CampaignScheduler from "@/components/campaigns/CampaignScheduler";
 import CampaignPreview from "@/components/campaigns/CampaignPreview";
 import SendConfirmationModal from "@/components/campaigns/SendConfirmationModal";
+import { HeaderMediaSelector } from "@/components/campaigns/HeaderMediaSelector";
 import { useCampaigns, useCreateCampaign, useSendCampaign } from "@/hooks/useCampaigns";
 import { useTemplates } from "@/hooks/useTemplates";
 import { Campaign, MessageTemplate, BulkMessageRequest } from "@/types/campaign";
@@ -29,6 +30,13 @@ export default function Send() {
   const [activeTab, setActiveTab] = useState("create");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [headerMedia, setHeaderMedia] = useState<{
+    id?: string;
+    url?: string;
+    type: 'image' | 'video' | 'document';
+    mime?: string;
+    filename?: string;
+  } | null>(null);
   
   const { toast } = useToast();
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaigns();
@@ -124,14 +132,30 @@ export default function Send() {
         ? selectedTemplate.id 
         : null;
 
-      const campaign = await createCampaign.mutateAsync({
+      // Prepare campaign data
+      const campaignData: any = {
         name: campaignName,
         message,
         template_id: templateId,
         target_contacts: Array.from(selectedContacts),
         scheduled_at: scheduledAt?.toISOString(),
         status: scheduledAt ? "scheduled" : "draft",
-      });
+      };
+
+      // Add WhatsApp template fields if applicable
+      if (selectedTemplate && isOfficialWhatsAppTemplate(selectedTemplate)) {
+        campaignData.wa_template_id = selectedTemplate.template_id;
+        
+        // Add header media if provided
+        if (headerMedia) {
+          campaignData.header_media_id = headerMedia.id;
+          campaignData.header_media_url = headerMedia.url;
+          campaignData.header_media_type = headerMedia.type;
+          campaignData.header_media_mime = headerMedia.mime;
+        }
+      }
+
+      const campaign = await createCampaign.mutateAsync(campaignData);
 
       if (!scheduledAt) {
         // Send immediately - get contacts data
@@ -160,6 +184,7 @@ export default function Send() {
             ? selectedTemplate.template_id  // Use Meta's template_id for WhatsApp templates
             : undefined,
           campaign_id: campaign.id,
+          header_media: headerMedia || undefined,
         };
 
         await sendCampaign.mutateAsync({
@@ -175,6 +200,7 @@ export default function Send() {
       setSelectedContacts(new Set());
       setScheduledAt(null);
       setValidationErrors([]);
+      setHeaderMedia(null);
       setShowConfirmModal(false);
       setActiveTab("history");
       
@@ -287,8 +313,27 @@ export default function Send() {
                 {/* Template Selector */}
                 <TemplateSelector
                   selectedTemplate={selectedTemplate}
-                  onTemplateSelect={(template) => setSelectedTemplate(template as MessageTemplate | WhatsAppTemplate | null)}
+                  onTemplateSelect={(template) => {
+                    setSelectedTemplate(template as MessageTemplate | WhatsAppTemplate | null);
+                    setHeaderMedia(null); // Reset header media when template changes
+                  }}
                 />
+
+                {/* Header Media Selector for WhatsApp templates with media headers */}
+                {selectedTemplate && isOfficialWhatsAppTemplate(selectedTemplate) && (() => {
+                  const headerComponent = selectedTemplate.components?.find(c => c.type === 'HEADER');
+                  const mediaType = headerComponent?.format === 'IMAGE' ? 'image' 
+                    : headerComponent?.format === 'VIDEO' ? 'video'
+                    : headerComponent?.format === 'DOCUMENT' ? 'document' : null;
+                  
+                  return mediaType ? (
+                    <HeaderMediaSelector
+                      mediaType={mediaType}
+                      onMediaSelect={setHeaderMedia}
+                      selectedMedia={headerMedia}
+                    />
+                  ) : null;
+                })()}
 
                 {/* Custom Message for non-template campaigns */}
                 {!selectedTemplate && (

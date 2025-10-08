@@ -225,6 +225,10 @@ export type Database = {
           created_at: string
           delivered_count: number | null
           failed_count: number | null
+          header_media_id: string | null
+          header_media_mime: string | null
+          header_media_type: string | null
+          header_media_url: string | null
           id: string
           message: string
           name: string
@@ -235,11 +239,16 @@ export type Database = {
           target_contacts: string[]
           template_id: string | null
           updated_at: string
+          wa_template_id: string | null
         }
         Insert: {
           created_at?: string
           delivered_count?: number | null
           failed_count?: number | null
+          header_media_id?: string | null
+          header_media_mime?: string | null
+          header_media_type?: string | null
+          header_media_url?: string | null
           id?: string
           message: string
           name: string
@@ -250,11 +259,16 @@ export type Database = {
           target_contacts?: string[]
           template_id?: string | null
           updated_at?: string
+          wa_template_id?: string | null
         }
         Update: {
           created_at?: string
           delivered_count?: number | null
           failed_count?: number | null
+          header_media_id?: string | null
+          header_media_mime?: string | null
+          header_media_type?: string | null
+          header_media_url?: string | null
           id?: string
           message?: string
           name?: string
@@ -265,6 +279,7 @@ export type Database = {
           target_contacts?: string[]
           template_id?: string | null
           updated_at?: string
+          wa_template_id?: string | null
         }
         Relationships: [
           {

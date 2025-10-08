@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +9,7 @@ const corsHeaders = {
 interface ContactInfo {
   phone: string;
   name?: string;
+  variables?: Record<string, string>;
 }
 
 interface BulkMessageRequest {
@@ -16,762 +17,415 @@ interface BulkMessageRequest {
   message: string;
   template_id?: string;
   campaign_id?: string;
+  header_media?: {
+    id?: string;
+    url?: string;
+    type: 'image' | 'video' | 'document';
+    mime?: string;
+    filename?: string;
+  };
 }
 
-// Helper function to upload media to WhatsApp and get media_id
+// Helper function to upload media to WhatsApp and return media_id
 async function uploadMediaToWhatsApp(
   mediaUrl: string,
-  mediaType: string,
-  phoneNumberId: string,
-  accessToken: string
-): Promise<string | null> {
-  try {
-    console.log(`📤 Downloading media from: ${mediaUrl}`);
-    
-    // 1. Download file from URL
-    const fileResponse = await fetch(mediaUrl);
-    if (!fileResponse.ok) {
-      console.error(`Failed to download media: ${fileResponse.statusText}`);
-      return null;
-    }
-    
-    const fileBlob = await fileResponse.blob();
-    const fileBuffer = await fileBlob.arrayBuffer();
-    
-    // 2. Prepare FormData for WhatsApp upload
-    const formData = new FormData();
-    const mimeType = mediaType === 'IMAGE' ? 'image/jpeg' 
-                   : mediaType === 'VIDEO' ? 'video/mp4'
-                   : mediaType === 'DOCUMENT' ? 'application/pdf'
-                   : 'image/jpeg';
-    
-    const fileName = mediaType === 'IMAGE' ? 'image.jpg'
-                   : mediaType === 'VIDEO' ? 'video.mp4'
-                   : 'document.pdf';
-    
-    formData.append('file', new Blob([fileBuffer], { type: mimeType }), fileName);
-    formData.append('type', mimeType);
-    formData.append('messaging_product', 'whatsapp');
-    
-    // 3. Upload to WhatsApp Media API
-    console.log(`📤 Uploading ${mediaType} to WhatsApp Media API...`);
-    const uploadResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${phoneNumberId}/media`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: formData
-      }
-    );
-    
-    const uploadResult = await uploadResponse.json();
-    
-    if (!uploadResponse.ok) {
-      console.error('❌ WhatsApp Media upload failed:', uploadResult);
-      return null;
-    }
-    
-    console.log(`✅ Media uploaded successfully. Media ID: ${uploadResult.id}`);
-    return uploadResult.id;
-    
-  } catch (error) {
-    console.error('❌ Error uploading media to WhatsApp:', error);
-    return null;
+  accessToken: string,
+  phoneNumberId: string
+): Promise<{ media_id: string; mime_type: string; filename: string }> {
+  console.log(`\n📥 Downloading media from: ${mediaUrl}`);
+  
+  // Download the media file with User-Agent to avoid 403
+  const downloadResponse = await fetch(mediaUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; WhatsAppBot/1.0)',
+    },
+  });
+
+  if (!downloadResponse.ok) {
+    throw new Error(`Failed to download media: ${downloadResponse.status} ${downloadResponse.statusText}`);
   }
+
+  const contentType = downloadResponse.headers.get('content-type') || 'application/octet-stream';
+  const contentDisposition = downloadResponse.headers.get('content-disposition') || '';
+  
+  console.log(`📄 Content-Type: ${contentType}`);
+  console.log(`📄 Content-Disposition: ${contentDisposition}`);
+
+  // Extract or generate filename
+  let filename = 'file';
+  const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+  if (filenameMatch && filenameMatch[1]) {
+    filename = filenameMatch[1].replace(/['"]/g, '');
+  } else {
+    // Generate filename based on mime type
+    const ext = contentType.split('/')[1]?.split(';')[0] || 'bin';
+    filename = `media_${Date.now()}.${ext}`;
+  }
+
+  const mediaBlob = await downloadResponse.blob();
+  const mediaArrayBuffer = await mediaBlob.arrayBuffer();
+  
+  console.log(`📦 Media size: ${mediaArrayBuffer.byteLength} bytes`);
+  console.log(`📤 Uploading to WhatsApp Media API...`);
+
+  // Create FormData for WhatsApp Media API
+  const formData = new FormData();
+  formData.append('file', new Blob([mediaArrayBuffer], { type: contentType }), filename);
+  formData.append('messaging_product', 'whatsapp');
+  formData.append('type', contentType);
+
+  // Upload to WhatsApp Media API
+  const uploadResponse = await fetch(
+    `https://graph.facebook.com/v21.0/${phoneNumberId}/media`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!uploadResponse.ok) {
+    const errorText = await uploadResponse.text();
+    console.error('❌ WhatsApp Media API error:', errorText);
+    throw new Error(`WhatsApp Media API error: ${uploadResponse.status} - ${errorText}`);
+  }
+
+  const uploadResult = await uploadResponse.json();
+  console.log(`✅ Media uploaded successfully. ID: ${uploadResult.id}`);
+
+  return {
+    media_id: uploadResult.id,
+    mime_type: contentType,
+    filename,
+  };
 }
 
-// Helper function to get or upload media_id with caching
+// Helper to get or upload media_id (with caching)
 async function getOrUploadMediaId(
   template: any,
-  supabaseAdmin: any,
+  headerMedia: BulkMessageRequest['header_media'],
+  accessToken: string,
   phoneNumberId: string,
-  accessToken: string
-): Promise<string | null> {
-  try {
-    // 1. Check if template already has valid cached media_id
-    if (template.media_id && template.media_uploaded_at) {
-      const uploadedAt = new Date(template.media_uploaded_at);
-      const now = new Date();
-      const hoursDiff = (now.getTime() - uploadedAt.getTime()) / (1000 * 60 * 60);
-      
-      // WhatsApp media IDs are valid for ~30 days
-      // Renew if older than 15 days (360 hours) to be safe
-      if (hoursDiff < 360) {
-        console.log(`✅ Using cached media_id for template ${template.template_name} (age: ${Math.round(hoursDiff)}h)`);
-        return template.media_id;
-      } else {
-        console.log(`⏰ Cached media_id expired for template ${template.template_name} (age: ${Math.round(hoursDiff)}h)`);
-      }
+  supabase: any
+): Promise<string> {
+  
+  // Priority 1: Use provided media_id
+  if (headerMedia?.id) {
+    console.log(`✅ Using provided media_id: ${headerMedia.id}`);
+    return headerMedia.id;
+  }
+
+  // Priority 2: Check cache (valid for 15 days)
+  if (template.media_id && template.media_uploaded_at) {
+    const uploadedAt = new Date(template.media_uploaded_at);
+    const now = new Date();
+    const daysSinceUpload = (now.getTime() - uploadedAt.getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (daysSinceUpload < 15) {
+      console.log(`✅ Using cached media_id (${daysSinceUpload.toFixed(1)} days old): ${template.media_id}`);
+      return template.media_id;
+    } else {
+      console.log(`⏰ Cached media_id expired (${daysSinceUpload.toFixed(1)} days old)`);
     }
+  }
+
+  // Priority 3: Upload from provided URL
+  if (headerMedia?.url) {
+    console.log(`📤 Uploading media from URL: ${headerMedia.url}`);
+    const uploadResult = await uploadMediaToWhatsApp(headerMedia.url, accessToken, phoneNumberId);
     
-    // 2. Extract media URL from template
-    const headerComponent = template.components?.find(c => c.type === 'HEADER');
-    if (!headerComponent?.example?.header_handle?.[0]) {
-      console.error('❌ No media URL found in template header');
-      return null;
-    }
-    
-    const mediaUrl = headerComponent.example.header_handle[0];
-    const mediaType = headerComponent.format; // IMAGE, VIDEO, DOCUMENT
-    
-    console.log(`📤 Need to upload ${mediaType} for template ${template.template_name}`);
-    
-    // 3. Upload media to WhatsApp
-    const mediaId = await uploadMediaToWhatsApp(
-      mediaUrl,
-      mediaType,
-      phoneNumberId,
-      accessToken
-    );
-    
-    if (!mediaId) {
-      console.error('❌ Failed to upload media to WhatsApp');
-      return null;
-    }
-    
-    // 4. Cache media_id in database
-    const { error: updateError } = await supabaseAdmin
+    // Cache the media_id
+    console.log(`💾 Caching media_id in database...`);
+    await supabase
       .from('whatsapp_templates')
       .update({
-        media_id: mediaId,
-        media_uploaded_at: new Date().toISOString()
+        media_id: uploadResult.media_id,
+        media_uploaded_at: new Date().toISOString(),
       })
-      .eq('id', template.id);
+      .eq('template_id', template.template_id);
     
-    if (updateError) {
-      console.error('⚠️ Failed to cache media_id:', updateError);
-      // Not critical - we still have the media_id to use
-    } else {
-      console.log(`✅ Cached media_id ${mediaId} for template ${template.template_name}`);
-    }
-    
-    return mediaId;
-    
-  } catch (error) {
-    console.error('❌ Error in getOrUploadMediaId:', error);
-    return null;
+    return uploadResult.media_id;
   }
+
+  // No media available
+  throw new Error('Template requires header media, but no media was provided');
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get authorization header and verify user
-    const authHeader = req.headers.get('Authorization');
+    // Authentication
+    const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      console.error('❌ No authorization header');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Autorização necessária' 
-        }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      throw new Error('Missing authorization header');
     }
 
-    // Initialize Supabase client with user context
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
 
-    // Verify user is authenticated and get user info
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      console.error('❌ Authentication failed:', authError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Falha na autenticação' 
-        }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      throw new Error('Unauthorized');
     }
 
     // Check if user is admin
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('user_id', user.id)
       .single();
 
-    if (profileError || !profile || profile.role !== 'admin') {
-      console.error('❌ User not authorized for bulk messaging:', profileError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Privilégios de administrador necessários para envio em massa' 
-        }),
-        { 
-          status: 403, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+    if (!profile || profile.role !== 'admin') {
+      throw new Error('Only admins can send bulk messages');
     }
 
-    console.log('✅ User authenticated as admin:', user.email);
+    console.log(`✅ User authenticated as admin: ${user.email}`);
 
-    const { contacts, message, template_id, campaign_id }: BulkMessageRequest = await req.json();
+    // Parse request
+    const requestData: BulkMessageRequest = await req.json();
+    const { contacts, message, template_id, campaign_id, header_media } = requestData;
 
-    console.log('Bulk message request:', { contactCount: contacts.length, messageLength: message.length });
-
-    // Validate input
-    if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Lista de contatos é obrigatória e deve conter pelo menos um contato' 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+    if (!contacts || contacts.length === 0) {
+      throw new Error('No contacts provided');
     }
 
-    if (!message || message.trim().length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Mensagem é obrigatória' 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    // Function to clean and validate Brazilian phone numbers
-    function cleanPhoneNumber(phone: string): string {
-      // Remove all non-numeric characters
-      return phone.replace(/\D/g, '');
-    }
-
-    function validateBrazilianPhone(phone: string): boolean {
-      const cleaned = cleanPhoneNumber(phone);
-      
-      // Brazilian phone patterns:
-      // - 13 digits: +55 XX 9 XXXX-XXXX (with country code and mobile 9)
-      // - 12 digits: +55 XX XXXX-XXXX (with country code, no mobile 9)
-      // - 11 digits: XX 9 XXXX-XXXX (no country code, with mobile 9)
-      // - 10 digits: XX XXXX-XXXX (no country code, no mobile 9)
-      
-      if (cleaned.length === 13 && cleaned.startsWith('55')) {
-        // +55 format with mobile 9
-        return true;
-      } else if (cleaned.length === 12 && cleaned.startsWith('55')) {
-        // +55 format without mobile 9
-        return true;
-      } else if (cleaned.length === 11) {
-        // Brazilian format with mobile 9 (no country code)
-        return true;
-      } else if (cleaned.length === 10) {
-        // Brazilian format without mobile 9 (no country code)
-        return true;
-      }
-      
-      return false;
-    }
-
-    function normalizePhoneNumber(phone: string): string {
-      const cleaned = cleanPhoneNumber(phone);
-      
-      // Normalize to WhatsApp format (with country code, no + sign)
-      if (cleaned.length === 13 && cleaned.startsWith('55')) {
-        // Already has country code
-        return cleaned;
-      } else if (cleaned.length === 12 && cleaned.startsWith('55')) {
-        // Has country code but missing mobile 9, add it
-        const areaCode = cleaned.slice(2, 4);
-        const number = cleaned.slice(4);
-        return `55${areaCode}9${number}`;
-      } else if (cleaned.length === 11) {
-        // No country code, add 55
-        return `55${cleaned}`;
-      } else if (cleaned.length === 10) {
-        // No country code and no mobile 9, add both
-        const areaCode = cleaned.slice(0, 2);
-        const number = cleaned.slice(2);
-        return `55${areaCode}9${number}`;
-      }
-      
-      return cleaned; // Return as-is if doesn't match patterns
-    }
-
-    // Validate phone numbers and rate limiting
-    const invalidContacts = contacts.filter(contact => {
-      if (!contact.phone || typeof contact.phone !== 'string') {
-        return true;
-      }
-      
-      const isValid = validateBrazilianPhone(contact.phone);
-      if (!isValid) {
-        console.log(`❌ Invalid phone format: ${contact.phone} (cleaned: ${cleanPhoneNumber(contact.phone)})`);
-      }
-      return !isValid;
-    });
-
-    if (invalidContacts.length > 0) {
-      console.error('❌ Invalid phone numbers found:', invalidContacts);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Números de telefone inválidos encontrados',
-          invalid_contacts: invalidContacts
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    // Rate limiting - max 100 contacts per request
     if (contacts.length > 100) {
-      console.error('❌ Too many contacts in single request:', contacts.length);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Máximo de 100 contatos permitidos por solicitação de envio em massa' 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      throw new Error('Maximum 100 contacts per request');
     }
 
-    // Get WhatsApp API credentials from secrets
+    console.log(`Bulk message request: { contactCount: ${contacts.length}, messageLength: ${message?.length || 0} }`);
+
+    // Get WhatsApp credentials
     const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
     const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
-    
-    if (!accessToken || !phoneNumberId) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Configuração do WhatsApp não encontrada' 
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
 
-    // Initialize Supabase client for database operations
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (!accessToken || !phoneNumberId) {
+      throw new Error('WhatsApp credentials not configured');
+    }
 
     let successful = 0;
     let failed = 0;
     const errors: Array<{ phone: string; error: string }> = [];
-    const whatsappUrl = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
 
-    // Process each contact with delay to respect rate limits
+    // If template_id is provided, fetch template details
+    let template: any = null;
+    if (template_id) {
+      const { data: templateData, error: templateError } = await supabase
+        .from('whatsapp_templates')
+        .select('*')
+        .eq('template_id', template_id)
+        .single();
+
+      if (templateError || !templateData) {
+        throw new Error(`Template not found: ${template_id}`);
+      }
+
+      template = templateData;
+      console.log(`Using WhatsApp template: ${template.template_name}`);
+    }
+
+    // Process each contact
     for (let i = 0; i < contacts.length; i++) {
       const contact = contacts[i];
+      const normalizedPhone = contact.phone.replace(/\D/g, '');
       
+      // Ensure phone starts with country code
+      const finalPhone = normalizedPhone.startsWith('55') ? normalizedPhone : `55${normalizedPhone}`;
+
+      console.log(`\nSending message ${i + 1}/${contacts.length} to ${contact.phone} (normalized: ${finalPhone})`);
+
       try {
-        const normalizedPhone = normalizePhoneNumber(contact.phone);
-        console.log(`Sending message ${i + 1}/${contacts.length} to ${contact.phone} (normalized: ${normalizedPhone})`);
+        let payload: any;
+        let messageType: string;
 
-        // Prepare WhatsApp API payload - use template if provided, otherwise text
-        let whatsappPayload: any;
-        let useTemplate = false;
+        if (template) {
+          // Using WhatsApp template
+          messageType = 'template';
+          const components: any[] = [];
 
-        if (template_id) {
-          // Fetch WhatsApp template from database
-          const { data: template, error: templateError } = await supabase
-            .from('whatsapp_templates')
-            .select('*')
-            .eq('template_id', template_id)
-            .eq('status', 'active')
-            .single();
+          // Check for HEADER component
+          const headerComponent = template.components?.find((c: any) => c.type === 'HEADER');
+          if (headerComponent) {
+            console.log(`Template has HEADER component: format=${headerComponent.format}`);
 
-          if (template && !templateError) {
-            console.log(`Using WhatsApp template: ${template.template_name}`);
-            useTemplate = true;
-
-            // Analyze template components
-            const headerComponent = template.components?.find(c => c.type === 'HEADER');
-            const bodyComponent = template.components?.find(c => c.type === 'BODY');
-            
-            // Build components array for WhatsApp API
-            const templateComponents: any[] = [];
-
-            // Handle HEADER component (images, videos, documents) with media_id
-            if (headerComponent) {
-              const headerFormat = headerComponent.format;
-              const headerExample = headerComponent.example;
-              
-              console.log(`Template has HEADER component: format=${headerFormat}`);
-              
-              if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat) && headerExample?.header_handle?.[0]) {
-                // Try to get or upload media_id
-                const mediaId = await getOrUploadMediaId(
+            if (headerComponent.format === 'IMAGE' || headerComponent.format === 'VIDEO' || headerComponent.format === 'DOCUMENT') {
+              try {
+                // Get or upload media_id
+                const mediaType = headerComponent.format.toLowerCase();
+                const media_id = await getOrUploadMediaId(
                   template,
-                  supabase,
+                  header_media,
+                  accessToken,
                   phoneNumberId,
-                  accessToken
+                  supabase
                 );
-                
-                if (mediaId) {
-                  // Use media_id (recommended by WhatsApp)
-                  console.log(`✅ Using media_id for ${headerFormat}: ${mediaId}`);
-                  
-                  const mediaParam = {
-                    type: headerFormat.toLowerCase(),
-                    [headerFormat.toLowerCase()]: { id: mediaId }
-                  };
-                  
-                  templateComponents.push({
-                    type: "header",
-                    parameters: [mediaParam]
-                  });
-                } else {
-                  // Fallback to link if media_id failed
-                  const mediaUrl = headerExample.header_handle[0];
-                  console.log(`⚠️ Fallback to link for ${headerFormat}: ${mediaUrl}`);
-                  
-                  const mediaParam = {
-                    type: headerFormat.toLowerCase(),
-                    [headerFormat.toLowerCase()]: { link: mediaUrl }
-                  };
-                  
-                  templateComponents.push({
-                    type: "header",
-                    parameters: [mediaParam]
-                  });
-                }
+
+                console.log(`Adding ${headerComponent.format} header with media_id: ${media_id}`);
+
+                components.push({
+                  type: 'header',
+                  parameters: [{
+                    type: mediaType,
+                    [mediaType]: { id: media_id }
+                  }]
+                });
+              } catch (mediaError: any) {
+                console.error(`❌ Failed to handle header media:`, mediaError.message);
+                throw new Error(`Header media error: ${mediaError.message}`);
+              }
+            } else if (headerComponent.format === 'TEXT' && headerComponent.text) {
+              // TEXT header with variables
+              const headerVariables = headerComponent.text.match(/\{\{(\d+)\}\}/g);
+              if (headerVariables && contact.variables) {
+                const headerParams = headerVariables.map((v: string) => {
+                  const index = parseInt(v.replace(/\{|\}/g, '')) - 1;
+                  const varKeys = Object.keys(contact.variables || {});
+                  return { type: 'text', text: contact.variables?.[varKeys[index]] || '' };
+                });
+                components.push({ type: 'header', parameters: headerParams });
               }
             }
-
-            // Handle BODY component with parameters
-            const bodyText = bodyComponent?.text || '';
-            const placeholderMatches = bodyText.match(/\{\{\d+\}\}/g);
-            const requiredParams = placeholderMatches ? placeholderMatches.length : 0;
-            
-            console.log(`Template "${template.template_name}" BODY requires ${requiredParams} parameters`);
-            
-            if (requiredParams > 0) {
-              // Build exact number of template parameters
-              const templateParams = [];
-              
-              // Use contact data for parameters
-              if (contact.name) {
-                templateParams.push({
-                  type: "text",
-                  text: contact.name
-                });
-              }
-              
-              // Add parameters from contact.variables if available
-              if (contact.variables && Object.keys(contact.variables).length > 0) {
-                const variableValues = Object.values(contact.variables);
-                for (let i = templateParams.length; i < requiredParams && i < variableValues.length; i++) {
-                  templateParams.push({
-                    type: "text",
-                    text: String(variableValues[i - templateParams.length])
-                  });
-                }
-              }
-              
-              // Fill remaining slots with fallback data
-              const fallbackData = ["-", "-", "-", "-", "-"];
-              while (templateParams.length < requiredParams) {
-                const fallbackIndex = templateParams.length - (contact.name ? 1 : 0);
-                templateParams.push({
-                  type: "text",
-                  text: fallbackData[fallbackIndex] || "-"
-                });
-              }
-
-              templateComponents.push({
-                type: "body",
-                parameters: templateParams
-              });
-            }
-
-            console.log(`Template components array:`, JSON.stringify(templateComponents, null, 2));
-
-            whatsappPayload = {
-              messaging_product: 'whatsapp',
-              to: normalizedPhone,
-              type: 'template',
-              template: {
-                name: template.template_name,
-                language: {
-                  code: template.language || 'pt_BR'
-                },
-                ...(templateComponents.length > 0 ? {
-                  components: templateComponents
-                } : {})
-              }
-            };
-          } else {
-            console.log(`Template ${template_id} not found or inactive, falling back to text message`);
-            whatsappPayload = {
-              messaging_product: 'whatsapp',
-              to: normalizedPhone,
-              type: 'text',
-              text: { body: message }
-            };
           }
-        } else {
-          // Use text message
-          whatsappPayload = {
+
+          // Handle BODY component variables
+          const bodyComponent = template.components?.find((c: any) => c.type === 'BODY');
+          if (bodyComponent?.text) {
+            const bodyVariables = bodyComponent.text.match(/\{\{(\d+)\}\}/g);
+            console.log(`Template "${template.template_name}" BODY requires ${bodyVariables?.length || 0} parameters`);
+
+            if (bodyVariables && bodyVariables.length > 0) {
+              const bodyParams = bodyVariables.map((v: string) => {
+                const index = parseInt(v.replace(/\{|\}/g, '')) - 1;
+                const varKeys = Object.keys(contact.variables || {});
+                const value = contact.variables?.[varKeys[index]] || `{{${index + 1}}}`;
+                return { type: 'text', text: value };
+              });
+              components.push({ type: 'body', parameters: bodyParams });
+            }
+          }
+
+          console.log(`Template components array: ${JSON.stringify(components, null, 2)}`);
+
+          payload = {
             messaging_product: 'whatsapp',
-            to: normalizedPhone,
+            to: finalPhone,
+            type: 'template',
+            template: {
+              name: template.template_name,
+              language: { code: template.language || 'pt_BR' },
+              components: components.length > 0 ? components : undefined,
+            },
+          };
+        } else {
+          // Regular text message
+          messageType = 'text';
+          payload = {
+            messaging_product: 'whatsapp',
+            to: finalPhone,
             type: 'text',
-            text: { body: message }
+            text: { body: message },
           };
         }
 
-        // Send message via WhatsApp API
-        const response = await fetch(whatsappUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(whatsappPayload)
+        // Send message to WhatsApp
+        const waResponse = await fetch(
+          `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        const waResult = await waResponse.json();
+
+        if (!waResponse.ok || waResult.error) {
+          const errorMsg = waResult.error?.message || 'Unknown WhatsApp API error';
+          console.error(`❌ WhatsApp API error for ${finalPhone}:`, JSON.stringify(waResult, null, 2));
+          throw new Error(errorMsg);
+        }
+
+        console.log(`✅ Message sent successfully to ${finalPhone}`);
+
+        // Save to messages table
+        await supabase.from('messages').insert({
+          wa_message_id: waResult.messages?.[0]?.id,
+          wa_from: phoneNumberId,
+          wa_to: finalPhone,
+          wa_phone_number_id: phoneNumberId,
+          direction: 'outbound',
+          body: messageType === 'template' ? `[Template: ${template.template_name}]` : message,
+          is_template: messageType === 'template',
+          wa_timestamp: new Date().toISOString(),
+          raw: waResult,
         });
 
-        const result = await response.json();
-        
-        if (!response.ok) {
-          console.log(`WhatsApp API error for ${contact.phone}:`, JSON.stringify(result, null, 2));
-          
-          // Check for specific template errors
-          const isTemplateNotFound = result.error?.code === 132001;
-          const isInvalidTemplate = result.error?.message?.includes('Template name does not exist') ||
-                                  result.error?.message?.includes('template name') ||
-                                  result.error?.message?.includes('does not exist in the translation');
-          
-          // Enhanced error handling with automatic template fallback
-          const isWindowError = result.error?.code === 131047 || 
-                               result.error?.code === 131053 ||
-                               result.error?.message?.includes('24 hour') ||
-                               result.error?.message?.includes('outside the support window');
-          
-          let fallbackAttempted = false;
-          
-          if (isWindowError && !template_id) {
-            console.log(`24-hour window error detected for ${contact.phone}. Attempting template fallback...`);
-            
-            // Try multiple approved templates as fallback
-            const { data: availableTemplates } = await supabase
-              .from('whatsapp_templates')
-              .select('template_id, template_name, components, language')
-              .eq('status', 'active')
-              .in('template_name', ['hello_world', 'triagem_1', 'att_pp'])
-              .order('template_name')
-              .limit(3);
-            
-            for (const fallbackTemplate of availableTemplates || []) {
-              try {
-                const templateMessage = {
-                  messaging_product: "whatsapp",
-                  to: normalizedPhone,
-                  type: "template",
-                  template: {
-                    name: fallbackTemplate.template_name,
-                    language: { code: fallbackTemplate.language || "pt_BR" },
-                    ...(fallbackTemplate.components && fallbackTemplate.components.length > 0 ? {
-                      components: fallbackTemplate.components
-                    } : {})
-                  }
-                };
-                
-                console.log(`Trying template "${fallbackTemplate.template_name}" for ${contact.phone}`);
-                
-                const templateResponse = await fetch(whatsappUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(templateMessage)
-                });
-                
-                if (templateResponse.ok) {
-                  const templateData = await templateResponse.json();
-                  console.log(`✅ Template fallback successful for ${contact.phone} using "${fallbackTemplate.template_name}"`);
-                  
-                  // Log successful template message
-                  await supabase.from('messages').insert({
-                    wa_message_id: templateData.messages?.[0]?.id,
-                    wa_from: null,
-                    wa_to: normalizedPhone,
-                    wa_phone_number_id: phoneNumberId,
-                    direction: 'outbound',
-                    body: `Template: ${fallbackTemplate.template_name} (Fallback)`,
-                    wa_timestamp: new Date().toISOString(),
-                    raw: templateData,
-                    is_template: true
-                  });
-                  
-                  successful++;
-                  fallbackAttempted = true;
-                  break; // Success, exit the template loop
-                } else {
-                  const templateError = await templateResponse.json();
-                  console.log(`Template "${fallbackTemplate.template_name}" failed:`, templateError);
-                }
-              } catch (templateErr) {
-                console.log(`Error trying template "${fallbackTemplate.template_name}":`, templateErr);
-              }
-            }
-          }
-          
-          if (!fallbackAttempted) {
-            failed++;
-            let errorMsg = '';
-            
-            if (isTemplateNotFound || isInvalidTemplate) {
-              errorMsg = `${contact.phone}: Template inválido ou não encontrado (ID: ${template_id})`;
-            } else if (isWindowError) {
-              errorMsg = `${contact.phone}: Fora da janela de 24h (nenhum template aprovado funcionou)`;
-            } else {
-              errorMsg = `${contact.phone}: ${result.error?.message || 'Erro desconhecido'}`;
-            }
-            
-            errors.push({
-              phone: contact.phone,
-              error: errorMsg
-            });
-          }
-          continue;
-        }
-
-        // Save successful message to database
-        try {
-          const messageData = {
-            wa_message_id: result.messages?.[0]?.id || null,
-            wa_from: null, // Outbound message
-            wa_to: normalizedPhone, // Use normalized phone for consistency with API
-            wa_phone_number_id: phoneNumberId,
-            direction: 'outbound',
-            body: message,
-            wa_timestamp: new Date().toISOString(),
-            raw: result,
-            created_at: new Date().toISOString(),
-            is_template: useTemplate || !!template_id
-          };
-
-          const { error: dbError } = await supabase
-            .from('messages')
-            .insert([messageData]);
-
-          if (dbError) {
-            console.error(`Database error for ${contact.phone}:`, dbError);
-          }
-
-          // Save campaign result if campaign_id is provided
-          if (campaign_id) {
-            const campaignResultData = {
-              campaign_id,
-              contact_id: null, // We'd need to find this by phone
-              phone: contact.phone,
-              status: 'sent' as const,
-              sent_at: new Date().toISOString(),
-            };
-
-            const { error: campaignError } = await supabase
-              .from('campaign_results')
-              .insert([campaignResultData]);
-
-            if (campaignError) {
-              console.error(`Campaign result error for ${contact.phone}:`, campaignError);
-            }
-          }
-        } catch (dbError) {
-          console.error(`Database save error for ${contact.phone}:`, dbError);
+        // Save to campaign_results if campaign_id provided
+        if (campaign_id) {
+          await supabase.from('campaign_results').insert({
+            campaign_id,
+            phone: finalPhone,
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+          });
         }
 
         successful++;
-        console.log(`Message sent successfully to ${contact.phone}`);
+
+        // Rate limiting: small delay between messages
+        if (i < contacts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
 
       } catch (error: any) {
-        console.error(`Error sending to ${contact.phone}:`, error);
+        console.error(`❌ Error sending to ${finalPhone}:`, error.message);
         failed++;
-        errors.push({
-          phone: contact.phone,
-          error: error.message || 'Erro desconhecido'
-        });
+        errors.push({ phone: finalPhone, error: error.message });
 
-        // Save failed campaign result if campaign_id is provided
+        // Save failed result
         if (campaign_id) {
-          try {
-            const campaignResultData = {
-              campaign_id,
-              contact_id: null,
-              phone: contact.phone,
-              status: 'failed' as const,
-              error_message: error.message || 'Erro desconhecido',
-            };
-
-            await supabase
-              .from('campaign_results')
-              .insert([campaignResultData]);
-          } catch (dbError) {
-            console.error(`Campaign result error for failed ${contact.phone}:`, dbError);
-          }
+          await supabase.from('campaign_results').insert({
+            campaign_id,
+            phone: finalPhone,
+            status: 'failed',
+            error_message: error.message,
+            sent_at: new Date().toISOString(),
+          });
         }
-      }
-
-      // Add delay between messages to respect rate limits (2 seconds)
-      if (i < contacts.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
-    console.log(`Bulk message completed: ${successful} successful, ${failed} failed`);
+    console.log(`\nBulk message completed: ${successful} successful, ${failed} failed`);
 
-    // Return final results
     return new Response(
-      JSON.stringify({ 
-        success: true,
+      JSON.stringify({
         successful,
         failed,
-        total: contacts.length,
-        errors
+        errors: errors.length > 0 ? errors : undefined,
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
-    console.error('Error in send-bulk-messages function:', error);
-    
+    console.error('❌ Error in send-bulk-messages:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: 'Erro interno do servidor' 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      JSON.stringify({ error: error.message }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }

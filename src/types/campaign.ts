@@ -14,6 +14,7 @@ export interface Campaign {
   name: string;
   message: string;
   template_id?: string;
+  wa_template_id?: string;
   target_contacts: string[]; // contact IDs
   scheduled_at?: string;
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled';
@@ -23,6 +24,10 @@ export interface Campaign {
   delivered_count?: number;
   failed_count?: number;
   response_count?: number;
+  header_media_id?: string;
+  header_media_type?: 'image' | 'video' | 'document';
+  header_media_url?: string;
+  header_media_mime?: string;
 }
 
 export interface CampaignResult {
@@ -74,6 +79,13 @@ export interface BulkMessageRequest {
   message: string;
   template_id?: string;
   campaign_id?: string;
+  header_media?: {
+    id?: string;
+    url?: string;
+    type: 'image' | 'video' | 'document';
+    mime?: string;
+    filename?: string;
+  };
 }
 
 export interface ScheduledMessage {

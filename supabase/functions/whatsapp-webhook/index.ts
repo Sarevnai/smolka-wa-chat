@@ -56,6 +56,12 @@ serve(async (req) => {
                   await processIncomingMessage(message, change.value);
                 }
               }
+              // Process message statuses (delivery, read, failed)
+              if (change.field === 'messages' && change.value.statuses) {
+                for (const status of change.value.statuses) {
+                  await processMessageStatus(status);
+                }
+              }
             }
           }
         }
@@ -111,6 +117,69 @@ function extractNameFromMessage(messageBody: string): string | null {
   }
   
   return null;
+}
+
+async function processMessageStatus(status: any) {
+  try {
+    console.log('Processing message status:', status);
+    
+    const waMessageId = status.id;
+    const statusType = status.status; // sent, delivered, read, failed
+    const timestamp = status.timestamp ? new Date(parseInt(status.timestamp) * 1000).toISOString() : new Date().toISOString();
+    
+    // Update campaign_results if this message is from a campaign
+    const { data: campaignResult } = await supabase
+      .from('campaign_results')
+      .select('id, campaign_id')
+      .eq('phone', status.recipient_id)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (campaignResult) {
+      const updateData: any = { status: statusType };
+      
+      switch (statusType) {
+        case 'delivered':
+          updateData.delivered_at = timestamp;
+          break;
+        case 'read':
+          updateData.read_at = timestamp;
+          break;
+        case 'failed':
+          updateData.error_message = status.errors?.[0]?.title || 'Failed to deliver';
+          break;
+      }
+      
+      await supabase
+        .from('campaign_results')
+        .update(updateData)
+        .eq('id', campaignResult.id);
+      
+      console.log(`✅ Updated campaign result status to ${statusType}`);
+      
+      // Update campaign counters
+      if (statusType === 'delivered') {
+        await supabase.rpc('increment_campaign_delivered', { 
+          campaign_id_param: campaignResult.campaign_id 
+        }).catch(() => {
+          // Fallback if function doesn't exist
+          console.log('⚠️ Campaign counter update failed (function may not exist)');
+        });
+      }
+    }
+    
+    // Store status in messages raw data
+    await supabase
+      .from('messages')
+      .update({ 
+        raw: { status: status }
+      })
+      .eq('wa_message_id', waMessageId);
+      
+  } catch (error) {
+    console.error('Error processing message status:', error);
+  }
 }
 
 async function processIncomingMessage(message: any, value: any) {

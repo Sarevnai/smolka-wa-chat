@@ -93,7 +93,19 @@ export const useCreateCampaign = () => {
     mutationFn: async (campaign: Omit<Campaign, "id" | "created_at" | "updated_at">) => {
       const { data, error } = await supabase
         .from("campaigns")
-        .insert([campaign])
+        .insert([{
+          name: campaign.name,
+          message: campaign.message,
+          template_id: campaign.template_id,
+          wa_template_id: campaign.wa_template_id,
+          target_contacts: campaign.target_contacts,
+          scheduled_at: campaign.scheduled_at,
+          status: campaign.status,
+          header_media_id: campaign.header_media_id,
+          header_media_type: campaign.header_media_type,
+          header_media_url: campaign.header_media_url,
+          header_media_mime: campaign.header_media_mime,
+        }])
         .select()
         .single();
 
