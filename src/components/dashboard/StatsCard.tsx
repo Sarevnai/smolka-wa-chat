@@ -31,9 +31,9 @@ export function StatsCard({ title, value, description, icon: Icon, trend, classN
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold text-neutral-900">{value}</div>
+        <div className="text-3xl font-bold text-neutral-900 truncate">{value}</div>
         {description && (
-          <p className="text-sm text-neutral-500 mt-1">{description}</p>
+          <p className="text-sm text-neutral-500 mt-1 truncate">{description}</p>
         )}
         {trend && (
           <div className="flex items-center gap-2 mt-3">

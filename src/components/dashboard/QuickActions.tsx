@@ -83,7 +83,7 @@ export function QuickActions() {
               Acesse as funcionalidades principais
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <CardContent className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {quickActions.map((action) => (
               <Tooltip key={action.title}>
                 <TooltipTrigger asChild>
@@ -91,9 +91,11 @@ export function QuickActions() {
                     asChild
                     className="h-20 p-3 flex-col gap-2 hover-scale shadow-md hover:shadow-lg transition-all duration-200"
                   >
-                    <Link to={action.href}>
-                      <action.icon className="h-6 w-6" />
-                      <span className="text-xs font-medium text-center leading-tight">{action.title}</span>
+                    <Link to={action.href} className="flex flex-col items-center gap-2 min-w-0 w-full">
+                      <action.icon className="h-6 w-6 flex-shrink-0" />
+                      <span className="text-xs font-medium text-center leading-tight line-clamp-2 overflow-hidden px-1">
+                        {action.title}
+                      </span>
                     </Link>
                   </Button>
                 </TooltipTrigger>
