@@ -17,32 +17,33 @@ interface StatsCardProps {
 
 export function StatsCard({ title, value, description, icon: Icon, trend, className }: StatsCardProps) {
   return (
-    <Card className={cn("transition-all duration-200 hover:shadow-lg hover-scale", className)}>
+    <Card className={cn(
+      "transition-all duration-200 hover:shadow-gold-md hover-scale border-gold-primary/20",
+      "bg-surface-elevated shadow-elevation-2",
+      className
+    )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium text-neutral-600">
           {title}
         </CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <div className="p-2 rounded-lg bg-gold-light">
+          <Icon className="h-5 w-5 text-gold-primary" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-foreground">{value}</div>
+        <div className="text-3xl font-bold text-neutral-900">{value}</div>
         {description && (
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+          <p className="text-sm text-neutral-500 mt-1">{description}</p>
         )}
         {trend && (
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-3">
             <Badge 
-              variant={trend.isPositive ? "default" : "secondary"}
-              className={cn(
-                "text-xs",
-                trend.isPositive 
-                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                  : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-              )}
+              variant={trend.isPositive ? "success" : "error"}
+              className="text-xs"
             >
               {trend.isPositive ? "+" : ""}{trend.value}%
             </Badge>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-neutral-500">
               vs. semana passada
             </span>
           </div>

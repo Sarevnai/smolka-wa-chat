@@ -67,6 +67,32 @@ All colors MUST be HSL.
     
     /* Shadows */
     --shadow-message: 0 1px 0.5px hsl(0 0% 0% / 0.13);
+
+    /* === GOLD SAAS THEME === */
+    --gold-primary: 45 79% 53%;
+    --gold-accent: 48 88% 69%;
+    --gold-dark: 45 73% 41%;
+    --gold-light: 45 79% 93%;
+    
+    --neutral-900: 0 0% 10%;
+    --neutral-800: 0 0% 15%;
+    --neutral-700: 0 0% 25%;
+    --neutral-600: 0 0% 35%;
+    --neutral-500: 0 0% 45%;
+    --neutral-400: 0 0% 60%;
+    --neutral-300: 0 0% 75%;
+    --neutral-200: 0 0% 88%;
+    --neutral-100: 0 0% 95%;
+    
+    --surface-primary: 210 17% 98%;
+    --surface-secondary: 0 0% 100%;
+    --surface-sidebar: 0 0% 98%;
+    --surface-elevated: 0 0% 100%;
+    
+    --success-modern: 142 71% 45%;
+    --warning-modern: 38 92% 50%;
+    --error-modern: 0 84% 60%;
+    --info-modern: 221 83% 53%;
   }
 
   .dark {
@@ -120,6 +146,32 @@ All colors MUST be HSL.
     --chat-background: 17 20% 7%;
     --chat-header: 17 20% 11%;
     --chat-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+
+    /* === GOLD SAAS THEME DARK === */
+    --gold-primary: 45 79% 58%;
+    --gold-accent: 48 88% 74%;
+    --gold-dark: 45 73% 36%;
+    --gold-light: 45 79% 23%;
+    
+    --neutral-900: 0 0% 95%;
+    --neutral-800: 0 0% 88%;
+    --neutral-700: 0 0% 75%;
+    --neutral-600: 0 0% 60%;
+    --neutral-500: 0 0% 45%;
+    --neutral-400: 0 0% 35%;
+    --neutral-300: 0 0% 25%;
+    --neutral-200: 0 0% 15%;
+    --neutral-100: 0 0% 12%;
+    
+    --surface-primary: 17 20% 9%;
+    --surface-secondary: 17 20% 11%;
+    --surface-sidebar: 17 20% 11%;
+    --surface-elevated: 17 20% 13%;
+    
+    --success-modern: 142 71% 50%;
+    --warning-modern: 38 92% 55%;
+    --error-modern: 0 84% 65%;
+    --info-modern: 221 83% 58%;
   }
 }
 

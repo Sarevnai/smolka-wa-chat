@@ -64,13 +64,16 @@ export function AppSidebar() {
     return cn(
       "w-full justify-start transition-all duration-200",
       isActive(path)
-        ? "bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
-        : "hover:bg-accent hover:text-accent-foreground"
+        ? "bg-gold-primary/12 border-l-3 border-gold-primary text-gold-primary font-semibold hover:bg-gold-primary/20"
+        : "hover:bg-neutral-100 text-neutral-700 hover:text-neutral-900"
     );
   };
 
   return (
-    <Sidebar collapsible="icon" className={cn("transition-all duration-300", collapsed ? "w-14" : "w-64")}>
+    <Sidebar collapsible="icon" className={cn(
+      "transition-all duration-300 bg-surface-sidebar border-r border-neutral-200",
+      collapsed ? "w-14" : "w-64"
+    )}>
       <SidebarContent>
         {/* Main Navigation */}
         <SidebarGroup>
