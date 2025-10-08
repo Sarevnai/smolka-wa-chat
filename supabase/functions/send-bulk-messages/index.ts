@@ -18,6 +18,143 @@ interface BulkMessageRequest {
   campaign_id?: string;
 }
 
+// Helper function to upload media to WhatsApp and get media_id
+async function uploadMediaToWhatsApp(
+  mediaUrl: string,
+  mediaType: string,
+  phoneNumberId: string,
+  accessToken: string
+): Promise<string | null> {
+  try {
+    console.log(`📤 Downloading media from: ${mediaUrl}`);
+    
+    // 1. Download file from URL
+    const fileResponse = await fetch(mediaUrl);
+    if (!fileResponse.ok) {
+      console.error(`Failed to download media: ${fileResponse.statusText}`);
+      return null;
+    }
+    
+    const fileBlob = await fileResponse.blob();
+    const fileBuffer = await fileBlob.arrayBuffer();
+    
+    // 2. Prepare FormData for WhatsApp upload
+    const formData = new FormData();
+    const mimeType = mediaType === 'IMAGE' ? 'image/jpeg' 
+                   : mediaType === 'VIDEO' ? 'video/mp4'
+                   : mediaType === 'DOCUMENT' ? 'application/pdf'
+                   : 'image/jpeg';
+    
+    const fileName = mediaType === 'IMAGE' ? 'image.jpg'
+                   : mediaType === 'VIDEO' ? 'video.mp4'
+                   : 'document.pdf';
+    
+    formData.append('file', new Blob([fileBuffer], { type: mimeType }), fileName);
+    formData.append('type', mimeType);
+    formData.append('messaging_product', 'whatsapp');
+    
+    // 3. Upload to WhatsApp Media API
+    console.log(`📤 Uploading ${mediaType} to WhatsApp Media API...`);
+    const uploadResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${phoneNumberId}/media`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: formData
+      }
+    );
+    
+    const uploadResult = await uploadResponse.json();
+    
+    if (!uploadResponse.ok) {
+      console.error('❌ WhatsApp Media upload failed:', uploadResult);
+      return null;
+    }
+    
+    console.log(`✅ Media uploaded successfully. Media ID: ${uploadResult.id}`);
+    return uploadResult.id;
+    
+  } catch (error) {
+    console.error('❌ Error uploading media to WhatsApp:', error);
+    return null;
+  }
+}
+
+// Helper function to get or upload media_id with caching
+async function getOrUploadMediaId(
+  template: any,
+  supabaseAdmin: any,
+  phoneNumberId: string,
+  accessToken: string
+): Promise<string | null> {
+  try {
+    // 1. Check if template already has valid cached media_id
+    if (template.media_id && template.media_uploaded_at) {
+      const uploadedAt = new Date(template.media_uploaded_at);
+      const now = new Date();
+      const hoursDiff = (now.getTime() - uploadedAt.getTime()) / (1000 * 60 * 60);
+      
+      // WhatsApp media IDs are valid for ~30 days
+      // Renew if older than 15 days (360 hours) to be safe
+      if (hoursDiff < 360) {
+        console.log(`✅ Using cached media_id for template ${template.template_name} (age: ${Math.round(hoursDiff)}h)`);
+        return template.media_id;
+      } else {
+        console.log(`⏰ Cached media_id expired for template ${template.template_name} (age: ${Math.round(hoursDiff)}h)`);
+      }
+    }
+    
+    // 2. Extract media URL from template
+    const headerComponent = template.components?.find(c => c.type === 'HEADER');
+    if (!headerComponent?.example?.header_handle?.[0]) {
+      console.error('❌ No media URL found in template header');
+      return null;
+    }
+    
+    const mediaUrl = headerComponent.example.header_handle[0];
+    const mediaType = headerComponent.format; // IMAGE, VIDEO, DOCUMENT
+    
+    console.log(`📤 Need to upload ${mediaType} for template ${template.template_name}`);
+    
+    // 3. Upload media to WhatsApp
+    const mediaId = await uploadMediaToWhatsApp(
+      mediaUrl,
+      mediaType,
+      phoneNumberId,
+      accessToken
+    );
+    
+    if (!mediaId) {
+      console.error('❌ Failed to upload media to WhatsApp');
+      return null;
+    }
+    
+    // 4. Cache media_id in database
+    const { error: updateError } = await supabaseAdmin
+      .from('whatsapp_templates')
+      .update({
+        media_id: mediaId,
+        media_uploaded_at: new Date().toISOString()
+      })
+      .eq('id', template.id);
+    
+    if (updateError) {
+      console.error('⚠️ Failed to cache media_id:', updateError);
+      // Not critical - we still have the media_id to use
+    } else {
+      console.log(`✅ Cached media_id ${mediaId} for template ${template.template_name}`);
+    }
+    
+    return mediaId;
+    
+  } catch (error) {
+    console.error('❌ Error in getOrUploadMediaId:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -281,58 +418,50 @@ serve(async (req) => {
             // Build components array for WhatsApp API
             const templateComponents: any[] = [];
 
-            // Handle HEADER component (images, videos, documents)
+            // Handle HEADER component (images, videos, documents) with media_id
             if (headerComponent) {
               const headerFormat = headerComponent.format;
               const headerExample = headerComponent.example;
               
               console.log(`Template has HEADER component: format=${headerFormat}`);
               
-              if (headerFormat === 'IMAGE' && headerExample?.header_handle?.[0]) {
-                const imageUrl = headerExample.header_handle[0];
-                console.log(`Adding IMAGE header with URL: ${imageUrl}`);
+              if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat) && headerExample?.header_handle?.[0]) {
+                // Try to get or upload media_id
+                const mediaId = await getOrUploadMediaId(
+                  template,
+                  supabase,
+                  phoneNumberId,
+                  accessToken
+                );
                 
-                templateComponents.push({
-                  type: "header",
-                  parameters: [
-                    {
-                      type: "image",
-                      image: {
-                        link: imageUrl
-                      }
-                    }
-                  ]
-                });
-              } else if (headerFormat === 'VIDEO' && headerExample?.header_handle?.[0]) {
-                const videoUrl = headerExample.header_handle[0];
-                console.log(`Adding VIDEO header with URL: ${videoUrl}`);
-                
-                templateComponents.push({
-                  type: "header",
-                  parameters: [
-                    {
-                      type: "video",
-                      video: {
-                        link: videoUrl
-                      }
-                    }
-                  ]
-                });
-              } else if (headerFormat === 'DOCUMENT' && headerExample?.header_handle?.[0]) {
-                const documentUrl = headerExample.header_handle[0];
-                console.log(`Adding DOCUMENT header with URL: ${documentUrl}`);
-                
-                templateComponents.push({
-                  type: "header",
-                  parameters: [
-                    {
-                      type: "document",
-                      document: {
-                        link: documentUrl
-                      }
-                    }
-                  ]
-                });
+                if (mediaId) {
+                  // Use media_id (recommended by WhatsApp)
+                  console.log(`✅ Using media_id for ${headerFormat}: ${mediaId}`);
+                  
+                  const mediaParam = {
+                    type: headerFormat.toLowerCase(),
+                    [headerFormat.toLowerCase()]: { id: mediaId }
+                  };
+                  
+                  templateComponents.push({
+                    type: "header",
+                    parameters: [mediaParam]
+                  });
+                } else {
+                  // Fallback to link if media_id failed
+                  const mediaUrl = headerExample.header_handle[0];
+                  console.log(`⚠️ Fallback to link for ${headerFormat}: ${mediaUrl}`);
+                  
+                  const mediaParam = {
+                    type: headerFormat.toLowerCase(),
+                    [headerFormat.toLowerCase()]: { link: mediaUrl }
+                  };
+                  
+                  templateComponents.push({
+                    type: "header",
+                    parameters: [mediaParam]
+                  });
+                }
               }
             }
 

@@ -19,6 +19,8 @@ export interface WhatsAppTemplate {
   }[];
   created_at: string;
   updated_at: string;
+  media_id?: string;
+  media_uploaded_at?: string;
 }
 
 export interface WhatsAppTemplateRequest {

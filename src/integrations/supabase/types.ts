@@ -809,6 +809,8 @@ export type Database = {
           created_at: string
           id: string
           language: string
+          media_id: string | null
+          media_uploaded_at: string | null
           status: string
           template_id: string
           template_name: string
@@ -820,6 +822,8 @@ export type Database = {
           created_at?: string
           id?: string
           language?: string
+          media_id?: string | null
+          media_uploaded_at?: string | null
           status?: string
           template_id: string
           template_name: string
@@ -831,6 +835,8 @@ export type Database = {
           created_at?: string
           id?: string
           language?: string
+          media_id?: string | null
+          media_uploaded_at?: string | null
           status?: string
           template_id?: string
           template_name?: string
