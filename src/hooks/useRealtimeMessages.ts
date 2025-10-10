@@ -4,22 +4,24 @@ import { useNotificationSound } from './useNotificationSound';
 import { MessageRow } from '@/lib/messages';
 
 interface UseRealtimeMessagesProps {
-  onNewMessage?: (message: MessageRow) => void;
   currentConversation?: string | null;
 }
 
+/**
+ * Hook simplificado para notificações sonoras globais de novas mensagens.
+ * NÃO deve ser usado para atualizar UI - cada componente deve ter seu próprio listener.
+ */
 export function useRealtimeMessages({ 
-  onNewMessage, 
   currentConversation 
 }: UseRealtimeMessagesProps) {
   const { playNotificationSound } = useNotificationSound();
   const lastMessageIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    console.log('Setting up realtime messages subscription');
+    console.log('🔔 Configurando listener global de notificações sonoras');
     
     const channel = supabase
-      .channel('messages-realtime')
+      .channel('global-sound-notifications')
       .on(
         'postgres_changes',
         {
@@ -28,52 +30,34 @@ export function useRealtimeMessages({
           table: 'messages'
         },
         (payload) => {
-          console.log('New message received:', payload);
-          
           const newMessage = payload.new as MessageRow;
           
-          // Avoid duplicate notifications
+          // Evitar notificações duplicadas
           if (lastMessageIdRef.current === newMessage.id) {
             return;
           }
           lastMessageIdRef.current = newMessage.id;
 
-          // Call the callback
-          onNewMessage?.(newMessage);
-
-          // Play notification sound for inbound messages
+          // Tocar som apenas para mensagens inbound que não sejam da conversa atual
           if (newMessage.direction === 'inbound') {
-            // Play sound if not in the current conversation or window not focused
-            if (!currentConversation || newMessage.wa_from !== currentConversation) {
-              console.log('Playing notification sound for new message');
+            const messageFrom = (newMessage.wa_from || '').replace(/\D/g, '');
+            const currentPhone = (currentConversation || '').replace(/\D/g, '');
+            
+            // Tocar som se não estiver na conversa atual ou janela não estiver focada
+            if (!currentConversation || messageFrom !== currentPhone || !document.hasFocus()) {
+              console.log('🔊 Tocando som de notificação para mensagem de:', messageFrom);
               playNotificationSound();
             }
           }
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages'
-        },
-        (payload) => {
-          console.log('Message updated:', payload);
-          
-          const updatedMessage = payload.new as MessageRow;
-          
-          // Call the callback to refresh UI
-          onNewMessage?.(updatedMessage);
-        }
-      )
       .subscribe();
 
     return () => {
-      console.log('Cleaning up realtime messages subscription');
+      console.log('🔌 Removendo listener global de notificações sonoras');
       supabase.removeChannel(channel);
     };
-  }, [onNewMessage, currentConversation, playNotificationSound]);
+  }, [currentConversation, playNotificationSound]);
 
   return { playNotificationSound };
 }

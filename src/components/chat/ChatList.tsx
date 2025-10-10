@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { usePinnedConversations } from "@/hooks/usePinnedConversations";
-import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
+
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 
 interface Conversation {
@@ -40,15 +40,31 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const { pinnedConversations } = usePinnedConversations();
   const { soundEnabled, toggleSound } = useNotificationSound();
   
-  // Setup realtime message notifications
-  useRealtimeMessages({
-    onNewMessage: (message) => {
-      console.log('New message received in ChatList:', message);
-      // Reload conversations when new message arrives
-      loadConversations();
-    },
-    currentConversation: selectedContact
-  });
+  // Setup realtime listener apenas para atualizar lista de conversações
+  useEffect(() => {
+    console.log('📡 ChatList: Configurando listener para atualizar lista de conversações');
+    
+    const channel = supabase
+      .channel('conversations-list-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          console.log('📨 ChatList: Nova mensagem detectada, recarregando conversações');
+          loadConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔌 ChatList: Removendo listener de conversações');
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const loadConversations = async () => {
     try {

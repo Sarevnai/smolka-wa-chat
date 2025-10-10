@@ -163,17 +163,31 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           
           if (isRelevant) {
             console.log("✅ Mensagem relevante para esta conversa, adicionando à lista");
+            
             setMessages(prev => {
+              // Verificar se já existe para prevenir duplicatas
               const exists = prev.some(msg => msg.id === newMessage.id);
               if (exists) {
-                console.log("⚠️ Mensagem duplicada, ignorando");
+                console.log("⚠️ Mensagem duplicada detectada, ignorando");
                 return prev;
               }
-              return [...prev, newMessage];
+              
+              // Adicionar nova mensagem e ordenar por timestamp
+              const updated = [...prev, newMessage].sort((a, b) => 
+                new Date(a.wa_timestamp || a.created_at || "").getTime() - 
+                new Date(b.wa_timestamp || b.created_at || "").getTime()
+              );
+              
+              console.log("📝 Total de mensagens após adicionar:", updated.length);
+              return updated;
             });
-            setTimeout(scrollToBottom, 100);
+            
+            // Forçar scroll para o final após adicionar mensagem
+            requestAnimationFrame(() => {
+              setTimeout(scrollToBottom, 100);
+            });
           } else {
-            console.log("❌ Mensagem NÃO relevante para esta conversa, ignorando");
+            console.log("❌ Mensagem não relevante para esta conversa");
           }
         }
       )
