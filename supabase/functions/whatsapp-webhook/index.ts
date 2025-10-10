@@ -42,8 +42,25 @@ serve(async (req) => {
 
     if (req.method === 'POST') {
       // Handle incoming webhook events
+      const url = new URL(req.url);
+      console.log('🔵 WEBHOOK POST REQUEST RECEIVED');
+      console.log('📍 URL:', url.href);
+      console.log('🔑 Headers:', Object.fromEntries(req.headers.entries()));
+      console.log('🔗 Query params:', Object.fromEntries(url.searchParams.entries()));
+      
       const body = await req.json();
-      console.log('Received webhook:', JSON.stringify(body, null, 2));
+      console.log('📦 Full webhook body:', JSON.stringify(body, null, 2));
+      
+      // Log specific parts of the structure
+      if (body.entry) {
+        console.log(`📋 Entries count: ${body.entry.length}`);
+        body.entry.forEach((entry: any, idx: number) => {
+          console.log(`  Entry ${idx}:`, {
+            id: entry.id,
+            changes: entry.changes?.length || 0
+          });
+        });
+      }
 
       // Process WhatsApp webhook data
       if (body.entry && body.entry.length > 0) {
@@ -184,9 +201,17 @@ async function processMessageStatus(status: any) {
 
 async function processIncomingMessage(message: any, value: any) {
   try {
-    console.log('Processing message:', message);
+    console.log('🟢 PROCESSING INBOUND MESSAGE');
+    console.log('📱 From:', message.from);
+    console.log('🆔 Message ID:', message.id);
+    console.log('⏰ Timestamp:', message.timestamp);
+    console.log('📝 Type:', message.type);
+    console.log('🔍 Full message object:', JSON.stringify(message, null, 2));
+    console.log('🔍 Full value object:', JSON.stringify(value, null, 2));
 
     const messageBody = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || '';
+    console.log('💬 Extracted body:', messageBody);
+    
     const mediaInfo = await extractMediaInfo(message, value);
 
     // If media exists, download and store permanently

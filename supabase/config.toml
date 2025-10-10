@@ -1,5 +1,8 @@
 project_id = "wpjxsgxxhogzkkuznyke"
 
+[functions.debug-inbound]
+verify_jwt = false
+
 [functions.download-media]
 verify_jwt = false
 

@@ -201,6 +201,32 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     };
   }, [phoneNumber, loadMessages, scrollToBottom]);
 
+  // Polling backup: reload messages if no realtime updates after 10 seconds
+  useEffect(() => {
+    if (!phoneNumber) return;
+    
+    let lastMessageTime = Date.now();
+    
+    // Update timestamp when messages change
+    if (messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      lastMessageTime = new Date(lastMsg.wa_timestamp || lastMsg.created_at || "").getTime();
+    }
+    
+    const pollInterval = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastMessage = now - lastMessageTime;
+      
+      // If more than 15 seconds without updates and window is focused, reload
+      if (timeSinceLastMessage > 15000 && document.hasFocus()) {
+        console.log('⏱️ Backup polling: reloading messages (no realtime updates for 15s)');
+        loadMessages();
+      }
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(pollInterval);
+  }, [phoneNumber, messages, loadMessages]);
+
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || sending) return;
 
