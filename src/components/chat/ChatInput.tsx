@@ -27,13 +27,12 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
     if (!profile) return baseAttendants;
 
     // If user is admin, show all users
-    if (profile.role === 'admin') {
+    if (profile.roles?.includes('admin')) {
       const userAttendants = profiles
         .filter(p => p.full_name)
         .map(p => ({
           value: p.full_name!,
-          label: p.full_name!,
-          role: p.role as 'admin' | 'user'
+          label: p.full_name!
         }));
       return [...baseAttendants, ...userAttendants];
     }
@@ -44,8 +43,7 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
         ...baseAttendants,
         { 
           value: profile.full_name, 
-          label: profile.full_name,
-          role: profile.role as 'admin' | 'user'
+          label: profile.full_name
         }
       ];
     }
@@ -62,7 +60,7 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
     const savedAttendant = localStorage.getItem("selectedAttendant");
     
     // If user is not admin and has a name, automatically select their name
-    if (profile.role !== 'admin' && profile.full_name) {
+    if (!profile.roles?.includes('admin') && profile.full_name) {
       setSelectedAttendant(profile.full_name);
       return;
     }

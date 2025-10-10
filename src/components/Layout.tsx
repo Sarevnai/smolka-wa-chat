@@ -111,10 +111,10 @@ export default function Layout({
                           <p className="text-sm font-medium leading-none">
                             {profile?.full_name || user?.user_metadata?.full_name || 'Usuário'}
                           </p>
-                          {profile?.role === 'admin' && <Crown className="h-3 w-3 text-yellow-500" />}
+                          {profile?.roles?.includes('admin') && <Crown className="h-3 w-3 text-yellow-500" />}
                         </div>
                         <p className="text-xs leading-none text-muted-foreground">
-                          {user?.email} • {profile?.role || 'user'}
+                          {user?.email} • {profile?.roles?.[0] || 'attendant'}
                         </p>
                       </div>
                     </DropdownMenuLabel>

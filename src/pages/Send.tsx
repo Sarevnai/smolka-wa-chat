@@ -43,7 +43,7 @@ export default function Send() {
   const createCampaign = useCreateCampaign();
   const sendCampaign = useSendCampaign();
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.roles?.includes('admin');
 
   const getMessage = () => {
     if (selectedTemplate) {

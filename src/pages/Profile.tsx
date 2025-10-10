@@ -210,7 +210,7 @@ export default function Profile() {
                 <Label>Papel no Sistema</Label>
                 <div className="p-3 bg-muted rounded-md">
                   <span className="capitalize font-medium">
-                    {profile?.role === 'admin' ? 'Administrador' : 'Usuário'}
+                    {profile?.roles?.includes('admin') ? 'Administrador' : profile?.roles?.[0] || 'Atendente'}
                   </span>
                 </div>
               </div>

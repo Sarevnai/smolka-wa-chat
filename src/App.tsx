@@ -17,6 +17,7 @@ import Profile from "./pages/Profile";
 import ClickUpConfig from "./pages/ClickUpConfig";
 import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
+import UserManagement from "./pages/UserManagement";
 
 // Create QueryClient outside component to avoid recreating on hot reload
 const queryClient = new QueryClient({

@@ -659,7 +659,6 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
-          role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           user_id: string
         }
@@ -668,7 +667,6 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id: string
         }
@@ -677,7 +675,6 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id?: string
         }
@@ -817,6 +814,30 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_templates: {
         Row: {
           category: string
@@ -864,6 +885,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_users: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       get_contact_message_stats: {
         Args: { phone_numbers: string[] }
         Returns: {
@@ -876,12 +901,32 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_user_roles: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_attendant: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_manager: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
     }
     Enums: {
+      app_role: "admin" | "manager" | "attendant"
       contact_status: "ativo" | "inativo" | "bloqueado"
       contact_type: "proprietario" | "inquilino"
       contract_status: "ativo" | "encerrado" | "suspenso"
@@ -1013,6 +1058,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "manager", "attendant"],
       contact_status: ["ativo", "inativo", "bloqueado"],
       contact_type: ["proprietario", "inquilino"],
       contract_status: ["ativo", "encerrado", "suspenso"],
