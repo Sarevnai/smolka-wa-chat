@@ -109,7 +109,7 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
         <Select 
           value={selectedAttendant} 
           onValueChange={setSelectedAttendant} 
-          disabled={disabled || (profile?.role !== 'admin' && Boolean(profile?.full_name))}
+          disabled={disabled || (!profile?.roles?.includes('admin') && Boolean(profile?.full_name))}
         >
           <SelectTrigger className="w-48 h-8 bg-muted/30 border-muted">
             <SelectValue placeholder="Selecionar atendente" />
@@ -119,9 +119,6 @@ export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
               <SelectItem key={attendant.value} value={attendant.value}>
                 <div className="flex items-center gap-2">
                   <span>{attendant.label}</span>
-                  {attendant.role === 'admin' && (
-                    <Crown className="h-3 w-3 text-yellow-500" />
-                  )}
                 </div>
               </SelectItem>
             ))}

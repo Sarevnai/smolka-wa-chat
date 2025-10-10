@@ -259,13 +259,13 @@ export function MessageComposer({
   return (
     <div className="flex flex-col gap-2">
       {/* Compact Attendant Selector - Only show for admins or when needed */}
-      {(profile?.role === 'admin' || availableAttendants.length > 1) && (
+      {(profile?.roles?.includes('admin') || availableAttendants.length > 1) && (
         <div className="flex items-center gap-2 px-1">
           <User className="h-3 w-3 text-muted-foreground shrink-0" />
           <Select 
             value={selectedAttendant} 
             onValueChange={setSelectedAttendant} 
-            disabled={disabled || (profile?.role !== 'admin' && Boolean(profile?.full_name))}
+            disabled={disabled || (!profile?.roles?.includes('admin') && Boolean(profile?.full_name))}
           >
             <SelectTrigger className="h-6 w-36 text-xs bg-muted/50 border-muted-foreground/20 rounded-md">
               <SelectValue placeholder="Atendente" />
@@ -275,9 +275,6 @@ export function MessageComposer({
                 <SelectItem key={attendant.value} value={attendant.value}>
                   <div className="flex items-center gap-2">
                     <span className="text-xs">{attendant.label}</span>
-                    {attendant.role === 'admin' && (
-                      <Crown className="h-2 w-2 text-yellow-500" />
-                    )}
                   </div>
                 </SelectItem>
               ))}
