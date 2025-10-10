@@ -143,11 +143,23 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           const messageFrom = (newMessage.wa_from || '').replace(/\D/g, '');
           const messageTo = (newMessage.wa_to || '').replace(/\D/g, '');
           
-          // Verificar se a mensagem pertence a esta conversa
-          const isRelevant = messageFrom.includes(normalizedPhone) || 
-                            messageTo.includes(normalizedPhone) ||
-                            messageFrom === normalizedPhone ||
-                            messageTo === normalizedPhone;
+          // Verificar se a mensagem pertence a esta conversa baseado na direção
+          // OUTBOUND: wa_to contém o número do destinatário
+          // INBOUND: wa_from contém o número do remetente (wa_to contém WhatsApp Business Phone ID)
+          const isRelevant = 
+            (newMessage.direction === 'outbound' && (messageTo.includes(normalizedPhone) || messageTo === normalizedPhone)) ||
+            (newMessage.direction === 'inbound' && (messageFrom.includes(normalizedPhone) || messageFrom === normalizedPhone));
+          
+          console.log("🔍 Verificação de relevância da mensagem:", {
+            direction: newMessage.direction,
+            normalizedPhone,
+            messageFrom,
+            messageTo,
+            isRelevant,
+            reason: newMessage.direction === 'outbound' 
+              ? `Outbound: comparando wa_to (${messageTo}) com ${normalizedPhone}`
+              : `Inbound: comparando wa_from (${messageFrom}) com ${normalizedPhone} (wa_to=${messageTo} é ignorado)`
+          });
           
           if (isRelevant) {
             console.log("✅ Mensagem relevante para esta conversa, adicionando à lista");
