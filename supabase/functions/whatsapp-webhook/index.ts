@@ -234,15 +234,29 @@ async function processIncomingMessage(message: any, value: any) {
       is_template: false, // Incoming messages are not templates
     };
 
+    console.log('📝 Dados da mensagem a serem inseridos:', {
+      wa_message_id: messageData.wa_message_id,
+      wa_from: messageData.wa_from,
+      wa_to: messageData.wa_to,
+      direction: messageData.direction,
+      body: messageData.body?.substring(0, 50),
+      timestamp: messageData.wa_timestamp
+    });
+
     // Insert into database
-    const { error } = await supabase
+    const { data: insertedData, error } = await supabase
       .from('messages')
-      .insert([messageData]);
+      .insert([messageData])
+      .select();
 
     if (error) {
-      console.error('Error inserting message:', error);
+      console.error('❌ Erro ao inserir mensagem:', error);
     } else {
-      console.log('Message inserted successfully:', messageData.wa_message_id);
+      console.log('✅ Mensagem inserida com sucesso!', {
+        id: insertedData?.[0]?.id,
+        wa_message_id: messageData.wa_message_id,
+        wa_from: messageData.wa_from
+      });
       
       // Handle auto-triage flow
       await handleAutoTriage(message.from, messageBody, message);

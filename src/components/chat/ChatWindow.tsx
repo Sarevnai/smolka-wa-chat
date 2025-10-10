@@ -114,7 +114,11 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   useEffect(() => {
     loadMessages();
 
-    // Setup realtime subscription for this specific conversation
+    // Normalizar o número de telefone para comparação (remover caracteres especiais)
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    console.log("🔍 Configurando realtime para número:", phoneNumber, "| Normalizado:", normalizedPhone);
+
+    // Setup realtime subscription - SEM filtros específicos para garantir que recebemos todas as mensagens
     const channel = supabase
       .channel(`messages-${phoneNumber}`)
       .on(
@@ -122,49 +126,54 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         {
           event: "INSERT",
           schema: "public",
-          table: "messages",
-          filter: `wa_from=eq.${phoneNumber}`
+          table: "messages"
+          // ❌ Removido filter para receber TODAS as mensagens
         },
         (payload) => {
           const newMessage = payload.new as MessageRow;
-          console.log("Nova mensagem INBOUND recebida via realtime:", newMessage);
-          
-          setMessages(prev => {
-            const exists = prev.some(msg => msg.id === newMessage.id);
-            if (exists) return prev;
-            return [...prev, newMessage];
+          console.log("📨 Nova mensagem recebida via realtime:", {
+            id: newMessage.id,
+            from: newMessage.wa_from,
+            to: newMessage.wa_to,
+            direction: newMessage.direction,
+            body: newMessage.body?.substring(0, 50)
           });
-          setTimeout(scrollToBottom, 100);
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `wa_to=eq.${phoneNumber}`
-        },
-        (payload) => {
-          const newMessage = payload.new as MessageRow;
-          console.log("Nova mensagem OUTBOUND recebida via realtime:", newMessage);
           
-          setMessages(prev => {
-            const exists = prev.some(msg => msg.id === newMessage.id);
-            if (exists) return prev;
-            return [...prev, newMessage];
-          });
-          setTimeout(scrollToBottom, 100);
+          // Normalizar números para comparação confiável
+          const messageFrom = (newMessage.wa_from || '').replace(/\D/g, '');
+          const messageTo = (newMessage.wa_to || '').replace(/\D/g, '');
+          
+          // Verificar se a mensagem pertence a esta conversa
+          const isRelevant = messageFrom.includes(normalizedPhone) || 
+                            messageTo.includes(normalizedPhone) ||
+                            messageFrom === normalizedPhone ||
+                            messageTo === normalizedPhone;
+          
+          if (isRelevant) {
+            console.log("✅ Mensagem relevante para esta conversa, adicionando à lista");
+            setMessages(prev => {
+              const exists = prev.some(msg => msg.id === newMessage.id);
+              if (exists) {
+                console.log("⚠️ Mensagem duplicada, ignorando");
+                return prev;
+              }
+              return [...prev, newMessage];
+            });
+            setTimeout(scrollToBottom, 100);
+          } else {
+            console.log("❌ Mensagem NÃO relevante para esta conversa, ignorando");
+          }
         }
       )
       .subscribe((status) => {
-        console.log("Status da subscrição realtime:", status);
+        console.log("🔌 Status da subscrição realtime:", status);
       });
 
     return () => {
+      console.log("🔌 Removendo canal realtime");
       supabase.removeChannel(channel);
     };
-  }, [phoneNumber]);
+  }, [phoneNumber, loadMessages, scrollToBottom]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || sending) return;
