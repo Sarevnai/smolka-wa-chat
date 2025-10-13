@@ -100,7 +100,6 @@ export function CreateTicketModal({
       priority: selectedPriority,
       assigned_to: assignedTo || undefined,
       source: "WhatsApp",
-      contact_type: contact?.contact_type || undefined,
       contact_id: contact?.id
     };
 
@@ -115,8 +114,13 @@ export function CreateTicketModal({
       setAssignedTo(undefined);
       
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao criar ticket:', error);
+      toast({
+        title: "Erro ao criar ticket",
+        description: error?.message || "Tente novamente.",
+        variant: "destructive"
+      });
     }
   };
 

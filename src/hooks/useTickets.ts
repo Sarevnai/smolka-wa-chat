@@ -47,7 +47,6 @@ export interface CreateTicketData {
   property_type?: "apartamento" | "casa" | "comercial" | "terreno";
   assigned_to?: string;
   source?: string;
-  contact_type?: "proprietario" | "inquilino";
   value?: number;
   contact_id?: string;
 }
