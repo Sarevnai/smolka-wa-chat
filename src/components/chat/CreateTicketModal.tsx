@@ -38,8 +38,8 @@ export function CreateTicketModal({
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPriority, setSelectedPriority] = useState<'baixa' | 'media' | 'alta' | 'critica'>('media');
-  const [selectedStage, setSelectedStage] = useState<string>('');
-  const [assignedTo, setAssignedTo] = useState('');
+  const [selectedStageId, setSelectedStageId] = useState<string | undefined>(undefined);
+  const [assignedTo, setAssignedTo] = useState<string | undefined>(undefined);
   const [includeMessages, setIncludeMessages] = useState(true);
   const [showCreateCategory, setShowCreateCategory] = useState(false);
 
@@ -53,7 +53,7 @@ export function CreateTicketModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim() || !description.trim() || !selectedCategory || !selectedStage) {
+    if (!title.trim() || !description.trim() || !selectedCategory || !selectedStageId) {
       toast({
         title: "Erro",
         description: "Preencha todos os campos obrigatórios",
@@ -61,6 +61,18 @@ export function CreateTicketModal({
       });
       return;
     }
+
+    // Derive stage name from stage ID
+    const selectedStageData = ticketStages?.find(s => s.id === selectedStageId);
+    if (!selectedStageData) {
+      toast({
+        title: "Erro",
+        description: "Estágio inválido",
+        variant: "destructive"
+      });
+      return;
+    }
+    const stageName = selectedStageData.name;
 
     // Prepare description with messages if selected
     let finalDescription = description.trim();
@@ -83,7 +95,7 @@ export function CreateTicketModal({
       description: finalDescription,
       phone: phoneNumber,
       email: contact?.email || undefined,
-      stage: selectedStage,
+      stage: stageName,
       category: categoryName,
       priority: selectedPriority,
       assigned_to: assignedTo || undefined,
@@ -99,8 +111,8 @@ export function CreateTicketModal({
       setTitle('');
       setDescription('');
       setSelectedCategory('');
-      setSelectedStage('');
-      setAssignedTo('');
+      setSelectedStageId(undefined);
+      setAssignedTo(undefined);
       
       onOpenChange(false);
     } catch (error) {
@@ -185,11 +197,13 @@ export function CreateTicketModal({
                     <SelectValue placeholder="Selecione a categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(categories || []).map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.icon} {category.name}
-                      </SelectItem>
-                    ))}
+                    {(categories || [])
+                      .filter(category => category.id && category.name)
+                      .map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.icon} {category.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 {canManageCategories && (
@@ -225,35 +239,52 @@ export function CreateTicketModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="stage">Estágio Inicial</Label>
-              <Select value={selectedStage} onValueChange={setSelectedStage}>
+              <Label htmlFor="stage">Estágio Inicial *</Label>
+              <Select value={selectedStageId} onValueChange={setSelectedStageId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione o estágio" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(ticketStages || []).map((stage) => (
-                    <SelectItem key={stage.id} value={stage.name}>
-                      {stage.name}
-                    </SelectItem>
-                  ))}
+                  {(ticketStages || [])
+                    .filter(stage => stage.id && stage.name)
+                    .map((stage) => (
+                      <SelectItem key={stage.id} value={stage.id}>
+                        {stage.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="assigned">Responsável</Label>
-              <Select value={assignedTo || undefined} onValueChange={setAssignedTo}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Não atribuído" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(profiles || []).map((profile) => (
-                    <SelectItem key={profile.user_id} value={profile.user_id}>
-                      {profile.full_name || 'Sem nome'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={assignedTo} onValueChange={setAssignedTo}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Não atribuído" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(profiles || [])
+                      .filter(profile => profile.user_id && profile.user_id.trim())
+                      .map((profile) => (
+                        <SelectItem key={profile.user_id} value={profile.user_id}>
+                          {profile.full_name || 'Sem nome'}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {assignedTo && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setAssignedTo(undefined)}
+                    title="Limpar responsável"
+                  >
+                    ✕
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 
