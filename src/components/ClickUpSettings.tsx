@@ -72,10 +72,9 @@ export function ClickUpSettings() {
         setApiToken(loadedConfig.apiToken || '');
         setSelectedWorkspace(loadedConfig.workspaceId || '');
         setSelectedSpace(loadedConfig.spaceId || '');
-          setDefaultList(config.defaultListId || '');
-          if (config.apiToken) {
-            setConnected(true);
-          }
+        setDefaultList(loadedConfig.defaultListId || '');
+        if (loadedConfig.apiToken) {
+          setConnected(true);
         }
       }
     };
