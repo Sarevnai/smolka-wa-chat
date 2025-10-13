@@ -39,10 +39,6 @@ export function CreateTicketModal({
   const [selectedPriority, setSelectedPriority] = useState<'baixa' | 'media' | 'alta' | 'critica'>('media');
   const [selectedStage, setSelectedStage] = useState<string>('');
   const [assignedTo, setAssignedTo] = useState('');
-  const [propertyCode, setPropertyCode] = useState('');
-  const [propertyAddress, setPropertyAddress] = useState('');
-  const [propertyType, setPropertyType] = useState<'apartamento' | 'casa' | 'comercial' | 'terreno'>('apartamento');
-  const [ticketValue, setTicketValue] = useState<string>('');
   const [includeMessages, setIncludeMessages] = useState(true);
   const [showCreateCategory, setShowCreateCategory] = useState(false);
 
@@ -84,13 +80,9 @@ export function CreateTicketModal({
       stage: selectedStage,
       category: selectedCategory,
       priority: selectedPriority,
-      property_code: propertyCode || undefined,
-      property_address: propertyAddress || undefined,
-      property_type: propertyType,
       assigned_to: assignedTo || undefined,
       source: "WhatsApp",
       contact_type: contact?.contact_type || undefined,
-      value: ticketValue ? parseFloat(ticketValue) : undefined,
       contact_id: contact?.id
     };
 
@@ -103,9 +95,6 @@ export function CreateTicketModal({
       setSelectedCategory('');
       setSelectedStage('');
       setAssignedTo('');
-      setPropertyCode('');
-      setPropertyAddress('');
-      setTicketValue('');
       
       onOpenChange(false);
     } catch (error) {
@@ -269,73 +258,18 @@ export function CreateTicketModal({
             />
           </div>
 
-          {/* Property Info */}
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="font-semibold">Informações do Imóvel</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="property-code">Código do Imóvel</Label>
-                <Input
-                  id="property-code"
-                  value={propertyCode}
-                  onChange={(e) => setPropertyCode(e.target.value)}
-                  placeholder="Ex: ED001-302"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="property-type">Tipo do Imóvel</Label>
-                <Select value={propertyType} onValueChange={(value: 'apartamento' | 'casa' | 'comercial' | 'terreno') => setPropertyType(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="apartamento">Apartamento</SelectItem>
-                    <SelectItem value="casa">Casa</SelectItem>
-                    <SelectItem value="comercial">Comercial</SelectItem>
-                    <SelectItem value="terreno">Terreno</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="property-address">Endereço do Imóvel</Label>
-                <Input
-                  id="property-address"
-                  value={propertyAddress}
-                  onChange={(e) => setPropertyAddress(e.target.value)}
-                  placeholder="Ex: Rua das Flores, 123 - Apto 302"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Additional Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="value">Valor Envolvido (R$)</Label>
-              <Input
-                id="value"
-                type="number"
-                step="0.01"
-                value={ticketValue}
-                onChange={(e) => setTicketValue(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div className="flex items-center space-x-2 pt-6">
-              <input
-                type="checkbox"
-                id="include-messages"
-                checked={includeMessages}
-                onChange={(e) => setIncludeMessages(e.target.checked)}
-                className="rounded"
-              />
-              <Label htmlFor="include-messages" className="text-sm">
-                Incluir mensagens recentes na descrição
-              </Label>
-            </div>
+          {/* Additional Options */}
+          <div className="flex items-center space-x-2 pt-4 border-t">
+            <input
+              type="checkbox"
+              id="include-messages"
+              checked={includeMessages}
+              onChange={(e) => setIncludeMessages(e.target.checked)}
+              className="rounded"
+            />
+            <Label htmlFor="include-messages" className="text-sm">
+              Incluir mensagens recentes na descrição
+            </Label>
           </div>
 
           {/* Actions */}
