@@ -242,12 +242,11 @@ export function CreateTicketModal({
 
             <div className="space-y-2">
               <Label htmlFor="assigned">Responsável</Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <Select value={assignedTo || undefined} onValueChange={setAssignedTo}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o responsável" />
+                  <SelectValue placeholder="Não atribuído" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Não atribuído</SelectItem>
                   {(profiles || []).map((profile) => (
                     <SelectItem key={profile.user_id} value={profile.user_id}>
                       {profile.full_name || 'Sem nome'}
