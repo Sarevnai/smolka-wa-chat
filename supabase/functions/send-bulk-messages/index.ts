@@ -179,17 +179,17 @@ serve(async (req) => {
     }
 
     // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
+    const { data: userRole } = await supabase
+      .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .single();
 
-    if (!profile || profile.role !== 'admin') {
+    if (!userRole || userRole.role !== 'admin') {
       throw new Error('Only admins can send bulk messages');
     }
 
-    console.log(`✅ User authenticated as admin: ${user.email}`);
+    console.log(`✅ User authenticated as admin: ${user.email}, role: ${userRole.role}`);
 
     // Parse request
     const requestData: BulkMessageRequest = await req.json();
