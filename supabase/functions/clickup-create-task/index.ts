@@ -43,14 +43,30 @@ serve(async (req) => {
       );
     }
 
-    const clickupToken = Deno.env.get('CLICKUP_API_TOKEN');
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get ClickUp config from database (prefer DB token over env)
+    const { data: config } = await supabase
+      .from('clickup_config')
+      .select('api_token, workspace_id, space_id, default_list_id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const clickupToken = config?.api_token || Deno.env.get('CLICKUP_API_TOKEN');
+    
     if (!clickupToken) {
+      console.error('❌ No ClickUp token found in database or environment');
       return new Response(
-        JSON.stringify({ error: 'ClickUp API token not configured' }),
+        JSON.stringify({ error: 'ClickUp API token not configured. Please configure it in the ClickUp Integration page.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('🔑 Using token from:', config?.api_token ? 'database' : 'environment');
     console.log('🎟️ Ticket data received:', JSON.stringify(ticket, null, 2));
     console.log('📋 List ID:', listId);
 
@@ -62,19 +78,38 @@ serve(async (req) => {
     });
 
     if (!validateResponse.ok) {
+      const errorBody = await validateResponse.text();
       console.error('❌ Invalid ClickUp list:', listId);
+      console.error('❌ ClickUp API Error:', validateResponse.status, errorBody);
+      
+      // If we have space_id, try to list available lists for debugging
+      let availableLists = '';
+      if (config?.space_id) {
+        try {
+          const listsResponse = await fetch(`https://api.clickup.com/api/v2/space/${config.space_id}/list`, {
+            headers: { 'Authorization': clickupToken }
+          });
+          
+          if (listsResponse.ok) {
+            const listsData = await listsResponse.json();
+            const listNames = listsData.lists.map((l: any) => `${l.name} (${l.id})`).join(', ');
+            availableLists = `\n\nListas disponíveis no Space: ${listNames}`;
+            console.log('📋 Available lists:', listNames);
+          }
+        } catch (e) {
+          console.error('Failed to fetch available lists:', e);
+        }
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: `Lista ${listId} não encontrada no ClickUp. Verifique a configuração.` 
+          error: `Lista ${listId} não encontrada no ClickUp. Verifique a configuração.`,
+          details: errorBody,
+          debug: availableLists || 'Configure o Space ID na página de integração para ver listas disponíveis'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Resolve assigned_to UUID to name if present
     let assignedName = null;
@@ -125,9 +160,9 @@ ${assignedName ? `• Responsável: ${assignedName}` : ''}`;
 
     if (!clickupResponse.ok) {
       const errorData = await clickupResponse.text();
-      console.error('ClickUp API Error:', errorData);
+      console.error('❌ ClickUp API Error:', clickupResponse.status, errorData);
       return new Response(
-        JSON.stringify({ error: 'Failed to create ClickUp task', details: errorData }),
+        JSON.stringify({ error: 'Failed to create ClickUp task', details: errorData, status: clickupResponse.status }),
         { status: clickupResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

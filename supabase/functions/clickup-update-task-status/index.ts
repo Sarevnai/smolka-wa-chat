@@ -34,18 +34,29 @@ serve(async (req) => {
 
     console.log('Updating ClickUp task for ticket:', ticketId, 'with updates:', updates);
 
-    // Get ClickUp API token from secrets
-    const clickupApiToken = Deno.env.get('CLICKUP_API_TOKEN');
-    if (!clickupApiToken) {
-      throw new Error('ClickUp API token not configured');
-    }
-
     // Get Supabase credentials
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get ClickUp config from database (prefer DB token over env)
+    const { data: config } = await supabase
+      .from('clickup_config')
+      .select('api_token')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const clickupApiToken = config?.api_token || Deno.env.get('CLICKUP_API_TOKEN');
+    
+    if (!clickupApiToken) {
+      console.error('❌ No ClickUp token found');
+      throw new Error('ClickUp API token not configured');
+    }
+
+    console.log('🔑 Using token from:', config?.api_token ? 'database' : 'environment');
 
     // Get ClickUp task ID from integration table
     const { data: integration, error: integrationError } = await supabase
@@ -89,7 +100,7 @@ serve(async (req) => {
       updateData.status = statusMap[updates.stage];
     }
 
-    console.log('Sending update to ClickUp:', updateData);
+    console.log('📤 Sending update to ClickUp:', updateData);
 
     // Update ClickUp task
     const clickupResponse = await fetch(`https://api.clickup.com/api/v2/task/${integration.clickup_task_id}`, {
@@ -103,14 +114,14 @@ serve(async (req) => {
 
     if (!clickupResponse.ok) {
       const errorText = await clickupResponse.text();
-      console.error('ClickUp API error:', errorText);
+      console.error('❌ ClickUp API error:', clickupResponse.status, errorText);
       
       // Update sync status to error
       await supabase
         .from('clickup_integration')
         .update({ 
           sync_status: 'error',
-          error_message: `ClickUp API error: ${errorText}`,
+          error_message: `ClickUp API error (${clickupResponse.status}): ${errorText}`,
           updated_at: new Date().toISOString()
         })
         .eq('ticket_id', ticketId);
@@ -129,7 +140,7 @@ serve(async (req) => {
       })
       .eq('ticket_id', ticketId);
 
-    console.log('ClickUp task updated successfully');
+    console.log('✅ ClickUp task updated successfully');
 
     return new Response(
       JSON.stringify({ 

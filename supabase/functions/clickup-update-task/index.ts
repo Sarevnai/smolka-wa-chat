@@ -28,19 +28,32 @@ serve(async (req) => {
       );
     }
 
-    const clickupToken = Deno.env.get('CLICKUP_API_TOKEN');
+    // Get Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get ClickUp config from database (prefer DB token over env)
+    const { data: config } = await supabase
+      .from('clickup_config')
+      .select('api_token')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const clickupToken = config?.api_token || Deno.env.get('CLICKUP_API_TOKEN');
+    
     if (!clickupToken) {
+      console.error('❌ No ClickUp token found');
       return new Response(
         JSON.stringify({ error: 'ClickUp API token not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get ClickUp task ID from integration table
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('🔑 Using token from:', config?.api_token ? 'database' : 'environment');
 
+    // Get ClickUp task ID from integration table
     const { data: integration, error: fetchError } = await supabase
       .from('clickup_integration')
       .select('clickup_task_id, clickup_list_id')
@@ -54,7 +67,7 @@ serve(async (req) => {
       );
     }
 
-    // Prepare simplified update data for ClickUp (avoid problematic fields)
+    // Prepare simplified update data for ClickUp
     const updateData: any = {};
 
     if (updates.title) {
@@ -69,10 +82,7 @@ serve(async (req) => {
       updateData.priority = priorityMap[updates.priority as keyof typeof priorityMap];
     }
 
-    // Note: Status updates removed to avoid ClickUp API errors
-    // Users will need to update status manually in ClickUp for now
-
-    console.log('Updating ClickUp task with data:', JSON.stringify(updateData, null, 2));
+    console.log('📤 Updating ClickUp task with data:', JSON.stringify(updateData, null, 2));
 
     // Update task in ClickUp
     const clickupResponse = await fetch(`https://api.clickup.com/api/v2/task/${integration.clickup_task_id}`, {
@@ -86,7 +96,7 @@ serve(async (req) => {
 
     if (!clickupResponse.ok) {
       const errorData = await clickupResponse.text();
-      console.error('ClickUp API Error:', errorData);
+      console.error('❌ ClickUp API Error:', clickupResponse.status, errorData);
       
       // Update sync status to error
       await supabase
@@ -99,13 +109,13 @@ serve(async (req) => {
         .eq('ticket_id', ticketId);
 
       return new Response(
-        JSON.stringify({ error: 'Failed to update ClickUp task', details: errorData }),
+        JSON.stringify({ error: 'Failed to update ClickUp task', details: errorData, status: clickupResponse.status }),
         { status: clickupResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const clickupTask = await clickupResponse.json();
-    console.log('ClickUp task updated successfully:', integration.clickup_task_id);
+    console.log('✅ ClickUp task updated successfully:', integration.clickup_task_id);
 
     // Update sync status to synced
     const { error: dbError } = await supabase
