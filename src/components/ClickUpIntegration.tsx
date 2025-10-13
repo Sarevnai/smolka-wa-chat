@@ -70,43 +70,25 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
           .maybeSingle();
 
         if (data && !error) {
-          config = {
-            proprietariosListId: data.proprietarios_list_id,
-            inquilinosListId: data.inquilinos_list_id
-          };
+          config = { defaultListId: data.default_list_id };
         }
       } catch (error) {
         console.error('Error loading config from database:', error);
-      }
-
-      // Fallback to localStorage
-      if (!config) {
-        const savedConfig = localStorage.getItem('clickup_config');
-        if (savedConfig) {
-          const parsedConfig = JSON.parse(savedConfig);
-          config = {
-            proprietariosListId: parsedConfig.proprietariosListId,
-            inquilinosListId: parsedConfig.inquilinosListId
-          };
-        }
       }
 
       if (!config) {
         throw new Error('ClickUp não configurado. Acesse a página ClickUp para configurar.');
       }
 
-      const listId = ticket.type === 'proprietario' 
-        ? config.proprietariosListId 
-        : config.inquilinosListId;
+      const listId = config.defaultListId;
 
       if (!listId) {
-        throw new Error(`Lista do ClickUp não configurada para ${ticket.type === 'proprietario' ? 'proprietários' : 'inquilinos'}`);
+        throw new Error('Lista do ClickUp não configurada');
       }
 
       console.log('Syncing ticket to ClickUp:', {
         ticketId: ticket.id,
-        listId,
-        ticketType: ticket.type
+        listId
       });
 
       const response = await supabase.functions.invoke('clickup-create-task', {
@@ -157,7 +139,6 @@ export function ClickUpIntegration({ ticket }: ClickUpIntegrationProps) {
             title: ticket.title,
             description: ticket.description,
             priority: ticket.priority,
-            type: ticket.type,
             assignedTo: ticket.assigned_to
           }
         }

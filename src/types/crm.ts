@@ -17,9 +17,20 @@ export interface Ticket {
   assignedTo?: string;
   lastContact: string;
   source: string;
-  type: "proprietario" | "inquilino";
+  contact_type?: "proprietario" | "inquilino";
   createdAt: string;
-  value?: number; // Para casos que envolvem valores
+  value?: number;
+}
+
+export interface TicketCategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Stage {
@@ -27,23 +38,6 @@ export interface Stage {
   name: string;
   color: string;
 }
-
-export const CATEGORIES = {
-  proprietario: [
-    { id: "manutencao-preventiva", name: "🔧 Manutenção Preventiva", color: "bg-blue-100 text-blue-700" },
-    { id: "gestao-contratual", name: "📋 Gestão Contratual", color: "bg-purple-100 text-purple-700" },
-    { id: "questoes-financeiras", name: "💰 Questões Financeiras", color: "bg-green-100 text-green-700" },
-    { id: "melhorias-imovel", name: "🏠 Melhorias no Imóvel", color: "bg-orange-100 text-orange-700" },
-    { id: "solicitacoes-inquilino", name: "📞 Solicitações do Inquilino", color: "bg-yellow-100 text-yellow-700" }
-  ],
-  inquilino: [
-    { id: "manutencao-corretiva", name: "🔨 Manutenção Corretiva", color: "bg-red-100 text-red-700" },
-    { id: "pagamentos-boletos", name: "💳 Pagamentos/Boletos", color: "bg-green-100 text-green-700" },
-    { id: "seguro-garantias", name: "🛡️ Seguro e Garantias", color: "bg-blue-100 text-blue-700" },
-    { id: "documentos", name: "📄 Documentos", color: "bg-gray-100 text-gray-700" },
-    { id: "duvidas-gerais", name: "❓ Dúvidas Gerais", color: "bg-indigo-100 text-indigo-700" }
-  ]
-};
 
 export const PRIORITY_CONFIG = {
   baixa: { color: "bg-gray-100 text-gray-600", label: "Baixa" },

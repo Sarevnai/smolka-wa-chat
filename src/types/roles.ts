@@ -27,6 +27,7 @@ export interface RolePermissions {
   canCreateTickets: boolean;
   canDeleteTickets: boolean;
   canViewAllTickets: boolean;
+  canManageCategories: boolean;
 }
 
 export const ROLE_LABELS: Record<AppRole, string> = {

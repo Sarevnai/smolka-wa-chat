@@ -42,6 +42,7 @@ export function usePermissions(): RolePermissions & {
         canCreateTickets: true,
         canDeleteTickets: true,
         canViewAllTickets: true,
+        canManageCategories: true,
       };
     }
 
@@ -65,6 +66,7 @@ export function usePermissions(): RolePermissions & {
         canCreateTickets: true,
         canDeleteTickets: false,
         canViewAllTickets: true,
+        canManageCategories: true,
       };
     }
 
@@ -88,6 +90,7 @@ export function usePermissions(): RolePermissions & {
       canCreateTickets: true,
       canDeleteTickets: false,
       canViewAllTickets: false,
+      canManageCategories: false,
     };
   }, [isAdmin, isManager, isAttendant]);
 

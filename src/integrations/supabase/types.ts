@@ -295,9 +295,8 @@ export type Database = {
         Row: {
           api_token: string
           created_at: string
+          default_list_id: string | null
           id: string
-          inquilinos_list_id: string
-          proprietarios_list_id: string
           space_id: string
           updated_at: string
           workspace_id: string
@@ -305,9 +304,8 @@ export type Database = {
         Insert: {
           api_token: string
           created_at?: string
+          default_list_id?: string | null
           id?: string
-          inquilinos_list_id: string
-          proprietarios_list_id: string
           space_id: string
           updated_at?: string
           workspace_id: string
@@ -315,9 +313,8 @@ export type Database = {
         Update: {
           api_token?: string
           created_at?: string
+          default_list_id?: string | null
           id?: string
-          inquilinos_list_id?: string
-          proprietarios_list_id?: string
           space_id?: string
           updated_at?: string
           workspace_id?: string
@@ -710,6 +707,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_categories: {
+        Row: {
+          color: string
+          created_at: string | null
+          created_by: string | null
+          icon: string
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          color: string
+          created_at?: string | null
+          created_by?: string | null
+          icon: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          created_by?: string | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ticket_stages: {
         Row: {
           color: string
@@ -717,7 +747,6 @@ export type Database = {
           id: string
           name: string
           order_index: number
-          ticket_type: string
           updated_at: string
         }
         Insert: {
@@ -726,7 +755,6 @@ export type Database = {
           id?: string
           name: string
           order_index: number
-          ticket_type: string
           updated_at?: string
         }
         Update: {
@@ -735,7 +763,6 @@ export type Database = {
           id?: string
           name?: string
           order_index?: number
-          ticket_type?: string
           updated_at?: string
         }
         Relationships: []
@@ -758,7 +785,6 @@ export type Database = {
           source: string
           stage: string
           title: string
-          type: string
           updated_at: string
           value: number | null
         }
@@ -779,7 +805,6 @@ export type Database = {
           source?: string
           stage: string
           title: string
-          type: string
           updated_at?: string
           value?: number | null
         }
@@ -800,7 +825,6 @@ export type Database = {
           source?: string
           stage?: string
           title?: string
-          type?: string
           updated_at?: string
           value?: number | null
         }

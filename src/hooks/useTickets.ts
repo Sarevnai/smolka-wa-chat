@@ -18,7 +18,7 @@ export interface Ticket {
   assigned_to: string | null;
   last_contact: string;
   source: string;
-  type: "proprietario" | "inquilino";
+  contact_type: "proprietario" | "inquilino" | null;
   value: number | null;
   contact_id: string | null;
   created_at: string;
@@ -29,7 +29,6 @@ export interface TicketStage {
   id: string;
   name: string;
   color: string;
-  ticket_type: "proprietario" | "inquilino";
   order_index: number;
   created_at: string;
   updated_at: string;
@@ -48,19 +47,31 @@ export interface CreateTicketData {
   property_type?: "apartamento" | "casa" | "comercial" | "terreno";
   assigned_to?: string;
   source?: string;
-  type: "proprietario" | "inquilino";
+  contact_type?: "proprietario" | "inquilino";
   value?: number;
   contact_id?: string;
 }
 
-export const useTickets = (type?: "proprietario" | "inquilino") => {
+export const useTickets = (filters?: {
+  assignedTo?: string;
+  category?: string;
+  unassignedOnly?: boolean;
+}) => {
   return useQuery({
-    queryKey: ["tickets", type],
+    queryKey: ["tickets", filters],
     queryFn: async () => {
       let query = supabase.from("tickets").select("*");
       
-      if (type) {
-        query = query.eq("type", type);
+      if (filters?.assignedTo) {
+        query = query.eq("assigned_to", filters.assignedTo);
+      }
+      
+      if (filters?.unassignedOnly) {
+        query = query.is("assigned_to", null);
+      }
+      
+      if (filters?.category) {
+        query = query.eq("category", filters.category);
       }
       
       const { data, error } = await query.order("created_at", { ascending: false });
@@ -75,17 +86,14 @@ export const useTickets = (type?: "proprietario" | "inquilino") => {
   });
 };
 
-export const useTicketStages = (type?: "proprietario" | "inquilino") => {
+export const useTicketStages = () => {
   return useQuery({
-    queryKey: ["ticket_stages", type],
+    queryKey: ["ticket_stages"],
     queryFn: async () => {
-      let query = supabase.from("ticket_stages").select("*");
-      
-      if (type) {
-        query = query.eq("ticket_type", type);
-      }
-      
-      const { data, error } = await query.order("order_index", { ascending: true });
+      const { data, error } = await supabase
+        .from("ticket_stages")
+        .select("*")
+        .order("order_index", { ascending: true });
       
       if (error) {
         toast.error("Erro ao carregar estágios");

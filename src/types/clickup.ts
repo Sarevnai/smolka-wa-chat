@@ -2,8 +2,7 @@ export interface ClickUpConfig {
   apiToken: string;
   workspaceId: string;
   spaceId: string;
-  proprietariosListId: string;
-  inquilinosListId: string;
+  defaultListId: string;
 }
 
 export interface ClickUpTask {

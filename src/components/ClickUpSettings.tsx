@@ -35,8 +35,7 @@ export function ClickUpSettings() {
   const [lists, setLists] = useState<ClickUpList[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState('');
   const [selectedSpace, setSelectedSpace] = useState('');
-  const [proprietariosList, setProprietariosList] = useState('');
-  const [inquilinosList, setInquilinosList] = useState('');
+  const [defaultList, setDefaultList] = useState('');
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(false);
   const { toast } = useToast();
@@ -56,8 +55,7 @@ export function ClickUpSettings() {
           setApiToken(data.api_token || '');
           setSelectedWorkspace(data.workspace_id || '');
           setSelectedSpace(data.space_id || '');
-          setProprietariosList(data.proprietarios_list_id || '');
-          setInquilinosList(data.inquilinos_list_id || '');
+          setDefaultList(data.default_list_id || '');
           if (data.api_token) {
             setConnected(true);
           }
@@ -86,7 +84,7 @@ export function ClickUpSettings() {
   }, []);
 
   const saveConfiguration = async () => {
-    if (!apiToken || !selectedWorkspace || !selectedSpace || !proprietariosList || !inquilinosList) {
+    if (!apiToken || !selectedWorkspace || !selectedSpace || !defaultList) {
       toast({
         title: "Erro",
         description: "Por favor, preencha todas as configurações antes de salvar.",
@@ -103,8 +101,7 @@ export function ClickUpSettings() {
           api_token: apiToken,
           workspace_id: selectedWorkspace,
           space_id: selectedSpace,
-          proprietarios_list_id: proprietariosList,
-          inquilinos_list_id: inquilinosList
+          default_list_id: defaultList
         });
 
       if (error) {
@@ -348,40 +345,21 @@ export function ClickUpSettings() {
                 )}
 
                 {selectedSpace && lists.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="proprietarios-list">Lista Proprietários</Label>
-                      <select
-                        id="proprietarios-list"
-                        className="w-full p-2 border border-input rounded-md bg-background"
-                        value={proprietariosList}
-                        onChange={(e) => setProprietariosList(e.target.value)}
-                      >
-                        <option value="">Selecione uma lista</option>
-                        {lists.map((list) => (
-                          <option key={list.id} value={list.id}>
-                            {list.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="inquilinos-list">Lista Inquilinos</Label>
-                      <select
-                        id="inquilinos-list"
-                        className="w-full p-2 border border-input rounded-md bg-background"
-                        value={inquilinosList}
-                        onChange={(e) => setInquilinosList(e.target.value)}
-                      >
-                        <option value="">Selecione uma lista</option>
-                        {lists.map((list) => (
-                          <option key={list.id} value={list.id}>
-                            {list.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="default-list">Lista Padrão</Label>
+                    <select
+                      id="default-list"
+                      className="w-full p-2 border border-input rounded-md bg-background"
+                      value={defaultList}
+                      onChange={(e) => setDefaultList(e.target.value)}
+                    >
+                      <option value="">Selecione uma lista</option>
+                      {lists.map((list) => (
+                        <option key={list.id} value={list.id}>
+                          {list.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
 
