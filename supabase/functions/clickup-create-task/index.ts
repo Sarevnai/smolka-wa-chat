@@ -15,14 +15,9 @@ interface TicketData {
   stage: string;
   category: string;
   priority: "baixa" | "media" | "alta" | "critica";
-  property_code?: string;
-  property_address?: string;
-  property_type?: "apartamento" | "casa" | "comercial" | "terreno";
   assigned_to?: string;
   last_contact: string;
   source: string;
-  type: "proprietario" | "inquilino";
-  value?: number;
   contact_id?: string;
 }
 
@@ -56,6 +51,44 @@ serve(async (req) => {
       );
     }
 
+    console.log('🎟️ Ticket data received:', JSON.stringify(ticket, null, 2));
+    console.log('📋 List ID:', listId);
+
+    // Validate that the list exists in ClickUp
+    const validateResponse = await fetch(`https://api.clickup.com/api/v2/list/${listId}`, {
+      headers: {
+        'Authorization': clickupToken
+      }
+    });
+
+    if (!validateResponse.ok) {
+      console.error('❌ Invalid ClickUp list:', listId);
+      return new Response(
+        JSON.stringify({ 
+          error: `Lista ${listId} não encontrada no ClickUp. Verifique a configuração.` 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Resolve assigned_to UUID to name if present
+    let assignedName = null;
+    if (ticket.assigned_to) {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', ticket.assigned_to)
+        .single();
+      
+      assignedName = profileData?.full_name || ticket.assigned_to;
+      console.log('👤 Assigned to:', assignedName);
+    }
+
     // Prepare comprehensive description with all ticket details
     const fullDescription = `**Descrição:** ${ticket.description}
 
@@ -63,29 +96,22 @@ serve(async (req) => {
 • Telefone: ${ticket.phone}
 • Email: ${ticket.email || 'Não informado'}
 
-**Informações do Imóvel:**
-• Código: ${ticket.property_code || 'Não informado'}
-• Endereço: ${ticket.property_address || 'Não informado'}
-• Tipo: ${ticket.property_type || 'Não informado'}
-
 **Outras Informações:**
 • Último Contato: ${ticket.last_contact}
 • Fonte: ${ticket.source}
 • Categoria: ${ticket.category}
 • Estágio: ${ticket.stage}
-• Tipo de Cliente: ${ticket.type}
-${ticket.value ? `• Valor: R$ ${ticket.value}` : ''}
-${ticket.assigned_to ? `• Responsável: ${ticket.assigned_to}` : ''}`;
+${assignedName ? `• Responsável: ${assignedName}` : ''}`;
 
     // Simplified task data to avoid ClickUp API errors
     const taskData = {
       name: ticket.title,
       description: fullDescription,
       priority: priorityMap[ticket.priority as keyof typeof priorityMap],
-      tags: [ticket.category, ticket.type, ticket.property_type || 'geral', ticket.stage].filter(Boolean)
+      tags: [ticket.category, ticket.stage, ticket.priority].filter(Boolean)
     };
 
-    console.log('Creating ClickUp task with data:', JSON.stringify(taskData, null, 2));
+    console.log('📤 Sending to ClickUp:', JSON.stringify(taskData, null, 2));
 
     // Create task in ClickUp
     const clickupResponse = await fetch(`https://api.clickup.com/api/v2/list/${listId}/task`, {
@@ -107,12 +133,7 @@ ${ticket.assigned_to ? `• Responsável: ${ticket.assigned_to}` : ''}`;
     }
 
     const clickupTask = await clickupResponse.json();
-    console.log('ClickUp task created successfully:', clickupTask.id);
-
-    // Store integration record in Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('✅ ClickUp task created successfully:', clickupTask.id);
 
     const { error: dbError } = await supabase
       .from('clickup_integration')

@@ -126,9 +126,40 @@ export const useCreateTicket = () => {
       
       return data as Ticket;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
       toast.success("Ticket criado com sucesso!");
+      
+      // 🚀 Automatic ClickUp synchronization
+      try {
+        console.log('🔄 Starting automatic ClickUp sync for ticket:', data.id);
+        
+        const { data: config } = await supabase
+          .from('clickup_config')
+          .select('default_list_id')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (config?.default_list_id) {
+          const { data: syncResult, error: syncError } = await supabase.functions.invoke('clickup-create-task', {
+            body: { ticket: data, listId: config.default_list_id }
+          });
+          
+          if (syncError) {
+            console.error('❌ ClickUp sync failed:', syncError);
+            toast.error("Ticket criado, mas falha na sincronização com ClickUp");
+          } else {
+            console.log('✅ ClickUp sync successful:', syncResult);
+            toast.success("Ticket sincronizado com ClickUp!");
+          }
+        } else {
+          console.warn('⚠️ ClickUp not configured - skipping sync');
+        }
+      } catch (clickupError) {
+        console.error('❌ ClickUp sync error:', clickupError);
+        // Don't block ticket creation if ClickUp sync fails
+      }
     },
     onError: (error) => {
       console.error("Erro ao criar ticket:", error);

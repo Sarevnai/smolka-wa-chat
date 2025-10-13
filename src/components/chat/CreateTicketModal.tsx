@@ -17,6 +17,7 @@ import { useCreateTicket, useTicketStages } from '@/hooks/useTickets';
 import { useTicketCategories } from '@/hooks/useTicketCategories';
 import { CreateCategoryDialog } from '@/components/tickets/CreateCategoryDialog';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useUserProfiles } from '@/hooks/useUserProfiles';
 
 interface CreateTicketModalProps {
   open: boolean;
@@ -47,6 +48,7 @@ export function CreateTicketModal({
   const { data: ticketStages } = useTicketStages();
   const { data: categories } = useTicketCategories();
   const { canManageCategories } = usePermissions();
+  const { profiles } = useUserProfiles();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +73,10 @@ export function CreateTicketModal({
       finalDescription += `\n\n--- Mensagens Recentes ---\n${messagesText}`;
     }
     
+    // Find category name for ClickUp integration
+    const selectedCategoryData = categories?.find(c => c.id === selectedCategory);
+    const categoryName = selectedCategoryData ? `${selectedCategoryData.icon} ${selectedCategoryData.name}` : selectedCategory;
+    
     // Prepare ticket data
     const ticketData = {
       title: title.trim(),
@@ -78,7 +84,7 @@ export function CreateTicketModal({
       phone: phoneNumber,
       email: contact?.email || undefined,
       stage: selectedStage,
-      category: selectedCategory,
+      category: categoryName,
       priority: selectedPriority,
       assigned_to: assignedTo || undefined,
       source: "WhatsApp",
@@ -236,12 +242,19 @@ export function CreateTicketModal({
 
             <div className="space-y-2">
               <Label htmlFor="assigned">Responsável</Label>
-              <Input
-                id="assigned"
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                placeholder="Nome do responsável"
-              />
+              <Select value={assignedTo} onValueChange={setAssignedTo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Não atribuído</SelectItem>
+                  {(profiles || []).map((profile) => (
+                    <SelectItem key={profile.user_id} value={profile.user_id}>
+                      {profile.full_name || 'Sem nome'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
