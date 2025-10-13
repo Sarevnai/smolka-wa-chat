@@ -68,14 +68,14 @@ export function ClickUpSettings() {
       // Fallback to localStorage
       const savedConfig = localStorage.getItem('clickup_config');
       if (savedConfig) {
-        const config = JSON.parse(savedConfig);
-        setApiToken(config.apiToken || '');
-        setSelectedWorkspace(config.workspaceId || '');
-        setSelectedSpace(config.spaceId || '');
-        setProprietariosList(config.proprietariosListId || '');
-        setInquilinosList(config.inquilinosListId || '');
-        if (config.apiToken) {
-          setConnected(true);
+        const loadedConfig = JSON.parse(savedConfig);
+        setApiToken(loadedConfig.apiToken || '');
+        setSelectedWorkspace(loadedConfig.workspaceId || '');
+        setSelectedSpace(loadedConfig.spaceId || '');
+          setDefaultList(config.defaultListId || '');
+          if (config.apiToken) {
+            setConnected(true);
+          }
         }
       }
     };
@@ -119,8 +119,7 @@ export function ClickUpSettings() {
         apiToken,
         workspaceId: selectedWorkspace,
         spaceId: selectedSpace,
-        proprietariosListId: proprietariosList,
-        inquilinosListId: inquilinosList
+        defaultListId: defaultList
       };
       localStorage.setItem('clickup_config', JSON.stringify(config));
       

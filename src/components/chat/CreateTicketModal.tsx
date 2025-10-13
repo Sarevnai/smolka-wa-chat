@@ -8,12 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FileText, Phone, Building2, User, Calendar, AlertTriangle } from 'lucide-react';
-import { CATEGORIES, PRIORITY_CONFIG } from '@/types/crm';
+import { FileText, Phone, User, AlertTriangle, Plus } from 'lucide-react';
+import { PRIORITY_CONFIG } from '@/types/crm';
 import { Contact } from '@/types/contact';
 import { MessageRow } from '@/lib/messages';
 import { useToast } from '@/hooks/use-toast';
 import { useCreateTicket, useTicketStages } from '@/hooks/useTickets';
+import { useTicketCategories } from '@/hooks/useTicketCategories';
+import { CreateCategoryDialog } from '@/components/tickets/CreateCategoryDialog';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface CreateTicketModalProps {
   open: boolean;
@@ -32,9 +35,6 @@ export function CreateTicketModal({
 }: CreateTicketModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedType, setSelectedType] = useState<'proprietario' | 'inquilino'>(
-    contact?.contact_type || 'inquilino'
-  );
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedPriority, setSelectedPriority] = useState<'baixa' | 'media' | 'alta' | 'critica'>('media');
   const [selectedStage, setSelectedStage] = useState<string>('');
@@ -44,10 +44,13 @@ export function CreateTicketModal({
   const [propertyType, setPropertyType] = useState<'apartamento' | 'casa' | 'comercial' | 'terreno'>('apartamento');
   const [ticketValue, setTicketValue] = useState<string>('');
   const [includeMessages, setIncludeMessages] = useState(true);
+  const [showCreateCategory, setShowCreateCategory] = useState(false);
 
   const { toast } = useToast();
   const createTicketMutation = useCreateTicket();
-  const { data: ticketStages } = useTicketStages(selectedType);
+  const { data: ticketStages } = useTicketStages();
+  const { data: categories } = useTicketCategories();
+  const { canManageCategories } = usePermissions();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +89,7 @@ export function CreateTicketModal({
       property_type: propertyType,
       assigned_to: assignedTo || undefined,
       source: "WhatsApp",
-      type: selectedType,
+      contact_type: contact?.contact_type || undefined,
       value: ticketValue ? parseFloat(ticketValue) : undefined,
       contact_id: contact?.id
     };
@@ -180,42 +183,31 @@ export function CreateTicketModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Tipo de Demanda *</Label>
-              <Select value={selectedType} onValueChange={(value: 'proprietario' | 'inquilino') => setSelectedType(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="proprietario">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Proprietário
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="inquilino">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Inquilino
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="category">Categoria *</Label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES[selectedType].map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(categories || []).map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.icon} {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {canManageCategories && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowCreateCategory(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -366,6 +358,11 @@ export function CreateTicketModal({
             </Button>
           </div>
         </form>
+
+        <CreateCategoryDialog 
+          open={showCreateCategory}
+          onOpenChange={setShowCreateCategory}
+        />
       </DialogContent>
     </Dialog>
   );
