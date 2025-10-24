@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
 import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
@@ -19,6 +20,7 @@ import { QuickTemplateSender } from "@/components/chat/QuickTemplateSender";
 import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { Contact } from "@/types/contact";
 import { formatPhoneNumber } from "@/lib/utils";
+import { getRatingDescription } from "@/lib/contactRating";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 
@@ -66,17 +68,29 @@ export default function Contacts() {
 
   const renderStars = (rating?: number) => {
     if (!rating) return null;
+    
+    const description = getRatingDescription(rating);
+    
     return (
-      <div className="flex items-center gap-1">
-        {Array.from({ length: 5 }, (_, i) => (
-          <Star
-            key={i}
-            className={`h-3 w-3 ${
-              i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
-            }`}
-          />
-        ))}
-      </div>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1 cursor-help">
+              {Array.from({ length: 5 }, (_, i) => (
+                <Star
+                  key={i}
+                  className={`h-3 w-3 ${
+                    i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'
+                  }`}
+                />
+              ))}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">{description}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   };
 
@@ -184,10 +198,11 @@ export default function Contacts() {
         )}
 
         {/* Search */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-4">
-              <div className="relative flex-1">
+        <div className="sticky top-0 z-10">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Buscar por nome, telefone, email ou contrato..." 
@@ -210,12 +225,13 @@ export default function Contacts() {
                   }}
                 />
               </div>
-              <Badge variant="outline" className="px-4 py-2">
+              <Badge variant="outline" className="px-4 py-2 font-semibold">
                 {isLoading ? '...' : `${contacts?.length || 0} contatos`}
               </Badge>
             </div>
           </CardContent>
         </Card>
+        </div>
 
         {/* Filters */}
         <ContactFilters 
@@ -226,8 +242,8 @@ export default function Contacts() {
 
         {/* Contacts Grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {Array.from({ length: 10 }).map((_, i) => (
               <Card key={i}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center space-x-3">
@@ -321,7 +337,7 @@ export default function Contacts() {
                         <FileText className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-medium">Contratos:</span>
                       </div>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1 max-h-16 overflow-hidden relative">
                         {contact.contracts.slice(0, 3).map((contract) => (
                           <Badge
                             key={contract.id}

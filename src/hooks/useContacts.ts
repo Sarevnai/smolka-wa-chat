@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Contact, Contract, ContactStats, CreateContactRequest } from '@/types/contact';
 import { ContactFiltersState } from '@/components/contacts/ContactFilters';
+import { calculateContactRating } from '@/lib/contactRating';
 
 // Optimized hook for contact selection with pagination to load all contacts
 export const useContactsForSelection = (searchTerm?: string, filters?: ContactFiltersState, limit = 2000) => {
@@ -151,6 +152,17 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
           lastTimestamp: null 
         };
 
+        // Calculate automatic rating based on engagement
+        const activeContracts = (contact.contact_contracts || []).filter(
+          (c: any) => c.status === 'ativo'
+        ).length;
+        
+        const autoRating = calculateContactRating({
+          totalMessages: Number(stats.totalMessages),
+          lastMessageTimestamp: stats.lastTimestamp,
+          activeContracts
+        });
+
         return {
           ...contact,
           contracts: contact.contact_contracts || [],
@@ -158,7 +170,9 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
           lastContact: stats.lastTimestamp 
             ? formatLastContact(stats.lastTimestamp)
             : "Sem mensagens",
-          lastMessageTimestamp: stats.lastTimestamp
+          lastMessageTimestamp: stats.lastTimestamp,
+          // Use manual rating if set, otherwise use auto-calculated rating
+          rating: contact.rating || autoRating
         } as Contact & { lastMessageTimestamp: string | null };
       });
 
@@ -394,11 +408,23 @@ export const useContactByPhone = (phone?: string) => {
         ? formatLastContact(lastMessage.wa_timestamp)
         : 'Nunca';
 
+      // Calculate automatic rating
+      const activeContracts = (data.contact_contracts || []).filter(
+        (c: any) => c.status === 'ativo'
+      ).length;
+      
+      const autoRating = calculateContactRating({
+        totalMessages: totalMessages || 0,
+        lastMessageTimestamp: lastMessage?.wa_timestamp || null,
+        activeContracts
+      });
+
       return {
         ...data,
         contracts: data.contact_contracts || [],
         totalMessages: totalMessages || 0,
-        lastContact
+        lastContact,
+        rating: data.rating || autoRating
       } as Contact;
     },
     enabled: !!phone,
