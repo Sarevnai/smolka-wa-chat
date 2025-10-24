@@ -259,20 +259,20 @@ export function MessageComposer({
       {/* Compact Attendant Selector - Only show for admins or when needed */}
       {(profile?.roles?.includes('admin') || availableAttendants.length > 1) && (
         <div className="flex items-center gap-2 px-1">
-          <User className="h-3 w-3 text-muted-foreground shrink-0" />
+          <User className="h-4 w-4 text-muted-foreground shrink-0" />
           <Select 
             value={selectedAttendant} 
             onValueChange={setSelectedAttendant} 
             disabled={disabled || (!profile?.roles?.includes('admin') && Boolean(profile?.full_name))}
           >
-            <SelectTrigger className="h-6 w-36 text-xs bg-muted/50 border-muted-foreground/20 rounded-md">
-              <SelectValue placeholder="Atendente" />
+            <SelectTrigger className="h-8 min-w-[200px] max-w-[280px] text-sm bg-muted/50 border-muted-foreground/20 rounded-md">
+              <SelectValue placeholder="Selecione o atendente" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-w-[280px]">
               {availableAttendants.map((attendant) => (
-                <SelectItem key={attendant.value} value={attendant.value}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs">{attendant.label}</span>
+                <SelectItem key={attendant.value} value={attendant.value} className="cursor-pointer">
+                  <div className="flex items-center gap-2 w-full">
+                    <span className="text-sm truncate">{attendant.label}</span>
                   </div>
                 </SelectItem>
               ))}
