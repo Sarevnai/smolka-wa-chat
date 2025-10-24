@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Upload, CheckCircle, XCircle, Info } from "lucide-react";
 import { Progress } from "./ui/progress";
 import { Input } from "./ui/input";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ImportResult {
   success: boolean;
@@ -33,6 +34,7 @@ export function ImportContactsModal({
   const [csvText, setCsvText] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,6 +86,11 @@ export function ImportContactsModal({
           title: 'Importação concluída',
           description: data.summary,
         });
+        
+        // Invalidate queries to refresh data instead of page reload
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        queryClient.invalidateQueries({ queryKey: ['contact-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['contacts-selection'] });
         
         onImportComplete?.();
       } else {

@@ -49,10 +49,24 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
   }, [initialPhone]);
 
   const handleAddContract = () => {
-    if (newContract.contract_number.trim()) {
-      setContracts([...contracts, { ...newContract }]);
-      setNewContract({ contract_number: '', contract_type: '', property_code: '' });
+    const contractNumber = newContract.contract_number.trim();
+    
+    if (!contractNumber) {
+      return;
     }
+    
+    // Check for duplicate contract numbers
+    if (contracts.some(c => c.contract_number === contractNumber)) {
+      toast({
+        title: "Contrato duplicado",
+        description: "Este número de contrato já foi adicionado",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setContracts([...contracts, { ...newContract }]);
+    setNewContract({ contract_number: '', contract_type: '', property_code: '' });
   };
 
   const handleRemoveContract = (index: number) => {
@@ -80,6 +94,19 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
         variant: "destructive"
       });
       return;
+    }
+
+    // Validate email if provided
+    if (email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        toast({
+          title: "Erro",
+          description: "Formato de email inválido",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     const request: CreateContactRequest = {
