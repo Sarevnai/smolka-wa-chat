@@ -11,6 +11,7 @@ import { useUpdateContact, useAddContract } from '@/hooks/useContacts';
 import { Contact } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
 import { AutoNameDetectionBadge } from './AutoNameDetectionBadge';
+import { normalizePhoneNumber, isValidPhoneNumber } from '@/lib/validation';
 
 interface EditContactModalProps {
   open: boolean;
@@ -97,12 +98,23 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
       return;
     }
 
+    // Normalize and validate phone
+    const normalizedPhone = normalizePhoneNumber(phone.trim());
+    if (!isValidPhoneNumber(normalizedPhone)) {
+      toast({
+        title: "Erro",
+        description: "Formato de telefone inválido. Use o formato: +55 11 99999-9999",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       await updateContact.mutateAsync({
         contactId: contact.id,
         updates: {
           name: name.trim() || null,
-          phone: phone.trim(),
+          phone: normalizedPhone,
           email: email.trim() || null,
           status,
           contact_type: contactType,

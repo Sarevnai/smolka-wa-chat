@@ -1,8 +1,7 @@
-import { MessageSquare, SparklesIcon } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ChatList } from "./ChatList";
 import { ChatWindow } from "./ChatWindow";
-import { NameSuggestionsPanel } from "@/components/contacts/NameSuggestionsPanel";
 
 interface ChatLayoutProps {
   selectedContact?: string;
@@ -48,23 +47,9 @@ export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps
                 Selecione uma conversa
               </h2>
               
-              <p className="text-muted-foreground text-center max-w-md mb-8 text-sm sm:text-base px-4">
-                Escolha uma conversa da lista à esquerda para começar ou visualize sugestões de nomes abaixo
+              <p className="text-muted-foreground text-center max-w-md text-sm sm:text-base px-4">
+                Escolha uma conversa da lista à esquerda para começar
               </p>
-              
-              {/* Name suggestions with better integration */}
-              <div className="w-full max-w-3xl">
-                <div className="mb-4 px-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                    <SparklesIcon className="h-4 w-4" />
-                    Sugestões de Nomes Detectados
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Estes contatos foram identificados automaticamente em suas conversas
-                  </p>
-                </div>
-                <NameSuggestionsPanel />
-              </div>
             </div>
           </div>
         )}

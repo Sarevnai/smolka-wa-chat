@@ -10,6 +10,7 @@ import { Plus, X, Phone, Mail, FileText, Heart, Building2, Key } from 'lucide-re
 import { useCreateContact } from '@/hooks/useContacts';
 import { CreateContactRequest } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
+import { normalizePhoneNumber, isValidPhoneNumber } from '@/lib/validation';
 
 interface NewContactModalProps {
   open: boolean;
@@ -70,9 +71,20 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
       return;
     }
 
+    // Normalize and validate phone
+    const normalizedPhone = normalizePhoneNumber(phone.trim());
+    if (!isValidPhoneNumber(normalizedPhone)) {
+      toast({
+        title: "Erro",
+        description: "Formato de telefone inválido. Use o formato: +55 11 99999-9999",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const request: CreateContactRequest = {
       name: name.trim() || undefined,
-      phone: phone.trim(),
+      phone: normalizedPhone,
       email: email.trim() || undefined,
       contact_type: contactType,
       description: description.trim() || undefined,
