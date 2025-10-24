@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent, useEffect, useRef } from "react";
+import { useState, KeyboardEvent, useEffect, useRef, useMemo } from "react";
 import { Send, User, Crown, X, FileText, Image as ImageIcon, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,8 +50,8 @@ export function MessageComposer({
   const { profiles } = useUserProfiles();
   const { sendMediaMessage } = useMediaUpload();
 
-  // Get available attendants based on user role
-  const getAvailableAttendants = () => {
+  // Memoize available attendants to prevent infinite re-renders
+  const availableAttendants = useMemo(() => {
     const baseAttendants: Array<{ value: string; label: string; role?: 'admin' | 'user' }> = [
       { value: "none", label: "Sem identificação" }
     ];
@@ -81,9 +81,7 @@ export function MessageComposer({
     }
 
     return baseAttendants;
-  };
-
-  const availableAttendants = getAvailableAttendants();
+  }, [profile, profiles]);
 
   // Load attendant from localStorage on component mount and set default based on user
   useEffect(() => {
