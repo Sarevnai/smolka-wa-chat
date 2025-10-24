@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useContactByPhone, useUpdateContact, useDeleteContact } from "@/hooks/useContacts";
 import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
 import { EditContactModal } from "@/components/contacts/EditContactModal";
+import { QuickTemplateSender } from "@/components/chat/QuickTemplateSender";
 import { useToast } from "@/hooks/use-toast";
 import { formatPhoneNumber } from "@/lib/utils";
 import { 
@@ -21,7 +22,8 @@ import {
   MessageSquare,
   Calendar,
   Building2,
-  Key
+  Key,
+  Sparkles
 } from "lucide-react";
 
 interface ContactProfileProps {
@@ -35,6 +37,7 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
   const updateContact = useUpdateContact();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showQuickTemplate, setShowQuickTemplate] = useState(false);
   const [notes, setNotes] = useState(contact?.notes || "");
   const { toast } = useToast();
 
@@ -235,10 +238,18 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Heart className="h-4 w-4" />
-                  Estatísticas
+                  Ações Rápidas
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Button
+                  variant="default"
+                  className="w-full gap-2"
+                  onClick={() => setShowQuickTemplate(true)}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Iniciar Conversa com Template
+                </Button>
                 {contact.rating && (
                   <div>
                     <div className="text-sm font-medium mb-2">Classificação</div>
@@ -309,6 +320,15 @@ export function ContactProfile({ phoneNumber, open, onOpenChange }: ContactProfi
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         contact={contact}
+      />
+
+      <QuickTemplateSender
+        phoneNumber={contact.phone}
+        open={showQuickTemplate}
+        onOpenChange={setShowQuickTemplate}
+        onSuccess={() => {
+          onOpenChange(false);
+        }}
       />
     </>
   );

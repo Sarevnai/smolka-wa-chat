@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2, UserPlus, Building2, Key, FileText, Star, User as UserIcon, Phone, Mail, Calendar, Activity, MessageCircle, Users, Upload } from "lucide-react";
+import { Plus, Search, Filter, MoreVertical, Edit, Trash2, UserPlus, Building2, Key, FileText, Star, User as UserIcon, Phone, Mail, Calendar, Activity, MessageCircle, Users, Upload, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { ContactProfile } from "@/components/contacts/ContactProfile";
 import { ImportContactsModal } from "@/components/ImportContactsModal";
 import { BulkMessageModal } from "@/components/contacts/BulkMessageModal";
 import { ContactFilters, ContactFiltersState } from "@/components/contacts/ContactFilters";
+import { QuickTemplateSender } from "@/components/chat/QuickTemplateSender";
 import { useContacts, useContactStats } from "@/hooks/useContacts";
 import { Contact } from "@/types/contact";
 import { formatPhoneNumber } from "@/lib/utils";
@@ -30,6 +31,8 @@ export default function Contacts() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [showQuickTemplate, setShowQuickTemplate] = useState(false);
+  const [quickTemplatePhone, setQuickTemplatePhone] = useState<string>("");
   const navigate = useNavigate();
   
   const { data: contacts, isLoading } = useContacts(searchTerm, filters);
@@ -335,6 +338,19 @@ export default function Contacts() {
                     <div className="flex space-x-2">
                        <Button 
                          size="sm" 
+                         variant="default" 
+                         className="h-8 gap-1"
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           setQuickTemplatePhone(contact.phone);
+                           setShowQuickTemplate(true);
+                         }}
+                       >
+                         <Sparkles className="h-3 w-3" />
+                         Iniciar
+                       </Button>
+                       <Button 
+                         size="sm" 
                          variant="outline" 
                          className="h-8 w-8 p-0"
                          onClick={(e) => {
@@ -344,17 +360,6 @@ export default function Contacts() {
                        >
                          <MessageCircle className="h-4 w-4" />
                        </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-8 w-8 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(`https://wa.me/${contact.phone.replace(/\D/g, '')}`, '_blank');
-                        }}
-                      >
-                        <Phone className="h-4 w-4" />
-                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -466,6 +471,15 @@ export default function Contacts() {
              onOpenChange={setShowProfileModal}
            />
          )}
+
+         <QuickTemplateSender
+           phoneNumber={quickTemplatePhone}
+           open={showQuickTemplate}
+           onOpenChange={setShowQuickTemplate}
+           onSuccess={() => {
+             navigate(`/chat/${quickTemplatePhone}`);
+           }}
+         />
       </div>
     </Layout>
   );

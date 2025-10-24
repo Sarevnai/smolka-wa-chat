@@ -19,7 +19,17 @@ export interface Message {
 
 export interface SendMessageRequest {
   to: string;
-  text: string;
+  text?: string;
+  template_name?: string;
+  language_code?: string;
+  components?: Array<{
+    type: string;
+    parameters?: Array<{
+      type: string;
+      text?: string;
+      [key: string]: any;
+    }>;
+  }>;
 }
 
 export interface SendMessageResponse {

@@ -13,16 +13,16 @@ serve(async (req) => {
   }
 
   try {
-    const { to, text, interactive } = await req.json();
+    const { to, text, interactive, template_name, language_code, components } = await req.json();
 
     console.log('Send message request:', { to, text, interactive });
 
     // Validate input
-    if (!to || (!text && !interactive)) {
+    if (!to || (!text && !interactive && !template_name)) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Campos "to" e "text" (ou interactive) são obrigatórios' 
+          error: 'Campos "to" e "text" (ou interactive ou template_name) são obrigatórios' 
         }),
         { 
           status: 400, 
@@ -57,10 +57,20 @@ serve(async (req) => {
     };
 
     // Add message content based on type
-    if (interactive) {
+    if (template_name) {
+      // Template message (HSM)
+      whatsappPayload.type = 'template';
+      whatsappPayload.template = {
+        name: template_name,
+        language: { code: language_code || 'pt_BR' },
+        components: components || []
+      };
+    } else if (interactive) {
+      // Interactive message
       whatsappPayload.type = 'interactive';
       whatsappPayload.interactive = interactive;
     } else {
+      // Simple text message
       whatsappPayload.type = 'text';
       whatsappPayload.text = { body: text };
     }
@@ -104,11 +114,11 @@ serve(async (req) => {
         wa_to: to,
         wa_phone_number_id: phoneNumberId,
         direction: 'outbound',
-        body: text,
+        body: text || `[Template: ${template_name}]`,
         wa_timestamp: new Date().toISOString(),
         raw: result,
         created_at: new Date().toISOString(),
-        is_template: !!interactive // Mark as template if interactive message
+        is_template: !!template_name || !!interactive // Mark as template if template_name or interactive
       };
 
       const { error: dbError } = await supabase

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,6 +23,7 @@ import { useDeleteConversation } from "@/hooks/useDeleteConversation";
 import { useDeleteMessage } from "@/hooks/useDeleteMessage";
 import { DeleteMessageConfirmation } from "./DeleteMessageConfirmation";
 import { DeletedMessagesTrash } from "./DeletedMessagesTrash";
+import { QuickTemplateSender } from "./QuickTemplateSender";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useMediaGallery } from "@/hooks/useMediaGallery";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -63,6 +64,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showQuickTemplate, setShowQuickTemplate] = useState(false);
   const [selectedFlags, setSelectedFlags] = useState<FlagType[]>([]);
   
   const { toast } = useToast();
@@ -432,6 +434,18 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         </div>
         
         <div className="flex items-center gap-1">
+          {messages.length === 0 && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowQuickTemplate(true)}
+              className="gap-2 mr-2"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Enviar Template
+            </Button>
+          )}
+          
           <Button 
             variant="ghost" 
             size="sm" 
@@ -662,6 +676,16 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         contactName={contact?.name}
         onConfirm={handleDeleteConversation}
         isDeleting={isDeleting}
+      />
+
+      <QuickTemplateSender
+        phoneNumber={phoneNumber}
+        open={showQuickTemplate}
+        onOpenChange={setShowQuickTemplate}
+        onSuccess={() => {
+          setShowQuickTemplate(false);
+          loadMessages();
+        }}
       />
 
       <DeleteMessageConfirmation
