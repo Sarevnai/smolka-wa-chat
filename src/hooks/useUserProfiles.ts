@@ -7,6 +7,8 @@ export interface UserProfile {
   id: string;
   user_id: string;
   full_name: string | null;
+  username: string;
+  user_code: number;
   roles: AppRole[];
   avatar_url?: string | null;
 }
@@ -28,7 +30,7 @@ export function useUserProfiles() {
         // Fetch all profiles
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, user_id, full_name, avatar_url')
+          .select('id, user_id, full_name, username, user_code, avatar_url')
           .order('full_name');
 
         if (profilesError) {

@@ -269,13 +269,21 @@ export function MessageComposer({
               <SelectValue placeholder="Selecione o atendente" />
             </SelectTrigger>
             <SelectContent className="max-w-[280px]">
-              {availableAttendants.map((attendant) => (
-                <SelectItem key={attendant.value} value={attendant.value} className="cursor-pointer">
-                  <div className="flex items-center gap-2 w-full">
-                    <span className="text-sm truncate">{attendant.label}</span>
-                  </div>
-                </SelectItem>
-              ))}
+              {availableAttendants.map((attendant) => {
+                const attendantProfile = profiles.find(p => p.full_name === attendant.label);
+                return (
+                  <SelectItem key={attendant.value} value={attendant.value} className="cursor-pointer">
+                    <div className="flex items-center gap-2 w-full justify-between">
+                      <span className="text-sm truncate">{attendant.label}</span>
+                      {attendantProfile?.username && (
+                        <span className="text-xs text-muted-foreground font-mono">
+                          @{attendantProfile.username}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>

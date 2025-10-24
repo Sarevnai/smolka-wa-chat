@@ -28,6 +28,8 @@ interface UserWithRole {
   id: string;
   email: string;
   full_name: string | null;
+  username: string;
+  user_code: number;
   role: AppRole | null;
 }
 
@@ -47,7 +49,7 @@ export default function UserManagement() {
       // Buscar todos os perfis
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, user_id, full_name');
+        .select('id, user_id, full_name, username, user_code');
 
       if (profilesError) throw profilesError;
 
@@ -78,6 +80,8 @@ export default function UserManagement() {
           id: profile.user_id,
           email: emailData?.email || 'N/A',
           full_name: profile.full_name,
+          username: profile.username,
+          user_code: profile.user_code,
           role: userRole?.role as AppRole || null,
         };
       }) || [];
@@ -156,10 +160,11 @@ export default function UserManagement() {
               ) : users.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">Nenhum usuário encontrado</p>
               ) : (
-                <Table>
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
+                      <TableHead>Username</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Permissão Atual</TableHead>
                       <TableHead>Alterar Permissão</TableHead>
@@ -170,6 +175,12 @@ export default function UserManagement() {
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">
                           {user.full_name || 'Sem nome'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-muted-foreground">@{user.username}</span>
+                            <span className="text-[10px] text-muted-foreground/60">#{user.user_code}</span>
+                          </div>
                         </TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>

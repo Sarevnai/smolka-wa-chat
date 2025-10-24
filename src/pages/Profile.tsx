@@ -7,22 +7,44 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { Camera, User, Mail, Save, Loader2 } from 'lucide-react';
+import { Camera, User, Mail, Save, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Layout from '@/components/Layout';
+import { validateUsername, sanitizeUsername } from '@/lib/username-validation';
 
 export default function Profile() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [usernameValidation, setUsernameValidation] = useState<{ isValid: boolean; error?: string }>({ isValid: true });
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || '',
+    username: profile?.username || '',
     email: user?.email || ''
   });
+
+  const handleUsernameChange = (value: string) => {
+    const sanitized = sanitizeUsername(value);
+    const validation = validateUsername(sanitized);
+    
+    setUsernameValidation(validation);
+    setFormData({ ...formData, username: sanitized });
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    // Validar username antes de enviar
+    const validation = validateUsername(formData.username);
+    if (!validation.isValid) {
+      toast({
+        title: 'Username inválido',
+        description: validation.error,
+        variant: 'destructive'
+      });
+      return;
+    }
 
     setIsLoading(true);
     
@@ -31,6 +53,7 @@ export default function Profile() {
         .from('profiles')
         .update({ 
           full_name: formData.full_name,
+          username: formData.username,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
@@ -190,6 +213,32 @@ export default function Profile() {
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   placeholder="Digite seu nome completo"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="username">Username (identificador único)</Label>
+                <div className="relative">
+                  <Input
+                    id="username"
+                    value={formData.username}
+                    onChange={(e) => handleUsernameChange(e.target.value)}
+                    placeholder="seu_username"
+                    maxLength={30}
+                    className={!usernameValidation.isValid ? 'border-destructive' : ''}
+                  />
+                  {usernameValidation.isValid && formData.username && (
+                    <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+                  )}
+                  {!usernameValidation.isValid && formData.username && (
+                    <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" />
+                  )}
+                </div>
+                {!usernameValidation.isValid && formData.username && (
+                  <p className="text-xs text-destructive">{usernameValidation.error}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  @{formData.username || 'seu_username'} • Código #{profile?.user_code || '0000'}
+                </p>
               </div>
 
               <div className="space-y-2">
