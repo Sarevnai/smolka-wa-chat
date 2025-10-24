@@ -909,10 +909,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      can_manage_users: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      can_manage_users: { Args: never; Returns: boolean }
       get_contact_message_stats: {
         Args: { phone_numbers: string[] }
         Returns: {
@@ -922,7 +919,7 @@ export type Database = {
         }[]
       }
       get_current_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       get_user_roles: {
@@ -936,18 +933,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_attendant: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_manager: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_admin: { Args: never; Returns: boolean }
+      is_attendant: { Args: never; Returns: boolean }
+      is_manager: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "manager" | "attendant"
