@@ -39,32 +39,6 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const { toast } = useToast();
   const { pinnedConversations } = usePinnedConversations();
   const { soundEnabled, toggleSound } = useNotificationSound();
-  
-  // Setup realtime listener apenas para atualizar lista de conversações
-  useEffect(() => {
-    console.log('📡 ChatList: Configurando listener para atualizar lista de conversações');
-    
-    const channel = supabase
-      .channel('conversations-list-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        (payload) => {
-          console.log('📨 ChatList: Nova mensagem detectada, recarregando conversações');
-          loadConversations();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log('🔌 ChatList: Removendo listener de conversações');
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   const loadConversations = async () => {
     try {
