@@ -336,51 +336,67 @@ export default function Contacts() {
                     </div>
                     
                     <div className="flex space-x-2">
-                       <Button 
-                         size="sm" 
-                         variant="default" 
-                         className="h-8 gap-1"
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           setQuickTemplatePhone(contact.phone);
-                           setShowQuickTemplate(true);
-                         }}
-                       >
-                         <Sparkles className="h-3 w-3" />
-                         Iniciar
-                       </Button>
-                       <Button 
-                         size="sm" 
-                         variant="outline" 
-                         className="h-8 w-8 p-0"
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           navigate(`/chat/${contact.phone}`);
-                         }}
-                       >
-                         <MessageCircle className="h-4 w-4" />
-                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0"
+                      {/* Primary actions - always visible */}
+                      <Button 
+                        size="sm" 
+                        variant="default" 
+                        className="h-8 gap-1 flex-1 sm:flex-none"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setEditingContact(contact);
+                          setQuickTemplatePhone(contact.phone);
+                          setShowQuickTemplate(true);
                         }}
                       >
-                        <Edit className="h-4 w-4" />
+                        <Sparkles className="h-3 w-3" />
+                        <span className="hidden xs:inline">Iniciar</span>
                       </Button>
-                      <DeleteContactDialog contact={contact}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </DeleteContactDialog>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 gap-1 flex-1 sm:flex-none"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/chat/${contact.phone}`);
+                        }}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        <span className="hidden xs:inline">Chat</span>
+                      </Button>
+                      
+                      {/* Secondary actions - dropdown */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingContact(contact);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DeleteContactDialog contact={contact}>
+                            <DropdownMenuItem
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-destructive focus:text-destructive"
+                              onSelect={(e) => e.preventDefault()}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Deletar
+                            </DropdownMenuItem>
+                          </DeleteContactDialog>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardContent>

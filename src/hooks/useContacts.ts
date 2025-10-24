@@ -83,8 +83,11 @@ export const useContactsForSelection = (searchTerm?: string, filters?: ContactFi
 
 export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) => {
   return useQuery({
-    queryKey: ['contacts', searchTerm, filters],
+    queryKey: ["contacts", searchTerm, filters],
     queryFn: async () => {
+      console.log("Fetching contacts with optimized query...", { searchTerm, filters });
+
+      // Build base query
       let query = supabase
         .from('contacts')
         .select(`
@@ -99,8 +102,7 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
         query = query.or(`
           name.ilike.%${term}%,
           phone.ilike.%${term}%,
-          email.ilike.%${term}%,
-          contact_contracts.contract_number.ilike.%${term}%
+          email.ilike.%${term}%
         `);
       }
 
@@ -120,60 +122,47 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
       const { data, error } = await query;
       if (error) throw error;
 
-      // For better performance, get all message statistics in a single optimized query
-      const phoneNumbers = data.map(contact => contact.phone);
-      
-      // Get message statistics for all contacts using direct SQL query
-      let messageStatsMap = new Map();
-      
-      if (phoneNumbers.length > 0) {
-        const { data: messageStats } = await supabase
-          .from('messages')
-          .select('wa_from, wa_timestamp')
-          .in('wa_from', phoneNumbers)
-          .order('wa_timestamp', { ascending: false });
-
-        if (messageStats) {
-          // Process message statistics
-          const statsTemp = new Map();
-          messageStats.forEach((msg: any) => {
-            const phone = msg.wa_from;
-            if (!statsTemp.has(phone)) {
-              statsTemp.set(phone, {
-                totalMessages: 0,
-                lastTimestamp: null
-              });
-            }
-            
-            const current = statsTemp.get(phone);
-            current.totalMessages += 1;
-            
-            // Keep the most recent timestamp
-            if (!current.lastTimestamp || msg.wa_timestamp > current.lastTimestamp) {
-              current.lastTimestamp = msg.wa_timestamp;
-            }
-          });
-          
-          messageStatsMap = statsTemp;
-        }
+      if (!data || data.length === 0) {
+        return [];
       }
 
-      // Enhance contacts with message statistics
+      // Optimized: Get message stats in ONE aggregated query
+      const phoneNumbers = data.map(contact => contact.phone);
+      
+      // Use Supabase RPC function for aggregated stats
+      const { data: messageStats } = await supabase
+        .rpc('get_contact_message_stats', { phone_numbers: phoneNumbers });
+
+      // Create stats map for quick lookup
+      const statsMap = new Map();
+      if (messageStats) {
+        messageStats.forEach((stat: any) => {
+          statsMap.set(stat.phone, {
+            totalMessages: stat.total_messages,
+            lastTimestamp: stat.last_timestamp
+          });
+        });
+      }
+
+      // Map contacts with stats
       let contactsWithStats = data.map(contact => {
-        const stats = messageStatsMap.get(contact.phone) || { totalMessages: 0, lastTimestamp: null };
-        const lastContact = stats.lastTimestamp 
-          ? formatLastContact(stats.lastTimestamp)
-          : 'Nunca';
+        const stats = statsMap.get(contact.phone) || { 
+          totalMessages: 0, 
+          lastTimestamp: null 
+        };
 
         return {
           ...contact,
           contracts: contact.contact_contracts || [],
-          totalMessages: stats.totalMessages,
-          lastContact
-        } as Contact;
+          totalMessages: Number(stats.totalMessages),
+          lastContact: stats.lastTimestamp 
+            ? formatLastContact(stats.lastTimestamp)
+            : "Sem mensagens",
+          lastMessageTimestamp: stats.lastTimestamp
+        } as Contact & { lastMessageTimestamp: string | null };
       });
 
-      // Apply client-side filters that require processed data
+      // Apply client-side filters
       if (filters?.hasContracts !== undefined) {
         contactsWithStats = contactsWithStats.filter(contact => {
           const hasContracts = contact.contracts && contact.contracts.length > 0;
@@ -182,22 +171,23 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
       }
 
       if (filters?.hasRecentActivity !== undefined) {
-        contactsWithStats = contactsWithStats.filter(contact => {
-          const hasRecentActivity = contact.lastContact !== 'Nunca';
-          if (hasRecentActivity && contact.lastContact !== 'Nunca') {
-            // Check if activity is recent (last 30 days)
-            const isRecent = ['Hoje', 'Ontem'].includes(contact.lastContact) || 
-                           contact.lastContact.includes('dias atrás') || 
-                           (contact.lastContact.includes('semanas atrás') && 
-                            parseInt(contact.lastContact) <= 4);
-            return filters.hasRecentActivity ? isRecent : !isRecent;
+        contactsWithStats = contactsWithStats.filter((contact: any) => {
+          if (!contact.lastMessageTimestamp) {
+            return !filters.hasRecentActivity;
           }
-          return !filters.hasRecentActivity;
+          
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const lastMessageDate = new Date(contact.lastMessageTimestamp);
+          const isRecent = lastMessageDate >= thirtyDaysAgo;
+          
+          return filters.hasRecentActivity ? isRecent : !isRecent;
         });
       }
 
+      console.log(`Fetched ${contactsWithStats.length} contacts with stats in optimized query`);
       return contactsWithStats;
-    }
+    },
   });
 };
 
