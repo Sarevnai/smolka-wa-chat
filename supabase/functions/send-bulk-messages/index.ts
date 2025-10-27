@@ -288,22 +288,31 @@ serve(async (req) => {
               const headerVariables = headerComponent.text.match(/\{\{([a-zA-Z0-9_]+)\}\}/g);
               
               if (headerVariables && contact.variables) {
-                // Header has variables - replace them with contact-specific values
+                // Header has variables - detect if they're named or numeric
+                const isNamedMode = headerVariables.some((v: string) => {
+                  const varName = v.replace(/\{|\}/g, '');
+                  return !/^\d+$/.test(varName); // Not purely numeric
+                });
+
+                console.log(`  HEADER mode: ${isNamedMode ? 'NAMED' : 'NUMERIC'} (${headerVariables.length} vars)`);
+
                 const headerParams = headerVariables.map((v: string) => {
                   const varName = v.replace(/\{|\}/g, '');
                   const value = contact.variables?.[varName] || `[${varName}]`;
-                  console.log(`  Mapping header variable ${varName}: ${value}`);
-                  return { type: 'text', text: value };
+                  console.log(`    - ${varName}: ${value}`);
+                  
+                  if (isNamedMode) {
+                    return { type: 'text', text: value, parameter_name: varName };
+                  } else {
+                    return { type: 'text', text: value };
+                  }
                 });
+                
                 components.push({ type: 'header', parameters: headerParams });
-                console.log(`Added TEXT header with ${headerParams.length} variables`);
               } else {
-                // Header is fixed text (no variables) - send as-is
-                console.log(`Adding fixed TEXT header: ${headerComponent.text}`);
-                components.push({
-                  type: 'header',
-                  parameters: [{ type: 'text', text: headerComponent.text }]
-                });
+                // Fixed text header (no variables) - DO NOT include in components
+                // WhatsApp renders it automatically from the template
+                console.log(`  HEADER: Fixed text (not sending in components)`);
               }
             }
           }
@@ -315,12 +324,28 @@ serve(async (req) => {
             console.log(`Template "${template.template_name}" BODY requires ${bodyVariables?.length || 0} parameters`);
 
             if (bodyVariables && bodyVariables.length > 0) {
+              // Detect if variables are named ({{nome}}) or numeric ({{1}})
+              const isNamedMode = bodyVariables.some((v: string) => {
+                const varName = v.replace(/\{|\}/g, '');
+                return !/^\d+$/.test(varName); // Not purely numeric
+              });
+
+              console.log(`  BODY mode: ${isNamedMode ? 'NAMED' : 'NUMERIC'}`);
+
               const bodyParams = bodyVariables.map((v: string) => {
                 const varName = v.replace(/\{|\}/g, '');
                 const value = contact.variables?.[varName] || `[${varName}]`;
-                console.log(`  Mapping variable ${varName}: ${value}`);
-                return { type: 'text', text: value };
+                console.log(`    - ${varName}: ${value}`);
+                
+                if (isNamedMode) {
+                  // Named variables require parameter_name
+                  return { type: 'text', text: value, parameter_name: varName };
+                } else {
+                  // Numeric variables don't use parameter_name
+                  return { type: 'text', text: value };
+                }
               });
+              
               components.push({ type: 'body', parameters: bodyParams });
             }
           }
