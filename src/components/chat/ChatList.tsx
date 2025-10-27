@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, MessageSquare, ArrowLeft, Volume2, VolumeX } from "lucide-react";
+import { Search, MessageSquare, ArrowLeft, Volume2, VolumeX, Plus, User } from "lucide-react";
 import { format, parseISO, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -7,14 +7,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ConversationItem } from "./ConversationItem";
+import { QuickTemplateSender } from "./QuickTemplateSender";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { usePinnedConversations } from "@/hooks/usePinnedConversations";
-
 import { useNotificationSound } from "@/hooks/useNotificationSound";
+import { useNavigate } from "react-router-dom";
 
 interface Conversation {
   phoneNumber: string;
@@ -36,9 +38,15 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<'all' | 'inquilino' | 'proprietario'>('all');
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showTemplateSender, setShowTemplateSender] = useState(false);
+  const [selectedContactPhone, setSelectedContactPhone] = useState<string>("");
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [contactSearch, setContactSearch] = useState("");
   const { toast } = useToast();
   const { pinnedConversations } = usePinnedConversations();
   const { soundEnabled, toggleSound } = useNotificationSound();
+  const navigate = useNavigate();
 
   const loadConversations = async () => {
     try {
@@ -141,6 +149,50 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
     loadConversations();
   }, []);
 
+  // Load contacts for the "New Conversation" modal
+  const loadContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("id, name, phone, contact_type")
+        .eq("status", "ativo")
+        .order("name");
+      
+      if (error) throw error;
+      setContacts(data || []);
+    } catch (error) {
+      console.error("Error loading contacts:", error);
+      toast({
+        title: "Erro ao carregar contatos",
+        description: "Não foi possível carregar a lista de contatos.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (showContactModal) {
+      loadContacts();
+    }
+  }, [showContactModal]);
+
+  const filteredContacts = contacts.filter(contact => 
+    contact.name?.toLowerCase().includes(contactSearch.toLowerCase()) ||
+    contact.phone?.includes(contactSearch)
+  );
+
+  const handleContactSelect = (phone: string) => {
+    setSelectedContactPhone(phone);
+    setShowContactModal(false);
+    setShowTemplateSender(true);
+  };
+
+  const handleTemplateSendSuccess = () => {
+    navigate(`/chat/${selectedContactPhone}`);
+    setShowTemplateSender(false);
+    setSelectedContactPhone("");
+  };
+
   const filteredConversations = conversations.filter(conversation => {
     // Apply search filter
     const matchesSearch = conversation.phoneNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -183,7 +235,8 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   };
 
   return (
-    <div className="h-full flex flex-col bg-sidebar">
+    <>
+      <div className="h-full flex flex-col bg-sidebar relative">
       {/* Chat Header */}
       <div className="px-4 py-2 bg-sidebar-header text-sidebar-primary-foreground h-[59px] flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -301,6 +354,79 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
           </div>
         )}
       </ScrollArea>
+
+      {/* Floating Action Button - New Conversation */}
+      <Button
+        onClick={() => setShowContactModal(true)}
+        className="absolute bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all"
+        size="icon"
+        title="Iniciar nova conversa"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
     </div>
+
+    {/* Contact Selection Modal */}
+    <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Iniciar Nova Conversa</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar contato..."
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <ScrollArea className="h-[400px]">
+            {filteredContacts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum contato encontrado
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {filteredContacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    onClick={() => handleContactSelect(contact.phone)}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-muted rounded-lg transition-colors text-left"
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback>
+                        <User className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{contact.name || contact.phone}</p>
+                      <p className="text-sm text-muted-foreground">{contact.phone}</p>
+                    </div>
+                    {contact.contact_type && (
+                      <Badge variant="outline" className="text-xs">
+                        {contact.contact_type}
+                      </Badge>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Template Sender Modal */}
+    {selectedContactPhone && (
+      <QuickTemplateSender
+        phoneNumber={selectedContactPhone}
+        open={showTemplateSender}
+        onOpenChange={setShowTemplateSender}
+        onSuccess={handleTemplateSendSuccess}
+      />
+    )}
+    </>
   );
 }

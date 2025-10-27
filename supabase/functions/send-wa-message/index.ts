@@ -60,10 +60,68 @@ serve(async (req) => {
     if (template_name) {
       // Template message (HSM)
       whatsappPayload.type = 'template';
+      
+      // Build template components with support for named and numeric variables
+      const templateComponents: any[] = [];
+      
+      if (components && components.length > 0) {
+        console.log(`Processing ${components.length} template components`);
+        
+        for (const component of components) {
+          if (component.type === 'header') {
+            if (component.parameters) {
+              // Check if header has named or numeric variables
+              const hasNamedVars = component.parameters.some((p: any) => 
+                p.parameter_name && !/^\d+$/.test(p.parameter_name)
+              );
+              
+              console.log(`HEADER mode: ${hasNamedVars ? 'NAMED' : 'NUMERIC'} (${component.parameters.length} params)`);
+              
+              const headerParams = component.parameters.map((param: any) => {
+                if (param.type === 'text') {
+                  console.log(`  - ${param.parameter_name || 'numeric'}: ${param.text}`);
+                  if (hasNamedVars && param.parameter_name) {
+                    return { type: 'text', text: param.text, parameter_name: param.parameter_name };
+                  } else {
+                    return { type: 'text', text: param.text };
+                  }
+                }
+                return param; // media or other types
+              });
+              
+              templateComponents.push({ type: 'header', parameters: headerParams });
+            }
+          } else if (component.type === 'body') {
+            if (component.parameters) {
+              // Check if body has named or numeric variables
+              const hasNamedVars = component.parameters.some((p: any) => 
+                p.parameter_name && !/^\d+$/.test(p.parameter_name)
+              );
+              
+              console.log(`BODY mode: ${hasNamedVars ? 'NAMED' : 'NUMERIC'} (${component.parameters.length} params)`);
+              
+              const bodyParams = component.parameters.map((param: any) => {
+                console.log(`  - ${param.parameter_name || 'numeric'}: ${param.text}`);
+                if (hasNamedVars && param.parameter_name) {
+                  return { type: 'text', text: param.text, parameter_name: param.parameter_name };
+                } else {
+                  return { type: 'text', text: param.text };
+                }
+              });
+              
+              templateComponents.push({ type: 'body', parameters: bodyParams });
+            }
+          } else {
+            // Other component types (buttons, etc.)
+            templateComponents.push(component);
+          }
+        }
+      }
+      
       whatsappPayload.template = {
         name: template_name,
         language: { code: language_code || 'pt_BR' },
-        components: components || []
+        components: templateComponents
       };
     } else if (interactive) {
       // Interactive message

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useWhatsAppTemplates, WhatsAppTemplate, getTemplatePreview } from "@/hooks/useWhatsAppTemplates";
 import { useQuickTemplate } from "@/hooks/useQuickTemplate";
 import { useContactByPhone } from "@/hooks/useContacts";
+import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Send, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -28,40 +29,56 @@ export function QuickTemplateSender({
   const { data: templates, isLoading: loadingTemplates } = useWhatsAppTemplates();
   const { data: contact } = useContactByPhone(phoneNumber);
   const { sendTemplate, isLoading: sending } = useQuickTemplate();
+  const { profile } = useAuth();
   
   const [selectedTemplate, setSelectedTemplate] = useState<WhatsAppTemplate | null>(null);
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<string>("");
 
-  // Extract placeholders from template
+  // Extract placeholders from template (supports both named and numeric)
   const extractPlaceholders = (template: WhatsAppTemplate): string[] => {
     const bodyComponent = template.components.find(c => c.type === 'BODY');
     if (!bodyComponent?.text) return [];
     
-    const matches = bodyComponent.text.match(/\{\{(\d+)\}\}/g) || [];
+    // Match both {{1}} (numeric) and {{nome}} (named) patterns
+    const matches = bodyComponent.text.match(/\{\{([a-zA-Z0-9_]+)\}\}/g) || [];
     return matches.map(m => m.replace(/[{}]/g, ''));
   };
 
   // Auto-fill variables when template or contact changes
   useEffect(() => {
-    if (selectedTemplate && contact) {
+    if (selectedTemplate) {
       const placeholders = extractPlaceholders(selectedTemplate);
       const autoFilled: Record<string, string> = {};
       
-      // Auto-fill known variables
-      if (placeholders.includes('1') && contact.name) {
+      // Auto-fill for named variables
+      if (placeholders.includes('nome') && contact?.name) {
+        autoFilled['nome'] = contact.name;
+      }
+      if (placeholders.includes('user') && profile?.full_name) {
+        autoFilled['user'] = profile.full_name;
+      }
+      if (placeholders.includes('contrato') && contact?.contracts?.[0]?.contract_number) {
+        autoFilled['contrato'] = contact.contracts[0].contract_number;
+      }
+      if (placeholders.includes('imovel') && contact?.contracts?.[0]?.property_code) {
+        autoFilled['imovel'] = contact.contracts[0].property_code;
+      }
+      
+      // Auto-fill for numeric variables (backward compatibility)
+      if (placeholders.includes('1') && contact?.name) {
         autoFilled['1'] = contact.name;
       }
-      if (placeholders.includes('2') && contact.contracts?.[0]?.contract_number) {
+      if (placeholders.includes('2') && contact?.contracts?.[0]?.contract_number) {
         autoFilled['2'] = contact.contracts[0].contract_number;
       }
-      if (placeholders.includes('3') && contact.contracts?.[0]?.property_code) {
+      if (placeholders.includes('3') && contact?.contracts?.[0]?.property_code) {
         autoFilled['3'] = contact.contracts[0].property_code;
       }
       
       setVariables(autoFilled);
     }
-  }, [selectedTemplate, contact]);
+  }, [selectedTemplate, contact, profile]);
 
   // Update preview when template or variables change
   useEffect(() => {
@@ -188,25 +205,39 @@ export function QuickTemplateSender({
             {selectedTemplate && extractPlaceholders(selectedTemplate).length > 0 && (
               <div className="space-y-4">
                 <Label className="text-sm font-medium">Variáveis do Template</Label>
-                {extractPlaceholders(selectedTemplate).map((placeholder) => (
-                  <div key={placeholder} className="space-y-2">
-                    <Label htmlFor={`var-${placeholder}`} className="text-sm">
-                      Variável {placeholder}
-                      {placeholder === '1' && ' (Nome do contato)'}
-                      {placeholder === '2' && ' (Número do contrato)'}
-                      {placeholder === '3' && ' (Código do imóvel)'}
-                    </Label>
-                    <Input
-                      id={`var-${placeholder}`}
-                      value={variables[placeholder] || ""}
-                      onChange={(e) => setVariables(prev => ({
-                        ...prev,
-                        [placeholder]: e.target.value
-                      }))}
-                      placeholder={`Digite o valor para {{${placeholder}}}`}
-                    />
-                  </div>
-                ))}
+                {extractPlaceholders(selectedTemplate).map((placeholder) => {
+                  // Generate friendly labels for common variables
+                  const isNumeric = /^\d+$/.test(placeholder);
+                  let label = isNumeric ? `Variável ${placeholder}` : placeholder;
+                  let hint = '';
+                  
+                  if (placeholder === 'nome' || placeholder === '1') {
+                    hint = ' (Nome do contato)';
+                  } else if (placeholder === 'user') {
+                    hint = ' (Atendente)';
+                  } else if (placeholder === 'contrato' || placeholder === '2') {
+                    hint = ' (Número do contrato)';
+                  } else if (placeholder === 'imovel' || placeholder === '3') {
+                    hint = ' (Código do imóvel)';
+                  }
+                  
+                  return (
+                    <div key={placeholder} className="space-y-2">
+                      <Label htmlFor={`var-${placeholder}`} className="text-sm">
+                        {label}{hint}
+                      </Label>
+                      <Input
+                        id={`var-${placeholder}`}
+                        value={variables[placeholder] || ""}
+                        onChange={(e) => setVariables(prev => ({
+                          ...prev,
+                          [placeholder]: e.target.value
+                        }))}
+                        placeholder={`Digite o valor para {{${placeholder}}}`}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
 
