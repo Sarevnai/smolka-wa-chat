@@ -12,6 +12,7 @@ import CampaignScheduler from "@/components/campaigns/CampaignScheduler";
 import CampaignPreview from "@/components/campaigns/CampaignPreview";
 import SendConfirmationModal from "@/components/campaigns/SendConfirmationModal";
 import { HeaderMediaSelector } from "@/components/campaigns/HeaderMediaSelector";
+import { TemplateVariablesForm } from "@/components/campaigns/TemplateVariablesForm";
 import { useCampaigns, useCreateCampaign, useSendCampaign } from "@/hooks/useCampaigns";
 import { useTemplates } from "@/hooks/useTemplates";
 import { Campaign, MessageTemplate, BulkMessageRequest } from "@/types/campaign";
@@ -37,6 +38,7 @@ export default function Send() {
     mime?: string;
     filename?: string;
   } | null>(null);
+  const [customTemplateVariables, setCustomTemplateVariables] = useState<Record<string, string>>({});
   
   const { toast } = useToast();
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaigns();
@@ -190,21 +192,21 @@ export default function Send() {
           }
         }
 
-        // Normalize phone numbers and auto-map variables
+        // Normalize phone numbers and map variables
         const validContacts = selectedContactObjects
           .filter(contact => contact.phone)
           .map(contact => {
-            // Auto-map known variables
-            const variables: Record<string, string> = {};
+            // Start with custom variables from the form
+            const variables: Record<string, string> = { ...customTemplateVariables };
             
+            // Auto-fill only if not already provided by user
             templateVariables.forEach(varName => {
-              if (varName === 'nome' || varName === 'name') {
-                variables[varName] = contact.name || '[Sem nome]';
-              } else if (varName === 'user' || varName === 'usuario') {
-                variables[varName] = profile?.full_name || 'Equipe Smolka';
-              } else {
-                // Placeholder for unmapped variables
-                variables[varName] = `[${varName}]`;
+              if (!variables[varName] || variables[varName] === '') {
+                if (varName === 'nome' || varName === 'name') {
+                  variables[varName] = contact.name || '[Sem nome]';
+                } else if (varName === 'user' || varName === 'usuario') {
+                  variables[varName] = profile?.full_name || 'Equipe Smolka';
+                }
               }
             });
 
@@ -239,6 +241,7 @@ export default function Send() {
       setScheduledAt(null);
       setValidationErrors([]);
       setHeaderMedia(null);
+      setCustomTemplateVariables({});
       setShowConfirmModal(false);
       setActiveTab("history");
       
@@ -354,6 +357,7 @@ export default function Send() {
                   onTemplateSelect={(template) => {
                     setSelectedTemplate(template as MessageTemplate | WhatsAppTemplate | null);
                     setHeaderMedia(null); // Reset header media when template changes
+                    setCustomTemplateVariables({}); // Reset variables when template changes
                   }}
                 />
 
@@ -369,6 +373,20 @@ export default function Send() {
                       mediaType={mediaType}
                       onMediaSelect={setHeaderMedia}
                       selectedMedia={headerMedia}
+                    />
+                  ) : null;
+                })()}
+
+                {/* Template Variables Form for WhatsApp templates */}
+                {selectedTemplate && isOfficialWhatsAppTemplate(selectedTemplate) && (() => {
+                  const bodyComponent = selectedTemplate.components?.find(c => c.type === 'BODY');
+                  const templateText = bodyComponent?.text || '';
+                  
+                  return templateText ? (
+                    <TemplateVariablesForm
+                      templateText={templateText}
+                      onVariablesChange={setCustomTemplateVariables}
+                      defaultValues={customTemplateVariables}
                     />
                   ) : null;
                 })()}
