@@ -284,30 +284,29 @@ serve(async (req) => {
                 throw new Error(`Header media error: ${mediaError.message}`);
               }
             } else if (headerComponent.format === 'TEXT' && headerComponent.text) {
-              // TEXT header with variables
-              const headerVariables = headerComponent.text.match(/\{\{(\d+)\}\}/g);
+              // TEXT header with named variables like {{nome}}, {{user}}
+              const headerVariables = headerComponent.text.match(/\{\{([a-zA-Z0-9_]+)\}\}/g);
               if (headerVariables && contact.variables) {
                 const headerParams = headerVariables.map((v: string) => {
-                  const index = parseInt(v.replace(/\{|\}/g, '')) - 1;
-                  const varKeys = Object.keys(contact.variables || {});
-                  return { type: 'text', text: contact.variables?.[varKeys[index]] || '' };
+                  const varName = v.replace(/\{|\}/g, '');
+                  return { type: 'text', text: contact.variables?.[varName] || `[${varName}]` };
                 });
                 components.push({ type: 'header', parameters: headerParams });
               }
             }
           }
 
-          // Handle BODY component variables
+          // Handle BODY component variables with named placeholders
           const bodyComponent = template.components?.find((c: any) => c.type === 'BODY');
           if (bodyComponent?.text) {
-            const bodyVariables = bodyComponent.text.match(/\{\{(\d+)\}\}/g);
+            const bodyVariables = bodyComponent.text.match(/\{\{([a-zA-Z0-9_]+)\}\}/g);
             console.log(`Template "${template.template_name}" BODY requires ${bodyVariables?.length || 0} parameters`);
 
             if (bodyVariables && bodyVariables.length > 0) {
               const bodyParams = bodyVariables.map((v: string) => {
-                const index = parseInt(v.replace(/\{|\}/g, '')) - 1;
-                const varKeys = Object.keys(contact.variables || {});
-                const value = contact.variables?.[varKeys[index]] || `{{${index + 1}}}`;
+                const varName = v.replace(/\{|\}/g, '');
+                const value = contact.variables?.[varName] || `[${varName}]`;
+                console.log(`  Mapping variable ${varName}: ${value}`);
                 return { type: 'text', text: value };
               });
               components.push({ type: 'body', parameters: bodyParams });

@@ -180,14 +180,40 @@ export default function Send() {
           throw contactsError;
         }
 
-        // Normalize phone numbers and validate
+        // Extract template variables if using WhatsApp template
+        let templateVariables: string[] = [];
+        if (selectedTemplate && isOfficialWhatsAppTemplate(selectedTemplate)) {
+          const bodyComponent = selectedTemplate.components?.find(c => c.type === 'BODY');
+          if (bodyComponent?.text) {
+            const matches = bodyComponent.text.match(/\{\{([a-zA-Z0-9_]+)\}\}/g);
+            templateVariables = matches ? matches.map(v => v.replace(/\{|\}/g, '')) : [];
+          }
+        }
+
+        // Normalize phone numbers and auto-map variables
         const validContacts = selectedContactObjects
           .filter(contact => contact.phone)
-          .map(contact => ({
-            phone: normalizePhoneNumber(contact.phone),
-            name: contact.name || undefined,
-            variables: {} // Template variables can be mapped here if needed
-          }));
+          .map(contact => {
+            // Auto-map known variables
+            const variables: Record<string, string> = {};
+            
+            templateVariables.forEach(varName => {
+              if (varName === 'nome' || varName === 'name') {
+                variables[varName] = contact.name || '[Sem nome]';
+              } else if (varName === 'user' || varName === 'usuario') {
+                variables[varName] = profile?.full_name || 'Equipe Smolka';
+              } else {
+                // Placeholder for unmapped variables
+                variables[varName] = `[${varName}]`;
+              }
+            });
+
+            return {
+              phone: normalizePhoneNumber(contact.phone),
+              name: contact.name || undefined,
+              variables
+            };
+          });
 
         const bulkRequest: BulkMessageRequest = {
           contacts: validContacts,
