@@ -17,7 +17,9 @@ import Profile from "./pages/Profile";
 import ClickUpConfig from "./pages/ClickUpConfig";
 import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
-import UserManagement from "./pages/UserManagement";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import UserManagement from "./pages/admin/UserManagement";
+import { AdminGuard } from "./components/guards/AdminGuard";
 
 // Create QueryClient outside component to avoid recreating on hot reload
 const queryClient = new QueryClient({
@@ -83,6 +85,20 @@ const App = () => (
             <Route path="/integrations" element={
               <ProtectedRoute>
                 <Integrations />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminGuard>
+                  <AdminDashboard />
+                </AdminGuard>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute>
+                <AdminGuard>
+                  <UserManagement />
+                </AdminGuard>
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

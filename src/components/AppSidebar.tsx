@@ -8,7 +8,10 @@ import {
   BarChart3, 
   Settings,
   Puzzle,
-  ChevronRight
+  ChevronRight,
+  Shield,
+  LayoutDashboard,
+  UserCog
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -27,6 +30,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useNewMessages } from "@/hooks/useNewMessages";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   Collapsible,
   CollapsibleContent,
@@ -51,6 +55,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const { unreadCount } = useNewMessages();
+  const permissions = usePermissions();
   const [integrationsOpen, setIntegrationsOpen] = useState(true);
 
   const currentPath = location.pathname;
@@ -150,6 +155,36 @@ export function AppSidebar() {
             </CollapsibleContent>
           </SidebarGroup>
         </Collapsible>
+
+        {/* Seção Administrativa - Apenas para Admins */}
+        {permissions.isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="flex items-center gap-2 text-primary">
+              <Shield className="h-4 w-4" />
+              {!collapsed && <span>Administração</span>}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className={getNavClassName('/admin')}>
+                    <Link to="/admin">
+                      <LayoutDashboard className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                      {!collapsed && <span>Dashboard Admin</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className={getNavClassName('/admin/users')}>
+                    <Link to="/admin/users">
+                      <UserCog className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                      {!collapsed && <span>Gestão de Usuários</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );

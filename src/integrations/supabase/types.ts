@@ -868,6 +868,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_status: {
+        Row: {
+          blocked_reason: string | null
+          blocked_until: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_blocked: boolean | null
+          last_login: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          blocked_reason?: string | null
+          blocked_until?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_blocked?: boolean | null
+          last_login?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          blocked_reason?: string | null
+          blocked_until?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_blocked?: boolean | null
+          last_login?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_templates: {
         Row: {
           category: string
