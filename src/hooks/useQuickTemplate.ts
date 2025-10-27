@@ -28,6 +28,12 @@ export const useQuickTemplate = () => {
         throw new Error("Sessão expirada. Faça login novamente.");
       }
 
+      // Detect variable mode (named vs numeric)
+      const variableKeys = Object.keys(variables);
+      const isNamedMode = variableKeys.some(key => !/^\d+$/.test(key));
+
+      console.log(`Variables mode: ${isNamedMode ? 'NAMED' : 'NUMERIC'}`, variables);
+
       // Build components with variables
       const components: Array<{
         type: string;
@@ -35,6 +41,7 @@ export const useQuickTemplate = () => {
           type: string;
           text?: string;
           image?: { id: string };
+          parameter_name?: string;
         }>;
       }> = [];
 
@@ -50,13 +57,22 @@ export const useQuickTemplate = () => {
       }
 
       // Add body component with text variables
-      if (Object.keys(variables).length > 0) {
+      if (variableKeys.length > 0) {
         components.push({
           type: "body",
-          parameters: Object.values(variables).map(value => ({
-            type: "text",
-            text: value
-          }))
+          parameters: variableKeys.map(key => {
+            const param: any = {
+              type: "text",
+              text: variables[key]
+            };
+            
+            // Add parameter_name only for named variables
+            if (isNamedMode) {
+              param.parameter_name = key;
+            }
+            
+            return param;
+          })
         });
       }
 
