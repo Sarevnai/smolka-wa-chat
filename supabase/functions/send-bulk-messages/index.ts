@@ -284,14 +284,26 @@ serve(async (req) => {
                 throw new Error(`Header media error: ${mediaError.message}`);
               }
             } else if (headerComponent.format === 'TEXT' && headerComponent.text) {
-              // TEXT header with named variables like {{nome}}, {{user}}
+              // TEXT header - can be fixed text or have variables
               const headerVariables = headerComponent.text.match(/\{\{([a-zA-Z0-9_]+)\}\}/g);
+              
               if (headerVariables && contact.variables) {
+                // Header has variables - replace them with contact-specific values
                 const headerParams = headerVariables.map((v: string) => {
                   const varName = v.replace(/\{|\}/g, '');
-                  return { type: 'text', text: contact.variables?.[varName] || `[${varName}]` };
+                  const value = contact.variables?.[varName] || `[${varName}]`;
+                  console.log(`  Mapping header variable ${varName}: ${value}`);
+                  return { type: 'text', text: value };
                 });
                 components.push({ type: 'header', parameters: headerParams });
+                console.log(`Added TEXT header with ${headerParams.length} variables`);
+              } else {
+                // Header is fixed text (no variables) - send as-is
+                console.log(`Adding fixed TEXT header: ${headerComponent.text}`);
+                components.push({
+                  type: 'header',
+                  parameters: [{ type: 'text', text: headerComponent.text }]
+                });
               }
             }
           }
