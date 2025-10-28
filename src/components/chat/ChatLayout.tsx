@@ -32,7 +32,7 @@ export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps
           onContactSelect={onContactSelect}
         />
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center min-w-0 max-w-[1400px] mx-auto w-full">
+      <div className="flex-1 flex flex-col items-center justify-center min-w-0 w-full">
         {selectedContact ? (
           <ChatWindow phoneNumber={selectedContact} />
         ) : (

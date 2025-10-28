@@ -12,6 +12,7 @@ import { BreadcrumbNav } from "@/components/navigation/BreadcrumbNav";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { cn } from "@/lib/utils";
 export default function Layout({
   children
 }: {
@@ -138,9 +139,11 @@ export default function Layout({
 
           {/* Main content */}
           <main className="flex-1 overflow-auto">
-            <div className="p-6">
-              {/* Breadcrumbs */}
-              <BreadcrumbNav />
+            <div className={cn(
+              !location.pathname.startsWith('/chat') && 'p-6'
+            )}>
+              {/* Breadcrumbs - only show if NOT chat page */}
+              {!location.pathname.startsWith('/chat') && <BreadcrumbNav />}
               
               {/* Page Content */}
               {children}
