@@ -14,7 +14,7 @@ import { QuickTemplateSender } from "./QuickTemplateSender";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
-import { normalizePhone } from "@/lib/phone-utils";
+import { normalizePhone, getPhoneSearchPattern } from "@/lib/phone-utils";
 import { usePinnedConversations } from "@/hooks/usePinnedConversations";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 import { useNavigate } from "react-router-dom";
@@ -44,6 +44,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const [selectedContactPhone, setSelectedContactPhone] = useState<string>("");
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactSearch, setContactSearch] = useState("");
+  const [searchedContacts, setSearchedContacts] = useState<any[]>([]);
   const { toast } = useToast();
   const { pinnedConversations } = usePinnedConversations();
   const { soundEnabled, toggleSound } = useNotificationSound();
@@ -333,6 +334,60 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
     }
   }, [showContactModal]);
 
+  // Search contacts in database
+  const searchContactsInDatabase = async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setSearchedContacts([]);
+      return;
+    }
+
+    try {
+      const term = query.trim();
+      const isPhoneSearch = /[\d+\-() ]/.test(term) && term.length >= 4;
+      
+      let supabaseQuery = supabase
+        .from("contacts")
+        .select("id, name, phone, contact_type")
+        .eq("status", "ativo")
+        .limit(10);
+
+      if (isPhoneSearch) {
+        const phonePattern = getPhoneSearchPattern(term);
+        supabaseQuery = supabaseQuery.or(
+          `name.ilike.%${term}%,phone.ilike.%${phonePattern}%`
+        );
+      } else {
+        supabaseQuery = supabaseQuery.or(
+          `name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`
+        );
+      }
+
+      const { data, error } = await supabaseQuery;
+      
+      if (error) throw error;
+
+      // Filter contacts that already have active conversations
+      const existingPhones = new Set(conversations.map(c => c.phoneNumber));
+      const newContacts = (data || []).filter(
+        contact => !existingPhones.has(contact.phone)
+      );
+
+      setSearchedContacts(newContacts);
+    } catch (error) {
+      console.error("Error searching contacts:", error);
+      setSearchedContacts([]);
+    }
+  };
+
+  // Real-time search with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchContactsInDatabase(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, conversations]);
+
   const filteredContacts = contacts.filter(contact => {
     const searchLower = contactSearch.toLowerCase();
     const nameMatch = contact.name?.toLowerCase().includes(searchLower);
@@ -487,34 +542,93 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ) : filteredConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-6 animate-fade-in">
-            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-6">
-              <MessageSquare className="h-8 w-8 text-muted-foreground/60" />
-            </div>
-            <h3 className="text-base font-medium text-foreground mb-2">
-              {searchQuery ? "Nenhuma conversa encontrada" : "Sem conversas"}
-            </h3>
-            <p className="text-sm text-muted-foreground text-center max-w-xs">
-              {searchQuery 
-                ? "Tente usar outros termos de busca"
-                : "As conversas aparecerão aqui quando você receber mensagens"
-              }
-            </p>
-          </div>
         ) : (
           <div className="space-y-0">
-            {filteredConversations.map((conversation) => (
-              <ConversationItem
-                key={conversation.phoneNumber}
-                phoneNumber={conversation.phoneNumber}
-                lastMessage={conversation.lastMessage}
-                messageCount={conversation.messageCount}
-                unreadCount={conversation.unreadCount}
-                isSelected={selectedContact === conversation.phoneNumber}
-                onClick={() => onContactSelect(conversation.phoneNumber)}
-              />
-            ))}
+            {/* Existing Conversations */}
+            {filteredConversations.length > 0 && (
+              <div>
+                {filteredConversations.map((conversation) => (
+                  <ConversationItem
+                    key={conversation.phoneNumber}
+                    phoneNumber={conversation.phoneNumber}
+                    lastMessage={conversation.lastMessage}
+                    messageCount={conversation.messageCount}
+                    unreadCount={conversation.unreadCount}
+                    isSelected={selectedContact === conversation.phoneNumber}
+                    onClick={() => onContactSelect(conversation.phoneNumber)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Divider if both sections have results */}
+            {filteredConversations.length > 0 && searchedContacts.length > 0 && (
+              <div className="px-4 py-2 bg-muted/50">
+                <p className="text-xs font-medium text-muted-foreground">
+                  CONTATOS DO BANCO
+                </p>
+              </div>
+            )}
+
+            {/* Searched Contacts from Database */}
+            {searchedContacts.length > 0 && (
+              <div className="space-y-0">
+                {searchedContacts.map((contact) => (
+                  <button
+                    key={contact.id}
+                    onClick={() => {
+                      setSelectedContactPhone(contact.phone);
+                      setShowTemplateSender(true);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors border-b border-border/50",
+                      "group cursor-pointer"
+                    )}
+                  >
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10">
+                        <User className="h-6 w-6 text-primary" />
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium truncate">
+                          {contact.name || contact.phone}
+                        </p>
+                        {contact.contact_type && (
+                          <Badge variant="outline" className="text-xs">
+                            {contact.contact_type}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{contact.phone}</p>
+                      <p className="text-xs text-primary mt-1">
+                        Clique para iniciar conversa
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Empty state when no results */}
+            {filteredConversations.length === 0 && searchedContacts.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 px-6 animate-fade-in">
+                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+                  <MessageSquare className="h-8 w-8 text-muted-foreground/60" />
+                </div>
+                <h3 className="text-base font-medium text-foreground mb-2">
+                  {searchQuery ? "Nenhum resultado encontrado" : "Sem conversas"}
+                </h3>
+                <p className="text-sm text-muted-foreground text-center max-w-xs">
+                  {searchQuery 
+                    ? "Tente usar outros termos de busca ou inicie uma nova conversa"
+                    : "As conversas aparecerão aqui quando você receber mensagens"
+                  }
+                </p>
+              </div>
+            )}
           </div>
         )}
       </ScrollArea>
