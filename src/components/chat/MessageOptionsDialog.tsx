@@ -155,8 +155,8 @@ export function MessageOptionsDialog({
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="w-80 p-0 bg-background border border-border rounded-2xl shadow-lg">
-        <div className="py-2">
+      <DialogContent className="w-80 p-0 bg-background border border-border rounded-2xl shadow-lg overflow-hidden">
+        <div className="flex flex-col">
           {!showDeleteOptions ? (
             <>
               {menuItems
@@ -166,30 +166,30 @@ export function MessageOptionsDialog({
                     <Button
                       variant="ghost"
           className={cn(
-            "w-full justify-start h-12 px-6 rounded-none text-foreground hover:bg-muted/50 focus:bg-muted/50 transition-colors",
+            "w-full justify-start h-12 px-4 rounded-none text-foreground hover:bg-muted/50 focus:bg-muted/50 transition-colors",
             "focus:outline-none focus:ring-2 focus:ring-primary/20",
             item.className
           )}
           aria-label={item.label}
                       onClick={item.action}
                     >
-                      <item.icon className="mr-4 h-5 w-5" />
+                      <item.icon className="mr-3 h-5 w-5" />
                       <span className="text-base">{item.label}</span>
                     </Button>
                     {index < filteredItems.length - 1 && (
-                      <Separator className="mx-6" />
+                      <Separator />
                     )}
                   </div>
                 ))}
             </>
           ) : (
             <>
-              <div className="px-6 py-3">
+              <div className="px-4 py-3">
                 <h3 className="text-lg font-medium text-foreground">Apagar mensagem</h3>
               </div>
               <Separator />
               {isOutbound && deletionPermissions.canDeleteForEveryone && (
-                <div className="px-6 py-3 text-xs text-muted-foreground bg-muted/30 border-l-4 border-blue-400">
+                <div className="px-4 py-3 text-xs text-muted-foreground bg-muted/30 border-l-4 border-blue-400">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-400" />
                     <div>
@@ -200,7 +200,7 @@ export function MessageOptionsDialog({
                 </div>
               )}
               {!deletionPermissions.canDeleteForEveryone && deletionPermissions.reasonForEveryone && (
-                <div className="px-6 py-2 text-xs text-muted-foreground border-l-4 border-yellow-400 bg-yellow-50/20 rounded-r">
+                <div className="px-4 py-2 text-xs text-muted-foreground border-l-4 border-yellow-400 bg-yellow-50/20 rounded-r">
                   ⚠️ {deletionPermissions.reasonForEveryone}
                 </div>
               )}
@@ -210,11 +210,11 @@ export function MessageOptionsDialog({
                   <div key={option.label}>
                     <Button
                       variant="ghost"
-                      className="w-full justify-start h-auto min-h-12 px-6 py-3 rounded-none text-destructive hover:bg-destructive/10 focus:bg-destructive/10 transition-colors focus:outline-none focus:ring-2 focus:ring-destructive/20"
+                      className="w-full justify-start h-auto min-h-12 px-4 py-3 rounded-none text-destructive hover:bg-destructive/10 focus:bg-destructive/10 transition-colors focus:outline-none focus:ring-2 focus:ring-destructive/20"
                       aria-label={option.label}
                       onClick={option.action}
                     >
-                      <option.icon className="mr-4 h-5 w-5 flex-shrink-0" />
+                      <option.icon className="mr-3 h-5 w-5 flex-shrink-0" />
                       <div className="flex flex-col items-start text-left">
                         <span className="text-base">{option.label}</span>
                         {option.description && (
@@ -223,7 +223,7 @@ export function MessageOptionsDialog({
                       </div>
                     </Button>
                     {index < filteredOptions.length - 1 && (
-                      <Separator className="mx-6" />
+                      <Separator />
                     )}
                   </div>
                 ))}
