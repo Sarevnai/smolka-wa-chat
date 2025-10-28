@@ -1,58 +1,49 @@
-import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Settings,
-  Bell,
-  Shield,
-  Database,
-  Mail,
-  Smartphone,
-  Save,
-  Info,
-} from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Save, Settings, Bell, Shield, Database } from 'lucide-react';
+import { useSystemSettings } from '@/hooks/admin/useSystemSettings';
+import { useState, useEffect } from 'react';
 
 export default function SystemSettings() {
-  const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
+  const { settings, loading, updateSetting, getSetting } = useSystemSettings();
+  const [localSettings, setLocalSettings] = useState<Record<string, any>>({});
+  const [hasChanges, setHasChanges] = useState(false);
 
-  // General Settings
-  const [companyName, setCompanyName] = useState('Smolka WhatsApp Inbox');
-  const [timezone, setTimezone] = useState('America/Sao_Paulo');
-
-  // Notification Settings
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [notificationEmail, setNotificationEmail] = useState('admin@smolka.com.br');
-
-  // Security Settings
-  const [sessionTimeout, setSessionTimeout] = useState('30');
-  const [requireStrongPassword, setRequireStrongPassword] = useState(true);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-
-  // Backup Settings
-  const [autoBackup, setAutoBackup] = useState(true);
-  const [backupFrequency, setBackupFrequency] = useState('daily');
+  useEffect(() => {
+    if (settings.length > 0) {
+      const settingsMap: Record<string, any> = {};
+      settings.forEach(s => {
+        settingsMap[s.setting_key] = s.setting_value;
+      });
+      setLocalSettings(settingsMap);
+    }
+  }, [settings]);
 
   const handleSave = async () => {
-    setSaving(true);
-    
-    // Simular salvamento
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: 'Configurações Salvas',
-      description: 'As configurações do sistema foram atualizadas com sucesso.',
-    });
-    
-    setSaving(false);
+    for (const key in localSettings) {
+      if (localSettings[key] !== getSetting(key)) {
+        await updateSetting(key, localSettings[key]);
+      }
+    }
+    setHasChanges(false);
   };
+
+  const updateLocalSetting = (key: string, value: any) => {
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+    setHasChanges(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-pulse text-muted-foreground">Carregando configurações...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 space-y-6">
@@ -60,22 +51,14 @@ export default function SystemSettings() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Configurações do Sistema</h1>
           <p className="text-muted-foreground">
-            Gerencie as configurações gerais do sistema
+            Gerencie as configurações gerais da plataforma
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
+        <Button onClick={handleSave} disabled={!hasChanges}>
           <Save className="h-4 w-4 mr-2" />
-          {saving ? 'Salvando...' : 'Salvar Alterações'}
+          Salvar Alterações
         </Button>
       </div>
-
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle>Em Desenvolvimento</AlertTitle>
-        <AlertDescription>
-          Esta página está em desenvolvimento. As configurações ainda não são persistidas no banco de dados.
-        </AlertDescription>
-      </Alert>
 
       {/* General Settings */}
       <Card>
@@ -85,28 +68,34 @@ export default function SystemSettings() {
             Configurações Gerais
           </CardTitle>
           <CardDescription>
-            Informações básicas sobre a empresa e sistema
+            Configurações básicas do sistema
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="companyName">Nome da Empresa</Label>
-            <Input
-              id="companyName"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="Nome da sua empresa"
+            <Label htmlFor="company-name">Nome da Empresa</Label>
+            <Input 
+              id="company-name" 
+              value={localSettings.company_name || ''}
+              onChange={(e) => updateLocalSetting('company_name', e.target.value)}
             />
           </div>
-
+          
           <div className="space-y-2">
             <Label htmlFor="timezone">Fuso Horário</Label>
-            <Input
-              id="timezone"
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              placeholder="America/Sao_Paulo"
-            />
+            <Select 
+              value={localSettings.timezone || 'America/Sao_Paulo'}
+              onValueChange={(value) => updateLocalSetting('timezone', value)}
+            >
+              <SelectTrigger id="timezone">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="America/Sao_Paulo">América/São Paulo (UTC-3)</SelectItem>
+                <SelectItem value="America/New_York">América/Nova York (UTC-5)</SelectItem>
+                <SelectItem value="Europe/London">Europa/Londres (UTC+0)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -119,56 +108,33 @@ export default function SystemSettings() {
             Notificações
           </CardTitle>
           <CardDescription>
-            Configure como você deseja receber notificações
+            Configure as notificações do sistema
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="emailNotifications" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Notificações por Email
-              </Label>
+              <Label>Notificações por Email</Label>
               <p className="text-sm text-muted-foreground">
-                Receber alertas importantes por email
+                Receber notificações importantes por email
               </p>
             </div>
-            <Switch
-              id="emailNotifications"
-              checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
+            <Switch 
+              checked={localSettings.email_notifications || false}
+              onCheckedChange={(checked) => updateLocalSetting('email_notifications', checked)}
             />
           </div>
-
-          {emailNotifications && (
-            <div className="space-y-2 pl-6">
-              <Label htmlFor="notificationEmail">Email para Notificações</Label>
-              <Input
-                id="notificationEmail"
-                type="email"
-                value={notificationEmail}
-                onChange={(e) => setNotificationEmail(e.target.value)}
-                placeholder="admin@smolka.com.br"
-              />
-            </div>
-          )}
-
-          <Separator />
-
+          
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="pushNotifications" className="flex items-center gap-2">
-                <Smartphone className="h-4 w-4" />
-                Notificações Push
-              </Label>
+              <Label>Notificações Push</Label>
               <p className="text-sm text-muted-foreground">
-                Receber notificações no navegador
+                Receber notificações push no navegador
               </p>
             </div>
-            <Switch
-              id="pushNotifications"
-              checked={pushNotifications}
-              onCheckedChange={setPushNotifications}
+            <Switch 
+              checked={localSettings.push_notifications || false}
+              onCheckedChange={(checked) => updateLocalSetting('push_notifications', checked)}
             />
           </div>
         </CardContent>
@@ -187,59 +153,42 @@ export default function SystemSettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="sessionTimeout">Tempo de Sessão (minutos)</Label>
-            <Input
-              id="sessionTimeout"
-              type="number"
-              value={sessionTimeout}
-              onChange={(e) => setSessionTimeout(e.target.value)}
-              placeholder="30"
+            <Label htmlFor="session-timeout">Timeout da Sessão (minutos)</Label>
+            <Input 
+              id="session-timeout" 
+              type="number" 
+              value={localSettings.session_timeout || 30}
+              onChange={(e) => updateLocalSetting('session_timeout', parseInt(e.target.value))}
+              min="5"
+              max="120"
             />
-            <p className="text-xs text-muted-foreground">
-              Tempo até o usuário ser desconectado automaticamente
-            </p>
           </div>
-
-          <Separator />
-
+          
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="requireStrongPassword">Exigir Senha Forte</Label>
+              <Label>Exigir Senha Forte</Label>
               <p className="text-sm text-muted-foreground">
-                Mínimo 8 caracteres, letras e números
+                Obrigar usuários a usar senhas fortes
               </p>
             </div>
-            <Switch
-              id="requireStrongPassword"
-              checked={requireStrongPassword}
-              onCheckedChange={setRequireStrongPassword}
+            <Switch 
+              checked={localSettings.require_strong_password || false}
+              onCheckedChange={(checked) => updateLocalSetting('require_strong_password', checked)}
             />
           </div>
-
-          <Separator />
-
+          
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="twoFactor">Autenticação de Dois Fatores (2FA)</Label>
+              <Label>Autenticação de Dois Fatores</Label>
               <p className="text-sm text-muted-foreground">
-                Aumentar segurança com código adicional
+                Habilitar 2FA para todos os usuários
               </p>
             </div>
-            <Switch
-              id="twoFactor"
-              checked={twoFactorEnabled}
-              onCheckedChange={setTwoFactorEnabled}
-              disabled
+            <Switch 
+              checked={localSettings.enable_2fa || false}
+              onCheckedChange={(checked) => updateLocalSetting('enable_2fa', checked)}
             />
           </div>
-          {twoFactorEnabled && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                O 2FA será implementado em uma versão futura.
-              </AlertDescription>
-            </Alert>
-          )}
         </CardContent>
       </Card>
 
@@ -248,50 +197,47 @@ export default function SystemSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
-            Backup e Manutenção
+            Backup
           </CardTitle>
           <CardDescription>
-            Configure backups automáticos do sistema
+            Configurações de backup automático
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="autoBackup">Backup Automático</Label>
+              <Label>Backup Automático</Label>
               <p className="text-sm text-muted-foreground">
-                Realizar backup automático dos dados
+                Realizar backup automático do banco de dados
               </p>
             </div>
-            <Switch
-              id="autoBackup"
-              checked={autoBackup}
-              onCheckedChange={setAutoBackup}
-              disabled
+            <Switch 
+              checked={localSettings.auto_backup || false}
+              onCheckedChange={(checked) => updateLocalSetting('auto_backup', checked)}
             />
           </div>
-
-          {autoBackup && (
-            <div className="space-y-2 pl-6">
-              <Label htmlFor="backupFrequency">Frequência</Label>
-              <Input
-                id="backupFrequency"
-                value={backupFrequency}
-                onChange={(e) => setBackupFrequency(e.target.value)}
-                placeholder="daily"
-                disabled
-              />
-              <p className="text-xs text-muted-foreground">
-                Opções: daily, weekly, monthly
-              </p>
-            </div>
-          )}
-
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              O sistema de backup automático será implementado em uma versão futura.
-            </AlertDescription>
-          </Alert>
+          
+          <div className="space-y-2">
+            <Label htmlFor="backup-frequency">Frequência do Backup</Label>
+            <Select 
+              value={localSettings.backup_frequency || 'daily'}
+              onValueChange={(value) => updateLocalSetting('backup_frequency', value)}
+            >
+              <SelectTrigger id="backup-frequency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hourly">A cada hora</SelectItem>
+                <SelectItem value="daily">Diariamente</SelectItem>
+                <SelectItem value="weekly">Semanalmente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <Button variant="outline" className="w-full">
+            <Database className="h-4 w-4 mr-2" />
+            Realizar Backup Agora
+          </Button>
         </CardContent>
       </Card>
     </div>

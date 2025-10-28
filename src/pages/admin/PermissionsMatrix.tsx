@@ -1,190 +1,154 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, Shield, Info } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
+import { Shield } from 'lucide-react';
+import { useRolePermissions } from '@/hooks/admin/useRolePermissions';
 
-interface Permission {
-  category: string;
-  name: string;
-  admin: boolean;
-  manager: boolean;
-  attendant: boolean;
-}
-
-const permissions: Permission[] = [
-  // Dashboard
-  { category: 'Dashboard', name: 'Ver Dashboard', admin: true, manager: true, attendant: false },
-  { category: 'Dashboard', name: 'Ver Métricas Financeiras', admin: true, manager: false, attendant: false },
-  
-  // Conversas
-  { category: 'Conversas', name: 'Ver Conversas', admin: true, manager: true, attendant: true },
-  { category: 'Conversas', name: 'Enviar Mensagens', admin: true, manager: true, attendant: true },
-  { category: 'Conversas', name: 'Deletar Mensagens', admin: true, manager: false, attendant: false },
-  { category: 'Conversas', name: 'Restaurar Mensagens', admin: true, manager: false, attendant: false },
-  
-  // Contatos
-  { category: 'Contatos', name: 'Ver Contatos', admin: true, manager: true, attendant: true },
-  { category: 'Contatos', name: 'Criar Contatos', admin: true, manager: true, attendant: false },
-  { category: 'Contatos', name: 'Editar Contatos', admin: true, manager: true, attendant: false },
-  { category: 'Contatos', name: 'Deletar Contatos', admin: true, manager: false, attendant: false },
-  { category: 'Contatos', name: 'Importar Contatos', admin: true, manager: false, attendant: false },
-  { category: 'Contatos', name: 'Exportar Contatos', admin: true, manager: true, attendant: false },
-  
-  // Tickets
-  { category: 'Tickets', name: 'Ver Todos os Tickets', admin: true, manager: true, attendant: false },
-  { category: 'Tickets', name: 'Ver Tickets Atribuídos', admin: true, manager: true, attendant: true },
-  { category: 'Tickets', name: 'Criar Tickets', admin: true, manager: true, attendant: true },
-  { category: 'Tickets', name: 'Editar Tickets', admin: true, manager: true, attendant: false },
-  { category: 'Tickets', name: 'Deletar Tickets', admin: true, manager: false, attendant: false },
-  { category: 'Tickets', name: 'Atribuir Tickets', admin: true, manager: true, attendant: false },
-  
-  // Campanhas
-  { category: 'Campanhas', name: 'Ver Campanhas', admin: true, manager: true, attendant: false },
-  { category: 'Campanhas', name: 'Criar Campanhas', admin: true, manager: false, attendant: false },
-  { category: 'Campanhas', name: 'Editar Campanhas', admin: true, manager: false, attendant: false },
-  { category: 'Campanhas', name: 'Enviar Campanhas', admin: true, manager: false, attendant: false },
-  { category: 'Campanhas', name: 'Deletar Campanhas', admin: true, manager: false, attendant: false },
-  
-  // Relatórios
-  { category: 'Relatórios', name: 'Ver Relatórios Básicos', admin: true, manager: true, attendant: false },
-  { category: 'Relatórios', name: 'Ver Relatórios Financeiros', admin: true, manager: false, attendant: false },
-  { category: 'Relatórios', name: 'Exportar Relatórios', admin: true, manager: true, attendant: false },
-  
-  // Integrações
-  { category: 'Integrações', name: 'Ver Integrações', admin: true, manager: false, attendant: false },
-  { category: 'Integrações', name: 'Configurar Integrações', admin: true, manager: false, attendant: false },
-  { category: 'Integrações', name: 'ClickUp - Criar Tarefas', admin: true, manager: false, attendant: false },
-  
-  // Templates
-  { category: 'Templates', name: 'Ver Templates', admin: true, manager: true, attendant: true },
-  { category: 'Templates', name: 'Criar Templates', admin: true, manager: false, attendant: false },
-  { category: 'Templates', name: 'Editar Templates', admin: true, manager: false, attendant: false },
-  { category: 'Templates', name: 'Deletar Templates', admin: true, manager: false, attendant: false },
-  
-  // Administração
-  { category: 'Administração', name: 'Acessar Painel Admin', admin: true, manager: false, attendant: false },
-  { category: 'Administração', name: 'Gerenciar Usuários', admin: true, manager: false, attendant: false },
-  { category: 'Administração', name: 'Alterar Roles', admin: true, manager: false, attendant: false },
-  { category: 'Administração', name: 'Bloquear Usuários', admin: true, manager: false, attendant: false },
-  { category: 'Administração', name: 'Ver Logs de Auditoria', admin: true, manager: false, attendant: false },
-  { category: 'Administração', name: 'Ver Configurações', admin: true, manager: false, attendant: false },
+const RESOURCES = [
+  { key: 'users', label: 'Usuários', description: 'Gerenciar usuários do sistema' },
+  { key: 'contacts', label: 'Contatos', description: 'Gerenciar contatos' },
+  { key: 'messages', label: 'Mensagens', description: 'Enviar e visualizar mensagens' },
+  { key: 'campaigns', label: 'Campanhas', description: 'Criar e gerenciar campanhas' },
+  { key: 'templates', label: 'Templates', description: 'Gerenciar templates de mensagens' },
+  { key: 'tickets', label: 'Tickets', description: 'Gerenciar tickets de atendimento' },
+  { key: 'reports', label: 'Relatórios', description: 'Visualizar relatórios e métricas' },
+  { key: 'integrations', label: 'Integrações', description: 'Configurar integrações' },
+  { key: 'settings', label: 'Configurações', description: 'Configurações do sistema' }
 ];
 
-const RoleIcon = ({ role }: { role: string }) => {
-  const colors = {
-    admin: 'bg-red-500/10 text-red-500 border-red-500/20',
-    manager: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-    attendant: 'bg-green-500/10 text-green-500 border-green-500/20',
-  };
-  
-  return (
-    <Badge variant="outline" className={colors[role as keyof typeof colors]}>
-      {role === 'admin' && '🔴 Admin'}
-      {role === 'manager' && '🟡 Manager'}
-      {role === 'attendant' && '🟢 Atendente'}
-    </Badge>
-  );
+const ROLE_INFO = {
+  admin: {
+    label: 'Administrador',
+    color: 'bg-red-500/10 text-red-500 border-red-500/20'
+  },
+  manager: {
+    label: 'Gerente',
+    color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+  },
+  attendant: {
+    label: 'Atendente',
+    color: 'bg-green-500/10 text-green-500 border-green-500/20'
+  }
 };
 
 export default function PermissionsMatrix() {
-  const groupedPermissions = permissions.reduce((acc, perm) => {
-    if (!acc[perm.category]) {
-      acc[perm.category] = [];
-    }
-    acc[perm.category].push(perm);
-    return acc;
-  }, {} as Record<string, Permission[]>);
+  const { permissions, loading, updatePermission, getPermissionForResource } = useRolePermissions();
+
+  const handlePermissionChange = async (
+    role: 'admin' | 'manager' | 'attendant',
+    resource: string,
+    field: 'can_view' | 'can_create' | 'can_edit' | 'can_delete',
+    value: boolean
+  ) => {
+    await updatePermission(role, resource, field, value);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-pulse text-muted-foreground">Carregando permissões...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">Matriz de Permissões</h1>
         <p className="text-muted-foreground">
-          Visualize as permissões de cada role no sistema
+          Gerencie as permissões de cada nível de acesso
         </p>
       </div>
 
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle>Visualização Apenas</AlertTitle>
-        <AlertDescription>
-          Esta é uma visualização das permissões atuais do sistema. A edição de permissões
-          será implementada em uma versão futura.
-        </AlertDescription>
-      </Alert>
-
-      {Object.entries(groupedPermissions).map(([category, perms]) => (
-        <Card key={category}>
+      {/* Tabela para cada role */}
+      {(['admin', 'manager', 'attendant'] as const).map((role) => (
+        <Card key={role}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              {category}
+              <Badge variant="outline" className={ROLE_INFO[role].color}>
+                {ROLE_INFO[role].label}
+              </Badge>
             </CardTitle>
             <CardDescription>
-              Permissões da categoria {category.toLowerCase()}
+              Configure as permissões para o role {ROLE_INFO[role].label}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40%]">Permissão</TableHead>
-                    <TableHead className="text-center w-[20%]">
-                      <div className="flex items-center justify-center">
-                        <RoleIcon role="admin" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-center w-[20%]">
-                      <div className="flex items-center justify-center">
-                        <RoleIcon role="manager" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-center w-[20%]">
-                      <div className="flex items-center justify-center">
-                        <RoleIcon role="attendant" />
-                      </div>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {perms.map((perm) => (
-                    <TableRow key={perm.name}>
-                      <TableCell className="font-medium">{perm.name}</TableCell>
-                      <TableCell className="text-center">
-                        {perm.admin ? (
-                          <Check className="h-5 w-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="h-5 w-5 text-muted-foreground/30 mx-auto" />
-                        )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[300px]">Recurso</TableHead>
+                  <TableHead className="text-center">Visualizar</TableHead>
+                  <TableHead className="text-center">Criar</TableHead>
+                  <TableHead className="text-center">Editar</TableHead>
+                  <TableHead className="text-center">Excluir</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {RESOURCES.map((resource) => {
+                  const perm = getPermissionForResource(role, resource.key);
+                  return (
+                    <TableRow key={resource.key}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{resource.label}</p>
+                          <p className="text-sm text-muted-foreground">{resource.description}</p>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {perm.manager ? (
-                          <Check className="h-5 w-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="h-5 w-5 text-muted-foreground/30 mx-auto" />
-                        )}
+                        <div className="flex justify-center">
+                          <Switch
+                            checked={perm?.can_view || false}
+                            onCheckedChange={(checked) => 
+                              handlePermissionChange(role, resource.key, 'can_view', checked)
+                            }
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {perm.attendant ? (
-                          <Check className="h-5 w-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="h-5 w-5 text-muted-foreground/30 mx-auto" />
-                        )}
+                        <div className="flex justify-center">
+                          <Switch
+                            checked={perm?.can_create || false}
+                            onCheckedChange={(checked) => 
+                              handlePermissionChange(role, resource.key, 'can_create', checked)
+                            }
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex justify-center">
+                          <Switch
+                            checked={perm?.can_edit || false}
+                            onCheckedChange={(checked) => 
+                              handlePermissionChange(role, resource.key, 'can_edit', checked)
+                            }
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex justify-center">
+                          <Switch
+                            checked={perm?.can_delete || false}
+                            onCheckedChange={(checked) => 
+                              handlePermissionChange(role, resource.key, 'can_delete', checked)
+                            }
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       ))}
