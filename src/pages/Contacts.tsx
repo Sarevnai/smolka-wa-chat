@@ -208,21 +208,7 @@ export default function Contacts() {
                   placeholder="Buscar por nome, telefone, email ou contrato..." 
                   className="pl-10"
                   value={searchTerm}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    // If searching by phone, normalize it
-                    if (value && /[0-9+\-() ]/.test(value)) {
-                      const cleaned = value.replace(/[^\d]/g, '');
-                      if (cleaned.length >= 8) {
-                        // Only normalize if it looks like a phone number
-                        setSearchTerm(value);
-                      } else {
-                        setSearchTerm(value);
-                      }
-                    } else {
-                      setSearchTerm(value);
-                    }
-                  }}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <Badge variant="outline" className="px-4 py-2 font-semibold">

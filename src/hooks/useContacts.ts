@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Contact, Contract, ContactStats, CreateContactRequest } from '@/types/contact';
 import { ContactFiltersState } from '@/components/contacts/ContactFilters';
 import { calculateContactRating } from '@/lib/contactRating';
+import { normalizePhone, getPhoneSearchPattern } from '@/lib/phone-utils';
 
 // Optimized hook for contact selection with pagination to load all contacts
 export const useContactsForSelection = (searchTerm?: string, filters?: ContactFiltersState, limit = 2000) => {
@@ -27,12 +28,26 @@ export const useContactsForSelection = (searchTerm?: string, filters?: ContactFi
         // Apply search term - server-side search for better performance
         if (searchTerm && searchTerm.trim()) {
           const term = searchTerm.trim();
-          query = query.or(`
-            name.ilike.%${term}%,
-            phone.ilike.%${term}%,
-            email.ilike.%${term}%,
-            contact_contracts.contract_number.ilike.%${term}%
-          `);
+          const isPhoneSearch = /[\d+\-() ]/.test(term) && term.length >= 4;
+          
+          if (isPhoneSearch) {
+            const phonePattern = getPhoneSearchPattern(term);
+            // Phone search with normalized pattern
+            query = query.or(`
+              name.ilike.%${term}%,
+              phone.ilike.%${phonePattern}%,
+              email.ilike.%${term}%,
+              contact_contracts.contract_number.ilike.%${term}%
+            `);
+          } else {
+            // Regular text search
+            query = query.or(`
+              name.ilike.%${term}%,
+              phone.ilike.%${term}%,
+              email.ilike.%${term}%,
+              contact_contracts.contract_number.ilike.%${term}%
+            `);
+          }
         }
 
         // Apply filters - server-side filtering
@@ -100,11 +115,26 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
       // Apply search term
       if (searchTerm && searchTerm.trim()) {
         const term = searchTerm.trim();
-        query = query.or(`
-          name.ilike.%${term}%,
-          phone.ilike.%${term}%,
-          email.ilike.%${term}%
-        `);
+        
+        // Check if search term looks like a phone number
+        const isPhoneSearch = /[\d+\-() ]/.test(term) && term.length >= 4;
+        
+        if (isPhoneSearch) {
+          // Phone search: normalize and search by digits only
+          const phonePattern = getPhoneSearchPattern(term);
+          query = query.or(`
+            name.ilike.%${term}%,
+            phone.ilike.%${phonePattern}%,
+            email.ilike.%${term}%
+          `);
+        } else {
+          // Text search: normal search
+          query = query.or(`
+            name.ilike.%${term}%,
+            phone.ilike.%${term}%,
+            email.ilike.%${term}%
+          `);
+        }
       }
 
       // Apply filters

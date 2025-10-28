@@ -14,6 +14,7 @@ import { QuickTemplateSender } from "./QuickTemplateSender";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
+import { normalizePhone } from "@/lib/phone-utils";
 import { usePinnedConversations } from "@/hooks/usePinnedConversations";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 import { useNavigate } from "react-router-dom";
@@ -311,7 +312,8 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         .from("contacts")
         .select("id, name, phone, contact_type")
         .eq("status", "ativo")
-        .order("name");
+        .order("name", { nullsFirst: false }) // Contacts without name come last
+        .order("phone"); // Fallback to phone
       
       if (error) throw error;
       setContacts(data || []);
@@ -331,10 +333,17 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
     }
   }, [showContactModal]);
 
-  const filteredContacts = contacts.filter(contact => 
-    contact.name?.toLowerCase().includes(contactSearch.toLowerCase()) ||
-    contact.phone?.includes(contactSearch)
-  );
+  const filteredContacts = contacts.filter(contact => {
+    const searchLower = contactSearch.toLowerCase();
+    const nameMatch = contact.name?.toLowerCase().includes(searchLower);
+    
+    // Normalize both search term and stored phone for comparison
+    const normalizedSearch = normalizePhone(contactSearch);
+    const normalizedPhone = normalizePhone(contact.phone);
+    const phoneMatch = normalizedPhone.includes(normalizedSearch);
+    
+    return nameMatch || phoneMatch;
+  });
 
   const handleContactSelect = (phone: string) => {
     setSelectedContactPhone(phone);
