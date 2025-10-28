@@ -20,6 +20,8 @@ import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import AuditLogs from "./pages/admin/AuditLogs";
+import PermissionsMatrix from "./pages/admin/PermissionsMatrix";
+import SystemSettings from "./pages/admin/SystemSettings";
 import { AdminGuard } from "./components/guards/AdminGuard";
 
 // Create QueryClient outside component to avoid recreating on hot reload
@@ -106,6 +108,20 @@ const App = () => (
             <ProtectedRoute>
               <AdminGuard>
                 <AuditLogs />
+              </AdminGuard>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/permissions" element={
+            <ProtectedRoute>
+              <AdminGuard>
+                <PermissionsMatrix />
+              </AdminGuard>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <ProtectedRoute>
+              <AdminGuard>
+                <SystemSettings />
               </AdminGuard>
             </ProtectedRoute>
           } />
