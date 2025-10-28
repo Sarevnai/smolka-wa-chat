@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import Layout from '@/components/Layout';
 import {
   Select,
   SelectContent,
@@ -41,9 +42,10 @@ export default function AuditLogs() {
   const hasActiveFilters = Object.values(filters).some(v => v !== undefined && v !== '');
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Logs de Auditoria</h1>
+    <Layout>
+      <div className="container mx-auto py-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Logs de Auditoria</h1>
         <p className="text-muted-foreground">
           Acompanhe todas as ações realizadas no sistema
         </p>
@@ -192,6 +194,7 @@ export default function AuditLogs() {
           <ActivityLogTable logs={logs} loading={loading} />
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </Layout>
   );
 }

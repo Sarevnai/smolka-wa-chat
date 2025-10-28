@@ -3,6 +3,7 @@ import { SystemMetrics } from '@/components/admin/SystemMetrics';
 import { useAdminStats } from '@/hooks/admin/useAdminStats';
 import { Users, Shield, Activity, TrendingUp, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import Layout from '@/components/Layout';
 import {
   LineChart,
   Line,
@@ -57,9 +58,10 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Dashboard Administrativo</h1>
+    <Layout>
+      <div className="container mx-auto py-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Dashboard Administrativo</h1>
         <p className="text-muted-foreground">
           Visão geral do sistema e métricas importantes
         </p>
@@ -236,6 +238,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }

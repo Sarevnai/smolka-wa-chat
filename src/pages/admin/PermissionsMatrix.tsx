@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import Layout from '@/components/Layout';
 import { 
   Table, 
   TableBody, 
@@ -60,9 +61,10 @@ export default function PermissionsMatrix() {
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Matriz de Permissões</h1>
+    <Layout>
+      <div className="container mx-auto py-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Matriz de Permissões</h1>
         <p className="text-muted-foreground">
           Gerencie as permissões de cada nível de acesso
         </p>
@@ -152,6 +154,7 @@ export default function PermissionsMatrix() {
           </CardContent>
         </Card>
       ))}
-    </div>
+      </div>
+    </Layout>
   );
 }

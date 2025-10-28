@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Save, Settings, Bell, Shield, Database } from 'lucide-react';
 import { useSystemSettings } from '@/hooks/admin/useSystemSettings';
 import { useState, useEffect } from 'react';
+import Layout from '@/components/Layout';
 
 export default function SystemSettings() {
   const { settings, loading, updateSetting, getSetting } = useSystemSettings();
@@ -46,10 +47,11 @@ export default function SystemSettings() {
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Configurações do Sistema</h1>
+    <Layout>
+      <div className="container mx-auto py-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Configurações do Sistema</h1>
           <p className="text-muted-foreground">
             Gerencie as configurações gerais da plataforma
           </p>
@@ -240,6 +242,7 @@ export default function SystemSettings() {
           </Button>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </Layout>
   );
 }
