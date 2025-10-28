@@ -19,6 +19,7 @@ import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
+import AuditLogs from "./pages/admin/AuditLogs";
 import { AdminGuard } from "./components/guards/AdminGuard";
 
 // Create QueryClient outside component to avoid recreating on hot reload
@@ -87,20 +88,27 @@ const App = () => (
                 <Integrations />
               </ProtectedRoute>
             } />
-            <Route path="/admin" element={
-              <ProtectedRoute>
-                <AdminGuard>
-                  <AdminDashboard />
-                </AdminGuard>
-              </ProtectedRoute>
-            } />
-            <Route path="/admin/users" element={
-              <ProtectedRoute>
-                <AdminGuard>
-                  <UserManagement />
-                </AdminGuard>
-              </ProtectedRoute>
-            } />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <AdminGuard>
+                <AdminDashboard />
+              </AdminGuard>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <ProtectedRoute>
+              <AdminGuard>
+                <UserManagement />
+              </AdminGuard>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/logs" element={
+            <ProtectedRoute>
+              <AdminGuard>
+                <AuditLogs />
+              </AdminGuard>
+            </ProtectedRoute>
+          } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
