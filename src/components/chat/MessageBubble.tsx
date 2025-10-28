@@ -142,7 +142,7 @@ export function MessageBubble({
 
   return (
     <div className={cn(
-      "flex mb-2 px-2 sm:px-3 md:px-4 animate-fade-in",
+      "flex mb-2 px-4 animate-fade-in",
       isOutbound ? "justify-end" : "justify-start"
     )}>
       <MessageOptionsDialog
@@ -164,7 +164,7 @@ export function MessageBubble({
             variant="ghost"
             size="sm"
             className={cn(
-              "absolute -top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10",
+              "absolute -top-1 opacity-0 group-hover:opacity-100 transition-opacity z-10",
               "h-6 w-6 p-0 rounded-full bg-background/90 hover:bg-background shadow-sm",
               "focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-primary/20",
               isOutbound ? "right-1" : "left-1"
@@ -175,7 +175,7 @@ export function MessageBubble({
           </Button>
         
           <div className={cn(
-            "min-w-[120px] max-w-[min(450px,85vw)] sm:max-w-[min(500px,75vw)] md:max-w-[min(550px,65vw)] lg:max-w-[600px]",
+            "min-w-[120px] max-w-[min(550px,85vw)] lg:max-w-[650px]",
             "relative animate-slide-in-from-left",
             hasMedia ? "rounded-2xl overflow-hidden" : "rounded-2xl",
             isOutbound 

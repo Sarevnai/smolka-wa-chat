@@ -103,7 +103,7 @@ export function ConversationItem({
     return `${truncated}...`;
   };
   
-  const truncateName = (name: string, maxLength: number = 20) => {
+  const truncateName = (name: string, maxLength: number = 30) => {
     return name.length > maxLength ? `${name.substring(0, maxLength)}...` : name;
   };
 
@@ -149,7 +149,7 @@ export function ConversationItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-0.5">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <h3 className="font-medium text-gray-900 text-sm overflow-hidden text-ellipsis whitespace-nowrap">
+            <h3 className="font-medium text-gray-900 text-sm overflow-hidden text-ellipsis whitespace-nowrap max-w-[calc(100%-3rem)]">
               {displayName}
             </h3>
             {isAutoDetectedName && (

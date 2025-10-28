@@ -404,10 +404,10 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         </div>
         
         <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
             <Input
-              placeholder="Pesquisar ou começar uma nova conversa"
+              placeholder="Pesquisar conversa"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 bg-white/90 border-0 rounded-lg h-8 text-sm text-gray-900 placeholder:text-gray-500"
