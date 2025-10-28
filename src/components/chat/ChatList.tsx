@@ -646,12 +646,12 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
 
     {/* Contact Selection Modal */}
     <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Iniciar Nova Conversa</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="relative">
+        <div className="flex flex-col gap-4 flex-1 min-h-0">
+          <div className="relative flex-shrink-0">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar contato..."
@@ -660,13 +660,13 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
               className="pl-10"
             />
           </div>
-          <ScrollArea className="h-[400px]">
+          <ScrollArea className="flex-1 min-h-0 pr-4">
             {filteredContacts.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 Nenhum contato encontrado
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-1 pb-2">
                 {filteredContacts.map((contact) => (
                   <button
                     key={contact.id}
