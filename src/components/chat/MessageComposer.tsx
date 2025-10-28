@@ -255,7 +255,7 @@ export function MessageComposer({
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 p-3">
       {/* Compact Attendant Selector - Only show for admins or when needed */}
       {(profile?.roles?.includes('admin') || availableAttendants.length > 1) && (
         <div className="flex items-center gap-2 px-1">
@@ -265,7 +265,7 @@ export function MessageComposer({
             onValueChange={setSelectedAttendant} 
             disabled={disabled || (!profile?.roles?.includes('admin') && Boolean(profile?.full_name))}
           >
-            <SelectTrigger className="h-8 min-w-[200px] max-w-[280px] text-sm bg-muted/50 border-muted-foreground/20 rounded-md">
+            <SelectTrigger className="h-8 min-w-[160px] max-w-[280px] text-sm bg-muted/50 border-muted-foreground/20 rounded-md">
               <SelectValue placeholder="Selecione o atendente" />
             </SelectTrigger>
             <SelectContent className="max-w-[280px]">
@@ -291,7 +291,7 @@ export function MessageComposer({
 
       {/* Attached Files Preview */}
       {attachedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-2">
+        <div className="flex flex-wrap gap-2 px-2 max-h-[120px] overflow-y-auto">
           {attachedFiles.map((file, index) => {
             const FileIcon = getFileIcon(file.mimeType);
             return (

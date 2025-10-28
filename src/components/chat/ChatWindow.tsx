@@ -395,7 +395,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   return (
     <div className="w-full h-full flex flex-col border-x border-border/30">
       {/* Chat Header */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-chat-header border-b border-sidebar-border shadow-sm h-[59px]">
+      <div className="flex items-center gap-3 px-4 py-2 bg-chat-header border-b border-sidebar-border shadow-sm min-h-[59px]">
         {onBack && (
           <Button variant="ghost" size="sm" onClick={onBack} className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-100">
             <ArrowLeft className="h-4 w-4" />
