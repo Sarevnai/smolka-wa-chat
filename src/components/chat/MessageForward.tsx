@@ -3,6 +3,7 @@ import { Forward, Search, Check, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MessageRow } from "@/lib/messages";
@@ -13,12 +14,13 @@ interface MessageForwardProps {
   isOpen: boolean;
   onClose: () => void;
   message: MessageRow;
-  onForward: (selectedContacts: string[], message: MessageRow) => void;
+  onForward: (selectedContacts: string[], message: MessageRow, additionalText?: string) => void;
 }
 
 export function MessageForward({ isOpen, onClose, message, onForward }: MessageForwardProps) {
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [additionalText, setAdditionalText] = useState("");
   const { data: contacts = [] } = useContacts();
 
   const filteredContacts = contacts.filter(contact => 
@@ -37,16 +39,18 @@ export function MessageForward({ isOpen, onClose, message, onForward }: MessageF
   const handleForward = () => {
     if (selectedContacts.length === 0) return;
     
-    onForward(selectedContacts, message);
+    onForward(selectedContacts, message, additionalText);
     onClose();
     setSelectedContacts([]);
     setSearchQuery("");
+    setAdditionalText("");
   };
 
   const handleClose = () => {
     onClose();
     setSelectedContacts([]);
     setSearchQuery("");
+    setAdditionalText("");
   };
 
   if (!isOpen) return null;
@@ -67,6 +71,22 @@ export function MessageForward({ isOpen, onClose, message, onForward }: MessageF
           <div className="text-sm line-clamp-3">
             {message.body || (message.media_type && "Arquivo anexado") || "Mensagem"}
           </div>
+        </div>
+
+        {/* Additional message */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">
+            Mensagem adicional (opcional)
+          </label>
+          <Textarea
+            placeholder="Digite uma mensagem para acompanhar o encaminhamento..."
+            value={additionalText}
+            onChange={(e) => setAdditionalText(e.target.value)}
+            className="min-h-[80px] resize-none"
+          />
+          <p className="text-xs text-muted-foreground">
+            A mensagem será encaminhada com a marcação "📩 Encaminhado"
+          </p>
         </div>
 
         {/* Search */}

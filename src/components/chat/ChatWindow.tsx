@@ -272,12 +272,75 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     setShowForwardModal(true);
   }, []);
 
-  const handleForwardSend = useCallback(async (selectedContacts: string[], message: MessageRow) => {
-    // TODO: Implement forward message logic
+  const handleForwardSend = useCallback(async (
+    selectedContacts: string[], 
+    message: MessageRow,
+    additionalText?: string
+  ) => {
+    const { formatForwardedMessage, isMediaMessage, getWhatsAppMediaType } = await import("@/lib/forward-utils");
+    
+    let successCount = 0;
+    let failCount = 0;
+
     toast({
-      title: "Mensagem encaminhada",
-      description: `Enviada para ${selectedContacts.length} contato(s)`,
+      title: "Encaminhando mensagens...",
+      description: `Enviando para ${selectedContacts.length} contato(s)`,
     });
+
+    for (const contactPhone of selectedContacts) {
+      try {
+        // Se for mensagem de mídia
+        if (isMediaMessage(message)) {
+          const formattedCaption = formatForwardedMessage(message, additionalText);
+          
+          const { error } = await supabase.functions.invoke('send-wa-media', {
+            body: {
+              to: contactPhone,
+              mediaUrl: message.media_url,
+              mediaType: getWhatsAppMediaType(message.media_mime_type || message.media_type || ''),
+              caption: formattedCaption,
+              filename: message.media_filename || undefined,
+            }
+          });
+
+          if (error) throw error;
+          successCount++;
+        } 
+        // Se for mensagem de texto
+        else if (message.body) {
+          const formattedText = formatForwardedMessage(message, additionalText);
+          
+          const { error } = await supabase.functions.invoke('send-wa-message', {
+            body: {
+              to: contactPhone,
+              text: formattedText,
+            }
+          });
+
+          if (error) throw error;
+          successCount++;
+        }
+      } catch (error) {
+        console.error(`Erro ao encaminhar para ${contactPhone}:`, error);
+        failCount++;
+      }
+    }
+
+    // Feedback final
+    if (failCount === 0) {
+      toast({
+        title: "✅ Mensagens encaminhadas!",
+        description: `Enviadas com sucesso para ${successCount} contato(s)`,
+      });
+    } else {
+      toast({
+        title: "⚠️ Encaminhamento parcial",
+        description: `${successCount} enviadas, ${failCount} falharam`,
+        variant: "destructive",
+      });
+    }
+
+    setShowForwardModal(false);
   }, [toast]);
 
   const handleScheduleMessage = useCallback(async (message: string, scheduledTime: Date) => {
