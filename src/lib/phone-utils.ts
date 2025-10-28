@@ -19,10 +19,15 @@ export function normalizePhone(phone: string): string {
  */
 export function getPhoneSearchPattern(searchTerm: string): string {
   const normalized = normalizePhone(searchTerm);
-  // Allow search with or without country code
+  
+  // If has at least 8 digits, search by last digits with wildcards
   if (normalized.length >= 8) {
-    // Return just the last 8-9 digits for more flexible matching
-    return normalized.slice(-9);
+    const lastDigits = normalized.slice(-8); // Last 8 digits
+    // Return pattern that accepts any character between digits
+    // Example: "91226090" becomes "9%1%2%2%6%0%9%0"
+    return lastDigits.split('').join('%');
   }
-  return normalized;
+  
+  // For shorter searches, also use wildcards
+  return normalized.split('').join('%');
 }

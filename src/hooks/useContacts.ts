@@ -25,30 +25,18 @@ export const useContactsForSelection = (searchTerm?: string, filters?: ContactFi
           .order('updated_at', { ascending: false })
           .range(from, from + pageSize - 1);
 
-        // Apply search term - server-side search for better performance
-        if (searchTerm && searchTerm.trim()) {
-          const term = searchTerm.trim();
-          const isPhoneSearch = /[\d+\-() ]/.test(term) && term.length >= 4;
-          
-          if (isPhoneSearch) {
-            const phonePattern = getPhoneSearchPattern(term);
-            // Phone search with normalized pattern
-            query = query.or(`
-              name.ilike.%${term}%,
-              phone.ilike.%${phonePattern}%,
-              email.ilike.%${term}%,
-              contact_contracts.contract_number.ilike.%${term}%
-            `);
-          } else {
-            // Regular text search
-            query = query.or(`
-              name.ilike.%${term}%,
-              phone.ilike.%${term}%,
-              email.ilike.%${term}%,
-              contact_contracts.contract_number.ilike.%${term}%
-            `);
-          }
-        }
+  // Apply search term - server-side search for better performance
+  if (searchTerm && searchTerm.trim()) {
+    const term = searchTerm.trim();
+    const isPhoneSearch = /[\d+\-() ]/.test(term) && term.length >= 4;
+    
+    if (isPhoneSearch) {
+      const phonePattern = getPhoneSearchPattern(term);
+      query = query.or(`name.ilike.%${term}%,phone.ilike.%${phonePattern}%,email.ilike.%${term}%`);
+    } else {
+      query = query.or(`name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`);
+    }
+  }
 
         // Apply filters - server-side filtering
         if (filters?.status && Array.isArray(filters.status) && filters.status.length > 0) {
@@ -122,18 +110,10 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
         if (isPhoneSearch) {
           // Phone search: normalize and search by digits only
           const phonePattern = getPhoneSearchPattern(term);
-          query = query.or(`
-            name.ilike.%${term}%,
-            phone.ilike.%${phonePattern}%,
-            email.ilike.%${term}%
-          `);
+          query = query.or(`name.ilike.%${term}%,phone.ilike.%${phonePattern}%,email.ilike.%${term}%`);
         } else {
           // Text search: normal search
-          query = query.or(`
-            name.ilike.%${term}%,
-            phone.ilike.%${term}%,
-            email.ilike.%${term}%
-          `);
+          query = query.or(`name.ilike.%${term}%,phone.ilike.%${term}%,email.ilike.%${term}%`);
         }
       }
 
