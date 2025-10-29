@@ -48,7 +48,7 @@ export function MessageComposer({
   
   const { profile } = useAuth();
   const { profiles } = useUserProfiles();
-  const { sendMediaMessage } = useMediaUpload();
+  const { sendMediaMessage, uploadFile } = useMediaUpload();
 
   // Memoize available attendants to prevent infinite re-renders
   const availableAttendants = useMemo(() => {
@@ -238,6 +238,52 @@ export function MessageComposer({
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData.items;
+    
+    // Procurar por imagens no clipboard
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      
+      // Se for imagem
+      if (item.type.startsWith('image/')) {
+        e.preventDefault(); // Previne que a imagem seja colada como texto
+        
+        const file = item.getAsFile();
+        if (!file) continue;
+        
+        // Criar nome do arquivo com timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const extension = file.type.split('/')[1] || 'png';
+        
+        // Criar um novo arquivo com nome apropriado
+        const blob = file.slice(0, file.size, file.type);
+        const renamedFile = new window.File(
+          [blob], 
+          `screenshot-${timestamp}.${extension}`,
+          { type: file.type }
+        );
+        
+        // Usar o sistema de upload existente
+        try {
+          const uploadResult = await uploadFile(renamedFile);
+          if (uploadResult) {
+            await handleFileUpload(uploadResult);
+          }
+        } catch (error) {
+          console.error('Erro ao processar screenshot:', error);
+          toast({
+            title: "Erro ao colar imagem",
+            description: "Tente novamente ou use o botão de anexo.",
+            variant: "destructive",
+          });
+        }
+        
+        break; // Processar apenas a primeira imagem
+      }
+    }
+  };
+
   const handleAudioReady = (audioBlob: Blob, duration: number) => {
     toast({
       title: "Áudio gravado",
@@ -342,6 +388,7 @@ export function MessageComposer({
             value={message}
             onChange={(e) => handleMessageChange(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={attachedFiles.length > 0 ? "Adicione uma legenda (opcional)..." : "Digite uma mensagem..."}
             className={cn(
               "min-h-[28px] max-h-[80px] resize-none border-0 bg-transparent py-1.5 px-0",
