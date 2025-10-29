@@ -45,11 +45,53 @@ export function usePermissions(): FunctionPermissions & {
       }
     };
 
-    if (user?.id && !authLoading) {
-      fetchEffectivePermissions();
-    } else {
+    if (!user?.id || authLoading) {
       setPermissionsLoading(false);
+      return;
     }
+
+    // Initial fetch
+    fetchEffectivePermissions();
+
+    // Subscribe to changes in user_permissions
+    const userPermissionsChannel = supabase
+      .channel(`user-permissions-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_permissions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          console.log('🔄 Permissões do usuário atualizadas, refazendo fetch...');
+          fetchEffectivePermissions();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to changes in function_permissions (affects all users with that function)
+    const functionPermissionsChannel = supabase
+      .channel(`function-permissions-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'function_permissions',
+        },
+        () => {
+          console.log('🔄 Permissões de função atualizadas, refazendo fetch...');
+          fetchEffectivePermissions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(userPermissionsChannel);
+      supabase.removeChannel(functionPermissionsChannel);
+    };
   }, [user?.id, authLoading]);
 
   const functions = useMemo(() => {

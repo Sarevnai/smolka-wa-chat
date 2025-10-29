@@ -39,16 +39,16 @@ import {
 import { useState } from "react";
 
 const mainItems = [
-  { title: "Dashboard", url: "/", icon: Home },
-  { title: "Inbox", url: "/inbox", icon: Inbox, badge: "New" },
-  { title: "Conversas", url: "/chat", icon: MessageCircle, hasUnreadCount: true },
-  { title: "Campanhas", url: "/send", icon: Send },
-  { title: "Contatos", url: "/contacts", icon: Users },
-  { title: "Relatórios", url: "/reports", icon: BarChart3 },
+  { title: "Dashboard", url: "/", icon: Home, permission: 'canViewDashboard' as const },
+  { title: "Inbox", url: "/inbox", icon: Inbox, badge: "New", permission: 'canViewChats' as const },
+  { title: "Conversas", url: "/chat", icon: MessageCircle, hasUnreadCount: true, permission: 'canViewChats' as const },
+  { title: "Campanhas", url: "/send", icon: Send, permission: 'canViewCampaigns' as const },
+  { title: "Contatos", url: "/contacts", icon: Users, permission: 'canViewContacts' as const },
+  { title: "Relatórios", url: "/reports", icon: BarChart3, permission: 'canViewReports' as const },
 ];
 
 const integrationItems = [
-  { title: "ClickUp", url: "/clickup", icon: Settings },
+  { title: "ClickUp", url: "/clickup", icon: Settings, permission: 'canManageIntegrations' as const },
 ];
 
 export function AppSidebar() {
@@ -85,30 +85,32 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navegação Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className={getNavClassName(item.url)}>
-                    <Link to={item.url}>
-                      <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                      {!collapsed && (
-                        <div className="flex items-center justify-between flex-1">
-                          <span>{item.title}</span>
-                          {item.badge && (
-                            <Badge variant="secondary" className="text-xs">
-                              {item.badge}
-                            </Badge>
-                          )}
-                          {item.hasUnreadCount && unreadCount > 0 && (
-                            <Badge variant="destructive" className="text-xs">
-                              {unreadCount}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {mainItems
+                .filter(item => !item.permission || permissions[item.permission])
+                .map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild className={getNavClassName(item.url)}>
+                      <Link to={item.url}>
+                        <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                        {!collapsed && (
+                          <div className="flex items-center justify-between flex-1">
+                            <span>{item.title}</span>
+                            {item.badge && (
+                              <Badge variant="secondary" className="text-xs">
+                                {item.badge}
+                              </Badge>
+                            )}
+                            {item.hasUnreadCount && unreadCount > 0 && (
+                              <Badge variant="destructive" className="text-xs">
+                                {unreadCount}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -139,16 +141,18 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   <SidebarMenuSub>
-                    {integrationItems.map((item) => (
-                      <SidebarMenuSubItem key={item.title}>
-                        <SidebarMenuSubButton asChild className={getNavClassName(item.url)}>
-                          <Link to={item.url}>
-                            <item.icon className="h-4 w-4 mr-2" />
-                            {!collapsed && <span>{item.title}</span>}
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
+                    {integrationItems
+                      .filter(item => !item.permission || permissions[item.permission])
+                      .map((item) => (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton asChild className={getNavClassName(item.url)}>
+                            <Link to={item.url}>
+                              <item.icon className="h-4 w-4 mr-2" />
+                              {!collapsed && <span>{item.title}</span>}
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
                   </SidebarMenuSub>
                 </SidebarMenu>
               </SidebarGroupContent>

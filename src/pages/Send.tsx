@@ -18,11 +18,15 @@ import { useTemplates } from "@/hooks/useTemplates";
 import { Campaign, MessageTemplate, BulkMessageRequest } from "@/types/campaign";
 import { WhatsAppTemplate, getTemplatePreview, isOfficialWhatsAppTemplate } from "@/hooks/useWhatsAppTemplates";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFullCampaign, normalizePhoneNumber } from "@/lib/validation";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ShieldAlert } from "lucide-react";
 
 export default function Send() {
   const { profile } = useAuth();
+  const permissions = usePermissions();
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | WhatsAppTemplate | null>(null);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [customMessage, setCustomMessage] = useState("");
@@ -44,8 +48,6 @@ export default function Send() {
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaigns();
   const createCampaign = useCreateCampaign();
   const sendCampaign = useSendCampaign();
-
-  const isAdmin = profile?.roles?.includes('admin');
 
   const getMessage = () => {
     if (selectedTemplate) {
@@ -277,18 +279,29 @@ export default function Send() {
     }
   };
 
-  if (!isAdmin) {
+  if (permissions.loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <h2 className="text-2xl font-bold">Acesso Restrito</h2>
-            <p className="text-muted-foreground">
-              Você não tem permissão para acessar esta funcionalidade.
+          <div className="animate-pulse text-muted-foreground">Verificando permissões...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!permissions.canViewCampaigns) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px] p-4">
+          <Alert variant="destructive" className="max-w-md">
+            <ShieldAlert className="h-5 w-5" />
+            <AlertTitle>Acesso Negado</AlertTitle>
+            <AlertDescription>
+              Você não tem permissão para acessar campanhas.
               <br />
-              Entre em contato com um administrador.
-            </p>
-          </div>
+              Entre em contato com um administrador se precisar de acesso.
+            </AlertDescription>
+          </Alert>
         </div>
       </Layout>
     );
