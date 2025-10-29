@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ConversationItem } from "./ConversationItem";
-import { QuickTemplateSender } from "./QuickTemplateSender";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
@@ -22,6 +21,8 @@ import { useRealtimeMessages } from "@/contexts/RealtimeMessagesContext";
 import { useWhatsAppTemplates } from "@/hooks/useWhatsAppTemplates";
 import { useQuickTemplate } from "@/hooks/useQuickTemplate";
 import { useAuth } from "@/hooks/useAuth";
+import { usePermissions } from "@/hooks/usePermissions";
+import { Loader2 } from "lucide-react";
 
 interface Conversation {
   phoneNumber: string;
@@ -44,7 +45,6 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<'all' | 'inquilino' | 'proprietario'>('all');
   const [showContactModal, setShowContactModal] = useState(false);
-  const [showTemplateSender, setShowTemplateSender] = useState(false);
   const [selectedContactPhone, setSelectedContactPhone] = useState<string>("");
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactSearch, setContactSearch] = useState("");
@@ -56,6 +56,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const { data: templates } = useWhatsAppTemplates();
   const { sendTemplate, isLoading: sendingTemplate } = useQuickTemplate();
   const { profile } = useAuth();
+  const permissions = usePermissions();
 
   const loadConversations = async () => {
     try {
@@ -347,28 +348,50 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   });
 
   const handleContactSelect = async (phone: string) => {
-    setSelectedContactPhone(phone);
-    setShowContactModal(false);
-    
-    // Buscar template "iniciar_atendimento"
-    const template = templates?.find(t => t.template_name === 'iniciar_atendimento');
-    
-    if (!template) {
+    // Verificar permissão
+    if (!permissions.canSendMessages) {
       toast({
-        title: "Template não encontrado",
-        description: "O template 'iniciar_atendimento' não está disponível.",
+        title: "Permissão negada",
+        description: "Você não tem permissão para enviar mensagens. Entre em contato com um administrador.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validação: verificar se templates estão carregados
+    if (!templates || templates.length === 0) {
+      toast({
+        title: "Templates não carregados",
+        description: "Aguarde o carregamento dos templates ou recarregue a página.",
         variant: "destructive"
       });
       return;
     }
     
-    // Auto-preencher variáveis
+    // Buscar template específico
+    const template = templates.find(t => t.template_name === 'iniciar_atendimento');
+    
+    if (!template) {
+      toast({
+        title: "Template não encontrado",
+        description: "O template 'iniciar_atendimento' não está configurado. Entre em contato com o administrador.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Preparar variáveis
     const variables: Record<string, string> = {
       user: profile?.full_name || 'Atendente'
     };
     
+    // Iniciar envio
+    setSelectedContactPhone(phone);
+    
     try {
-      // Enviar template automaticamente
+      console.log('📤 Enviando template iniciar_atendimento para:', phone);
+      
+      // Aguardar envio completo
       await sendTemplate({
         phoneNumber: phone,
         templateName: template.template_name,
@@ -376,20 +399,31 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         variables
       });
       
-      // Navegar para a conversa
+      console.log('✅ Template enviado com sucesso!');
+      
+      // Fechar modal APÓS envio bem-sucedido
+      setShowContactModal(false);
+      
+      // Aguardar um pouco para garantir que mensagem foi salva no banco
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Navegar para conversa
       navigate(`/chat/${phone}`);
+      
     } catch (error) {
-      console.error("Erro ao enviar template:", error);
-      // Toast de erro já é mostrado pelo hook useQuickTemplate
+      console.error('❌ Erro ao enviar template:', error);
+      
+      // Toast de erro mais detalhado (o hook já mostra um, mas vamos garantir)
+      if (error instanceof Error && !error.message.includes('Template enviado')) {
+        toast({
+          title: "Erro ao iniciar conversa",
+          description: error.message || "Não foi possível enviar a mensagem inicial. Tente novamente.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setSelectedContactPhone("");
     }
-  };
-
-  const handleTemplateSendSuccess = () => {
-    navigate(`/chat/${selectedContactPhone}`);
-    setShowTemplateSender(false);
-    setSelectedContactPhone("");
   };
 
   const filteredConversations = conversations.filter(conversation => {
@@ -556,13 +590,13 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
                 {searchedContacts.map((contact) => (
                   <button
                     key={contact.id}
-                    onClick={() => {
-                      setSelectedContactPhone(contact.phone);
-                      setShowTemplateSender(true);
-                    }}
+                    onClick={() => handleContactSelect(contact.phone)}
+                    disabled={sendingTemplate}
                     className={cn(
-                      "w-full flex items-center gap-3 p-4 hover:bg-accent transition-colors border-b border-border/50",
-                      "group cursor-pointer"
+                      "w-full flex items-center gap-3 p-4 transition-colors border-b border-border/50",
+                      sendingTemplate 
+                        ? "opacity-50 cursor-not-allowed" 
+                        : "hover:bg-accent group cursor-pointer"
                     )}
                   >
                     <Avatar className="h-12 w-12">
@@ -614,23 +648,26 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
       </ScrollArea>
 
       {/* Floating Action Button - New Conversation */}
-      <Button
-        onClick={() => setShowContactModal(true)}
-        className="absolute bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all"
-        size="icon"
-        title="Iniciar nova conversa"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      {permissions.canSendMessages && (
+        <Button
+          onClick={() => setShowContactModal(true)}
+          className="absolute bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all"
+          size="icon"
+          title="Iniciar nova conversa"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      )}
     </div>
 
     {/* Contact Selection Modal */}
     <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
-      <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-md max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0 pb-4">
           <DialogTitle>Iniciar Nova Conversa</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-4 flex-1 min-h-0">
+        
+        <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
           <div className="relative flex-shrink-0">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -640,7 +677,8 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
               className="pl-10"
             />
           </div>
-          <ScrollArea className="flex-1 min-h-0 pr-4">
+          
+          <ScrollArea className="flex-1 overflow-y-auto pr-4">
             {filteredContacts.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 Nenhum contato encontrado
@@ -651,7 +689,13 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
                   <button
                     key={contact.id}
                     onClick={() => handleContactSelect(contact.phone)}
-                    className="w-full flex items-center gap-3 p-3 hover:bg-muted rounded-lg transition-colors text-left"
+                    disabled={sendingTemplate}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left",
+                      sendingTemplate 
+                        ? "opacity-50 cursor-not-allowed" 
+                        : "hover:bg-muted"
+                    )}
                   >
                     <Avatar className="h-10 w-10">
                       <AvatarFallback>
@@ -672,19 +716,16 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
               </div>
             )}
           </ScrollArea>
+          
+          {sendingTemplate && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-2 border-t flex-shrink-0">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Iniciando conversa...</span>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
-
-    {/* Template Sender Modal */}
-    {selectedContactPhone && (
-      <QuickTemplateSender
-        phoneNumber={selectedContactPhone}
-        open={showTemplateSender}
-        onOpenChange={setShowTemplateSender}
-        onSuccess={handleTemplateSendSuccess}
-      />
-    )}
     </>
   );
 }
