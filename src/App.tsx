@@ -21,6 +21,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import AuditLogs from "./pages/admin/AuditLogs";
 import PermissionsMatrix from "./pages/admin/PermissionsMatrix";
+import UserPermissions from "./pages/admin/UserPermissions";
 import SystemSettings from "./pages/admin/SystemSettings";
 import { AdminGuard } from "./components/guards/AdminGuard";
 
@@ -115,6 +116,13 @@ const App = () => (
             <ProtectedRoute>
               <AdminGuard>
                 <PermissionsMatrix />
+              </AdminGuard>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/user-permissions" element={
+            <ProtectedRoute>
+              <AdminGuard>
+                <UserPermissions />
               </AdminGuard>
             </ProtectedRoute>
           } />

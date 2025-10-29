@@ -181,6 +181,14 @@ export function AppSidebar() {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className={getNavClassName('/admin/user-permissions')}>
+                    <Link to="/admin/user-permissions">
+                      <Shield className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                      {!collapsed && <span>Permissões por Usuário</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
