@@ -15,7 +15,7 @@ interface UserCardProps {
   onUnblock: (userId: string) => void;
 }
 
-export function UserCard({ user, onUpdateRole, onToggleStatus, onBlock, onUnblock }: UserCardProps) {
+export function UserCard({ user, onUpdateFunction, onToggleStatus, onBlock, onUnblock }: UserCardProps) {
   const getInitials = (name: string | null, username: string) => {
     if (name) {
       const parts = name.split(' ');
