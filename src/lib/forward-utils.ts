@@ -2,13 +2,13 @@ import { MessageRow } from "./messages";
 
 /**
  * Formata uma mensagem para encaminhamento
- * Adiciona o prefixo "📩 *Encaminhado*" seguido da mensagem adicional (se houver)
+ * Adiciona o prefixo "_Encaminhada_" seguido da mensagem adicional (se houver)
  */
 export function formatForwardedMessage(
   originalMessage: MessageRow,
   additionalText?: string
 ): string {
-  const forwardPrefix = "_Encaminhado_";
+  const forwardPrefix = "_Encaminhada_";
   
   // Se for mídia com caption
   if (originalMessage.media_caption) {
@@ -16,7 +16,6 @@ export function formatForwardedMessage(
     if (additionalText?.trim()) {
       parts.push(additionalText.trim());
     }
-    parts.push("---");
     parts.push(originalMessage.media_caption);
     return parts.join("\n");
   }
@@ -27,7 +26,6 @@ export function formatForwardedMessage(
     if (additionalText?.trim()) {
       parts.push(additionalText.trim());
     }
-    parts.push("---");
     parts.push(originalMessage.body);
     return parts.join("\n");
   }
