@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserPermissionsEditor } from '@/components/admin/UserPermissionsEditor';
 import { useUserManagement, UserWithStatus } from '@/hooks/admin/useUserManagement';
-import { ROLE_LABELS } from '@/types/roles';
+import { FUNCTION_LABELS } from '@/types/functions';
 import { Search, Settings, Shield, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -128,7 +128,7 @@ export default function UserPermissions() {
                         </p>
                         <div className="flex items-center gap-2 mt-2">
                           <Badge variant="outline" className="text-xs">
-                            {ROLE_LABELS[user.role]}
+                            {FUNCTION_LABELS[user.function]}
                           </Badge>
                           {!user.is_active && (
                             <Badge variant="secondary" className="text-xs">

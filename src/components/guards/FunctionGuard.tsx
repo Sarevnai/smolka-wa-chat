@@ -1,21 +1,21 @@
 import { usePermissions } from '@/hooks/usePermissions';
-import { AppRole, RolePermissions } from '@/types/roles';
+import { AppFunction, FunctionPermissions } from '@/types/functions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldAlert } from 'lucide-react';
 
-interface RoleGuardProps {
+interface FunctionGuardProps {
   children: React.ReactNode;
-  allowedRoles?: AppRole[];
-  requiredPermission?: keyof RolePermissions;
+  allowedFunctions?: AppFunction[];
+  requiredPermission?: keyof FunctionPermissions;
   fallback?: React.ReactNode;
 }
 
-export function RoleGuard({ 
+export function FunctionGuard({ 
   children, 
-  allowedRoles, 
+  allowedFunctions, 
   requiredPermission,
   fallback 
-}: RoleGuardProps) {
+}: FunctionGuardProps) {
   const permissions = usePermissions();
 
   // Wait for loading
@@ -23,10 +23,10 @@ export function RoleGuard({
     return null;
   }
 
-  // Check by role
-  if (allowedRoles) {
-    const hasAllowedRole = allowedRoles.some(role => permissions.hasRole(role));
-    if (!hasAllowedRole) {
+  // Check by function
+  if (allowedFunctions) {
+    const hasAllowedFunction = allowedFunctions.some(func => permissions.hasFunction(func));
+    if (!hasAllowedFunction) {
       return fallback || <AccessDenied />;
     }
   }

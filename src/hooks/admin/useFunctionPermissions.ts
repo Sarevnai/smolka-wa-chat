@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export interface RolePermission {
+export interface FunctionPermission {
   id: string;
-  role: 'admin' | 'manager' | 'attendant';
+  function: 'admin' | 'manager' | 'attendant';
   resource: string;
   can_view: boolean;
   can_create: boolean;
@@ -13,16 +13,16 @@ export interface RolePermission {
   updated_at: string;
 }
 
-export function useRolePermissions() {
-  const [permissions, setPermissions] = useState<RolePermission[]>([]);
+export function useFunctionPermissions() {
+  const [permissions, setPermissions] = useState<FunctionPermission[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPermissions = async () => {
     try {
       const { data, error } = await supabase
-        .from('role_permissions')
+        .from('function_permissions')
         .select('*')
-        .order('role', { ascending: true })
+        .order('function', { ascending: true })
         .order('resource', { ascending: true });
 
       if (error) throw error;
@@ -36,7 +36,7 @@ export function useRolePermissions() {
   };
 
   const updatePermission = async (
-    role: 'admin' | 'manager' | 'attendant',
+    userFunction: 'admin' | 'manager' | 'attendant',
     resource: string,
     field: 'can_view' | 'can_create' | 'can_edit' | 'can_delete',
     value: boolean
@@ -45,12 +45,12 @@ export function useRolePermissions() {
       const { data: currentUser } = await supabase.auth.getUser();
       
       const { error } = await supabase
-        .from('role_permissions')
+        .from('function_permissions')
         .update({ 
           [field]: value,
           updated_by: currentUser.user?.id
         })
-        .eq('role', role)
+        .eq('function', userFunction)
         .eq('resource', resource);
 
       if (error) throw error;
@@ -63,12 +63,12 @@ export function useRolePermissions() {
     }
   };
 
-  const getPermissionsByRole = (role: 'admin' | 'manager' | 'attendant') => {
-    return permissions.filter(p => p.role === role);
+  const getPermissionsByFunction = (userFunction: 'admin' | 'manager' | 'attendant') => {
+    return permissions.filter(p => p.function === userFunction);
   };
 
-  const getPermissionForResource = (role: 'admin' | 'manager' | 'attendant', resource: string) => {
-    return permissions.find(p => p.role === role && p.resource === resource);
+  const getPermissionForResource = (userFunction: 'admin' | 'manager' | 'attendant', resource: string) => {
+    return permissions.find(p => p.function === userFunction && p.resource === resource);
   };
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export function useRolePermissions() {
     permissions,
     loading,
     updatePermission,
-    getPermissionsByRole,
+    getPermissionsByFunction,
     getPermissionForResource,
     refetch: fetchPermissions
   };

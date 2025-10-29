@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useState } from 'react';
 import { useAuth } from './useAuth';
-import { AppRole, RolePermissions } from '@/types/roles';
+import { AppFunction, FunctionPermissions } from '@/types/functions';
 import { supabase } from '@/integrations/supabase/client';
 
 interface EffectivePermission {
@@ -12,9 +12,9 @@ interface EffectivePermission {
   is_custom: boolean;
 }
 
-export function usePermissions(): RolePermissions & { 
-  roles: AppRole[];
-  hasRole: (role: AppRole) => boolean;
+export function usePermissions(): FunctionPermissions & { 
+  functions: AppFunction[];
+  hasFunction: (func: AppFunction) => boolean;
   isAdmin: boolean;
   isManager: boolean;
   isAttendant: boolean;
@@ -52,14 +52,14 @@ export function usePermissions(): RolePermissions & {
     }
   }, [user?.id, authLoading]);
 
-  const roles = useMemo(() => {
-    return profile?.roles || [];
+  const functions = useMemo(() => {
+    return profile?.roles || []; // roles is still stored in profile but we call it functions in the API
   }, [profile]);
 
-  const hasRole = (role: AppRole) => roles.includes(role);
-  const isAdmin = hasRole('admin');
-  const isManager = hasRole('manager');
-  const isAttendant = hasRole('attendant');
+  const hasFunction = (func: AppFunction) => functions.includes(func);
+  const isAdmin = hasFunction('admin');
+  const isManager = hasFunction('manager');
+  const isAttendant = hasFunction('attendant');
 
   // Helper to get permission from effective permissions
   const getResourcePermission = (resource: string, action: 'view' | 'create' | 'edit' | 'delete'): boolean => {
@@ -75,7 +75,7 @@ export function usePermissions(): RolePermissions & {
     }
   };
 
-  const permissions = useMemo((): RolePermissions => {
+  const permissions = useMemo((): FunctionPermissions => {
     // If we have effective permissions from DB, use those
     if (effectivePermissions.length > 0) {
       return {
@@ -101,7 +101,7 @@ export function usePermissions(): RolePermissions & {
       };
     }
 
-    // Fallback to role-based permissions if no DB permissions
+    // Fallback to function-based permissions if no DB permissions
     if (isAdmin) {
       return {
         canViewDashboard: true,
@@ -178,8 +178,8 @@ export function usePermissions(): RolePermissions & {
 
   return {
     ...permissions,
-    roles,
-    hasRole,
+    functions,
+    hasFunction,
     isAdmin,
     isManager,
     isAttendant,

@@ -1,5 +1,5 @@
 import { UserWithStatus } from '@/hooks/admin/useUserManagement';
-import { AppRole, ROLE_LABELS } from '@/types/roles';
+import { AppFunction, FUNCTION_LABELS } from '@/types/functions';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -30,7 +30,7 @@ import { useState } from 'react';
 
 interface UserActionsMenuProps {
   user: UserWithStatus;
-  onUpdateRole: (userId: string, newRole: AppRole) => void;
+  onUpdateFunction: (userId: string, newFunction: AppFunction) => void;
   onToggleStatus: (userId: string, isActive: boolean) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
@@ -38,7 +38,7 @@ interface UserActionsMenuProps {
 
 export function UserActionsMenu({
   user,
-  onUpdateRole,
+  onUpdateFunction,
   onToggleStatus,
   onBlock,
   onUnblock,
@@ -56,21 +56,21 @@ export function UserActionsMenu({
         <DropdownMenuLabel>Ações do Usuário</DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {/* Alterar Role */}
+        {/* Alterar Function */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Shield className="mr-2 h-4 w-4" />
-            Alterar Permissão
+            Alterar Função
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
-            <DropdownMenuItem onClick={() => onUpdateRole(user.user_id, 'admin')}>
-              {ROLE_LABELS.admin}
+            <DropdownMenuItem onClick={() => onUpdateFunction(user.user_id, 'admin')}>
+              {FUNCTION_LABELS.admin}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onUpdateRole(user.user_id, 'manager')}>
-              {ROLE_LABELS.manager}
+            <DropdownMenuItem onClick={() => onUpdateFunction(user.user_id, 'manager')}>
+              {FUNCTION_LABELS.manager}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onUpdateRole(user.user_id, 'attendant')}>
-              {ROLE_LABELS.attendant}
+            <DropdownMenuItem onClick={() => onUpdateFunction(user.user_id, 'attendant')}>
+              {FUNCTION_LABELS.attendant}
             </DropdownMenuItem>
           </DropdownMenuSubContent>
         </DropdownMenuSub>

@@ -14,21 +14,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ROLE_LABELS } from '@/types/roles';
+import { FUNCTION_LABELS } from '@/types/functions';
 
 export default function UserManagement() {
   const {
     users,
     loading,
     refetch,
-    updateUserRole,
+    updateUserFunction,
     toggleUserStatus,
     blockUser,
     unblockUser,
   } = useUserManagement();
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'blocked'>('all');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'attendant' | 'none'>('all');
+  const [functionFilter, setFunctionFilter] = useState<'all' | 'admin' | 'manager' | 'attendant' | 'none'>('all');
 
   const filteredUsers = users.filter(user => {
     // Status filter
@@ -36,9 +36,9 @@ export default function UserManagement() {
     if (statusFilter === 'inactive' && user.is_active) return false;
     if (statusFilter === 'blocked' && !user.is_blocked) return false;
 
-    // Role filter
-    if (roleFilter === 'none' && user.role !== null) return false;
-    if (roleFilter !== 'all' && roleFilter !== 'none' && user.role !== roleFilter) return false;
+    // Function filter
+    if (functionFilter === 'none' && user.function !== null) return false;
+    if (functionFilter !== 'all' && functionFilter !== 'none' && user.function !== functionFilter) return false;
 
     return true;
   });
@@ -92,17 +92,17 @@ export default function UserManagement() {
                   </Select>
                 </div>
                 <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">Permissão</label>
-                  <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
+                  <label className="text-sm font-medium mb-2 block">Função</label>
+                  <Select value={functionFilter} onValueChange={(v: any) => setFunctionFilter(v)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
-                      <SelectItem value="manager">{ROLE_LABELS.manager}</SelectItem>
-                      <SelectItem value="attendant">{ROLE_LABELS.attendant}</SelectItem>
-                      <SelectItem value="none">Sem Permissão</SelectItem>
+                      <SelectItem value="admin">{FUNCTION_LABELS.admin}</SelectItem>
+                      <SelectItem value="manager">{FUNCTION_LABELS.manager}</SelectItem>
+                      <SelectItem value="attendant">{FUNCTION_LABELS.attendant}</SelectItem>
+                      <SelectItem value="none">Sem Função</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -134,7 +134,7 @@ export default function UserManagement() {
                 <UserCard
                   key={user.id}
                   user={user}
-                  onUpdateRole={updateUserRole}
+                  onUpdateFunction={updateUserFunction}
                   onToggleStatus={toggleUserStatus}
                   onBlock={blockUser}
                   onUnblock={unblockUser}

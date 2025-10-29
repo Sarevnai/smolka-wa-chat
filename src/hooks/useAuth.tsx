@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { AppRole } from '@/types/roles';
+import { AppFunction } from '@/types/functions';
 
 export interface UserProfile {
   id: string;
@@ -9,7 +9,7 @@ export interface UserProfile {
   full_name: string | null;
   username: string;
   user_code: number;
-  roles: AppRole[];
+  roles: AppFunction[];
   avatar_url?: string | null;
 }
 
@@ -50,19 +50,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // Fetch user roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('role')
+      // Fetch user functions
+      const { data: functionsData, error: functionsError } = await supabase
+        .from('user_functions')
+        .select('function')
         .eq('user_id', userId);
 
-      if (rolesError) {
-        console.error('Error fetching roles:', rolesError);
+      if (functionsError) {
+        console.error('Error fetching functions:', functionsError);
       }
 
       setProfile({
         ...profileData,
-        roles: rolesData?.map(r => r.role as AppRole) || [],
+        roles: functionsData?.map(r => r.function as AppFunction) || [],
       });
     } catch (error) {
       console.error('Error fetching profile:', error);

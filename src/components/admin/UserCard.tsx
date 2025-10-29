@@ -2,14 +2,14 @@ import { UserWithStatus } from '@/hooks/admin/useUserManagement';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ROLE_LABELS } from '@/types/roles';
+import { FUNCTION_LABELS } from '@/types/functions';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { UserActionsMenu } from './UserActionsMenu';
 
 interface UserCardProps {
   user: UserWithStatus;
-  onUpdateRole: (userId: string, newRole: any) => void;
+  onUpdateFunction: (userId: string, newFunction: any) => void;
   onToggleStatus: (userId: string, isActive: boolean) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
@@ -75,8 +75,8 @@ export function UserCard({ user, onUpdateRole, onToggleStatus, onBlock, onUnbloc
               </div>
 
               <div className="flex items-center gap-2 mt-3">
-                <Badge variant={getRoleBadgeVariant(user.role)}>
-                  {user.role ? ROLE_LABELS[user.role] : 'Sem permissão'}
+                <Badge variant={getRoleBadgeVariant(user.function)}>
+                  {user.function ? FUNCTION_LABELS[user.function] : 'Sem função'}
                 </Badge>
                 {user.last_login && (
                   <span className="text-xs text-muted-foreground">
@@ -99,7 +99,7 @@ export function UserCard({ user, onUpdateRole, onToggleStatus, onBlock, onUnbloc
 
           <UserActionsMenu
             user={user}
-            onUpdateRole={onUpdateRole}
+            onUpdateFunction={onUpdateFunction}
             onToggleStatus={onToggleStatus}
             onBlock={onBlock}
             onUnblock={onUnblock}

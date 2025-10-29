@@ -1,14 +1,14 @@
-export type AppRole = 'admin' | 'manager' | 'attendant';
+export type AppFunction = 'admin' | 'manager' | 'attendant';
 
-export interface UserRole {
+export interface UserFunction {
   id: string;
   user_id: string;
-  role: AppRole;
+  function: AppFunction;
   created_at: string;
   updated_at: string;
 }
 
-export interface RolePermissions {
+export interface FunctionPermissions {
   canViewDashboard: boolean;
   canViewChats: boolean;
   canSendMessages: boolean;
@@ -30,13 +30,13 @@ export interface RolePermissions {
   canManageCategories: boolean;
 }
 
-export const ROLE_LABELS: Record<AppRole, string> = {
+export const FUNCTION_LABELS: Record<AppFunction, string> = {
   admin: 'Administrador',
   manager: 'Gerente',
   attendant: 'Atendente'
 };
 
-export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+export const FUNCTION_DESCRIPTIONS: Record<AppFunction, string> = {
   admin: 'Acesso total à plataforma',
   manager: 'Acesso a dados operacionais',
   attendant: 'Acesso restrito ao atendimento'

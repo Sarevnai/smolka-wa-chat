@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useUserPermissions } from '@/hooks/admin/useUserPermissions';
-import { ROLE_LABELS } from '@/types/roles';
+import { FUNCTION_LABELS } from '@/types/functions';
 import { RefreshCw, Shield, Info } from 'lucide-react';
 import { UserWithStatus } from '@/hooks/admin/useUserManagement';
 import { toast } from 'sonner';
@@ -89,7 +89,7 @@ export function UserPermissionsEditor({ user, open, onOpenChange }: UserPermissi
             Permissões de {user.full_name || user.username}
           </SheetTitle>
           <SheetDescription>
-            Cargo: <Badge variant="outline">{ROLE_LABELS[user.role]}</Badge>
+            Função: <Badge variant="outline">{FUNCTION_LABELS[user.function]}</Badge>
             <br />
             Personalize as permissões individuais deste usuário
           </SheetDescription>

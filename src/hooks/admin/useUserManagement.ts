@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { AppRole } from '@/types/roles';
+import { AppFunction } from '@/types/functions';
 import { useToast } from '@/hooks/use-toast';
 
 export interface UserWithStatus {
@@ -11,7 +11,7 @@ export interface UserWithStatus {
   username: string;
   user_code: number;
   avatar_url: string | null;
-  role: AppRole | null;
+  function: AppFunction | null;
   is_active: boolean;
   is_blocked: boolean;
   blocked_reason: string | null;
@@ -36,12 +36,12 @@ export function useUserManagement() {
 
       if (profilesError) throw profilesError;
 
-      // Buscar roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      // Buscar functions
+      const { data: functions, error: functionsError } = await supabase
+        .from('user_functions')
+        .select('user_id, function');
 
-      if (rolesError) throw rolesError;
+      if (functionsError) throw functionsError;
 
       // Buscar status
       const { data: statuses, error: statusesError } = await supabase
@@ -61,7 +61,7 @@ export function useUserManagement() {
       // Combinar dados
       const combinedUsers: UserWithStatus[] = profiles?.map(profile => {
         const emailData = emailResults.find(e => e.id === profile.user_id);
-        const userRole = roles?.find(r => r.user_id === profile.user_id);
+        const userFunction = functions?.find(r => r.user_id === profile.user_id);
         const userStatus = statuses?.find(s => s.user_id === profile.user_id);
 
         return {
@@ -72,7 +72,7 @@ export function useUserManagement() {
           username: profile.username,
           user_code: profile.user_code,
           avatar_url: profile.avatar_url,
-          role: userRole?.role as AppRole || null,
+          function: userFunction?.function as AppFunction || null,
           is_active: userStatus?.is_active ?? true,
           is_blocked: userStatus?.is_blocked ?? false,
           blocked_reason: userStatus?.blocked_reason || null,
@@ -94,29 +94,29 @@ export function useUserManagement() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: AppRole) => {
+  const updateUserFunction = async (userId: string, newFunction: AppFunction) => {
     try {
-      // Remove role antiga
-      await supabase.from('user_roles').delete().eq('user_id', userId);
+      // Remove function antiga
+      await supabase.from('user_functions').delete().eq('user_id', userId);
 
-      // Adiciona nova role
+      // Adiciona nova function
       const { error } = await supabase
-        .from('user_roles')
-        .insert({ user_id: userId, role: newRole });
+        .from('user_functions')
+        .insert({ user_id: userId, function: newFunction });
 
       if (error) throw error;
 
       toast({
-        title: 'Permissão atualizada',
-        description: 'A permissão do usuário foi atualizada com sucesso.',
+        title: 'Função atualizada',
+        description: 'A função do usuário foi atualizada com sucesso.',
       });
 
       fetchUsers();
     } catch (error) {
-      console.error('Error updating role:', error);
+      console.error('Error updating function:', error);
       toast({
-        title: 'Erro ao atualizar permissão',
-        description: 'Não foi possível atualizar a permissão do usuário.',
+        title: 'Erro ao atualizar função',
+        description: 'Não foi possível atualizar a função do usuário.',
         variant: 'destructive',
       });
     }
@@ -212,7 +212,7 @@ export function useUserManagement() {
     users,
     loading,
     refetch: fetchUsers,
-    updateUserRole,
+    updateUserFunction,
     toggleUserStatus,
     blockUser,
     unblockUser,

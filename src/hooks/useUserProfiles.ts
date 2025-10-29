@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { AppRole } from '@/types/roles';
+import { AppFunction } from '@/types/functions';
 
 export interface UserProfile {
   id: string;
@@ -9,7 +9,7 @@ export interface UserProfile {
   full_name: string | null;
   username: string;
   user_code: number;
-  roles: AppRole[];
+  roles: AppFunction[];
   avatar_url?: string | null;
 }
 
@@ -38,22 +38,22 @@ export function useUserProfiles() {
           return;
         }
 
-        // Fetch all user roles
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('user_id, role');
+        // Fetch all user functions
+        const { data: functionsData, error: functionsError } = await supabase
+          .from('user_functions')
+          .select('user_id, function');
 
-        if (rolesError) {
-          console.error('Error fetching roles:', rolesError);
+        if (functionsError) {
+          console.error('Error fetching functions:', functionsError);
         }
 
-        // Combine profiles with roles
-        const profilesWithRoles = profilesData?.map(profile => ({
+        // Combine profiles with functions
+        const profilesWithFunctions = profilesData?.map(profile => ({
           ...profile,
-          roles: rolesData?.filter(r => r.user_id === profile.user_id).map(r => r.role as AppRole) || [],
+          roles: functionsData?.filter(r => r.user_id === profile.user_id).map(r => r.function as AppFunction) || [],
         })) || [];
 
-        setProfiles(profilesWithRoles);
+        setProfiles(profilesWithFunctions);
       } catch (error) {
         console.error('Error fetching profiles:', error);
       } finally {

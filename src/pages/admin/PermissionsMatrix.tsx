@@ -11,7 +11,7 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Shield } from 'lucide-react';
-import { useRolePermissions } from '@/hooks/admin/useRolePermissions';
+import { useFunctionPermissions } from '@/hooks/admin/useFunctionPermissions';
 
 const RESOURCES = [
   { key: 'users', label: 'Usuários', description: 'Gerenciar usuários do sistema' },
@@ -25,7 +25,7 @@ const RESOURCES = [
   { key: 'settings', label: 'Configurações', description: 'Configurações do sistema' }
 ];
 
-const ROLE_INFO = {
+const FUNCTION_INFO = {
   admin: {
     label: 'Administrador',
     color: 'bg-red-500/10 text-red-500 border-red-500/20'
@@ -41,15 +41,15 @@ const ROLE_INFO = {
 };
 
 export default function PermissionsMatrix() {
-  const { permissions, loading, updatePermission, getPermissionForResource } = useRolePermissions();
+  const { permissions, loading, updatePermission, getPermissionForResource } = useFunctionPermissions();
 
   const handlePermissionChange = async (
-    role: 'admin' | 'manager' | 'attendant',
+    userFunction: 'admin' | 'manager' | 'attendant',
     resource: string,
     field: 'can_view' | 'can_create' | 'can_edit' | 'can_delete',
     value: boolean
   ) => {
-    await updatePermission(role, resource, field, value);
+    await updatePermission(userFunction, resource, field, value);
   };
 
   if (loading) {
@@ -70,18 +70,18 @@ export default function PermissionsMatrix() {
         </p>
       </div>
 
-      {/* Tabela para cada role */}
-      {(['admin', 'manager', 'attendant'] as const).map((role) => (
-        <Card key={role}>
+      {/* Tabela para cada function */}
+      {(['admin', 'manager', 'attendant'] as const).map((userFunction) => (
+        <Card key={userFunction}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              <Badge variant="outline" className={ROLE_INFO[role].color}>
-                {ROLE_INFO[role].label}
+              <Badge variant="outline" className={FUNCTION_INFO[userFunction].color}>
+                {FUNCTION_INFO[userFunction].label}
               </Badge>
             </CardTitle>
             <CardDescription>
-              Configure as permissões para o role {ROLE_INFO[role].label}
+              Configure as permissões para a função {FUNCTION_INFO[userFunction].label}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -97,7 +97,7 @@ export default function PermissionsMatrix() {
               </TableHeader>
               <TableBody>
                 {RESOURCES.map((resource) => {
-                  const perm = getPermissionForResource(role, resource.key);
+                  const perm = getPermissionForResource(userFunction, resource.key);
                   return (
                     <TableRow key={resource.key}>
                       <TableCell>
@@ -111,7 +111,7 @@ export default function PermissionsMatrix() {
                           <Switch
                             checked={perm?.can_view || false}
                             onCheckedChange={(checked) => 
-                              handlePermissionChange(role, resource.key, 'can_view', checked)
+                              handlePermissionChange(userFunction, resource.key, 'can_view', checked)
                             }
                           />
                         </div>
@@ -121,7 +121,7 @@ export default function PermissionsMatrix() {
                           <Switch
                             checked={perm?.can_create || false}
                             onCheckedChange={(checked) => 
-                              handlePermissionChange(role, resource.key, 'can_create', checked)
+                              handlePermissionChange(userFunction, resource.key, 'can_create', checked)
                             }
                           />
                         </div>
@@ -131,7 +131,7 @@ export default function PermissionsMatrix() {
                           <Switch
                             checked={perm?.can_edit || false}
                             onCheckedChange={(checked) => 
-                              handlePermissionChange(role, resource.key, 'can_edit', checked)
+                              handlePermissionChange(userFunction, resource.key, 'can_edit', checked)
                             }
                           />
                         </div>
@@ -141,7 +141,7 @@ export default function PermissionsMatrix() {
                           <Switch
                             checked={perm?.can_delete || false}
                             onCheckedChange={(checked) => 
-                              handlePermissionChange(role, resource.key, 'can_delete', checked)
+                              handlePermissionChange(userFunction, resource.key, 'can_delete', checked)
                             }
                           />
                         </div>
