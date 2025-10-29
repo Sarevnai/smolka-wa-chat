@@ -18,6 +18,7 @@ import { normalizePhone, getPhoneSearchPattern } from "@/lib/phone-utils";
 import { usePinnedConversations } from "@/hooks/usePinnedConversations";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 import { useNavigate } from "react-router-dom";
+import { useRealtimeMessages } from "@/contexts/RealtimeMessagesContext";
 
 interface Conversation {
   phoneNumber: string;
@@ -151,160 +152,99 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
     loadConversations();
   }, []);
 
-  // Real-time listener for new messages
-  useEffect(() => {
-    console.log('🔔 Configurando listener realtime para ChatList');
-    
-    const channel = supabase
-      .channel('chat-list-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages'
-        },
-        async (payload) => {
-          const newMessage = payload.new as MessageRow;
-          console.log('📨 Nova mensagem recebida no ChatList:', newMessage.id);
-          
-          // Get phone number from message
-          const phoneNumber = newMessage.direction === 'inbound' 
-            ? newMessage.wa_from 
-            : newMessage.wa_to;
-          
-          if (!phoneNumber) return;
-          
-          // Check if conversation already exists
-          const existingIndex = conversations.findIndex(c => c.phoneNumber === phoneNumber);
-          
-          if (existingIndex >= 0) {
-            // Update existing conversation
-            setConversations(prev => {
-              const updated = [...prev];
-              const conversation = updated[existingIndex];
-              
-              // Update conversation data
-              updated[existingIndex] = {
-                ...conversation,
-                lastMessage: newMessage,
-                messageCount: conversation.messageCount + 1,
-                unreadCount: selectedContact === phoneNumber 
-                  ? conversation.unreadCount 
-                  : conversation.unreadCount + 1
-              };
-              
-              // Move to top (respecting pinned conversations)
-              const movedConversation = updated.splice(existingIndex, 1)[0];
-              const isPinned = pinnedConversations.includes(phoneNumber);
-              
-              if (isPinned) {
-                // Add to beginning (pinned section)
-                updated.unshift(movedConversation);
-              } else {
-                // Add after pinned conversations
-                const firstUnpinnedIndex = updated.findIndex(c => 
-                  !pinnedConversations.includes(c.phoneNumber)
-                );
-                if (firstUnpinnedIndex >= 0) {
-                  updated.splice(firstUnpinnedIndex, 0, movedConversation);
-                } else {
-                  updated.push(movedConversation);
-                }
-              }
-              
-              return updated;
-            });
-          } else {
-            // New conversation - fetch contact info and add to list
-            console.log('🆕 Nova conversa detectada, carregando dados do contato...');
-            
-            const { data: contact } = await supabase
-              .from('contacts')
-              .select('name, contact_type')
-              .eq('phone', phoneNumber)
-              .maybeSingle();
-            
-            const newConversation: Conversation = {
-              phoneNumber,
-              lastMessage: newMessage,
-              messageCount: 1,
-              unreadCount: selectedContact === phoneNumber ? 0 : 1,
-              contactName: contact?.name,
-              contactType: contact?.contact_type
-            };
-            
-            setConversations(prev => {
-              const isPinned = pinnedConversations.includes(phoneNumber);
-              
-              if (isPinned) {
-                return [newConversation, ...prev];
-              } else {
-                // Add after pinned conversations
-                const firstUnpinnedIndex = prev.findIndex(c => 
-                  !pinnedConversations.includes(c.phoneNumber)
-                );
-                if (firstUnpinnedIndex >= 0) {
-                  const updated = [...prev];
-                  updated.splice(firstUnpinnedIndex, 0, newConversation);
-                  return updated;
-                } else {
-                  return [...prev, newConversation];
-                }
-              }
-            });
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages'
-        },
-        (payload) => {
-          const updatedMessage = payload.new as MessageRow;
-          console.log('📝 Mensagem atualizada no ChatList:', updatedMessage.id);
-          
-          // If the message is deleted, update the conversation preview
-          if (updatedMessage.deleted_for_everyone) {
-            const phoneNumber = updatedMessage.direction === 'inbound' 
-              ? updatedMessage.wa_from 
-              : updatedMessage.wa_to;
-            
-            if (!phoneNumber) return;
-            
-            // Find conversation and check if this is the last message
-            setConversations(prev => {
-              const index = prev.findIndex(c => c.phoneNumber === phoneNumber);
-              if (index < 0) return prev;
-              
-              const conversation = prev[index];
-              if (conversation.lastMessage.id === updatedMessage.id) {
-                // Last message was updated, update the conversation
-                const updated = [...prev];
-                updated[index] = {
-                  ...conversation,
-                  lastMessage: updatedMessage
-                };
-                return updated;
-              }
-              
-              return prev;
-            });
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('🔌 Status da subscrição ChatList:', status);
-      });
+  // Use centralized realtime context
+  const { lastMessage } = useRealtimeMessages();
 
-    return () => {
-      console.log('🔌 Removendo canal realtime do ChatList');
-      supabase.removeChannel(channel);
-    };
-  }, [selectedContact, pinnedConversations, conversations]);
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    console.log('📨 [ChatList] Processando mensagem do contexto:', lastMessage.id);
+    
+    // Get phone number from message
+    const phoneNumber = lastMessage.direction === 'inbound' 
+      ? lastMessage.wa_from 
+      : lastMessage.wa_to;
+    
+    if (!phoneNumber) return;
+    
+    // Check if conversation already exists
+    const existingIndex = conversations.findIndex(c => c.phoneNumber === phoneNumber);
+    
+    if (existingIndex >= 0) {
+      // Update existing conversation
+      setConversations(prev => {
+        const updated = [...prev];
+        const conversation = updated[existingIndex];
+        
+        // Update conversation data
+        updated[existingIndex] = {
+          ...conversation,
+          lastMessage,
+          messageCount: conversation.messageCount + 1,
+          unreadCount: selectedContact === phoneNumber 
+            ? conversation.unreadCount 
+            : conversation.unreadCount + 1
+        };
+        
+        // Move to top (respecting pinned conversations)
+        const movedConversation = updated.splice(existingIndex, 1)[0];
+        const isPinned = pinnedConversations.includes(phoneNumber);
+        
+        if (isPinned) {
+          updated.unshift(movedConversation);
+        } else {
+          const firstUnpinnedIndex = updated.findIndex(c => 
+            !pinnedConversations.includes(c.phoneNumber)
+          );
+          if (firstUnpinnedIndex >= 0) {
+            updated.splice(firstUnpinnedIndex, 0, movedConversation);
+          } else {
+            updated.push(movedConversation);
+          }
+        }
+        
+        return updated;
+      });
+    } else {
+      // New conversation - fetch contact info and add to list
+      console.log('🆕 [ChatList] Nova conversa detectada');
+      
+      supabase
+        .from('contacts')
+        .select('name, contact_type')
+        .eq('phone', phoneNumber)
+        .maybeSingle()
+        .then(({ data: contact }) => {
+          const newConversation: Conversation = {
+            phoneNumber,
+            lastMessage,
+            messageCount: 1,
+            unreadCount: selectedContact === phoneNumber ? 0 : 1,
+            contactName: contact?.name,
+            contactType: contact?.contact_type
+          };
+          
+          setConversations(prev => {
+            const isPinned = pinnedConversations.includes(phoneNumber);
+            
+            if (isPinned) {
+              return [newConversation, ...prev];
+            } else {
+              const firstUnpinnedIndex = prev.findIndex(c => 
+                !pinnedConversations.includes(c.phoneNumber)
+              );
+              if (firstUnpinnedIndex >= 0) {
+                const updated = [...prev];
+                updated.splice(firstUnpinnedIndex, 0, newConversation);
+                return updated;
+              } else {
+                return [...prev, newConversation];
+              }
+            }
+          });
+        });
+    }
+  }, [lastMessage, selectedContact, pinnedConversations]);
 
   // Load contacts for the "New Conversation" modal
   const loadContacts = async () => {

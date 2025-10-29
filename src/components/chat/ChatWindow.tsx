@@ -29,6 +29,7 @@ import { useMediaGallery } from "@/hooks/useMediaGallery";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
+import { useRealtimeMessages } from "@/contexts/RealtimeMessagesContext";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
 import { DemandClassification } from "./DemandClassification";
@@ -115,93 +116,47 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
 
   useEffect(() => {
     loadMessages();
+  }, [loadMessages]);
 
-    // Normalizar o número de telefone para comparação (remover caracteres especiais)
+  // Use centralized realtime context
+  const { subscribeToPhone } = useRealtimeMessages();
+
+  useEffect(() => {
     const normalizedPhone = phoneNumber.replace(/\D/g, '');
-    console.log("🔍 Configurando realtime para número:", phoneNumber, "| Normalizado:", normalizedPhone);
+    console.log('🔍 [ChatWindow] Inscrevendo-se para mensagens de:', phoneNumber);
 
-    // Setup realtime subscription - SEM filtros específicos para garantir que recebemos todas as mensagens
-    const channel = supabase
-      .channel(`messages-${phoneNumber}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages"
-          // ❌ Removido filter para receber TODAS as mensagens
-        },
-        (payload) => {
-          const newMessage = payload.new as MessageRow;
-          console.log("📨 Nova mensagem recebida via realtime:", {
-            id: newMessage.id,
-            from: newMessage.wa_from,
-            to: newMessage.wa_to,
-            direction: newMessage.direction,
-            body: newMessage.body?.substring(0, 50)
-          });
-          
-          // Normalizar números para comparação confiável
-          const messageFrom = (newMessage.wa_from || '').replace(/\D/g, '');
-          const messageTo = (newMessage.wa_to || '').replace(/\D/g, '');
-          
-          // Verificar se a mensagem pertence a esta conversa baseado na direção
-          // OUTBOUND: wa_to contém o número do destinatário
-          // INBOUND: wa_from contém o número do remetente (wa_to contém WhatsApp Business Phone ID)
-          const isRelevant = 
-            (newMessage.direction === 'outbound' && (messageTo.includes(normalizedPhone) || messageTo === normalizedPhone)) ||
-            (newMessage.direction === 'inbound' && (messageFrom.includes(normalizedPhone) || messageFrom === normalizedPhone));
-          
-          console.log("🔍 Verificação de relevância da mensagem:", {
-            direction: newMessage.direction,
-            normalizedPhone,
-            messageFrom,
-            messageTo,
-            isRelevant,
-            reason: newMessage.direction === 'outbound' 
-              ? `Outbound: comparando wa_to (${messageTo}) com ${normalizedPhone}`
-              : `Inbound: comparando wa_from (${messageFrom}) com ${normalizedPhone} (wa_to=${messageTo} é ignorado)`
-          });
-          
-          if (isRelevant) {
-            console.log("✅ Mensagem relevante para esta conversa, adicionando à lista");
-            
-            setMessages(prev => {
-              // Verificar se já existe para prevenir duplicatas
-              const exists = prev.some(msg => msg.id === newMessage.id);
-              if (exists) {
-                console.log("⚠️ Mensagem duplicada detectada, ignorando");
-                return prev;
-              }
-              
-              // Adicionar nova mensagem e ordenar por timestamp
-              const updated = [...prev, newMessage].sort((a, b) => 
-                new Date(a.wa_timestamp || a.created_at || "").getTime() - 
-                new Date(b.wa_timestamp || b.created_at || "").getTime()
-              );
-              
-              console.log("📝 Total de mensagens após adicionar:", updated.length);
-              return updated;
-            });
-            
-            // Forçar scroll para o final após adicionar mensagem
-            requestAnimationFrame(() => {
-              setTimeout(scrollToBottom, 100);
-            });
-          } else {
-            console.log("❌ Mensagem não relevante para esta conversa");
-          }
+    const unsubscribe = subscribeToPhone(phoneNumber, (newMessage) => {
+      console.log('📨 [ChatWindow] Nova mensagem recebida:', newMessage.id);
+      
+      setMessages(prev => {
+        // Check for duplicates
+        const exists = prev.some(msg => msg.id === newMessage.id);
+        if (exists) {
+          console.log('⚠️ [ChatWindow] Mensagem duplicada, ignorando');
+          return prev;
         }
-      )
-      .subscribe((status) => {
-        console.log("🔌 Status da subscrição realtime:", status);
+        
+        // Add and sort by timestamp
+        const updated = [...prev, newMessage].sort((a, b) => 
+          new Date(a.wa_timestamp || a.created_at || "").getTime() - 
+          new Date(b.wa_timestamp || b.created_at || "").getTime()
+        );
+        
+        console.log('📝 [ChatWindow] Total de mensagens:', updated.length);
+        return updated;
       });
+      
+      // Scroll to bottom
+      requestAnimationFrame(() => {
+        setTimeout(scrollToBottom, 100);
+      });
+    });
 
     return () => {
-      console.log("🔌 Removendo canal realtime");
-      supabase.removeChannel(channel);
+      console.log('🔌 [ChatWindow] Desinscrevendo de:', phoneNumber);
+      unsubscribe();
     };
-  }, [phoneNumber, loadMessages, scrollToBottom]);
+  }, [phoneNumber, subscribeToPhone, scrollToBottom]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || sending) return;

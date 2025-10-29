@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { RealtimeMessagesProvider } from "@/contexts/RealtimeMessagesContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Inbox from "./pages/Inbox";
@@ -39,10 +40,11 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="system" storageKey="smolka-theme">
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+        <RealtimeMessagesProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
@@ -138,6 +140,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
+        </RealtimeMessagesProvider>
     </AuthProvider>
   </ThemeProvider>
 </QueryClientProvider>
