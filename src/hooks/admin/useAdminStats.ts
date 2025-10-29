@@ -46,14 +46,14 @@ export function useAdminStats() {
       const inactiveUsers = userStatuses?.filter(u => !u.is_active).length || 0;
       const blockedUsers = userStatuses?.filter(u => u.is_blocked).length || 0;
 
-      // Usuários por role
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('role');
+      // Usuários por função
+      const { data: functions } = await supabase
+        .from('user_functions')
+        .select('function');
 
-      const adminCount = roles?.filter(r => r.role === 'admin').length || 0;
-      const managerCount = roles?.filter(r => r.role === 'manager').length || 0;
-      const attendantCount = roles?.filter(r => r.role === 'attendant').length || 0;
+      const adminCount = functions?.filter(f => f.function === 'admin').length || 0;
+      const managerCount = functions?.filter(f => f.function === 'manager').length || 0;
+      const attendantCount = functions?.filter(f => f.function === 'attendant').length || 0;
       const noneCount = (totalUsers || 0) - (adminCount + managerCount + attendantCount);
 
       // Total de mensagens

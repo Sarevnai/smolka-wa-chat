@@ -503,6 +503,42 @@ export type Database = {
         }
         Relationships: []
       }
+      function_permissions: {
+        Row: {
+          can_create: boolean | null
+          can_delete: boolean | null
+          can_edit: boolean | null
+          can_view: boolean | null
+          function: Database["public"]["Enums"]["app_function"]
+          id: string
+          resource: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          function: Database["public"]["Enums"]["app_function"]
+          id?: string
+          resource: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          function?: Database["public"]["Enums"]["app_function"]
+          id?: string
+          resource?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       message_flags: {
         Row: {
           created_at: string
@@ -680,42 +716,6 @@ export type Database = {
           user_code?: number | null
           user_id?: string
           username?: string
-        }
-        Relationships: []
-      }
-      role_permissions: {
-        Row: {
-          can_create: boolean | null
-          can_delete: boolean | null
-          can_edit: boolean | null
-          can_view: boolean | null
-          id: string
-          resource: string
-          role: Database["public"]["Enums"]["app_role"]
-          updated_at: string | null
-          updated_by: string | null
-        }
-        Insert: {
-          can_create?: boolean | null
-          can_delete?: boolean | null
-          can_edit?: boolean | null
-          can_view?: boolean | null
-          id?: string
-          resource: string
-          role: Database["public"]["Enums"]["app_role"]
-          updated_at?: string | null
-          updated_by?: string | null
-        }
-        Update: {
-          can_create?: boolean | null
-          can_delete?: boolean | null
-          can_edit?: boolean | null
-          can_view?: boolean | null
-          id?: string
-          resource?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          updated_at?: string | null
-          updated_by?: string | null
         }
         Relationships: []
       }
@@ -910,6 +910,30 @@ export type Database = {
           },
         ]
       }
+      user_functions: {
+        Row: {
+          created_at: string
+          function: Database["public"]["Enums"]["app_function"]
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          function: Database["public"]["Enums"]["app_function"]
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          function?: Database["public"]["Enums"]["app_function"]
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           can_create: boolean | null
@@ -945,30 +969,6 @@ export type Database = {
           resource?: string
           updated_at?: string | null
           updated_by?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -1080,13 +1080,20 @@ export type Database = {
           resource: string
         }[]
       }
-      get_user_roles: {
+      get_user_functions: {
         Args: { _user_id: string }
-        Returns: Database["public"]["Enums"]["app_role"][]
+        Returns: Database["public"]["Enums"]["app_function"][]
+      }
+      has_function: {
+        Args: {
+          _function: Database["public"]["Enums"]["app_function"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       has_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
+          _role: Database["public"]["Enums"]["app_function"]
           _user_id: string
         }
         Returns: boolean
@@ -1096,7 +1103,7 @@ export type Database = {
       is_manager: { Args: never; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "manager" | "attendant"
+      app_function: "admin" | "manager" | "attendant"
       contact_status: "ativo" | "inativo" | "bloqueado"
       contact_type: "proprietario" | "inquilino"
       contract_status: "ativo" | "encerrado" | "suspenso"
@@ -1228,7 +1235,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "attendant"],
+      app_function: ["admin", "manager", "attendant"],
       contact_status: ["ativo", "inativo", "bloqueado"],
       contact_type: ["proprietario", "inquilino"],
       contract_status: ["ativo", "encerrado", "suspenso"],
