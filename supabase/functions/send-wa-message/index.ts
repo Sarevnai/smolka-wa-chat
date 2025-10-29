@@ -6,6 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * Normalize phone number by removing all non-numeric characters
+ * Example: "+55 (48) 9 9110-9003" → "554891109003"
+ */
+function normalizePhoneNumber(phone: string): string {
+  return phone.replace(/\D/g, '');
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -15,7 +23,13 @@ serve(async (req) => {
   try {
     const { to, text, interactive, template_name, language_code, components } = await req.json();
 
-    console.log('Send message request:', { to, text, interactive });
+    const normalizedPhone = normalizePhoneNumber(to);
+    console.log('Send message request:', { 
+      original: to, 
+      normalized: normalizedPhone, 
+      text, 
+      interactive 
+    });
 
     // Validate input
     if (!to || (!text && !interactive && !template_name)) {
@@ -53,7 +67,7 @@ serve(async (req) => {
     
     let whatsappPayload: any = {
       messaging_product: 'whatsapp',
-      to: to
+      to: normalizedPhone
     };
 
     // Add message content based on type
@@ -169,7 +183,7 @@ serve(async (req) => {
       const messageData = {
         wa_message_id: result.messages?.[0]?.id || null,
         wa_from: null, // Outbound message, so from is null
-        wa_to: to,
+        wa_to: normalizedPhone,
         wa_phone_number_id: phoneNumberId,
         direction: 'outbound',
         body: text || `[Template: ${template_name}]`,
