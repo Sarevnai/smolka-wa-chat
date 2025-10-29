@@ -50,24 +50,18 @@ export function useUserManagement() {
 
       if (statusesError) throw statusesError;
 
-      // Buscar emails
-      const userIds = profiles?.map(p => p.user_id) || [];
-      const emailPromises = userIds.map(async (userId) => {
-        const { data } = await supabase.auth.admin.getUserById(userId);
-        return { id: userId, email: data.user?.email || 'N/A' };
-      });
-      const emailResults = await Promise.all(emailPromises);
+      // TODO: Implement Edge Function with SERVICE_ROLE to fetch emails securely
+      // For now, emails are not shown to avoid 403 errors from admin API on client
 
       // Combinar dados
       const combinedUsers: UserWithStatus[] = profiles?.map(profile => {
-        const emailData = emailResults.find(e => e.id === profile.user_id);
         const userFunction = functions?.find(r => r.user_id === profile.user_id);
         const userStatus = statuses?.find(s => s.user_id === profile.user_id);
 
         return {
           id: profile.id,
           user_id: profile.user_id,
-          email: emailData?.email || 'N/A',
+          email: 'N/A', // Removed to avoid 403 from admin API
           full_name: profile.full_name,
           username: profile.username,
           user_code: profile.user_code,

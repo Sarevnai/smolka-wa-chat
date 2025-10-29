@@ -46,7 +46,7 @@ const PERMISSION_TYPES = [
 
 export function UserPermissionsEditor({ user, open, onOpenChange }: UserPermissionsEditorProps) {
   const { effectivePermissions, loading, setUserPermission, resetToRoleDefaults } = 
-    useUserPermissions(user?.id);
+    useUserPermissions(user?.user_id); // Fixed: using user_id from auth.users instead of profiles.id
   const [resetting, setResetting] = useState(false);
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({});
 

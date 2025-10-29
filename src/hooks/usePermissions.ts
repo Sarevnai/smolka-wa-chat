@@ -61,9 +61,22 @@ export function usePermissions(): FunctionPermissions & {
   const isManager = hasFunction('manager');
   const isAttendant = hasFunction('attendant');
 
+  // Resource name aliases to match DB schema
+  const RESOURCE_ALIASES: Record<string, string> = {
+    'chats': 'messages',
+    // Add more aliases as needed
+  };
+
   // Helper to get permission from effective permissions
   const getResourcePermission = (resource: string, action: 'view' | 'create' | 'edit' | 'delete'): boolean => {
-    const perm = effectivePermissions.find(p => p.resource === resource);
+    // Try original resource name first
+    let perm = effectivePermissions.find(p => p.resource === resource);
+    
+    // If not found, try alias
+    if (!perm && RESOURCE_ALIASES[resource]) {
+      perm = effectivePermissions.find(p => p.resource === RESOURCE_ALIASES[resource]);
+    }
+    
     if (!perm) return false;
     
     switch (action) {
