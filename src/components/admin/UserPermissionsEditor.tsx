@@ -16,6 +16,7 @@ import { useUserPermissions } from '@/hooks/admin/useUserPermissions';
 import { ROLE_LABELS } from '@/types/roles';
 import { RefreshCw, Shield, Info } from 'lucide-react';
 import { UserWithStatus } from '@/hooks/admin/useUserManagement';
+import { toast } from 'sonner';
 
 interface UserPermissionsEditorProps {
   user: UserWithStatus | null;
@@ -47,15 +48,30 @@ export function UserPermissionsEditor({ user, open, onOpenChange }: UserPermissi
   const { effectivePermissions, loading, setUserPermission, resetToRoleDefaults } = 
     useUserPermissions(user?.id);
   const [resetting, setResetting] = useState(false);
+  const [savingStates, setSavingStates] = useState<Record<string, boolean>>({});
 
   const handleResetAll = async () => {
     setResetting(true);
     await resetToRoleDefaults();
+    toast.success('Todas as permissões resetadas');
     setResetting(false);
   };
 
   const handleResetResource = async (resource: string) => {
     await resetToRoleDefaults(resource);
+  };
+
+  const handlePermissionChange = async (
+    resource: string,
+    field: typeof PERMISSION_TYPES[number]['key'],
+    checked: boolean
+  ) => {
+    const key = `${resource}_${field}`;
+    setSavingStates(prev => ({ ...prev, [key]: true }));
+    
+    await setUserPermission(resource, field, checked);
+    
+    setSavingStates(prev => ({ ...prev, [key]: false }));
   };
 
   const getPermissionForResource = (resource: string) => {
@@ -142,9 +158,9 @@ export function UserPermissionsEditor({ user, open, onOpenChange }: UserPermissi
                           <Switch
                             checked={permission?.[type.key] || false}
                             onCheckedChange={(checked) => 
-                              setUserPermission(resource.key, type.key, checked)
+                              handlePermissionChange(resource.key, type.key, checked)
                             }
-                            disabled={loading}
+                            disabled={loading || savingStates[`${resource.key}_${type.key}`]}
                           />
                         </div>
                       ))}
