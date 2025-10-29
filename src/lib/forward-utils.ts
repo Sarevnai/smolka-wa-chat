@@ -8,7 +8,7 @@ export function formatForwardedMessage(
   originalMessage: MessageRow,
   additionalText?: string
 ): string {
-  const forwardPrefix = "📩 *Encaminhado*";
+  const forwardPrefix = "_Encaminhado_";
   
   // Se for mídia com caption
   if (originalMessage.media_caption) {
