@@ -19,6 +19,9 @@ import { usePinnedConversations } from "@/hooks/usePinnedConversations";
 import { useNotificationSound } from "@/hooks/useNotificationSound";
 import { useNavigate } from "react-router-dom";
 import { useRealtimeMessages } from "@/contexts/RealtimeMessagesContext";
+import { useWhatsAppTemplates } from "@/hooks/useWhatsAppTemplates";
+import { useQuickTemplate } from "@/hooks/useQuickTemplate";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Conversation {
   phoneNumber: string;
@@ -50,6 +53,9 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const { pinnedConversations } = usePinnedConversations();
   const { soundEnabled, toggleSound } = useNotificationSound();
   const navigate = useNavigate();
+  const { data: templates } = useWhatsAppTemplates();
+  const { sendTemplate, isLoading: sendingTemplate } = useQuickTemplate();
+  const { profile } = useAuth();
 
   const loadConversations = async () => {
     try {
@@ -340,10 +346,44 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
     return nameMatch || phoneMatch;
   });
 
-  const handleContactSelect = (phone: string) => {
+  const handleContactSelect = async (phone: string) => {
     setSelectedContactPhone(phone);
     setShowContactModal(false);
-    setShowTemplateSender(true);
+    
+    // Buscar template "iniciar_atendimento"
+    const template = templates?.find(t => t.template_name === 'iniciar_atendimento');
+    
+    if (!template) {
+      toast({
+        title: "Template não encontrado",
+        description: "O template 'iniciar_atendimento' não está disponível.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Auto-preencher variáveis
+    const variables: Record<string, string> = {
+      user: profile?.full_name || 'Atendente'
+    };
+    
+    try {
+      // Enviar template automaticamente
+      await sendTemplate({
+        phoneNumber: phone,
+        templateName: template.template_name,
+        languageCode: template.language,
+        variables
+      });
+      
+      // Navegar para a conversa
+      navigate(`/chat/${phone}`);
+    } catch (error) {
+      console.error("Erro ao enviar template:", error);
+      // Toast de erro já é mostrado pelo hook useQuickTemplate
+    } finally {
+      setSelectedContactPhone("");
+    }
   };
 
   const handleTemplateSendSuccess = () => {
