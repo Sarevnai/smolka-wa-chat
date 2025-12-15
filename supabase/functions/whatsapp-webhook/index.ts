@@ -408,8 +408,39 @@ function checkBusinessHours(businessHours: { start: string; end: string; days: n
     return true;
   }
 
+  // Get current time in the configured timezone
   const now = new Date();
-  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  
+  // Convert to the business timezone (America/Sao_Paulo = UTC-3)
+  // We need to adjust for the timezone offset
+  let timezoneOffset = 0;
+  if (businessHours.timezone === 'America/Sao_Paulo') {
+    timezoneOffset = -3; // UTC-3
+  } else if (businessHours.timezone === 'America/New_York') {
+    timezoneOffset = -5; // UTC-5 (simplified, doesn't account for DST)
+  }
+  
+  // Calculate local time in the business timezone
+  const utcHours = now.getUTCHours();
+  const utcMinutes = now.getUTCMinutes();
+  let localHours = utcHours + timezoneOffset;
+  
+  // Handle day wrap-around
+  let dayOffset = 0;
+  if (localHours < 0) {
+    localHours += 24;
+    dayOffset = -1;
+  } else if (localHours >= 24) {
+    localHours -= 24;
+    dayOffset = 1;
+  }
+  
+  const utcDay = now.getUTCDay();
+  let currentDay = utcDay + dayOffset;
+  if (currentDay < 0) currentDay = 6;
+  if (currentDay > 6) currentDay = 0;
+  
+  console.log(`🌐 UTC: ${utcHours}:${utcMinutes}, Timezone: ${businessHours.timezone}, Local: ${localHours}:${utcMinutes}, Day: ${currentDay}`);
   
   // Check if current day is a business day
   if (!businessHours.days.includes(currentDay)) {
@@ -421,15 +452,12 @@ function checkBusinessHours(businessHours: { start: string; end: string; days: n
   const [startHour, startMin] = businessHours.start.split(':').map(Number);
   const [endHour, endMin] = businessHours.end.split(':').map(Number);
   
-  const currentHour = now.getHours();
-  const currentMin = now.getMinutes();
-  
-  const currentTime = currentHour * 60 + currentMin;
+  const currentTime = localHours * 60 + utcMinutes;
   const startTime = startHour * 60 + startMin;
   const endTime = endHour * 60 + endMin;
 
   const isWithin = currentTime >= startTime && currentTime <= endTime;
-  console.log(`🕐 Current time: ${currentHour}:${currentMin}, Business hours: ${businessHours.start}-${businessHours.end}, Within: ${isWithin}`);
+  console.log(`🕐 Local time: ${localHours}:${utcMinutes}, Business hours: ${businessHours.start}-${businessHours.end}, Within: ${isWithin}`);
   
   return isWithin;
 }
