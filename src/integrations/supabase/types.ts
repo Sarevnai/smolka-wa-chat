@@ -430,6 +430,8 @@ export type Database = {
       }
       contacts: {
         Row: {
+          ai_handling: boolean | null
+          ai_takeover_at: string | null
           contact_type: Database["public"]["Enums"]["contact_type"] | null
           created_at: string
           description: string | null
@@ -438,12 +440,16 @@ export type Database = {
           name: string | null
           notes: string | null
           onboarding_status: string | null
+          operator_takeover_at: string | null
+          operator_takeover_by: string | null
           phone: string
           rating: number | null
           status: Database["public"]["Enums"]["contact_status"]
           updated_at: string
         }
         Insert: {
+          ai_handling?: boolean | null
+          ai_takeover_at?: string | null
           contact_type?: Database["public"]["Enums"]["contact_type"] | null
           created_at?: string
           description?: string | null
@@ -452,12 +458,16 @@ export type Database = {
           name?: string | null
           notes?: string | null
           onboarding_status?: string | null
+          operator_takeover_at?: string | null
+          operator_takeover_by?: string | null
           phone: string
           rating?: number | null
           status?: Database["public"]["Enums"]["contact_status"]
           updated_at?: string
         }
         Update: {
+          ai_handling?: boolean | null
+          ai_takeover_at?: string | null
           contact_type?: Database["public"]["Enums"]["contact_type"] | null
           created_at?: string
           description?: string | null
@@ -466,10 +476,51 @@ export type Database = {
           name?: string | null
           notes?: string | null
           onboarding_status?: string | null
+          operator_takeover_at?: string | null
+          operator_takeover_by?: string | null
           phone?: string
           rating?: number | null
           status?: Database["public"]["Enums"]["contact_status"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      conversation_states: {
+        Row: {
+          ai_started_at: string | null
+          created_at: string | null
+          id: string
+          is_ai_active: boolean | null
+          last_ai_message_at: string | null
+          last_human_message_at: string | null
+          operator_id: string | null
+          operator_takeover_at: string | null
+          phone_number: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_started_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_ai_active?: boolean | null
+          last_ai_message_at?: string | null
+          last_human_message_at?: string | null
+          operator_id?: string | null
+          operator_takeover_at?: string | null
+          phone_number: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_started_at?: string | null
+          created_at?: string | null
+          id?: string
+          is_ai_active?: boolean | null
+          last_ai_message_at?: string | null
+          last_human_message_at?: string | null
+          operator_id?: string | null
+          operator_takeover_at?: string | null
+          phone_number?: string
+          updated_at?: string | null
         }
         Relationships: []
       }

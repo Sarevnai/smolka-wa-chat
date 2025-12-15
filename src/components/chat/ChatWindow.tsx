@@ -24,7 +24,9 @@ import { useDeleteMessage } from "@/hooks/useDeleteMessage";
 import { DeleteMessageConfirmation } from "./DeleteMessageConfirmation";
 import { DeletedMessagesTrash } from "./DeletedMessagesTrash";
 import { QuickTemplateSender } from "./QuickTemplateSender";
+import { AIHandoverBanner } from "./AIHandoverBanner";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useConversationState } from "@/hooks/useConversationState";
 import { useMediaGallery } from "@/hooks/useMediaGallery";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import { useToast } from "@/hooks/use-toast";
@@ -75,6 +77,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const { settings, updateBackground, exportChat, archiveChat, deleteChat } = useChatSettings(phoneNumber);
   const { deleteConversation, isDeleting } = useDeleteConversation();
   const { deleteMessage, isDeleting: isDeletingMessage } = useDeleteMessage();
+  const { markHumanMessage } = useConversationState(phoneNumber);
   
   // Message deletion states
   const [messageToDelete, setMessageToDelete] = useState<MessageRow | null>(null);
@@ -164,6 +167,9 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     try {
       setSending(true);
       stopTyping(); // Stop typing indicator when sending
+      
+      // Auto-takeover: mark that human is handling this conversation
+      await markHumanMessage();
 
       // Get current session for authorization
       const { data: { session } } = await supabase.auth.getSession();
@@ -212,7 +218,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     } finally {
       setSending(false);
     }
-  }, [sending, replyTo, phoneNumber, stopTyping, toast]);
+  }, [sending, replyTo, phoneNumber, stopTyping, toast, markHumanMessage]);
 
   const handleReply = useCallback((message: MessageRow) => {
     setReplyTo(message);
@@ -529,6 +535,9 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           />
         </div>
       )}
+
+      {/* AI Handover Banner */}
+      <AIHandoverBanner phoneNumber={phoneNumber} />
 
       {/* Messages */}
       <div 
