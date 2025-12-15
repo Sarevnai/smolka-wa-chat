@@ -41,3 +41,18 @@ verify_jwt = true
 
 [functions.restore-message]
 verify_jwt = true
+
+[functions.n8n-trigger]
+verify_jwt = false
+
+[functions.ai-assistant]
+verify_jwt = true
+
+[functions.ai-communicator]
+verify_jwt = true
+
+[functions.send-wa-media]
+verify_jwt = true
+
+[functions.upload-media]
+verify_jwt = true

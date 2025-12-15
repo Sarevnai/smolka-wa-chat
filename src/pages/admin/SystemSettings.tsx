@@ -4,10 +4,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Settings, Bell, Shield, Database } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Save, Settings, Bell, Shield, Database, Bot } from 'lucide-react';
 import { useSystemSettings } from '@/hooks/admin/useSystemSettings';
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
+import { N8NSettings } from '@/components/admin/N8NSettings';
 
 export default function SystemSettings() {
   const { settings, loading, updateSetting, getSetting } = useSystemSettings();
@@ -62,6 +64,19 @@ export default function SystemSettings() {
         </Button>
       </div>
 
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="general">Geral</TabsTrigger>
+          <TabsTrigger value="notifications">Notificações</TabsTrigger>
+          <TabsTrigger value="security">Segurança</TabsTrigger>
+          <TabsTrigger value="backup">Backup</TabsTrigger>
+          <TabsTrigger value="n8n" className="flex items-center gap-1">
+            <Bot className="h-4 w-4" />
+            N8N/IA
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="mt-6">
       {/* General Settings */}
       <Card>
         <CardHeader>
@@ -101,7 +116,9 @@ export default function SystemSettings() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="notifications" className="mt-6">
       {/* Notification Settings */}
       <Card>
         <CardHeader>
@@ -141,7 +158,9 @@ export default function SystemSettings() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="security" className="mt-6">
       {/* Security Settings */}
       <Card>
         <CardHeader>
@@ -193,7 +212,9 @@ export default function SystemSettings() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="backup" className="mt-6">
       {/* Backup Settings */}
       <Card>
         <CardHeader>
@@ -242,6 +263,12 @@ export default function SystemSettings() {
           </Button>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="n8n" className="mt-6">
+          <N8NSettings />
+        </TabsContent>
+      </Tabs>
       </div>
     </Layout>
   );

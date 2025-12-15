@@ -285,6 +285,9 @@ async function processIncomingMessage(message: any, value: any) {
       
       // Ensure contact exists (without auto-triage flow)
       await ensureContactExists(message.from);
+      
+      // Check if should trigger N8N virtual agent
+      await handleN8NTrigger(message.from, messageBody, message);
     }
 
   } catch (error) {
@@ -321,6 +324,114 @@ async function ensureContactExists(phoneNumber: string) {
   } catch (error) {
     console.error('Error in ensureContactExists:', error);
   }
+}
+
+/**
+ * Handle N8N virtual agent trigger based on business hours and conversation state
+ */
+async function handleN8NTrigger(phoneNumber: string, messageBody: string, message: any) {
+  try {
+    // Check conversation state - if operator has taken over, don't trigger N8N
+    const { data: convState } = await supabase
+      .from('conversation_states')
+      .select('is_ai_active, operator_id, operator_takeover_at')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+
+    // If operator has taken over this conversation, skip N8N
+    if (convState?.operator_id && !convState?.is_ai_active) {
+      console.log(`⏭️ Skipping N8N - operator ${convState.operator_id} handling conversation`);
+      return;
+    }
+
+    // Check business hours
+    const { data: settings } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'business_hours')
+      .single();
+
+    const businessHours = settings?.setting_value as { 
+      start: string; 
+      end: string; 
+      days: number[]; 
+      timezone: string 
+    } | null;
+
+    const isWithinBusinessHours = checkBusinessHours(businessHours);
+    
+    // Only trigger N8N outside business hours OR if AI is explicitly active
+    if (isWithinBusinessHours && !convState?.is_ai_active) {
+      console.log('⏰ Within business hours - human agents available');
+      return;
+    }
+
+    console.log('🤖 Outside business hours or AI active - triggering N8N');
+
+    // Get contact info for context
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('name, contact_type')
+      .eq('phone', phoneNumber)
+      .maybeSingle();
+
+    // Trigger N8N webhook
+    const { data: triggerResult, error: triggerError } = await supabase.functions.invoke('n8n-trigger', {
+      body: {
+        phoneNumber,
+        messageBody,
+        messageType: message.type,
+        contactName: contact?.name,
+        contactType: contact?.contact_type,
+        mediaUrl: message.media_url || null,
+        mediaType: message.media_type || null
+      }
+    });
+
+    if (triggerError) {
+      console.error('❌ Error triggering N8N:', triggerError);
+    } else {
+      console.log('✅ N8N triggered successfully:', triggerResult);
+    }
+
+  } catch (error) {
+    console.error('Error in handleN8NTrigger:', error);
+  }
+}
+
+/**
+ * Check if current time is within business hours
+ */
+function checkBusinessHours(businessHours: { start: string; end: string; days: number[]; timezone: string } | null): boolean {
+  if (!businessHours) {
+    console.log('⚠️ Business hours not configured, defaulting to within hours');
+    return true;
+  }
+
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  
+  // Check if current day is a business day
+  if (!businessHours.days.includes(currentDay)) {
+    console.log(`📅 Day ${currentDay} is not a business day`);
+    return false;
+  }
+
+  // Parse business hours
+  const [startHour, startMin] = businessHours.start.split(':').map(Number);
+  const [endHour, endMin] = businessHours.end.split(':').map(Number);
+  
+  const currentHour = now.getHours();
+  const currentMin = now.getMinutes();
+  
+  const currentTime = currentHour * 60 + currentMin;
+  const startTime = startHour * 60 + startMin;
+  const endTime = endHour * 60 + endMin;
+
+  const isWithin = currentTime >= startTime && currentTime <= endTime;
+  console.log(`🕐 Current time: ${currentHour}:${currentMin}, Business hours: ${businessHours.start}-${businessHours.end}, Within: ${isWithin}`);
+  
+  return isWithin;
 }
 
 async function updateContactType(phoneNumber: string, contactType: string) {
