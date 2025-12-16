@@ -43,6 +43,8 @@ interface AIAgentConfig {
   audio_voice_id: string;
   audio_voice_name: string;
   audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
+  audio_channel_mirroring: boolean;
+  audio_max_chars: number;
   // Business Context
   target_audience: string;
   competitive_advantages: string[];
@@ -101,6 +103,8 @@ const defaultConfig: AIAgentConfig = {
   audio_voice_id: '',
   audio_voice_name: 'Sarah',
   audio_mode: 'text_and_audio',
+  audio_channel_mirroring: true,
+  audio_max_chars: 400,
   // Business Context defaults
   target_audience: '',
   competitive_advantages: [],
@@ -643,44 +647,74 @@ serve(async (req) => {
     // Process and send messages
     let messagesSent = 0;
     
-    if (config.fragment_long_messages && config.humanize_responses) {
-      const fragments = fragmentMessage(aiMessage, 120);
-      console.log(`📝 Message fragmented into ${fragments.length} parts`);
-      
-      for (let i = 0; i < fragments.length; i++) {
-        const fragment = fragments[i];
+    // Determine response mode based on channel mirroring
+    let responseMode: 'text' | 'audio' = 'text';
+    
+    if (config.audio_channel_mirroring && config.audio_enabled) {
+      // Mirror the channel: respond in the same format as the customer
+      responseMode = messageType === 'audio' ? 'audio' : 'text';
+      console.log(`🔄 Channel mirroring: customer sent ${messageType} → responding with ${responseMode}`);
+    } else if (config.audio_enabled) {
+      // Use fixed audio_mode setting
+      responseMode = config.audio_mode === 'audio_only' ? 'audio' : 'text';
+    }
+    
+    if (responseMode === 'text') {
+      // TEXT MODE: Fragment into short messages (120 chars)
+      if (config.fragment_long_messages && config.humanize_responses) {
+        const fragments = fragmentMessage(aiMessage, 120);
+        console.log(`📝 Text mode: fragmented into ${fragments.length} parts`);
         
-        if (config.audio_mode !== 'audio_only') {
+        for (let i = 0; i < fragments.length; i++) {
+          const fragment = fragments[i];
           await sendWhatsAppMessage(phoneNumber, fragment);
           messagesSent++;
-        }
-        
-        if (config.audio_enabled && config.audio_mode !== 'text_only') {
-          const audioUrl = await generateAudio(fragment, config);
-          if (audioUrl) {
-            await sendWhatsAppAudio(phoneNumber, audioUrl);
-            messagesSent++;
+          
+          if (i < fragments.length - 1) {
+            const delay = config.message_delay_ms || 2000;
+            const variation = Math.random() * 1000 - 500;
+            await sleep(Math.max(1000, delay + variation));
           }
         }
-        
-        if (i < fragments.length - 1) {
-          const delay = config.message_delay_ms || 2000;
-          const variation = Math.random() * 1000 - 500;
-          await sleep(Math.max(1000, delay + variation));
-        }
-      }
-    } else {
-      if (config.audio_mode !== 'audio_only') {
+      } else {
         await sendWhatsAppMessage(phoneNumber, aiMessage);
         messagesSent++;
       }
       
-      if (config.audio_enabled && config.audio_mode !== 'text_only') {
+      // If NOT mirroring, also send audio based on audio_mode
+      if (!config.audio_channel_mirroring && config.audio_enabled && config.audio_mode === 'text_and_audio') {
         const audioUrl = await generateAudio(aiMessage, config);
         if (audioUrl) {
           await sendWhatsAppAudio(phoneNumber, audioUrl);
           messagesSent++;
         }
+      }
+    } else {
+      // AUDIO MODE: Send complete audio message (up to audio_max_chars)
+      // Truncate if necessary, but don't fragment
+      const maxChars = config.audio_max_chars || 400;
+      let audioText = aiMessage;
+      if (audioText.length > maxChars) {
+        // Truncate at sentence boundary if possible
+        const truncated = audioText.substring(0, maxChars);
+        const lastSentence = truncated.lastIndexOf('.');
+        if (lastSentence > maxChars * 0.6) {
+          audioText = truncated.substring(0, lastSentence + 1);
+        } else {
+          audioText = truncated + '...';
+        }
+      }
+      
+      console.log(`🎙️ Audio mode: sending complete audio (${audioText.length} chars)`);
+      const audioUrl = await generateAudio(audioText, config);
+      if (audioUrl) {
+        await sendWhatsAppAudio(phoneNumber, audioUrl);
+        messagesSent++;
+      } else {
+        // Fallback to text if audio generation fails
+        console.log('⚠️ Audio generation failed, falling back to text');
+        await sendWhatsAppMessage(phoneNumber, aiMessage);
+        messagesSent++;
       }
     }
 

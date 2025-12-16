@@ -66,6 +66,8 @@ interface AIAgentConfig {
   audio_voice_id: string;
   audio_voice_name: string;
   audio_mode: AudioMode;
+  audio_channel_mirroring: boolean;
+  audio_max_chars: number;
   // Business Context (NEW)
   target_audience: string;
   competitive_advantages: string[];
@@ -166,6 +168,8 @@ const defaultConfig: AIAgentConfig = {
   audio_voice_id: '',
   audio_voice_name: 'Sarah',
   audio_mode: 'text_and_audio',
+  audio_channel_mirroring: true,
+  audio_max_chars: 400,
   // Business Context defaults
   target_audience: 'Proprietários e inquilinos de imóveis residenciais e comerciais',
   competitive_advantages: ['Atendimento personalizado', 'Transparência nas informações', 'Agilidade nos processos'],
@@ -1270,17 +1274,52 @@ ${config.custom_instructions ? `INSTRUÇÕES ESPECIAIS:\n${config.custom_instruc
                   </SelectContent>
                 </Select>
 
-                <Select
-                  value={config.audio_mode}
-                  onValueChange={(value) => setConfig(prev => ({ ...prev, audio_mode: value as AudioMode }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="text_and_audio">Texto + Áudio</SelectItem>
-                    <SelectItem value="audio_only">Apenas Áudio</SelectItem>
-                    <SelectItem value="text_only">Apenas Texto</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Separator />
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Espelhar Canal do Cliente</Label>
+                    <p className="text-sm text-muted-foreground">Responde no mesmo formato que o cliente usou (texto → texto, áudio → áudio)</p>
+                  </div>
+                  <Switch
+                    checked={config.audio_channel_mirroring}
+                    onCheckedChange={(checked) => setConfig(prev => ({ ...prev, audio_channel_mirroring: checked }))}
+                  />
+                </div>
+
+                {config.audio_channel_mirroring && (
+                  <div className="space-y-2 pl-4 border-l-2 border-primary/20">
+                    <Label>Máximo de caracteres para áudio: {config.audio_max_chars}</Label>
+                    <p className="text-xs text-muted-foreground">Áudios são mais longos que textos fragmentados</p>
+                    <Slider
+                      value={[config.audio_max_chars]}
+                      onValueChange={([value]) => setConfig(prev => ({ ...prev, audio_max_chars: value }))}
+                      min={200}
+                      max={800}
+                      step={50}
+                    />
+                  </div>
+                )}
+
+                {!config.audio_channel_mirroring && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <Label>Modo de Áudio Fixo</Label>
+                      <Select
+                        value={config.audio_mode}
+                        onValueChange={(value) => setConfig(prev => ({ ...prev, audio_mode: value as AudioMode }))}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="text_and_audio">Texto + Áudio</SelectItem>
+                          <SelectItem value="audio_only">Apenas Áudio</SelectItem>
+                          <SelectItem value="text_only">Apenas Texto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}
