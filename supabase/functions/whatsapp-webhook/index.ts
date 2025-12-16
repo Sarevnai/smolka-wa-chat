@@ -351,7 +351,9 @@ async function handleN8NTrigger(phoneNumber: string, messageBody: string, messag
       .eq('setting_key', 'n8n_force_ai_mode')
       .maybeSingle();
 
-    const forceAIMode = forceAISetting?.setting_value === true;
+    // Handle both wrapped {value: bool} and plain boolean formats
+    const forceAIRaw = forceAISetting?.setting_value as any;
+    const forceAIMode = forceAIRaw?.value === true || forceAIRaw === true;
     
     if (forceAIMode) {
       console.log('🧪 Force AI mode enabled - bypassing business hours check');

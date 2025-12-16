@@ -50,12 +50,24 @@ serve(async (req) => {
       );
     }
 
-    const storedApiKey = typeof apiKeyData.setting_value === 'string' 
-      ? apiKeyData.setting_value.replace(/^"|"$/g, '')
-      : apiKeyData.setting_value;
+    // Handle both wrapped {value: "..."} and plain string formats
+    const rawApiKey = apiKeyData.setting_value as any;
+    let storedApiKey: string;
+    
+    if (typeof rawApiKey === 'string') {
+      storedApiKey = rawApiKey.replace(/^"|"$/g, '');
+    } else if (rawApiKey?.value && typeof rawApiKey.value === 'string') {
+      storedApiKey = rawApiKey.value;
+    } else {
+      console.error('[n8n-send-message] Invalid API key format in database:', typeof rawApiKey);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid API key format in system' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (api_key !== storedApiKey) {
-      console.error('[n8n-send-message] Invalid API key');
+      console.error('[n8n-send-message] Invalid API key provided');
       return new Response(
         JSON.stringify({ success: false, error: 'Invalid API key' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

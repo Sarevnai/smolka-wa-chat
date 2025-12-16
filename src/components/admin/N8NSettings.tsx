@@ -46,22 +46,26 @@ export function N8NSettings() {
         .in('setting_key', ['n8n_webhook_url', 'n8n_api_key', 'n8n_force_ai_mode', 'business_hours']);
 
       settings?.forEach((setting) => {
-        const value = setting.setting_value;
+        const raw = setting.setting_value as any;
         switch (setting.setting_key) {
           case 'n8n_webhook_url':
-            const url = typeof value === 'string' ? value : '';
+            // Handle both wrapped {value: "..."} and plain string formats
+            const url = raw?.value ?? (typeof raw === 'string' ? raw : '');
             setWebhookUrl(url.replace(/^"|"$/g, ''));
             break;
           case 'n8n_api_key':
-            const key = typeof value === 'string' ? value : '';
+            const key = raw?.value ?? (typeof raw === 'string' ? raw : '');
             setApiKey(key.replace(/^"|"$/g, ''));
             break;
           case 'n8n_force_ai_mode':
-            setForceAIMode(value === true);
+            // Handle both wrapped {value: bool} and plain boolean
+            setForceAIMode(raw?.value === true || raw === true);
             break;
           case 'business_hours':
-            if (value && typeof value === 'object') {
-              setBusinessHours(value as unknown as BusinessHours);
+            if (raw && typeof raw === 'object' && !raw.value) {
+              setBusinessHours(raw as BusinessHours);
+            } else if (raw?.value && typeof raw.value === 'object') {
+              setBusinessHours(raw.value as BusinessHours);
             }
             break;
         }
@@ -74,18 +78,38 @@ export function N8NSettings() {
   const saveSettings = async () => {
     setIsLoading(true);
     try {
+      // Prepare settings with proper JSON-safe values
+      // Strings wrapped in objects, empty strings as null
       const settingsToSave = [
-        { setting_key: 'n8n_webhook_url', setting_category: 'n8n', setting_value: webhookUrl },
-        { setting_key: 'n8n_api_key', setting_category: 'n8n', setting_value: apiKey },
-        { setting_key: 'n8n_force_ai_mode', setting_category: 'n8n', setting_value: forceAIMode },
-        { setting_key: 'business_hours', setting_category: 'n8n', setting_value: businessHours as any },
+        { 
+          setting_key: 'n8n_webhook_url', 
+          setting_category: 'n8n', 
+          setting_value: webhookUrl?.trim() ? { value: webhookUrl.trim() } : null 
+        },
+        { 
+          setting_key: 'n8n_api_key', 
+          setting_category: 'n8n', 
+          setting_value: apiKey?.trim() ? { value: apiKey.trim() } : null 
+        },
+        { 
+          setting_key: 'n8n_force_ai_mode', 
+          setting_category: 'n8n', 
+          setting_value: { value: forceAIMode } 
+        },
+        { 
+          setting_key: 'business_hours', 
+          setting_category: 'n8n', 
+          setting_value: businessHours 
+        },
       ];
 
       for (const setting of settingsToSave) {
         const { error } = await supabase
           .from('system_settings')
-          .upsert({ 
-            ...setting,
+          .upsert({
+            setting_key: setting.setting_key,
+            setting_category: setting.setting_category,
+            setting_value: setting.setting_value as any,
             updated_at: new Date().toISOString()
           }, { onConflict: 'setting_key' });
 
