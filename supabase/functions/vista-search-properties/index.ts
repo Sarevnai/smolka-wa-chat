@@ -78,26 +78,24 @@ serve(async (req) => {
       filter['Cidade'] = params.cidade;
     }
     
+    // Vista API requires array with 2 values for range filters
     if (params.preco_min || params.preco_max) {
       const precoField = params.finalidade === 'locacao' ? 'ValorLocacao' : 'ValorVenda';
-      if (params.preco_min && params.preco_max) {
-        filter[precoField] = [params.preco_min, params.preco_max];
-      } else if (params.preco_min) {
-        filter[precoField] = { '>=': params.preco_min };
-      } else if (params.preco_max) {
-        filter[precoField] = { '<=': params.preco_max };
-      }
+      const minPrice = params.preco_min || 0;
+      const maxPrice = params.preco_max || 99999999;
+      filter[precoField] = [minPrice, maxPrice];
     }
     
     if (params.quartos) {
-      filter['Dormitorios'] = { '>=': params.quartos };
+      // Use range for bedrooms too [min, max]
+      filter['Dormitorios'] = [params.quartos, 10];
     }
     
     if (params.finalidade) {
       filter['Finalidade'] = params.finalidade === 'locacao' ? 'Locação' : 'Venda';
     }
 
-    // Build request payload for Vista API
+    // Build request payload for Vista API - using only available fields
     const pesquisa = {
       fields: [
         'Codigo',
@@ -110,15 +108,12 @@ serve(async (req) => {
         'Dormitorios',
         'Suites',
         'Vagas',
-        'AreaUtil',
+        'AreaPrivativa',
         'AreaTotal',
         'Descricao',
-        'DescricaoWeb',
         'FotoDestaque',
-        'FotoDestaqueEmpreendimento',
         'Status',
-        'Finalidade',
-        { Foto: ['Foto', 'Destaque', 'Descricao'] }
+        'Finalidade'
       ],
       filter,
       paginacao: {
@@ -130,26 +125,35 @@ serve(async (req) => {
 
     console.log('📤 Vista API request:', JSON.stringify(pesquisa, null, 2));
 
-    // Call Vista CRM API
-    const apiUrl = `${VISTA_API_URL}/imoveis/listar?key=${VISTA_API_KEY}`;
+    // Call Vista CRM API using GET with encoded JSON in query string
+    const pesquisaEncoded = encodeURIComponent(JSON.stringify(pesquisa));
+    const apiUrl = `${VISTA_API_URL}/imoveis/listar?key=${VISTA_API_KEY}&pesquisa=${pesquisaEncoded}`;
+    
+    console.log('🔗 Calling Vista API (GET)');
     
     const response = await fetch(apiUrl, {
-      method: 'POST',
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify(pesquisa),
     });
 
+    const responseText = await response.text();
+    console.log('📥 Vista API response status:', response.status);
+    console.log('📥 Vista API response (first 500 chars):', responseText.substring(0, 500));
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Vista API error:', response.status, errorText);
-      throw new Error(`Vista API error: ${response.status}`);
+      console.error('❌ Vista API error:', response.status, responseText);
+      throw new Error(`Vista API error: ${response.status} - ${responseText.substring(0, 200)}`);
     }
 
-    const data = await response.json();
-    console.log('📥 Vista API response:', JSON.stringify(data).substring(0, 500));
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('❌ Failed to parse Vista response as JSON');
+      throw new Error('Vista API returned invalid JSON');
+    }
 
     // Transform Vista response to our standard format
     const properties: PropertyResult[] = [];
@@ -157,19 +161,23 @@ serve(async (req) => {
     // Vista returns object with property codes as keys
     if (data && typeof data === 'object') {
       const entries = Object.entries(data);
+      console.log(`📋 Processing ${entries.length} entries from Vista`);
       
       for (const [codigo, imovel] of entries) {
         if (!imovel || typeof imovel !== 'object') continue;
         
         const prop = imovel as Record<string, any>;
         
-        // Skip if it's pagination info
-        if (codigo === 'paginas' || codigo === 'pagina' || codigo === 'total') continue;
+        // Skip if it's pagination info or metadata
+        if (codigo === 'paginas' || codigo === 'pagina' || codigo === 'total' || codigo === 'qtd') continue;
         
         // Determine price based on finalidade
         const preco = params.finalidade === 'locacao' 
           ? parseFloat(prop.ValorLocacao || '0')
           : parseFloat(prop.ValorVenda || '0');
+        
+        // Skip if price is 0 (usually means it's not for sale/rent in this modality)
+        if (preco === 0) continue;
         
         // Format price
         const precoFormatado = preco.toLocaleString('pt-BR', {
@@ -179,17 +187,12 @@ serve(async (req) => {
           maximumFractionDigits: 0,
         });
         
-        // Extract photos
-        const fotos: string[] = [];
+        // Get photo - FotoDestaque is the main photo URL
+        let fotoDestaque = '';
         if (prop.FotoDestaque) {
-          fotos.push(prop.FotoDestaque);
-        }
-        if (prop.Foto && Array.isArray(prop.Foto)) {
-          for (const foto of prop.Foto) {
-            if (foto.Foto && !fotos.includes(foto.Foto)) {
-              fotos.push(foto.Foto);
-            }
-          }
+          fotoDestaque = prop.FotoDestaque.startsWith('http') 
+            ? prop.FotoDestaque 
+            : `https://lkaimobi-portais.vistahost.com.br${prop.FotoDestaque}`;
         }
         
         // Build property link
@@ -197,10 +200,21 @@ serve(async (req) => {
         
         // Extract characteristics
         const caracteristicas: string[] = [];
-        if (prop.Dormitorios) caracteristicas.push(`${prop.Dormitorios} dormitório(s)`);
-        if (prop.Suites) caracteristicas.push(`${prop.Suites} suíte(s)`);
-        if (prop.Vagas) caracteristicas.push(`${prop.Vagas} vaga(s)`);
-        if (prop.AreaUtil) caracteristicas.push(`${prop.AreaUtil}m² úteis`);
+        const dormitorios = parseInt(prop.Dormitorios || '0');
+        const suites = parseInt(prop.Suites || '0');
+        const vagas = parseInt(prop.Vagas || '0');
+        const areaUtil = parseFloat(prop.AreaPrivativa || prop.AreaTotal || '0');
+        
+        if (dormitorios > 0) {
+          const suiteText = suites > 0 ? ` (${suites} suíte${suites > 1 ? 's' : ''})` : '';
+          caracteristicas.push(`${dormitorios} dormitório${dormitorios > 1 ? 's' : ''}${suiteText}`);
+        }
+        if (vagas > 0) {
+          caracteristicas.push(`${vagas} vaga${vagas > 1 ? 's' : ''}`);
+        }
+        if (areaUtil > 0) {
+          caracteristicas.push(`${areaUtil}m²`);
+        }
         
         properties.push({
           codigo: codigo,
@@ -210,20 +224,20 @@ serve(async (req) => {
           endereco: prop.Endereco || '',
           preco,
           preco_formatado: precoFormatado,
-          quartos: parseInt(prop.Dormitorios || '0'),
-          suites: parseInt(prop.Suites || '0'),
-          vagas: parseInt(prop.Vagas || '0'),
-          area_util: parseFloat(prop.AreaUtil || '0'),
-          descricao: prop.DescricaoWeb || prop.Descricao || '',
-          foto_destaque: fotos[0] || '',
-          fotos,
+          quartos: dormitorios,
+          suites,
+          vagas,
+          area_util: areaUtil,
+          descricao: prop.Descricao || '',
+          foto_destaque: fotoDestaque,
+          fotos: fotoDestaque ? [fotoDestaque] : [],
           link,
           caracteristicas,
         });
       }
     }
 
-    console.log(`✅ Found ${properties.length} properties`);
+    console.log(`✅ Found ${properties.length} properties matching criteria`);
 
     return new Response(
       JSON.stringify({ 
