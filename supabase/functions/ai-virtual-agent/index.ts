@@ -90,7 +90,7 @@ const defaultConfig: AIAgentConfig = {
   fallback_message: 'Entendi sua solicitação. Um de nossos atendentes entrará em contato no próximo dia útil.',
   ai_provider: 'openai',
   ai_model: 'gpt-4o-mini',
-  max_tokens: 500,
+  max_tokens: 250,
   max_history_messages: 5,
   humanize_responses: true,
   fragment_long_messages: true,
@@ -327,8 +327,15 @@ ${config.custom_instructions}`;
 2. Identifique a necessidade do cliente usando as técnicas de qualificação
 3. Se puder ajudar, responda objetivamente
 4. Se não puder ou atingir critério de escalonamento, use: "${config.fallback_message}"
-5. Mantenha respostas ${config.fragment_long_messages ? 'curtas (máximo 2-3 frases por bloco)' : 'curtas (máximo 3 parágrafos)'}
-6. Use linguagem ${config.tone === 'formal' ? 'formal mas acolhedora' : config.tone}`;
+5. Use linguagem ${config.tone === 'formal' ? 'formal mas acolhedora' : config.tone}
+
+⚠️ REGRA CRÍTICA DE FORMATAÇÃO:
+- CADA mensagem deve ter NO MÁXIMO 150 caracteres
+- Se precisar dar mais informações, DIVIDA em várias mensagens curtas
+- NUNCA envie parágrafos longos, use frases curtas e diretas
+- Responda como se estivesse mandando mensagens de WhatsApp: curtas, rápidas e naturais
+- Evite listas longas - prefira perguntar sobre um item de cada vez
+- Se tiver muita informação, priorize o mais relevante e pergunte se quer saber mais`;
 
   // Customer context
   if (contactName && config.use_customer_name && config.rapport_use_name) {
@@ -342,36 +349,64 @@ ${config.custom_instructions}`;
   return prompt;
 }
 
-// Fragment long messages into smaller parts
-function fragmentMessage(text: string, maxLength: number = 150): string[] {
+// Fragment long messages into smaller parts - more aggressive fragmentation
+function fragmentMessage(text: string, maxLength: number = 120): string[] {
   if (text.length <= maxLength) return [text];
   
   const fragments: string[] = [];
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  let currentFragment = '';
   
-  for (const sentence of sentences) {
-    if ((currentFragment + ' ' + sentence).trim().length <= maxLength) {
-      currentFragment = (currentFragment + ' ' + sentence).trim();
-    } else {
-      if (currentFragment) fragments.push(currentFragment);
-      currentFragment = sentence;
+  // First, try to split by double line breaks (paragraphs)
+  const paragraphs = text.split(/\n\n+/);
+  
+  for (const paragraph of paragraphs) {
+    // Then split by sentence endings
+    const sentences = paragraph.split(/(?<=[.!?])\s+/);
+    let currentFragment = '';
+    
+    for (const sentence of sentences) {
+      const trimmedSentence = sentence.trim();
+      if (!trimmedSentence) continue;
+      
+      if ((currentFragment + ' ' + trimmedSentence).trim().length <= maxLength) {
+        currentFragment = (currentFragment + ' ' + trimmedSentence).trim();
+      } else {
+        if (currentFragment) fragments.push(currentFragment);
+        
+        // If single sentence is too long, split by comma or colon
+        if (trimmedSentence.length > maxLength) {
+          const parts = trimmedSentence.split(/[,;:]\s*/);
+          let subFragment = '';
+          for (const part of parts) {
+            if ((subFragment + ', ' + part).length <= maxLength) {
+              subFragment = subFragment ? subFragment + ', ' + part : part;
+            } else {
+              if (subFragment) fragments.push(subFragment);
+              subFragment = part;
+            }
+          }
+          currentFragment = subFragment;
+        } else {
+          currentFragment = trimmedSentence;
+        }
+      }
     }
+    
+    if (currentFragment) fragments.push(currentFragment);
   }
   
-  if (currentFragment) fragments.push(currentFragment);
-  
+  // Final pass: hard split any remaining long fragments
   return fragments.flatMap(frag => {
-    if (frag.length <= maxLength * 1.5) return [frag];
-    const parts = frag.split(/,\s*/);
+    if (frag.length <= maxLength) return [frag];
+    // Hard split at word boundaries
+    const words = frag.split(/\s+/);
     const result: string[] = [];
     let current = '';
-    for (const part of parts) {
-      if ((current + ', ' + part).length <= maxLength) {
-        current = current ? current + ', ' + part : part;
+    for (const word of words) {
+      if ((current + ' ' + word).trim().length <= maxLength) {
+        current = (current + ' ' + word).trim();
       } else {
         if (current) result.push(current);
-        current = part;
+        current = word;
       }
     }
     if (current) result.push(current);
@@ -609,7 +644,7 @@ serve(async (req) => {
     let messagesSent = 0;
     
     if (config.fragment_long_messages && config.humanize_responses) {
-      const fragments = fragmentMessage(aiMessage, 180);
+      const fragments = fragmentMessage(aiMessage, 120);
       console.log(`📝 Message fragmented into ${fragments.length} parts`);
       
       for (let i = 0; i < fragments.length; i++) {
