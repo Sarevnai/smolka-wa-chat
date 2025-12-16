@@ -77,6 +77,8 @@ interface AIAgentConfig {
   spin_implication_questions: string[];
   spin_need_questions: string[];
   escalation_criteria: string[];
+  // Vista CRM Integration
+  vista_integration_enabled: boolean;
 }
 
 const defaultConfig: AIAgentConfig = {
@@ -137,6 +139,8 @@ const defaultConfig: AIAgentConfig = {
   spin_implication_questions: [],
   spin_need_questions: [],
   escalation_criteria: [],
+  // Vista CRM
+  vista_integration_enabled: true,
 };
 
 const toneDescriptions: Record<string, string> = {
@@ -178,6 +182,53 @@ function getRandomPhrase(type: keyof typeof humanPhrases): string {
   return phrases[Math.floor(Math.random() * phrases.length)];
 }
 
+// Tool definitions for OpenAI function calling
+const tools = [
+  {
+    type: "function",
+    function: {
+      name: "buscar_imoveis",
+      description: "Busca imóveis no catálogo da Smolka Imóveis com base nos critérios do cliente. Use esta função quando o cliente fornecer informações sobre o tipo de imóvel, localização, preço ou número de quartos desejados.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: {
+            type: "string",
+            description: "Tipo do imóvel: apartamento, casa, terreno, comercial, cobertura, kitnet, sobrado",
+            enum: ["apartamento", "casa", "terreno", "comercial", "cobertura", "kitnet", "sobrado", "sala"]
+          },
+          bairro: {
+            type: "string",
+            description: "Nome do bairro ou região desejada (ex: Trindade, Centro, Ingleses, Campeche)"
+          },
+          cidade: {
+            type: "string",
+            description: "Nome da cidade (padrão: Florianópolis)"
+          },
+          preco_min: {
+            type: "number",
+            description: "Valor mínimo em reais (ex: 300000 para R$ 300.000)"
+          },
+          preco_max: {
+            type: "number",
+            description: "Valor máximo em reais (ex: 800000 para R$ 800.000)"
+          },
+          quartos: {
+            type: "number",
+            description: "Número mínimo de dormitórios desejados"
+          },
+          finalidade: {
+            type: "string",
+            description: "Finalidade da busca: venda ou locacao",
+            enum: ["venda", "locacao"]
+          }
+        },
+        required: []
+      }
+    }
+  }
+];
+
 function buildSystemPrompt(config: AIAgentConfig, contactName?: string, contactType?: string): string {
   let prompt = `Você é ${config.agent_name} da ${config.company_name}.
 
@@ -209,6 +260,38 @@ ${config.competitive_advantages.map(a => `• ${a}`).join('\n')}`;
 
   prompt += `\n\nSERVIÇOS OFERECIDOS:
 ${config.services.map(s => `• ${s}`).join('\n')}`;
+
+  // Vista CRM Integration - Property Search Instructions
+  if (config.vista_integration_enabled !== false) {
+    prompt += `\n\n🏠 BUSCA DE IMÓVEIS (FUNÇÃO CRÍTICA):
+Você tem acesso a uma função de busca de imóveis reais no catálogo da Smolka.
+
+FLUXO DE QUALIFICAÇÃO PARA BUSCA:
+1. Primeiro, pergunte qual TIPO de imóvel (apartamento, casa, etc.)
+2. Depois, pergunte qual BAIRRO ou região de interesse
+3. Em seguida, pergunte a FAIXA DE PREÇO
+4. Se relevante, pergunte número de quartos
+
+QUANDO BUSCAR IMÓVEIS:
+- Use a função buscar_imoveis assim que tiver pelo menos 2 critérios do cliente
+- Não espere ter todas as informações - comece a buscar com o que tem
+- Se o cliente disser "quero um apartamento no Centro até 500 mil", já pode buscar!
+
+COMO APRESENTAR RESULTADOS:
+Quando encontrar imóveis, apresente assim:
+1. Mensagem introdutória: "Encontrei uma opção que pode te interessar!"
+2. Use [ENVIAR_FOTO:url] para enviar a foto do imóvel
+3. Depois envie as características em bullets:
+   🏠 *Apartamento em [Bairro]*
+   • X dormitórios (X suíte)
+   • X vagas de garagem
+   • Xm² de área útil
+   • R$ XXX.XXX
+   🔗 [link do imóvel]
+4. Pergunte: "Faz sentido pra você?" ou "Quer conhecer esse?"
+
+Se não encontrar imóveis, diga: "No momento não encontrei opções com esses critérios. Quer que eu ajuste a busca?"`;
+  }
 
   // Rapport Techniques
   if (config.rapport_enabled) {
@@ -253,31 +336,21 @@ Responda algo como: "${obj.response}"`;
     }
   }
 
-  // SPIN Qualification
+  // SPIN Qualification (adjusted for property search)
   if (config.spin_enabled) {
     prompt += `\n\nQUALIFICAÇÃO DE LEADS (use perguntas SPIN para entender melhor o cliente):`;
     
-    if (config.spin_situation_questions && config.spin_situation_questions.length > 0) {
-      prompt += `\n\nPerguntas de SITUAÇÃO (contexto atual):
-${config.spin_situation_questions.map(q => `- ${q}`).join('\n')}`;
-    }
+    prompt += `\n\nPerguntas de SITUAÇÃO (contexto atual):
+- Você está procurando imóvel para comprar ou alugar?
+- Qual tipo de imóvel procura? Apartamento, casa...?
+- Qual região ou bairro seria ideal pra você?`;
     
-    if (config.spin_problem_questions && config.spin_problem_questions.length > 0) {
-      prompt += `\n\nPerguntas de PROBLEMA (dores e dificuldades):
-${config.spin_problem_questions.map(q => `- ${q}`).join('\n')}`;
-    }
-    
-    if (config.spin_implication_questions && config.spin_implication_questions.length > 0) {
-      prompt += `\n\nPerguntas de IMPLICAÇÃO (consequências de não resolver):
-${config.spin_implication_questions.map(q => `- ${q}`).join('\n')}`;
-    }
-    
-    if (config.spin_need_questions && config.spin_need_questions.length > 0) {
-      prompt += `\n\nPerguntas de NECESSIDADE (guiar para solução):
-${config.spin_need_questions.map(q => `- ${q}`).join('\n')}`;
-    }
+    prompt += `\n\nPerguntas de PROBLEMA (dores e dificuldades):
+- Qual faixa de preço você tem em mente?
+- Quantos quartos você precisa?
+- Precisa de garagem? Quantas vagas?`;
 
-    prompt += `\n\nIMPORTANTE: Não faça todas as perguntas de uma vez. Conduza naturalmente a conversa, fazendo 1-2 perguntas relevantes por mensagem.`;
+    prompt += `\n\nIMPORTANTE: Não faça todas as perguntas de uma vez. Conduza naturalmente a conversa, fazendo 1-2 perguntas relevantes por mensagem. Assim que tiver critérios suficientes, USE A FUNÇÃO buscar_imoveis!`;
   }
 
   // Knowledge Base
@@ -433,15 +506,72 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function callAI(config: AIAgentConfig, messages: any[]): Promise<string> {
+// Search properties using Vista CRM API
+async function searchProperties(params: Record<string, any>): Promise<any> {
+  try {
+    console.log('🏠 Searching properties with params:', params);
+    
+    const { data, error } = await supabase.functions.invoke('vista-search-properties', {
+      body: params
+    });
+
+    if (error) {
+      console.error('❌ Vista search error:', error);
+      return { success: false, properties: [], error: error.message };
+    }
+
+    console.log(`✅ Vista search returned ${data?.properties?.length || 0} properties`);
+    return data;
+  } catch (e) {
+    console.error('❌ Error calling Vista search:', e);
+    return { success: false, properties: [], error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+// Format property for WhatsApp message
+function formatPropertyMessage(property: any): string {
+  const lines = [
+    `🏠 *${property.tipo} em ${property.bairro}*`,
+  ];
+  
+  if (property.quartos > 0) {
+    const suiteText = property.suites > 0 ? ` (${property.suites} suíte${property.suites > 1 ? 's' : ''})` : '';
+    lines.push(`• ${property.quartos} dormitório${property.quartos > 1 ? 's' : ''}${suiteText}`);
+  }
+  if (property.vagas > 0) {
+    lines.push(`• ${property.vagas} vaga${property.vagas > 1 ? 's' : ''} de garagem`);
+  }
+  if (property.area_util > 0) {
+    lines.push(`• ${property.area_util}m² de área útil`);
+  }
+  lines.push(`• ${property.preco_formatado}`);
+  lines.push(`🔗 ${property.link}`);
+  
+  return lines.join('\n');
+}
+
+async function callAIWithTools(config: AIAgentConfig, messages: any[], useTools: boolean = true): Promise<{ content: string; toolCalls?: any[] }> {
   const provider = config.ai_provider || 'openai';
   
-  console.log(`🤖 Using AI provider: ${provider}, model: ${config.ai_model}`);
+  console.log(`🤖 Using AI provider: ${provider}, model: ${config.ai_model}, tools: ${useTools}`);
   
   if (provider === 'openai') {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY is not configured');
+    }
+
+    const requestBody: any = {
+      model: config.ai_model || 'gpt-4o-mini',
+      messages,
+      max_tokens: config.max_tokens || 500,
+      temperature: 0.8,
+    };
+
+    // Add tools only if enabled and Vista integration is on
+    if (useTools && config.vista_integration_enabled !== false) {
+      requestBody.tools = tools;
+      requestBody.tool_choice = 'auto';
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -450,12 +580,7 @@ async function callAI(config: AIAgentConfig, messages: any[]): Promise<string> {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: config.ai_model || 'gpt-4o-mini',
-        messages,
-        max_tokens: config.max_tokens || 500,
-        temperature: 0.8,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -472,8 +597,18 @@ async function callAI(config: AIAgentConfig, messages: any[]): Promise<string> {
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
+    const choice = data.choices?.[0];
+    
+    if (choice?.message?.tool_calls && choice.message.tool_calls.length > 0) {
+      return {
+        content: choice.message.content || '',
+        toolCalls: choice.message.tool_calls
+      };
+    }
+    
+    return { content: choice?.message?.content || '' };
   } else {
+    // Lovable AI doesn't support tool calling, so we use a workaround
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
@@ -506,7 +641,7 @@ async function callAI(config: AIAgentConfig, messages: any[]): Promise<string> {
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
+    return { content: data.choices?.[0]?.message?.content || '' };
   }
 }
 
@@ -567,6 +702,23 @@ async function sendWhatsAppAudio(to: string, audioUrl: string): Promise<boolean>
   }
 }
 
+async function sendWhatsAppImage(to: string, imageUrl: string, caption?: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.functions.invoke('send-wa-media', {
+      body: {
+        to,
+        mediaUrl: imageUrl,
+        mediaType: 'image',
+        caption: caption || ''
+      }
+    });
+    return !error;
+  } catch (e) {
+    console.error('❌ Error sending WhatsApp image:', e);
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -603,7 +755,8 @@ serve(async (req) => {
           triggers: config.triggers_enabled,
           spin: config.spin_enabled,
           hasKnowledgeBase: !!config.knowledge_base_content,
-          objectionsCount: config.objections?.length || 0
+          objectionsCount: config.objections?.length || 0,
+          vistaEnabled: config.vista_integration_enabled !== false
         });
       }
     } catch (e) {
@@ -642,11 +795,9 @@ serve(async (req) => {
     }
 
     // Dynamic max_tokens based on response mode
-    // Text mode: shorter responses that will be fragmented (150 tokens ≈ 120 chars per fragment)
-    // Audio mode: longer, complete responses (audio_max_chars / 3 ≈ tokens)
     const dynamicMaxTokens = expectedMode === 'audio' 
-      ? Math.ceil((config.audio_max_chars || 400) / 2.5) // ~160 tokens for 400 chars
-      : Math.min(config.max_tokens || 200, 200); // Cap at 200 for text to keep fragments manageable
+      ? Math.ceil((config.audio_max_chars || 400) / 2.5)
+      : Math.min(config.max_tokens || 200, 200);
 
     const estimatedTokens = Math.ceil((systemPrompt.length + conversationHistory.reduce((acc, m) => acc + m.content.length, 0)) / 4);
     console.log('📊 Token estimation:', {
@@ -662,17 +813,59 @@ serve(async (req) => {
     // Create a modified config with dynamic max_tokens
     const aiConfig = { ...config, max_tokens: dynamicMaxTokens };
 
-    // Call AI with adjusted tokens
-    const aiMessage = await callAI(aiConfig, [
+    // Call AI with tool support
+    let aiResult = await callAIWithTools(aiConfig, [
       { role: 'system', content: systemPrompt },
       ...conversationHistory
-    ]);
+    ], config.vista_integration_enabled !== false);
 
-    if (!aiMessage) {
+    let aiMessage = aiResult.content;
+    let propertiesToSend: any[] = [];
+
+    // Process tool calls if any
+    if (aiResult.toolCalls && aiResult.toolCalls.length > 0) {
+      console.log('🔧 Processing tool calls:', aiResult.toolCalls.length);
+      
+      for (const toolCall of aiResult.toolCalls) {
+        if (toolCall.function.name === 'buscar_imoveis') {
+          const args = JSON.parse(toolCall.function.arguments);
+          console.log('🏠 Tool call: buscar_imoveis with args:', args);
+          
+          const searchResult = await searchProperties(args);
+          
+          if (searchResult.success && searchResult.properties.length > 0) {
+            propertiesToSend = searchResult.properties;
+            console.log(`✅ Found ${propertiesToSend.length} properties to present`);
+          }
+          
+          // Call AI again with tool results to get proper response
+          const toolResultMessages = [
+            { role: 'system', content: systemPrompt },
+            ...conversationHistory,
+            { 
+              role: 'assistant', 
+              content: aiResult.content || null,
+              tool_calls: aiResult.toolCalls 
+            },
+            {
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify(searchResult)
+            }
+          ];
+
+          // Get AI's response after seeing tool results
+          const followUpResult = await callAIWithTools(aiConfig, toolResultMessages, false);
+          aiMessage = followUpResult.content;
+        }
+      }
+    }
+
+    if (!aiMessage && propertiesToSend.length === 0) {
       throw new Error('No response from AI');
     }
 
-    console.log('✅ AI response received:', aiMessage.substring(0, 100));
+    console.log('✅ AI response received:', aiMessage?.substring(0, 100));
 
     // Process and send messages
     let messagesSent = 0;
@@ -681,16 +874,14 @@ serve(async (req) => {
     let responseMode: 'text' | 'audio' = 'text';
     
     if (config.audio_channel_mirroring && config.audio_enabled) {
-      // Mirror the channel: respond in the same format as the customer
       responseMode = messageType === 'audio' ? 'audio' : 'text';
       console.log(`🔄 Channel mirroring: customer sent ${messageType} → responding with ${responseMode}`);
     } else if (config.audio_enabled) {
-      // Use fixed audio_mode setting
       responseMode = config.audio_mode === 'audio_only' ? 'audio' : 'text';
     }
     
-    if (responseMode === 'text') {
-      // TEXT MODE: Fragment into short messages (100 chars max)
+    // Send text response first (if any)
+    if (aiMessage && responseMode === 'text') {
       if (config.fragment_long_messages && config.humanize_responses) {
         const fragments = fragmentMessage(aiMessage, 100);
         console.log(`📝 Text mode: fragmented into ${fragments.length} parts (100 chars max)`);
@@ -700,32 +891,20 @@ serve(async (req) => {
           await sendWhatsAppMessage(phoneNumber, fragment);
           messagesSent++;
           
-          if (i < fragments.length - 1) {
+          if (i < fragments.length - 1 || propertiesToSend.length > 0) {
             const delay = config.message_delay_ms || 2000;
             const variation = Math.random() * 1000 - 500;
             await sleep(Math.max(1000, delay + variation));
           }
         }
-      } else {
+      } else if (aiMessage) {
         await sendWhatsAppMessage(phoneNumber, aiMessage);
         messagesSent++;
       }
-      
-      // If NOT mirroring, also send audio based on audio_mode
-      if (!config.audio_channel_mirroring && config.audio_enabled && config.audio_mode === 'text_and_audio') {
-        const audioUrl = await generateAudio(aiMessage, config);
-        if (audioUrl) {
-          await sendWhatsAppAudio(phoneNumber, audioUrl);
-          messagesSent++;
-        }
-      }
-    } else {
-      // AUDIO MODE: Send complete audio message (up to audio_max_chars)
-      // Truncate if necessary, but don't fragment
+    } else if (aiMessage && responseMode === 'audio') {
       const maxChars = config.audio_max_chars || 400;
       let audioText = aiMessage;
       if (audioText.length > maxChars) {
-        // Truncate at sentence boundary if possible
         const truncated = audioText.substring(0, maxChars);
         const lastSentence = truncated.lastIndexOf('.');
         if (lastSentence > maxChars * 0.6) {
@@ -741,9 +920,43 @@ serve(async (req) => {
         await sendWhatsAppAudio(phoneNumber, audioUrl);
         messagesSent++;
       } else {
-        // Fallback to text if audio generation fails
-        console.log('⚠️ Audio generation failed, falling back to text');
         await sendWhatsAppMessage(phoneNumber, aiMessage);
+        messagesSent++;
+      }
+    }
+
+    // Send property photos and details if we have them
+    if (propertiesToSend.length > 0) {
+      console.log(`📸 Sending ${propertiesToSend.length} property(ies) with photos`);
+      
+      for (const property of propertiesToSend.slice(0, 2)) { // Max 2 properties at a time
+        // Send photo if available
+        if (property.foto_destaque) {
+          await sleep(1500);
+          await sendWhatsAppImage(phoneNumber, property.foto_destaque);
+          messagesSent++;
+        }
+        
+        // Send property details
+        await sleep(1000);
+        const propertyText = formatPropertyMessage(property);
+        await sendWhatsAppMessage(phoneNumber, propertyText);
+        messagesSent++;
+      }
+      
+      // Ask follow-up question
+      if (propertiesToSend.length > 0) {
+        await sleep(1500);
+        await sendWhatsAppMessage(phoneNumber, "Faz sentido pra você? 😊");
+        messagesSent++;
+      }
+    }
+
+    // If NOT mirroring, also send audio based on audio_mode
+    if (!config.audio_channel_mirroring && config.audio_enabled && config.audio_mode === 'text_and_audio' && aiMessage) {
+      const audioUrl = await generateAudio(aiMessage, config);
+      if (audioUrl) {
+        await sendWhatsAppAudio(phoneNumber, audioUrl);
         messagesSent++;
       }
     }
@@ -765,6 +978,7 @@ serve(async (req) => {
         success: true, 
         response: aiMessage,
         messagesSent,
+        propertiesFound: propertiesToSend.length,
         provider: config.ai_provider,
         model: config.ai_model
       }),
