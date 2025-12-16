@@ -10,19 +10,8 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Top ElevenLabs voices
-const AVAILABLE_VOICES = {
-  'Sarah': 'EXAVITQu4vr4xnSDxMaL',      // Female, warm
-  'Laura': 'FGY2WhTYpPnrIDTdsKH5',      // Female, friendly
-  'Alice': 'Xb7hH8MSUJpSbSDYk0k2',      // Female, professional
-  'Jessica': 'cgSgspJ2msm6clMCkdW9',    // Female, conversational
-  'Lily': 'pFZP5JQG7iQjIQuC4Bku',       // Female, soft
-  'Roger': 'CwhRBWXzGAHq8TQ4Fs17',      // Male, authoritative
-  'Charlie': 'IKne3meq5aSn9XLyUdCD',    // Male, casual
-  'George': 'JBFqnCBsd6RMkjVDRZzb',     // Male, British
-  'Brian': 'nPczCjzI2devNBz1zQrb',      // Male, American
-  'Daniel': 'onwK4e9ZLuTAKqWW03F9',     // Male, deep
-};
+// Default voice ID (Sarah) as fallback
+const DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -30,7 +19,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voiceId, voiceName } = await req.json();
+    const { text, voiceId } = await req.json();
 
     if (!text) {
       return new Response(
@@ -47,14 +36,8 @@ serve(async (req) => {
       );
     }
 
-    // Determine voice ID (use provided ID, or lookup by name, or default)
-    let finalVoiceId = voiceId;
-    if (!finalVoiceId && voiceName && AVAILABLE_VOICES[voiceName as keyof typeof AVAILABLE_VOICES]) {
-      finalVoiceId = AVAILABLE_VOICES[voiceName as keyof typeof AVAILABLE_VOICES];
-    }
-    if (!finalVoiceId) {
-      finalVoiceId = AVAILABLE_VOICES['Sarah']; // Default to Sarah
-    }
+    // Use provided voice ID or default
+    const finalVoiceId = voiceId || DEFAULT_VOICE_ID;
 
     console.log('🎙️ ElevenLabs TTS request:', { 
       textLength: text.length, 

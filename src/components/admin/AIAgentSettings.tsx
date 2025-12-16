@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,13 +10,21 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Bot, Building2, Save, Plus, Trash2, MessageSquare, AlertTriangle, Sparkles, Eye, HelpCircle, Cpu, Volume2, Smile, Clock } from 'lucide-react';
+import { Bot, Building2, Save, Plus, Trash2, MessageSquare, AlertTriangle, Sparkles, Eye, HelpCircle, Cpu, Volume2, Smile, Clock, RefreshCw, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface FAQ {
   question: string;
   answer: string;
+}
+
+interface VoiceOption {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  previewUrl?: string;
 }
 
 type AIProvider = 'lovable' | 'openai';
@@ -64,18 +72,27 @@ const providerModels: Record<AIProvider, { value: string; label: string; descrip
   ],
 };
 
-const voiceOptions = [
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', description: 'Feminina, calorosa' },
-  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura', description: 'Feminina, amigável' },
-  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice', description: 'Feminina, profissional' },
-  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', description: 'Feminina, conversacional' },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', description: 'Feminina, suave' },
-  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger', description: 'Masculina, autoritária' },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', description: 'Masculina, casual' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', description: 'Masculina, britânica' },
-  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', description: 'Masculina, americana' },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', description: 'Masculina, grave' },
+// Fallback voices when dynamic loading fails
+const fallbackVoiceOptions: VoiceOption[] = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', category: 'premade', description: 'Feminina, calorosa' },
+  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura', category: 'premade', description: 'Feminina, amigável' },
+  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice', category: 'premade', description: 'Feminina, profissional' },
+  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', category: 'premade', description: 'Feminina, conversacional' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', category: 'premade', description: 'Feminina, suave' },
+  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger', category: 'premade', description: 'Masculina, autoritária' },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', category: 'premade', description: 'Masculina, casual' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', category: 'premade', description: 'Masculina, britânica' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', category: 'premade', description: 'Masculina, americana' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', category: 'premade', description: 'Masculina, grave' },
 ];
+
+const categoryLabels: Record<string, string> = {
+  'premade': 'Vozes Pré-definidas',
+  'cloned': 'Vozes Clonadas',
+  'generated': 'Vozes Geradas',
+  'professional': 'Profissionais',
+  'other': 'Outras',
+};
 
 const defaultConfig: AIAgentConfig = {
   agent_name: 'Assistente Virtual',
@@ -121,6 +138,11 @@ export function AIAgentSettings() {
   const [newService, setNewService] = useState('');
   const [newLimitation, setNewLimitation] = useState('');
   const [newFaq, setNewFaq] = useState<FAQ>({ question: '', answer: '' });
+  
+  // Dynamic voice loading state
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>(fallbackVoiceOptions);
+  const [isLoadingVoices, setIsLoadingVoices] = useState(false);
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -145,6 +167,32 @@ export function AIAgentSettings() {
       setIsLoading(false);
     }
   };
+
+  const loadVoices = useCallback(async () => {
+    setIsLoadingVoices(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-list-voices');
+      
+      if (error) {
+        console.error('Error loading voices:', error);
+        toast.error('Erro ao carregar vozes. Usando vozes padrão.');
+        return;
+      }
+      
+      if (data?.success && data.voices?.length > 0) {
+        setVoiceOptions(data.voices);
+        setVoicesLoaded(true);
+        toast.success(`${data.voices.length} vozes carregadas da sua conta ElevenLabs`);
+      } else {
+        toast.error('Nenhuma voz encontrada na conta ElevenLabs');
+      }
+    } catch (error) {
+      console.error('Error loading voices:', error);
+      toast.error('Erro ao carregar vozes');
+    } finally {
+      setIsLoadingVoices(false);
+    }
+  }, []);
 
   const saveConfig = async () => {
     setIsSaving(true);
@@ -274,8 +322,10 @@ ${config.fallback_message}`;
     setConfig(prev => ({ ...prev, ai_provider: provider, ai_model: defaultModel }));
   };
 
-  const handleVoiceChange = (voiceName: string) => {
-    const voice = voiceOptions.find(v => v.name === voiceName);
+  const handleVoiceChange = (voiceIdOrName: string) => {
+    // Try to find by ID first (new format), then by name (legacy)
+    const voice = voiceOptions.find(v => v.id === voiceIdOrName) || 
+                  voiceOptions.find(v => v.name === voiceIdOrName);
     if (voice) {
       setConfig(prev => ({
         ...prev,
@@ -506,25 +556,67 @@ ${config.fallback_message}`;
               
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Voz do Agente</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Voz do Agente</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={loadVoices}
+                      disabled={isLoadingVoices}
+                    >
+                      {isLoadingVoices ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Carregando...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          {voicesLoaded ? 'Recarregar' : 'Carregar vozes'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
                   <Select
-                    value={config.audio_voice_name}
+                    value={config.audio_voice_id || config.audio_voice_name}
                     onValueChange={handleVoiceChange}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione uma voz" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {voiceOptions.map(voice => (
-                        <SelectItem key={voice.id} value={voice.name}>
-                          <div className="flex flex-col">
-                            <span>{voice.name}</span>
-                            <span className="text-xs text-muted-foreground">{voice.description}</span>
+                    <SelectContent className="max-h-80">
+                      {/* Group voices by category */}
+                      {Object.entries(
+                        voiceOptions.reduce((groups, voice) => {
+                          const category = voice.category || 'other';
+                          if (!groups[category]) groups[category] = [];
+                          groups[category].push(voice);
+                          return groups;
+                        }, {} as Record<string, VoiceOption[]>)
+                      ).map(([category, voices]) => (
+                        <div key={category}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                            {categoryLabels[category] || category}
                           </div>
-                        </SelectItem>
+                          {voices.map(voice => (
+                            <SelectItem key={voice.id} value={voice.id}>
+                              <div className="flex flex-col">
+                                <span>{voice.name}</span>
+                                <span className="text-xs text-muted-foreground">{voice.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </div>
                       ))}
                     </SelectContent>
                   </Select>
+                  
+                  {!voicesLoaded && (
+                    <p className="text-xs text-muted-foreground">
+                      Clique em "Carregar vozes" para ver todas as vozes da sua conta ElevenLabs, incluindo vozes clonadas.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
