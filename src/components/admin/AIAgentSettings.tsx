@@ -6,9 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Bot, Building2, Save, Plus, Trash2, MessageSquare, AlertTriangle, Sparkles, Eye, HelpCircle, Cpu } from 'lucide-react';
+import { Bot, Building2, Save, Plus, Trash2, MessageSquare, AlertTriangle, Sparkles, Eye, HelpCircle, Cpu, Volume2, Smile, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -18,6 +20,8 @@ interface FAQ {
 }
 
 type AIProvider = 'lovable' | 'openai';
+type EmojiIntensity = 'none' | 'low' | 'medium';
+type AudioMode = 'text_only' | 'audio_only' | 'text_and_audio';
 
 interface AIAgentConfig {
   agent_name: string;
@@ -34,6 +38,17 @@ interface AIAgentConfig {
   ai_model: string;
   max_tokens: number;
   max_history_messages: number;
+  // Humanization settings
+  humanize_responses: boolean;
+  fragment_long_messages: boolean;
+  message_delay_ms: number;
+  emoji_intensity: EmojiIntensity;
+  use_customer_name: boolean;
+  // Audio settings
+  audio_enabled: boolean;
+  audio_voice_id: string;
+  audio_voice_name: string;
+  audio_mode: AudioMode;
 }
 
 const providerModels: Record<AIProvider, { value: string; label: string; description: string }[]> = {
@@ -48,6 +63,19 @@ const providerModels: Record<AIProvider, { value: string; label: string; descrip
     { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', description: 'Alta performance' },
   ],
 };
+
+const voiceOptions = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', description: 'Feminina, calorosa' },
+  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura', description: 'Feminina, amigável' },
+  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice', description: 'Feminina, profissional' },
+  { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', description: 'Feminina, conversacional' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', description: 'Feminina, suave' },
+  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger', description: 'Masculina, autoritária' },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', description: 'Masculina, casual' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', description: 'Masculina, britânica' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', description: 'Masculina, americana' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', description: 'Masculina, grave' },
+];
 
 const defaultConfig: AIAgentConfig = {
   agent_name: 'Assistente Virtual',
@@ -72,6 +100,17 @@ const defaultConfig: AIAgentConfig = {
   ai_model: 'gpt-4o-mini',
   max_tokens: 500,
   max_history_messages: 5,
+  // Humanization defaults
+  humanize_responses: true,
+  fragment_long_messages: true,
+  message_delay_ms: 2000,
+  emoji_intensity: 'low',
+  use_customer_name: true,
+  // Audio defaults
+  audio_enabled: false,
+  audio_voice_id: '',
+  audio_voice_name: 'Sarah',
+  audio_mode: 'text_and_audio',
 };
 
 export function AIAgentSettings() {
@@ -235,6 +274,17 @@ ${config.fallback_message}`;
     setConfig(prev => ({ ...prev, ai_provider: provider, ai_model: defaultModel }));
   };
 
+  const handleVoiceChange = (voiceName: string) => {
+    const voice = voiceOptions.find(v => v.name === voiceName);
+    if (voice) {
+      setConfig(prev => ({
+        ...prev,
+        audio_voice_name: voice.name,
+        audio_voice_id: voice.id
+      }));
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* AI Provider Settings */}
@@ -334,6 +384,188 @@ ${config.fallback_message}`;
                 Monitore o uso em <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" className="underline">platform.openai.com/usage</a>
               </p>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Humanization Settings */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Smile className="h-5 w-5 text-primary" />
+            <CardTitle>Humanização das Respostas</CardTitle>
+          </div>
+          <CardDescription>
+            Configure o agente para parecer mais humano e natural nas conversas
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Respostas Humanizadas</Label>
+              <p className="text-sm text-muted-foreground">Usa linguagem mais natural com variações e interjeições</p>
+            </div>
+            <Switch
+              checked={config.humanize_responses}
+              onCheckedChange={(checked) => setConfig(prev => ({ ...prev, humanize_responses: checked }))}
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Fragmentar Mensagens Longas</Label>
+              <p className="text-sm text-muted-foreground">Divide respostas em várias mensagens menores (simula digitação)</p>
+            </div>
+            <Switch
+              checked={config.fragment_long_messages}
+              onCheckedChange={(checked) => setConfig(prev => ({ ...prev, fragment_long_messages: checked }))}
+            />
+          </div>
+
+          {config.fragment_long_messages && (
+            <div className="space-y-3 pl-4 border-l-2 border-primary/20">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Delay entre mensagens: {(config.message_delay_ms / 1000).toFixed(1)}s
+                  </Label>
+                </div>
+                <Slider
+                  value={[config.message_delay_ms]}
+                  onValueChange={([value]) => setConfig(prev => ({ ...prev, message_delay_ms: value }))}
+                  min={1000}
+                  max={5000}
+                  step={500}
+                />
+                <p className="text-xs text-muted-foreground">Tempo de espera entre fragmentos (simula tempo de digitação)</p>
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label>Intensidade de Emojis</Label>
+            <Select
+              value={config.emoji_intensity}
+              onValueChange={(value) => setConfig(prev => ({ ...prev, emoji_intensity: value as EmojiIntensity }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhum emoji</SelectItem>
+                <SelectItem value="low">Baixa (1-2 por mensagem)</SelectItem>
+                <SelectItem value="medium">Média (2-3 por mensagem)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Usar Nome do Cliente</Label>
+              <p className="text-sm text-muted-foreground">Personaliza respostas usando o nome do contato</p>
+            </div>
+            <Switch
+              checked={config.use_customer_name}
+              onCheckedChange={(checked) => setConfig(prev => ({ ...prev, use_customer_name: checked }))}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Audio Settings (ElevenLabs) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Volume2 className="h-5 w-5 text-primary" />
+            <CardTitle>Respostas por Áudio</CardTitle>
+          </div>
+          <CardDescription>
+            Configure o agente para responder por áudio usando ElevenLabs
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Habilitar Respostas por Áudio</Label>
+              <p className="text-sm text-muted-foreground">Envia mensagens de voz além de texto</p>
+            </div>
+            <Switch
+              checked={config.audio_enabled}
+              onCheckedChange={(checked) => setConfig(prev => ({ ...prev, audio_enabled: checked }))}
+            />
+          </div>
+
+          {config.audio_enabled && (
+            <>
+              <Separator />
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Voz do Agente</Label>
+                  <Select
+                    value={config.audio_voice_name}
+                    onValueChange={handleVoiceChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {voiceOptions.map(voice => (
+                        <SelectItem key={voice.id} value={voice.name}>
+                          <div className="flex flex-col">
+                            <span>{voice.name}</span>
+                            <span className="text-xs text-muted-foreground">{voice.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Modo de Envio</Label>
+                  <Select
+                    value={config.audio_mode}
+                    onValueChange={(value) => setConfig(prev => ({ ...prev, audio_mode: value as AudioMode }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text_and_audio">
+                        <div className="flex flex-col">
+                          <span>Texto + Áudio</span>
+                          <span className="text-xs text-muted-foreground">Envia ambos (recomendado)</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="audio_only">
+                        <div className="flex flex-col">
+                          <span>Apenas Áudio</span>
+                          <span className="text-xs text-muted-foreground">Só envia mensagem de voz</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="text_only">
+                        <div className="flex flex-col">
+                          <span>Apenas Texto</span>
+                          <span className="text-xs text-muted-foreground">Desativa áudio temporariamente</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-sm">
+                    <strong>Powered by ElevenLabs</strong> - As vozes são geradas usando inteligência artificial de síntese de voz de alta qualidade.
+                  </p>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -488,26 +720,30 @@ ${config.fallback_message}`;
         <CardHeader>
           <div className="flex items-center gap-2">
             <HelpCircle className="h-5 w-5 text-primary" />
-            <CardTitle>Perguntas Frequentes (FAQs)</CardTitle>
+            <CardTitle>Perguntas Frequentes</CardTitle>
           </div>
           <CardDescription>
-            Respostas prontas para perguntas comuns que a IA usará como referência
+            Perguntas e respostas que a IA pode usar como referência
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Accordion type="single" collapsible className="space-y-2">
+          <Accordion type="multiple" className="w-full">
             {config.faqs.map((faq, index) => (
-              <AccordionItem key={index} value={`faq-${index}`} className="border rounded-lg px-4">
-                <div className="flex items-center justify-between">
-                  <AccordionTrigger className="flex-1 text-left">
-                    <span className="text-sm font-medium">{faq.question}</span>
-                  </AccordionTrigger>
-                  <Button variant="ghost" size="sm" onClick={() => removeFaq(index)} className="ml-2">
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
+              <AccordionItem key={index} value={`faq-${index}`}>
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2 text-left">
+                    <MessageSquare className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="text-sm">{faq.question}</span>
+                  </div>
+                </AccordionTrigger>
                 <AccordionContent>
-                  <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                  <div className="pl-6 space-y-2">
+                    <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                    <Button variant="ghost" size="sm" onClick={() => removeFaq(index)}>
+                      <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                      Remover
+                    </Button>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -515,13 +751,12 @@ ${config.fallback_message}`;
           
           <Separator />
           
-          <div className="space-y-2">
-            <Label>Adicionar FAQ</Label>
+          <div className="space-y-3">
+            <Label>Adicionar Nova FAQ</Label>
             <Input
               value={newFaq.question}
               onChange={(e) => setNewFaq(prev => ({ ...prev, question: e.target.value }))}
               placeholder="Pergunta..."
-              className="mb-2"
             />
             <Textarea
               value={newFaq.answer}
@@ -529,7 +764,7 @@ ${config.fallback_message}`;
               placeholder="Resposta..."
               rows={2}
             />
-            <Button variant="outline" onClick={addFaq} className="w-full">
+            <Button variant="outline" onClick={addFaq} disabled={!newFaq.question || !newFaq.answer}>
               <Plus className="h-4 w-4 mr-2" />
               Adicionar FAQ
             </Button>
@@ -545,7 +780,7 @@ ${config.fallback_message}`;
             <CardTitle>Mensagens Padrão</CardTitle>
           </div>
           <CardDescription>
-            Configure as mensagens que a IA usará em situações específicas
+            Mensagens de saudação e fallback
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -555,7 +790,7 @@ ${config.fallback_message}`;
               id="greeting"
               value={config.greeting_message}
               onChange={(e) => setConfig(prev => ({ ...prev, greeting_message: e.target.value }))}
-              placeholder="Olá! Como posso ajudá-lo?"
+              placeholder="Olá! Como posso ajudar?"
               rows={2}
             />
             <p className="text-xs text-muted-foreground">Use {'{company_name}'} para inserir o nome da empresa</p>
@@ -579,17 +814,17 @@ ${config.fallback_message}`;
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            <CardTitle>Instruções Especiais</CardTitle>
+            <CardTitle>Instruções Personalizadas</CardTitle>
           </div>
           <CardDescription>
-            Instruções adicionais e personalizadas para o comportamento da IA
+            Adicione instruções específicas para o comportamento da IA
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea
             value={config.custom_instructions}
             onChange={(e) => setConfig(prev => ({ ...prev, custom_instructions: e.target.value }))}
-            placeholder="Adicione instruções específicas para o seu negócio. Ex: 'Sempre pergunte o código do imóvel', 'Mencione nossa promoção de dezembro'..."
+            placeholder="Ex: Sempre mencione que temos estacionamento gratuito. Não discuta preços pelo WhatsApp..."
             rows={4}
           />
         </CardContent>
@@ -601,19 +836,19 @@ ${config.fallback_message}`;
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-primary" />
-              <CardTitle>Preview do Prompt</CardTitle>
+              <CardTitle>Prévia do Prompt</CardTitle>
             </div>
             <Button variant="outline" size="sm" onClick={() => setShowPreview(!showPreview)}>
               {showPreview ? 'Ocultar' : 'Mostrar'}
             </Button>
           </div>
           <CardDescription>
-            Visualize como ficará o prompt completo enviado à IA
+            Veja como o prompt será construído para a IA
           </CardDescription>
         </CardHeader>
         {showPreview && (
           <CardContent>
-            <pre className="text-xs bg-muted/50 p-4 rounded-lg overflow-auto max-h-96 whitespace-pre-wrap">
+            <pre className="p-4 bg-muted rounded-lg text-xs overflow-auto max-h-96 whitespace-pre-wrap">
               {generatePromptPreview()}
             </pre>
           </CardContent>
@@ -622,7 +857,7 @@ ${config.fallback_message}`;
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={saveConfig} disabled={isSaving}>
+        <Button onClick={saveConfig} disabled={isSaving} size="lg">
           <Save className="h-4 w-4 mr-2" />
           {isSaving ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
