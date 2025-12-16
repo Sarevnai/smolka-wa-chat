@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Bot, Clock, Save, TestTube, ExternalLink, Key, Copy, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Bot, Clock, Save, TestTube, ExternalLink, Key, Copy, Eye, EyeOff, Sparkles, Workflow } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -17,7 +18,10 @@ interface BusinessHours {
   timezone: string;
 }
 
+type AgentMode = 'native' | 'n8n';
+
 export function N8NSettings() {
+  const [agentMode, setAgentMode] = useState<AgentMode>('native');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [forceAIMode, setForceAIMode] = useState(false);
@@ -39,17 +43,19 @@ export function N8NSettings() {
 
   const loadSettings = async () => {
     try {
-      // Load all N8N settings at once
       const { data: settings } = await supabase
         .from('system_settings')
         .select('setting_key, setting_value')
-        .in('setting_key', ['n8n_webhook_url', 'n8n_api_key', 'n8n_force_ai_mode', 'business_hours']);
+        .in('setting_key', ['n8n_webhook_url', 'n8n_api_key', 'n8n_force_ai_mode', 'business_hours', 'ai_agent_mode']);
 
       settings?.forEach((setting) => {
         const raw = setting.setting_value as any;
         switch (setting.setting_key) {
+          case 'ai_agent_mode':
+            const mode = raw?.value ?? raw ?? 'native';
+            setAgentMode(mode as AgentMode);
+            break;
           case 'n8n_webhook_url':
-            // Handle both wrapped {value: "..."} and plain string formats
             const url = raw?.value ?? (typeof raw === 'string' ? raw : '');
             setWebhookUrl(url.replace(/^"|"$/g, ''));
             break;
@@ -58,7 +64,6 @@ export function N8NSettings() {
             setApiKey(key.replace(/^"|"$/g, ''));
             break;
           case 'n8n_force_ai_mode':
-            // Handle both wrapped {value: bool} and plain boolean
             setForceAIMode(raw?.value === true || raw === true);
             break;
           case 'business_hours':
@@ -78,29 +83,12 @@ export function N8NSettings() {
   const saveSettings = async () => {
     setIsLoading(true);
     try {
-      // Prepare settings with proper JSON-safe values
-      // Strings wrapped in objects, empty strings as null
       const settingsToSave = [
-        { 
-          setting_key: 'n8n_webhook_url', 
-          setting_category: 'n8n', 
-          setting_value: webhookUrl?.trim() ? { value: webhookUrl.trim() } : null 
-        },
-        { 
-          setting_key: 'n8n_api_key', 
-          setting_category: 'n8n', 
-          setting_value: apiKey?.trim() ? { value: apiKey.trim() } : null 
-        },
-        { 
-          setting_key: 'n8n_force_ai_mode', 
-          setting_category: 'n8n', 
-          setting_value: { value: forceAIMode } 
-        },
-        { 
-          setting_key: 'business_hours', 
-          setting_category: 'n8n', 
-          setting_value: businessHours 
-        },
+        { setting_key: 'ai_agent_mode', setting_category: 'n8n', setting_value: { value: agentMode } },
+        { setting_key: 'n8n_webhook_url', setting_category: 'n8n', setting_value: webhookUrl?.trim() ? { value: webhookUrl.trim() } : null },
+        { setting_key: 'n8n_api_key', setting_category: 'n8n', setting_value: apiKey?.trim() ? { value: apiKey.trim() } : null },
+        { setting_key: 'n8n_force_ai_mode', setting_category: 'n8n', setting_value: { value: forceAIMode } },
+        { setting_key: 'business_hours', setting_category: 'n8n', setting_value: businessHours },
       ];
 
       for (const setting of settingsToSave) {
@@ -113,13 +101,9 @@ export function N8NSettings() {
             updated_at: new Date().toISOString()
           }, { onConflict: 'setting_key' });
 
-        if (error) {
-          console.error(`Error saving ${setting.setting_key}:`, error);
-          throw error;
-        }
+        if (error) throw error;
       }
 
-      console.log('✅ Settings saved:', { webhookUrl, apiKey: apiKey ? '***' : '', forceAIMode });
       toast.success('Configurações salvas com sucesso!');
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -163,7 +147,6 @@ export function N8NSettings() {
       });
 
       if (error) throw error;
-
       if (data?.success) {
         toast.success('Webhook N8N funcionando corretamente!');
       } else {
@@ -180,9 +163,7 @@ export function N8NSettings() {
   const toggleDay = (day: number) => {
     setBusinessHours(prev => ({
       ...prev,
-      days: prev.days.includes(day)
-        ? prev.days.filter(d => d !== day)
-        : [...prev.days, day].sort()
+      days: prev.days.includes(day) ? prev.days.filter(d => d !== day) : [...prev.days, day].sort()
     }));
   };
 
@@ -190,121 +171,141 @@ export function N8NSettings() {
 
   return (
     <div className="space-y-6">
+      {/* Agent Mode Selection */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            <CardTitle>Agente Virtual N8N</CardTitle>
+            <CardTitle>Modo do Agente Virtual</CardTitle>
           </div>
           <CardDescription>
-            Configure a integração com o N8N para atendimento automatizado fora do horário comercial
+            Escolha como o agente virtual irá responder automaticamente fora do horário comercial
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="webhook-url">URL do Webhook N8N</Label>
-            <div className="flex gap-2">
-              <Input
-                id="webhook-url"
-                type="url"
-                placeholder="https://seu-n8n.com/webhook/..."
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-              />
-              <Button
-                variant="outline"
-                onClick={testWebhook}
-                disabled={isTesting || !webhookUrl}
-              >
-                <TestTube className="h-4 w-4 mr-2" />
-                {isTesting ? 'Testando...' : 'Testar'}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Configure um workflow N8N com trigger de webhook para receber mensagens
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label htmlFor="api-key">API Key para N8N</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  id="api-key"
-                  type={showApiKey ? 'text' : 'password'}
-                  placeholder="Clique em 'Gerar' para criar uma chave"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+        <CardContent>
+          <RadioGroup
+            value={agentMode}
+            onValueChange={(value) => setAgentMode(value as AgentMode)}
+            className="space-y-4"
+          >
+            <div className={`flex items-start space-x-3 p-4 rounded-lg border-2 transition-colors ${agentMode === 'native' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+              <RadioGroupItem value="native" id="native" className="mt-1" />
+              <div className="flex-1">
+                <Label htmlFor="native" className="flex items-center gap-2 cursor-pointer">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Agente Nativo (Lovable AI)</span>
+                  <Badge variant="secondary" className="ml-2">Recomendado</Badge>
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Usa IA integrada (Google Gemini) diretamente no Supabase. Mais rápido, confiável e sem dependências externas.
+                </p>
               </div>
-              <Button variant="outline" onClick={generateApiKey}>
-                <Key className="h-4 w-4 mr-2" />
-                Gerar
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => copyToClipboard(apiKey, 'API Key')}
-                disabled={!apiKey}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Use esta chave no HTTP Request do N8N para autenticar
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Label>URL de Callback (para N8N)</Label>
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                value={callbackUrl}
-                readOnly
-                className="bg-muted/50"
-              />
-              <Button 
-                variant="outline" 
-                onClick={() => copyToClipboard(callbackUrl, 'Callback URL')}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
+            
+            <div className={`flex items-start space-x-3 p-4 rounded-lg border-2 transition-colors ${agentMode === 'n8n' ? 'border-primary bg-primary/5' : 'border-border'}`}>
+              <RadioGroupItem value="n8n" id="n8n" className="mt-1" />
+              <div className="flex-1">
+                <Label htmlFor="n8n" className="flex items-center gap-2 cursor-pointer">
+                  <Workflow className="h-4 w-4 text-orange-500" />
+                  <span className="font-medium">N8N Externo</span>
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Usa workflow N8N customizado. Requer configuração adicional e manutenção de tokens.
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Configure esta URL no nó HTTP Request do N8N para enviar respostas
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-            <ExternalLink className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">
-              Precisa de ajuda? 
-              <a 
-                href="https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary hover:underline ml-1"
-              >
-                Documentação N8N Webhook
-              </a>
-            </span>
-          </div>
+          </RadioGroup>
         </CardContent>
       </Card>
 
+      {/* N8N Configuration - only show if N8N mode selected */}
+      {agentMode === 'n8n' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Workflow className="h-5 w-5 text-orange-500" />
+              <CardTitle>Configuração N8N</CardTitle>
+            </div>
+            <CardDescription>
+              Configure a integração com o N8N para atendimento automatizado
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="webhook-url">URL do Webhook N8N</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="webhook-url"
+                  type="url"
+                  placeholder="https://seu-n8n.com/webhook/..."
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                />
+                <Button variant="outline" onClick={testWebhook} disabled={isTesting || !webhookUrl}>
+                  <TestTube className="h-4 w-4 mr-2" />
+                  {isTesting ? 'Testando...' : 'Testar'}
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="api-key">API Key para N8N</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    id="api-key"
+                    type={showApiKey ? 'text' : 'password'}
+                    placeholder="Clique em 'Gerar' para criar uma chave"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                  >
+                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <Button variant="outline" onClick={generateApiKey}>
+                  <Key className="h-4 w-4 mr-2" />
+                  Gerar
+                </Button>
+                <Button variant="outline" onClick={() => copyToClipboard(apiKey, 'API Key')} disabled={!apiKey}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label>URL de Callback (para N8N)</Label>
+              <div className="flex gap-2">
+                <Input type="text" value={callbackUrl} readOnly className="bg-muted/50" />
+                <Button variant="outline" onClick={() => copyToClipboard(callbackUrl, 'Callback URL')}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+              <ExternalLink className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                <a href="https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  Documentação N8N Webhook
+                </a>
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Business Hours */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -362,13 +363,10 @@ export function N8NSettings() {
                 Modo de Teste (Forçar IA)
               </p>
               <p className="text-xs text-muted-foreground">
-                Quando ativo, TODAS as mensagens são enviadas para o N8N, ignorando o horário comercial
+                Quando ativo, TODAS as mensagens são enviadas para IA, ignorando o horário comercial
               </p>
             </div>
-            <Switch
-              checked={forceAIMode}
-              onCheckedChange={setForceAIMode}
-            />
+            <Switch checked={forceAIMode} onCheckedChange={setForceAIMode} />
           </div>
 
           <Separator />

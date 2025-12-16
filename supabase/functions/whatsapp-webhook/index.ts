@@ -327,45 +327,41 @@ async function ensureContactExists(phoneNumber: string) {
 }
 
 /**
- * Handle N8N virtual agent trigger based on business hours and conversation state
+ * Handle AI agent trigger based on business hours, conversation state, and agent mode
  */
 async function handleN8NTrigger(phoneNumber: string, messageBody: string, message: any) {
   try {
-    // Check conversation state - if operator has taken over, don't trigger N8N
+    // Check conversation state - if operator has taken over, don't trigger AI
     const { data: convState } = await supabase
       .from('conversation_states')
       .select('is_ai_active, operator_id, operator_takeover_at')
       .eq('phone_number', phoneNumber)
       .maybeSingle();
 
-    // If operator has taken over this conversation, skip N8N
+    // If operator has taken over this conversation, skip AI
     if (convState?.operator_id && !convState?.is_ai_active) {
-      console.log(`⏭️ Skipping N8N - operator ${convState.operator_id} handling conversation`);
+      console.log(`⏭️ Skipping AI - operator ${convState.operator_id} handling conversation`);
       return;
     }
 
-    // Check for force AI mode (testing mode)
-    const { data: forceAISetting } = await supabase
+    // Load all relevant settings at once
+    const { data: allSettings } = await supabase
       .from('system_settings')
-      .select('setting_value')
-      .eq('setting_key', 'n8n_force_ai_mode')
-      .maybeSingle();
+      .select('setting_key, setting_value')
+      .in('setting_key', ['n8n_force_ai_mode', 'business_hours', 'ai_agent_mode']);
 
-    // Handle both wrapped {value: bool} and plain boolean formats
-    const forceAIRaw = forceAISetting?.setting_value as any;
+    const settingsMap: Record<string, any> = {};
+    allSettings?.forEach(s => { settingsMap[s.setting_key] = s.setting_value; });
+
+    // Check for force AI mode (testing mode)
+    const forceAIRaw = settingsMap['n8n_force_ai_mode'];
     const forceAIMode = forceAIRaw?.value === true || forceAIRaw === true;
     
     if (forceAIMode) {
       console.log('🧪 Force AI mode enabled - bypassing business hours check');
     } else {
       // Check business hours only if not in force mode
-      const { data: settings } = await supabase
-        .from('system_settings')
-        .select('setting_value')
-        .eq('setting_key', 'business_hours')
-        .maybeSingle();
-
-      const businessHours = settings?.setting_value as { 
+      const businessHours = settingsMap['business_hours'] as { 
         start: string; 
         end: string; 
         days: number[]; 
@@ -374,14 +370,18 @@ async function handleN8NTrigger(phoneNumber: string, messageBody: string, messag
 
       const isWithinBusinessHours = checkBusinessHours(businessHours);
       
-      // Only trigger N8N outside business hours OR if AI is explicitly active
+      // Only trigger AI outside business hours OR if AI is explicitly active
       if (isWithinBusinessHours && !convState?.is_ai_active) {
         console.log('⏰ Within business hours - human agents available');
         return;
       }
     }
 
-    console.log('🤖 Triggering N8N - Outside business hours, AI active, or force mode enabled');
+    // Check which agent mode to use (native or n8n)
+    const agentModeRaw = settingsMap['ai_agent_mode'];
+    const agentMode = agentModeRaw?.value ?? agentModeRaw ?? 'native'; // Default to native
+
+    console.log(`🤖 Triggering AI agent (mode: ${agentMode}) - Outside business hours, AI active, or force mode enabled`);
 
     // Get contact info for context
     const { data: contact } = await supabase
@@ -390,23 +390,27 @@ async function handleN8NTrigger(phoneNumber: string, messageBody: string, messag
       .eq('phone', phoneNumber)
       .maybeSingle();
 
-    // Trigger N8N webhook
-    const { data: triggerResult, error: triggerError } = await supabase.functions.invoke('n8n-trigger', {
-      body: {
-        phoneNumber,
-        messageBody,
-        messageType: message.type,
-        contactName: contact?.name,
-        contactType: contact?.contact_type,
-        mediaUrl: message.media_url || null,
-        mediaType: message.media_type || null
-      }
+    const agentPayload = {
+      phoneNumber,
+      messageBody,
+      messageType: message.type,
+      contactName: contact?.name,
+      contactType: contact?.contact_type,
+      mediaUrl: message.media_url || null,
+      mediaType: message.media_type || null
+    };
+
+    // Use native agent or N8N based on configuration
+    const functionName = agentMode === 'n8n' ? 'n8n-trigger' : 'ai-virtual-agent';
+    
+    const { data: triggerResult, error: triggerError } = await supabase.functions.invoke(functionName, {
+      body: agentPayload
     });
 
     if (triggerError) {
-      console.error('❌ Error triggering N8N:', triggerError);
+      console.error(`❌ Error triggering ${functionName}:`, triggerError);
     } else {
-      console.log('✅ N8N triggered successfully:', triggerResult);
+      console.log(`✅ ${functionName} triggered successfully:`, triggerResult);
     }
 
   } catch (error) {
