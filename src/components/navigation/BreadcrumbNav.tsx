@@ -16,7 +16,9 @@ import {
   BarChart3,
   Settings,
   User,
-  Puzzle
+  Puzzle,
+  Shield,
+  Bot
 } from "lucide-react";
 
 const routeConfig = {
@@ -55,6 +57,22 @@ const routeConfig = {
   '/integrations': { 
     label: 'Integrações', 
     icon: Puzzle 
+  },
+  '/admin': { 
+    label: 'Administração', 
+    icon: Shield 
+  },
+  '/admin/ai-agent': { 
+    label: 'Agente IA', 
+    icon: Bot 
+  },
+  '/admin/users': { 
+    label: 'Gestão de Usuários', 
+    icon: Users 
+  },
+  '/admin/settings': { 
+    label: 'Configurações', 
+    icon: Settings 
   }
 };
 

@@ -24,6 +24,7 @@ import AuditLogs from "./pages/admin/AuditLogs";
 import PermissionsMatrix from "./pages/admin/PermissionsMatrix";
 import UserPermissions from "./pages/admin/UserPermissions";
 import SystemSettings from "./pages/admin/SystemSettings";
+import AIAgentConfig from "./pages/admin/AIAgentConfig";
 import { AdminGuard } from "./components/guards/AdminGuard";
 
 // Create QueryClient outside component to avoid recreating on hot reload
@@ -132,6 +133,13 @@ const App = () => (
             <ProtectedRoute>
               <AdminGuard>
                 <SystemSettings />
+              </AdminGuard>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/ai-agent" element={
+            <ProtectedRoute>
+              <AdminGuard>
+                <AIAgentConfig />
               </AdminGuard>
             </ProtectedRoute>
           } />

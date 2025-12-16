@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Shield,
   LayoutDashboard,
-  UserCog
+  UserCog,
+  Bot
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -190,6 +191,14 @@ export function AppSidebar() {
                     <Link to="/admin/user-permissions">
                       <Shield className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
                       {!collapsed && <span>Permissões por Usuário</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className={getNavClassName('/admin/ai-agent')}>
+                    <Link to="/admin/ai-agent">
+                      <Bot className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                      {!collapsed && <span>Agente IA</span>}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
