@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Bot, Clock, Save, TestTube, ExternalLink } from 'lucide-react';
+import { Bot, Clock, Save, TestTube, ExternalLink, Key, Copy, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -19,6 +19,7 @@ interface BusinessHours {
 
 export function N8NSettings() {
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [businessHours, setBusinessHours] = useState<BusinessHours>({
     start: '08:00',
     end: '18:00',
@@ -27,6 +28,9 @@ export function N8NSettings() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  const callbackUrl = 'https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/n8n-send-message';
 
   useEffect(() => {
     loadSettings();
@@ -46,6 +50,20 @@ export function N8NSettings() {
           ? n8nData.setting_value 
           : '';
         setWebhookUrl(url.replace(/^"|"$/g, '')); // Remove quotes if present
+      }
+
+      // Load API key
+      const { data: apiKeyData } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('setting_key', 'n8n_api_key')
+        .single();
+
+      if (apiKeyData?.setting_value) {
+        const key = typeof apiKeyData.setting_value === 'string' 
+          ? apiKeyData.setting_value 
+          : '';
+        setApiKey(key.replace(/^"|"$/g, ''));
       }
 
       // Load business hours
@@ -69,22 +87,36 @@ export function N8NSettings() {
       // Save N8N webhook URL
       const { error: urlError } = await supabase
         .from('system_settings')
-        .update({ 
+        .upsert({ 
+          setting_key: 'n8n_webhook_url',
+          setting_category: 'integrations',
           setting_value: webhookUrl,
           updated_at: new Date().toISOString()
-        })
-        .eq('setting_key', 'n8n_webhook_url');
+        }, { onConflict: 'setting_key' });
 
       if (urlError) throw urlError;
+
+      // Save API key
+      const { error: apiKeyError } = await supabase
+        .from('system_settings')
+        .upsert({ 
+          setting_key: 'n8n_api_key',
+          setting_category: 'integrations',
+          setting_value: apiKey,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'setting_key' });
+
+      if (apiKeyError) throw apiKeyError;
 
       // Save business hours
       const { error: hoursError } = await supabase
         .from('system_settings')
-        .update({ 
+        .upsert({ 
+          setting_key: 'business_hours',
+          setting_category: 'business',
           setting_value: businessHours as any,
           updated_at: new Date().toISOString()
-        })
-        .eq('setting_key', 'business_hours');
+        }, { onConflict: 'setting_key' });
 
       if (hoursError) throw hoursError;
 
@@ -95,6 +127,21 @@ export function N8NSettings() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const generateApiKey = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = 'n8n_';
+    for (let i = 0; i < 32; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setApiKey(result);
+    toast.success('Nova API key gerada! Lembre-se de salvar.');
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado!`);
   };
 
   const testWebhook = async () => {
@@ -175,6 +222,69 @@ export function N8NSettings() {
             </div>
             <p className="text-xs text-muted-foreground">
               Configure um workflow N8N com trigger de webhook para receber mensagens
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="api-key">API Key para N8N</Label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  id="api-key"
+                  type={showApiKey ? 'text' : 'password'}
+                  placeholder="Clique em 'Gerar' para criar uma chave"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <Button variant="outline" onClick={generateApiKey}>
+                <Key className="h-4 w-4 mr-2" />
+                Gerar
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => copyToClipboard(apiKey, 'API Key')}
+                disabled={!apiKey}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use esta chave no HTTP Request do N8N para autenticar
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label>URL de Callback (para N8N)</Label>
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                value={callbackUrl}
+                readOnly
+                className="bg-muted/50"
+              />
+              <Button 
+                variant="outline" 
+                onClick={() => copyToClipboard(callbackUrl, 'Callback URL')}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Configure esta URL no nó HTTP Request do N8N para enviar respostas
             </p>
           </div>
 
