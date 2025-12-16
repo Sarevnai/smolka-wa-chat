@@ -27,6 +27,17 @@ interface AIAgentConfig {
   ai_model: string;
   max_tokens: number;
   max_history_messages: number;
+  // Humanization settings
+  humanize_responses: boolean;
+  fragment_long_messages: boolean;
+  message_delay_ms: number;
+  emoji_intensity: 'none' | 'low' | 'medium';
+  use_customer_name: boolean;
+  // Audio settings
+  audio_enabled: boolean;
+  audio_voice_id: string;
+  audio_voice_name: string;
+  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
 }
 
 const defaultConfig: AIAgentConfig = {
@@ -49,6 +60,17 @@ const defaultConfig: AIAgentConfig = {
   ai_model: 'gpt-4o-mini',
   max_tokens: 500,
   max_history_messages: 5,
+  // Humanization defaults
+  humanize_responses: true,
+  fragment_long_messages: true,
+  message_delay_ms: 2000,
+  emoji_intensity: 'low',
+  use_customer_name: true,
+  // Audio defaults
+  audio_enabled: false,
+  audio_voice_id: '',
+  audio_voice_name: 'Sarah',
+  audio_mode: 'text_and_audio',
 };
 
 const toneDescriptions: Record<string, string> = {
@@ -57,6 +79,38 @@ const toneDescriptions: Record<string, string> = {
   friendly: 'Amigável e acolhedor',
   technical: 'Técnico e preciso'
 };
+
+// Emoji variations by context
+const emojiSets = {
+  greeting: ['😊', '👋', '🙂', '☺️'],
+  agreement: ['✅', '👍', '😊', '🙂'],
+  thinking: ['🤔', '💭', '📋', ''],
+  sorry: ['😔', '🙏', '', ''],
+  help: ['💡', '📞', '🏠', ''],
+  thanks: ['🙏', '😊', '✨', ''],
+  farewell: ['👋', '😊', '🙂', ''],
+};
+
+function getRandomEmoji(context: keyof typeof emojiSets, intensity: string): string {
+  if (intensity === 'none') return '';
+  const set = emojiSets[context];
+  const maxIndex = intensity === 'low' ? 2 : set.length;
+  const emoji = set[Math.floor(Math.random() * maxIndex)];
+  return emoji ? ` ${emoji}` : '';
+}
+
+// Humanization phrases
+const humanPhrases = {
+  thinking: ['Deixa eu verificar...', 'Um momento...', 'Vou conferir isso...', 'Só um instante...'],
+  agreement: ['Entendi!', 'Certo!', 'Perfeito!', 'Compreendi!', 'Claro!'],
+  transition: ['Olha só,', 'Então,', 'Bom,', 'Veja bem,', 'Pois é,'],
+  empathy: ['Entendo sua situação.', 'Compreendo.', 'Faz sentido.', 'Imagino como deve ser.'],
+};
+
+function getRandomPhrase(type: keyof typeof humanPhrases): string {
+  const phrases = humanPhrases[type];
+  return phrases[Math.floor(Math.random() * phrases.length)];
+}
 
 function buildSystemPrompt(config: AIAgentConfig, contactName?: string, contactType?: string): string {
   let prompt = `Você é ${config.agent_name} da ${config.company_name}.
@@ -85,23 +139,82 @@ ${config.faqs.map(faq => `P: ${faq.question}\nR: ${faq.answer}`).join('\n\n')}`;
 ${config.custom_instructions}`;
   }
 
+  // Humanization instructions
+  if (config.humanize_responses) {
+    prompt += `\n\nESTILO DE COMUNICAÇÃO HUMANIZADO:
+- Use linguagem natural e coloquial (mas educada)
+- Inclua pequenas variações e interjeições naturais como "olha só", "então", "veja bem"
+- Demonstre empatia quando apropriado
+- Faça pausas naturais com "..." em momentos de reflexão
+- Evite respostas robóticas ou muito padronizadas
+- Varie as saudações e despedidas`;
+
+    if (config.emoji_intensity !== 'none') {
+      const emojiLevel = config.emoji_intensity === 'low' ? 'ocasionalmente (1-2 por mensagem)' : 'moderadamente (2-3 por mensagem)';
+      prompt += `\n- Use emojis ${emojiLevel} para tornar a conversa mais amigável`;
+    }
+  }
+
   prompt += `\n\nINSTRUÇÕES GERAIS:
 1. Sempre cumprimente cordialmente
 2. Identifique a necessidade do cliente
 3. Se puder ajudar, responda objetivamente
 4. Se não puder, use esta mensagem: "${config.fallback_message}"
-5. Mantenha respostas curtas (máximo 3 parágrafos)
+5. Mantenha respostas ${config.fragment_long_messages ? 'curtas (máximo 2-3 frases por bloco)' : 'curtas (máximo 3 parágrafos)'}
 6. Use linguagem ${config.tone === 'formal' ? 'formal mas acolhedora' : config.tone}`;
 
-  if (contactName) {
+  if (contactName && config.use_customer_name) {
     prompt += `\n\nCONTEXTO DO CLIENTE:
-- Nome: ${contactName}`;
+- Nome: ${contactName} (use o nome nas interações para personalizar)`;
   }
   if (contactType) {
     prompt += `\n- Tipo: ${contactType === 'proprietario' ? 'Proprietário' : 'Inquilino'}`;
   }
 
   return prompt;
+}
+
+// Fragment long messages into smaller parts
+function fragmentMessage(text: string, maxLength: number = 150): string[] {
+  if (text.length <= maxLength) return [text];
+  
+  const fragments: string[] = [];
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  let currentFragment = '';
+  
+  for (const sentence of sentences) {
+    if ((currentFragment + ' ' + sentence).trim().length <= maxLength) {
+      currentFragment = (currentFragment + ' ' + sentence).trim();
+    } else {
+      if (currentFragment) fragments.push(currentFragment);
+      currentFragment = sentence;
+    }
+  }
+  
+  if (currentFragment) fragments.push(currentFragment);
+  
+  // If we still have very long fragments, split by commas or force split
+  return fragments.flatMap(frag => {
+    if (frag.length <= maxLength * 1.5) return [frag];
+    const parts = frag.split(/,\s*/);
+    const result: string[] = [];
+    let current = '';
+    for (const part of parts) {
+      if ((current + ', ' + part).length <= maxLength) {
+        current = current ? current + ', ' + part : part;
+      } else {
+        if (current) result.push(current);
+        current = part;
+      }
+    }
+    if (current) result.push(current);
+    return result;
+  });
+}
+
+// Add delay between messages
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function callAI(config: AIAgentConfig, messages: any[]): Promise<string> {
@@ -125,7 +238,7 @@ async function callAI(config: AIAgentConfig, messages: any[]): Promise<string> {
         model: config.ai_model || 'gpt-4o-mini',
         messages,
         max_tokens: config.max_tokens || 500,
-        temperature: 0.7,
+        temperature: 0.8, // Slightly higher for more natural responses
       }),
     });
 
@@ -182,6 +295,65 @@ async function callAI(config: AIAgentConfig, messages: any[]): Promise<string> {
   }
 }
 
+// Generate audio from text
+async function generateAudio(text: string, config: AIAgentConfig): Promise<string | null> {
+  if (!config.audio_enabled) return null;
+  
+  try {
+    console.log('🎙️ Generating audio for text:', text.substring(0, 50));
+    
+    const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+      body: {
+        text,
+        voiceId: config.audio_voice_id || undefined,
+        voiceName: config.audio_voice_name || 'Sarah',
+      }
+    });
+
+    if (error || !data?.success) {
+      console.error('❌ Audio generation failed:', error || data?.error);
+      return null;
+    }
+
+    console.log('✅ Audio generated:', data.audioUrl);
+    return data.audioUrl;
+  } catch (e) {
+    console.error('❌ Error generating audio:', e);
+    return null;
+  }
+}
+
+// Send WhatsApp message
+async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.functions.invoke('send-wa-message', {
+      body: { to, text }
+    });
+    return !error;
+  } catch (e) {
+    console.error('❌ Error sending WhatsApp message:', e);
+    return false;
+  }
+}
+
+// Send WhatsApp audio
+async function sendWhatsAppAudio(to: string, audioUrl: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.functions.invoke('send-wa-media', {
+      body: {
+        to,
+        mediaUrl: audioUrl,
+        mediaType: 'audio',
+        caption: ''
+      }
+    });
+    return !error;
+  } catch (e) {
+    console.error('❌ Error sending WhatsApp audio:', e);
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -200,7 +372,7 @@ serve(async (req) => {
     }
 
     // Load AI agent configuration from database
-    let config = defaultConfig;
+    let config = { ...defaultConfig };
     try {
       const { data: configData } = await supabase
         .from('system_settings')
@@ -213,8 +385,10 @@ serve(async (req) => {
         console.log('📋 Loaded AI config:', { 
           provider: config.ai_provider, 
           model: config.ai_model,
-          maxTokens: config.max_tokens,
-          maxHistory: config.max_history_messages 
+          humanize: config.humanize_responses,
+          fragment: config.fragment_long_messages,
+          audio: config.audio_enabled,
+          audioMode: config.audio_mode
         });
       }
     } catch (e) {
@@ -267,20 +441,57 @@ serve(async (req) => {
 
     console.log('✅ AI response received:', aiMessage.substring(0, 100));
 
-    // Send message via WhatsApp
-    const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-wa-message', {
-      body: {
-        to: phoneNumber,
-        text: aiMessage
+    // Process and send messages
+    let messagesSent = 0;
+    
+    if (config.fragment_long_messages && config.humanize_responses) {
+      // Fragment and send with delays (humanized)
+      const fragments = fragmentMessage(aiMessage, 180);
+      console.log(`📝 Message fragmented into ${fragments.length} parts`);
+      
+      for (let i = 0; i < fragments.length; i++) {
+        const fragment = fragments[i];
+        
+        // Send text (unless audio_only mode)
+        if (config.audio_mode !== 'audio_only') {
+          await sendWhatsAppMessage(phoneNumber, fragment);
+          messagesSent++;
+        }
+        
+        // Generate and send audio for each fragment
+        if (config.audio_enabled && config.audio_mode !== 'text_only') {
+          const audioUrl = await generateAudio(fragment, config);
+          if (audioUrl) {
+            await sendWhatsAppAudio(phoneNumber, audioUrl);
+            messagesSent++;
+          }
+        }
+        
+        // Add delay between fragments (simulates typing)
+        if (i < fragments.length - 1) {
+          const delay = config.message_delay_ms || 2000;
+          const variation = Math.random() * 1000 - 500; // +/- 500ms variation
+          await sleep(Math.max(1000, delay + variation));
+        }
       }
-    });
-
-    if (sendError) {
-      console.error('❌ Error sending WhatsApp message:', sendError);
-      throw new Error('Failed to send WhatsApp message');
+    } else {
+      // Send as single message
+      if (config.audio_mode !== 'audio_only') {
+        await sendWhatsAppMessage(phoneNumber, aiMessage);
+        messagesSent++;
+      }
+      
+      // Generate and send audio
+      if (config.audio_enabled && config.audio_mode !== 'text_only') {
+        const audioUrl = await generateAudio(aiMessage, config);
+        if (audioUrl) {
+          await sendWhatsAppAudio(phoneNumber, audioUrl);
+          messagesSent++;
+        }
+      }
     }
 
-    console.log('📱 WhatsApp message sent:', sendResult);
+    console.log(`📱 ${messagesSent} WhatsApp message(s) sent`);
 
     // Update conversation state
     await supabase
@@ -299,6 +510,9 @@ serve(async (req) => {
         message: 'AI response sent',
         provider: config.ai_provider,
         model: config.ai_model,
+        messagesSent,
+        audioEnabled: config.audio_enabled,
+        humanized: config.humanize_responses,
         aiMessage: aiMessage.substring(0, 100) + '...'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
