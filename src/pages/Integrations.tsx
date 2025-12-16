@@ -1,14 +1,16 @@
+import { useState } from "react";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Settings, RefreshCw, Plus, TrendingUp } from "lucide-react";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { IntegrationCard } from "@/components/integrations/IntegrationCard";
+import { N8NConfigSheet } from "@/components/integrations/N8NConfigSheet";
 
 export default function Integrations() {
   const { integrations, loading, testConnection, disconnectIntegration, refreshStatus } = useIntegrations();
+  const [n8nSheetOpen, setN8nSheetOpen] = useState(false);
 
   const connectedCount = integrations.filter(i => i.status === 'connected').length;
   const totalCount = integrations.length;
@@ -107,9 +109,21 @@ export default function Integrations() {
               integration={integration}
               onTestConnection={testConnection}
               onDisconnect={disconnectIntegration}
+              onConfigure={integration.isModal ? () => {
+                if (integration.id === 'n8n') {
+                  setN8nSheetOpen(true);
+                }
+              } : undefined}
             />
           ))}
         </div>
+
+        {/* N8N Config Sheet */}
+        <N8NConfigSheet 
+          open={n8nSheetOpen} 
+          onOpenChange={setN8nSheetOpen}
+          onStatusChange={refreshStatus}
+        />
 
         {/* Help Section */}
         <Card className="mt-8">
