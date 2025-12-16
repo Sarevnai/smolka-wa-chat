@@ -59,3 +59,6 @@ verify_jwt = true
 
 [functions.n8n-send-message]
 verify_jwt = false
+
+[functions.ai-virtual-agent]
+verify_jwt = false
