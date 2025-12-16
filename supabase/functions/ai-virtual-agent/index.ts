@@ -406,6 +406,14 @@ ${config.custom_instructions}`;
 4. Se não puder ou atingir critério de escalonamento, use: "${config.fallback_message}"
 5. Use linguagem ${config.tone === 'formal' ? 'formal mas acolhedora' : config.tone}
 
+⚠️ REGRA DE APRESENTAÇÃO DE IMÓVEIS:
+- NUNCA mostre mais de 1 imóvel por vez
+- Após mostrar um imóvel, SEMPRE pergunte "Faz sentido pra você?"
+- AGUARDE a resposta do cliente antes de mostrar outra opção
+- Se o cliente disser que não gostou ou não faz sentido, pergunte: "Quer que eu te mostre outra opção?"
+- Só busque/mostre outro imóvel APÓS o cliente confirmar que quer ver mais opções
+- Se o cliente gostar, pergunte: "Quer que eu agende uma visita?"
+
 ⚠️ REGRA CRÍTICA DE FORMATAÇÃO PARA WHATSAPP:
 - MÁXIMO 80-100 caracteres por frase/mensagem
 - Escreva como se estivesse conversando no WhatsApp: mensagens curtas e diretas
@@ -708,7 +716,7 @@ async function sendWhatsAppImage(to: string, imageUrl: string, caption?: string)
       body: {
         to,
         mediaUrl: imageUrl,
-        mediaType: 'image',
+        mediaType: 'image/jpeg',
         caption: caption || ''
       }
     });
@@ -925,31 +933,44 @@ serve(async (req) => {
       }
     }
 
-    // Send property photos and details if we have them
+    // Send property photos and details - ONLY 1 property at a time
     if (propertiesToSend.length > 0) {
-      console.log(`📸 Sending ${propertiesToSend.length} property(ies) with photos`);
+      console.log(`📸 Sending 1 property (${propertiesToSend.length} found total)`);
       
-      for (const property of propertiesToSend.slice(0, 2)) { // Max 2 properties at a time
-        // Send photo if available
-        if (property.foto_destaque) {
-          await sleep(1500);
-          await sendWhatsAppImage(phoneNumber, property.foto_destaque);
-          messagesSent++;
-        }
-        
-        // Send property details
-        await sleep(1000);
-        const propertyText = formatPropertyMessage(property);
-        await sendWhatsAppMessage(phoneNumber, propertyText);
-        messagesSent++;
-      }
+      // Only send the first property
+      const property = propertiesToSend[0];
       
-      // Ask follow-up question
-      if (propertiesToSend.length > 0) {
+      // Send photo if available
+      if (property.foto_destaque) {
         await sleep(1500);
-        await sendWhatsAppMessage(phoneNumber, "Faz sentido pra você? 😊");
+        await sendWhatsAppImage(phoneNumber, property.foto_destaque);
         messagesSent++;
       }
+      
+      // Send property details
+      await sleep(1000);
+      const propertyText = formatPropertyMessage(property);
+      await sendWhatsAppMessage(phoneNumber, propertyText);
+      messagesSent++;
+      
+      // Store remaining properties for future interactions
+      if (propertiesToSend.length > 1) {
+        const remainingProperties = propertiesToSend.slice(1);
+        console.log(`💾 Storing ${remainingProperties.length} remaining properties for later`);
+        
+        await supabase
+          .from('conversation_states')
+          .upsert({
+            phone_number: phoneNumber,
+            pending_properties: remainingProperties,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'phone_number' });
+      }
+      
+      // Ask confirmation question
+      await sleep(1500);
+      await sendWhatsAppMessage(phoneNumber, "Faz sentido pra você? 😊");
+      messagesSent++;
     }
 
     // If NOT mirroring, also send audio based on audio_mode
