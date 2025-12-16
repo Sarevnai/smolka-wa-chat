@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Copy, RefreshCw, Save, Clock, Key, Link, TestTube } from "lucide-react";
+import { Copy, RefreshCw, Save, Clock, Key, Link, TestTube, AlertTriangle } from "lucide-react";
 
 interface BusinessHours {
   start: string;
@@ -26,6 +27,7 @@ interface N8NConfigSheetProps {
 export function N8NConfigSheet({ open, onOpenChange, onStatusChange }: N8NConfigSheetProps) {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [forceAIMode, setForceAIMode] = useState(false);
   const [businessHours, setBusinessHours] = useState<BusinessHours>({
     start: "08:00",
     end: "18:00",
@@ -50,7 +52,7 @@ export function N8NConfigSheet({ open, onOpenChange, onStatusChange }: N8NConfig
       const { data, error } = await supabase
         .from("system_settings")
         .select("setting_key, setting_value")
-        .eq("setting_category", "n8n");
+        .in("setting_key", ["n8n_webhook_url", "n8n_api_key", "n8n_force_ai_mode", "business_hours"]);
 
       if (error) throw error;
 
@@ -58,13 +60,26 @@ export function N8NConfigSheet({ open, onOpenChange, onStatusChange }: N8NConfig
         const value = setting.setting_value as any;
         switch (setting.setting_key) {
           case "n8n_webhook_url":
-            setWebhookUrl(value || "");
+            setWebhookUrl(typeof value === 'string' ? value.replace(/^"|"$/g, '') : "");
             break;
           case "n8n_api_key":
-            setApiKey(value || "");
+            setApiKey(typeof value === 'string' ? value.replace(/^"|"$/g, '') : "");
             break;
-          case "n8n_business_hours":
-            if (value) setBusinessHours(value);
+          case "n8n_force_ai_mode":
+            setForceAIMode(value === true);
+            break;
+          case "business_hours":
+            if (value && typeof value === 'object') {
+              // Convert number days to string days if needed
+              const days = value.days?.map((d: number | string) => {
+                if (typeof d === 'number') {
+                  const dayMap: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
+                  return dayMap[d] || '';
+                }
+                return d;
+              }).filter(Boolean);
+              setBusinessHours({ ...value, days });
+            }
             break;
         }
       });
@@ -78,23 +93,34 @@ export function N8NConfigSheet({ open, onOpenChange, onStatusChange }: N8NConfig
   const saveSettings = async () => {
     setLoading(true);
     try {
+      // Convert string days to number days for consistency with N8NSettings
+      const dayMap: Record<string, number> = { 'dom': 0, 'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6 };
+      const numericDays = businessHours.days.map(d => typeof d === 'string' ? dayMap[d] : d).filter(d => d !== undefined);
+      
       const settings = [
         { key: "n8n_webhook_url", value: webhookUrl },
         { key: "n8n_api_key", value: apiKey },
-        { key: "n8n_business_hours", value: businessHours }
+        { key: "n8n_force_ai_mode", value: forceAIMode },
+        { key: "business_hours", value: { ...businessHours, days: numericDays } }
       ];
 
       for (const { key, value } of settings) {
-        await supabase
+        const { error } = await supabase
           .from("system_settings")
           .upsert({
             setting_category: "n8n",
             setting_key: key,
             setting_value: value as any,
             updated_at: new Date().toISOString()
-          }, { onConflict: "setting_category,setting_key" });
+          }, { onConflict: "setting_key" });
+        
+        if (error) {
+          console.error(`Error saving ${key}:`, error);
+          throw error;
+        }
       }
 
+      console.log('✅ Settings saved:', { webhookUrl, apiKey: apiKey ? '***' : '', forceAIMode });
       toast.success("Configurações salvas com sucesso!");
       onStatusChange?.();
     } catch (error) {
@@ -276,6 +302,34 @@ export function N8NConfigSheet({ open, onOpenChange, onStatusChange }: N8NConfig
               <p className="text-xs text-muted-foreground">
                 Configure o HTTP Request do N8N para enviar respostas para esta URL.
               </p>
+            </CardContent>
+          </Card>
+
+          <Separator />
+
+          {/* Force AI Mode */}
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Modo de Teste (Forçar IA)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Quando ativo, TODAS as mensagens são enviadas para o N8N, ignorando o horário comercial
+                </p>
+                <Switch
+                  checked={forceAIMode}
+                  onCheckedChange={setForceAIMode}
+                />
+              </div>
+              {forceAIMode && (
+                <p className="text-xs text-amber-500 font-medium">
+                  ⚠️ Ativo - todas as mensagens serão processadas pelo agente virtual
+                </p>
+              )}
             </CardContent>
           </Card>
 
