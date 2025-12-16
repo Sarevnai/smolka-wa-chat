@@ -57,28 +57,34 @@ export function N8NConfigSheet({ open, onOpenChange, onStatusChange }: N8NConfig
       if (error) throw error;
 
       data?.forEach((setting) => {
-        const value = setting.setting_value as any;
+        const raw = setting.setting_value as any;
         switch (setting.setting_key) {
           case "n8n_webhook_url":
-            setWebhookUrl(typeof value === 'string' ? value.replace(/^"|"$/g, '') : "");
+            // Handle both wrapped {value: "..."} and plain string formats
+            const url = raw?.value ?? (typeof raw === 'string' ? raw : '');
+            setWebhookUrl(url.replace(/^"|"$/g, ''));
             break;
           case "n8n_api_key":
-            setApiKey(typeof value === 'string' ? value.replace(/^"|"$/g, '') : "");
+            const key = raw?.value ?? (typeof raw === 'string' ? raw : '');
+            setApiKey(key.replace(/^"|"$/g, ''));
             break;
           case "n8n_force_ai_mode":
-            setForceAIMode(value === true);
+            // Handle both wrapped {value: bool} and plain boolean
+            setForceAIMode(raw?.value === true || raw === true);
             break;
           case "business_hours":
-            if (value && typeof value === 'object') {
+            // Handle both wrapped and unwrapped business hours
+            const bhData = raw?.value ?? raw;
+            if (bhData && typeof bhData === 'object') {
               // Convert number days to string days if needed
-              const days = value.days?.map((d: number | string) => {
+              const days = bhData.days?.map((d: number | string) => {
                 if (typeof d === 'number') {
                   const dayMap: Record<number, string> = { 0: 'dom', 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab' };
                   return dayMap[d] || '';
                 }
                 return d;
               }).filter(Boolean);
-              setBusinessHours({ ...value, days });
+              setBusinessHours({ ...bhData, days });
             }
             break;
         }
@@ -97,10 +103,11 @@ export function N8NConfigSheet({ open, onOpenChange, onStatusChange }: N8NConfig
       const dayMap: Record<string, number> = { 'dom': 0, 'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6 };
       const numericDays = businessHours.days.map(d => typeof d === 'string' ? dayMap[d] : d).filter(d => d !== undefined);
       
+      // Prepare settings with proper JSON-safe values wrapped in objects
       const settings = [
-        { key: "n8n_webhook_url", value: webhookUrl },
-        { key: "n8n_api_key", value: apiKey },
-        { key: "n8n_force_ai_mode", value: forceAIMode },
+        { key: "n8n_webhook_url", value: webhookUrl?.trim() ? { value: webhookUrl.trim() } : null },
+        { key: "n8n_api_key", value: apiKey?.trim() ? { value: apiKey.trim() } : null },
+        { key: "n8n_force_ai_mode", value: { value: forceAIMode } },
         { key: "business_hours", value: { ...businessHours, days: numericDays } }
       ];
 
