@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 export function useNotificationSound() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -27,7 +27,7 @@ export function useNotificationSound() {
     };
   }, []);
 
-  const playNotificationSound = async () => {
+  const playNotificationSound = useCallback(async () => {
     if (!soundEnabled || isWindowFocused || !audioRef.current) {
       return;
     }
@@ -39,11 +39,11 @@ export function useNotificationSound() {
     } catch (error) {
       console.error('Error playing notification sound:', error);
     }
-  };
+  }, [soundEnabled, isWindowFocused]);
 
-  const toggleSound = () => {
+  const toggleSound = useCallback(() => {
     setSoundEnabled(prev => !prev);
-  };
+  }, []);
 
   return {
     playNotificationSound,
