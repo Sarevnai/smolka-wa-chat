@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent, useEffect, useRef, useMemo } from "react";
+import { useState, KeyboardEvent, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { Send, User, Crown, X, FileText, Image as ImageIcon, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,16 +28,18 @@ interface MessageComposerProps {
   replyTo?: MessageRow | null;
   onVoiceRecord?: () => void;
   selectedContact?: string;
+  attendantControls?: ReactNode;
 }
 
-export function MessageComposer({ 
-  onSendMessage, 
-  disabled = false, 
-  onTypingStart, 
+export function MessageComposer({
+  onSendMessage,
+  disabled = false,
+  onTypingStart,
   onTypingStop,
   replyTo,
   onVoiceRecord,
-  selectedContact 
+  selectedContact,
+  attendantControls,
 }: MessageComposerProps) {
   const [message, setMessage] = useState("");
   const [selectedAttendant, setSelectedAttendant] = useState("none");
@@ -302,36 +304,46 @@ export function MessageComposer({
 
   return (
     <div className="flex flex-col gap-2 p-3">
-      {/* Compact Attendant Selector - Only show for admins or when needed */}
-      {(profile?.roles?.includes('admin') || availableAttendants.length > 1) && (
-        <div className="flex items-center gap-2 px-1">
-          <User className="h-4 w-4 text-muted-foreground shrink-0" />
-          <Select 
-            value={selectedAttendant} 
-            onValueChange={setSelectedAttendant} 
-            disabled={disabled || (!profile?.roles?.includes('admin') && Boolean(profile?.full_name))}
-          >
-            <SelectTrigger className="h-8 min-w-[160px] max-w-[280px] text-sm bg-muted/50 border-muted-foreground/20 rounded-md">
-              <SelectValue placeholder="Selecione o atendente" />
-            </SelectTrigger>
-            <SelectContent className="max-w-[280px]">
-              {availableAttendants.map((attendant) => {
-                const attendantProfile = profiles.find(p => p.full_name === attendant.label);
-                return (
-                  <SelectItem key={attendant.value} value={attendant.value} className="cursor-pointer">
-                    <div className="flex items-center gap-2 w-full justify-between">
-                      <span className="text-sm truncate">{attendant.label}</span>
-                      {attendantProfile?.username && (
-                        <span className="text-xs text-muted-foreground font-mono">
-                          @{attendantProfile.username}
-                        </span>
-                      )}
-                    </div>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+      {/* Compact Attendant Selector + AI controls */}
+      {(attendantControls || profile?.roles?.includes('admin') || availableAttendants.length > 1) && (
+        <div className="flex items-center gap-2 px-1 flex-wrap">
+          {(profile?.roles?.includes('admin') || availableAttendants.length > 1) && (
+            <>
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select
+                value={selectedAttendant}
+                onValueChange={setSelectedAttendant}
+                disabled={disabled || (!profile?.roles?.includes('admin') && Boolean(profile?.full_name))}
+              >
+                <SelectTrigger className="h-8 min-w-[160px] max-w-[280px] text-sm bg-muted/50 border-muted-foreground/20 rounded-md">
+                  <SelectValue placeholder="Selecione o atendente" />
+                </SelectTrigger>
+                <SelectContent className="max-w-[280px] z-50 bg-popover">
+                  {availableAttendants.map((attendant) => {
+                    const attendantProfile = profiles.find(p => p.full_name === attendant.label);
+                    return (
+                      <SelectItem key={attendant.value} value={attendant.value} className="cursor-pointer">
+                        <div className="flex items-center gap-2 w-full justify-between">
+                          <span className="text-sm truncate">{attendant.label}</span>
+                          {attendantProfile?.username && (
+                            <span className="text-xs text-muted-foreground font-mono">
+                              @{attendantProfile.username}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </>
+          )}
+
+          {attendantControls && (
+            <div className={cn(!(profile?.roles?.includes('admin') || availableAttendants.length > 1) && 'ml-auto')}>
+              {attendantControls}
+            </div>
+          )}
         </div>
       )}
 

@@ -462,32 +462,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             </p>
           )}
         </div>
-        
         <div className="flex items-center gap-1">
-          {/* AI Toggle Button */}
-          <Button
-            variant={isAIActive ? "default" : "outline"}
-            size="sm"
-            onClick={isAIActive ? takeoverConversation : releaseToAI}
-            disabled={aiLoading}
-            className={cn(
-              "h-8 gap-2 mr-2 transition-all",
-              isAIActive && "bg-primary text-primary-foreground"
-            )}
-          >
-            {isAIActive ? (
-              <>
-                <Bot className="h-4 w-4" />
-                <span className="hidden sm:inline">IA Ativa</span>
-              </>
-            ) : (
-              <>
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">Assumir</span>
-              </>
-            )}
-          </Button>
-          
           {messages.length === 0 && (
             <Button
               variant="default"
@@ -651,14 +626,38 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             />
             
             {/* Message Composer */}
-            <MessageComposer 
-              onSendMessage={sendMessage} 
+            <MessageComposer
+              onSendMessage={sendMessage}
               disabled={sending}
               onTypingStart={startTyping}
               onTypingStop={stopTyping}
               replyTo={replyTo}
               onVoiceRecord={() => setShowVoiceRecorder(true)}
               selectedContact={phoneNumber}
+              attendantControls={
+                <Button
+                  variant={isAIActive ? "default" : "outline"}
+                  size="sm"
+                  onClick={isAIActive ? takeoverConversation : releaseToAI}
+                  disabled={aiLoading}
+                  className={cn(
+                    "h-8 gap-2 transition-all",
+                    isAIActive && "bg-primary text-primary-foreground"
+                  )}
+                >
+                  {isAIActive ? (
+                    <>
+                      <User className="h-4 w-4" />
+                      <span className="hidden sm:inline">Assumir</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="h-4 w-4" />
+                      <span className="hidden sm:inline">Ligar IA</span>
+                    </>
+                  )}
+                </Button>
+              }
             />
           </div>
         )}
