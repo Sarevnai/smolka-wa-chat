@@ -59,11 +59,11 @@ serve(async (req) => {
           model_id: 'eleven_multilingual_v2',
           output_format: 'mp3_44100_128',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.4,
+            stability: 0.70,        // Mais consistente, menos variação
+            similarity_boost: 0.85, // Maior fidelidade à voz original
+            style: 0.25,            // Menos estilizado, mais natural
             use_speaker_boost: true,
-            speed: 1.0,
+            speed: 0.92,            // Ligeiramente mais lento para clareza
           },
         }),
       }
