@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.elevenlabs-list-voices]
 verify_jwt = true
+
+[functions.firecrawl-scrape-knowledge]
+verify_jwt = true
