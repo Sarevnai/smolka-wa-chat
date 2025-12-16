@@ -438,19 +438,28 @@ ${config.custom_instructions}`;
 - MÁXIMO 80-100 caracteres por frase/mensagem
 - Escreva como se estivesse conversando no WhatsApp: mensagens curtas e diretas
 - UMA ideia por mensagem, não agrupe informações
-- Se tiver várias coisas para dizer, responda com frases separadas
-- NUNCA use parágrafos longos ou listas extensas
-- Prefira perguntar "quer que eu explique mais?" do que explicar tudo de uma vez
 - Seja conciso: menos palavras = melhor comunicação
-- Evite repetir informações que o cliente já sabe
 
-Exemplo BOM:
-"Oi! Tudo bem? 😊"
-"Vi que você tem interesse em imóveis."
-"Posso te ajudar! Está procurando para alugar ou comprar?"
+⛔ NUNCA FAÇA ISSO NA RESPOSTA:
+- NUNCA inclua URLs ou links (nem de fotos, nem de sites)
+- NUNCA use markdown de imagem ![...](...)
+- NUNCA liste características de imóveis (o sistema faz isso automaticamente)
+- NUNCA descreva imóveis em detalhes na sua resposta
+- NUNCA envie mais de 2-3 frases por vez
 
-Exemplo RUIM:
-"Olá! Tudo bem? Sou a Helena da Smolka Imóveis e estou aqui para ajudá-lo a encontrar o imóvel perfeito. Trabalhamos com diversos tipos de imóveis como apartamentos, casas e salas comerciais nas regiões de Florianópolis e região."`;
+✅ QUANDO ENCONTRAR IMÓVEIS:
+Sua resposta deve ser APENAS uma frase curta de introdução, como:
+- "Encontrei uma opção interessante pra você!"
+- "Vou te mostrar um que costuma agradar!"
+- "Olha só o que achei!"
+O SISTEMA vai enviar a foto e as características automaticamente. Você NÃO precisa descrevê-las.
+
+Exemplo BOM (quando encontra imóvel):
+"Achei uma opção boa pra você! 😊"
+
+Exemplo RUIM (quando encontra imóvel):
+"Encontrei um apartamento de 2 quartos no Centro com 80m², preço de R$ 500.000, veja a foto: ![Apartamento](https://...)"`;
+
 
 
   // Customer context
@@ -532,6 +541,43 @@ function fragmentMessage(text: string, maxLength: number = 100): string[] {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Sanitize AI message: remove markdown images, URLs, and clean formatting
+function sanitizeAIMessage(text: string): string {
+  if (!text) return '';
+  
+  let cleaned = text
+    // Remove markdown images ![...](...)
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    // Remove raw URLs (http/https)
+    .replace(/https?:\/\/[^\s\)]+/g, '')
+    // Remove markdown headers
+    .replace(/^#{1,4}\s+/gm, '')
+    // Remove horizontal rules
+    .replace(/^---+$/gm, '')
+    // Remove property listing patterns (numbered lists with property details)
+    .replace(/\d+\.\s+\*\*[^*]+\*\*[\s\S]*?(?=\d+\.\s+\*\*|$)/g, '')
+    // Remove bold markdown for property names
+    .replace(/\*\*Apartamento\s+\d+\*\*/g, '')
+    .replace(/\*\*Imóvel\s+\d+\*\*/g, '')
+    // Remove excessive asterisks
+    .replace(/\*{2,}/g, '')
+    // Remove multiple consecutive newlines
+    .replace(/\n{3,}/g, '\n\n')
+    // Remove lines that are just bullets with property info
+    .replace(/^[-•]\s*\d+\s*(dormitório|quarto|vaga|m²|R\$).*$/gim, '')
+    // Remove empty bullet points
+    .replace(/^[-•]\s*$/gm, '')
+    // Trim whitespace
+    .trim();
+  
+  // If after cleaning we have almost nothing, return a fallback
+  if (cleaned.length < 10) {
+    return 'Vou te mostrar o que encontrei!';
+  }
+  
+  return cleaned;
 }
 
 // Search properties using Vista CRM API
@@ -867,6 +913,17 @@ serve(async (req) => {
           }
           
           // Call AI again with tool results to get proper response
+          // Add explicit instruction to NOT include property details in response
+          const postToolInstruction = `INSTRUÇÕES PÓS-BUSCA (CRÍTICO):
+Os imóveis encontrados serão enviados AUTOMATICAMENTE pelo sistema com foto e detalhes formatados.
+NÃO inclua nenhuma informação sobre imóveis na sua resposta.
+NÃO use markdown de imagem.
+NÃO inclua URLs ou links.
+NÃO liste características como quartos, área, preço.
+Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
+- "Achei uma opção boa pra você!"
+- "Vou te mostrar um que costuma agradar!"`;
+
           const toolResultMessages = [
             { role: 'system', content: systemPrompt },
             ...conversationHistory,
@@ -879,12 +936,16 @@ serve(async (req) => {
               role: 'tool',
               tool_call_id: toolCall.id,
               content: JSON.stringify(searchResult)
+            },
+            {
+              role: 'system',
+              content: postToolInstruction
             }
           ];
 
           // Get AI's response after seeing tool results
           const followUpResult = await callAIWithTools(aiConfig, toolResultMessages, false);
-          aiMessage = followUpResult.content;
+          aiMessage = sanitizeAIMessage(followUpResult.content);
         }
       }
     }
@@ -911,8 +972,16 @@ serve(async (req) => {
     // Send text response first (if any)
     if (aiMessage && responseMode === 'text') {
       if (config.fragment_long_messages && config.humanize_responses) {
-        const fragments = fragmentMessage(aiMessage, 100);
-        console.log(`📝 Text mode: fragmented into ${fragments.length} parts (100 chars max)`);
+        let fragments = fragmentMessage(aiMessage, 100);
+        
+        // LIMIT: máximo de 4 fragmentos para evitar "metralhadora de mensagens"
+        const MAX_FRAGMENTS = 4;
+        if (fragments.length > MAX_FRAGMENTS) {
+          console.log(`⚠️ Limiting fragments from ${fragments.length} to ${MAX_FRAGMENTS}`);
+          fragments = fragments.slice(0, MAX_FRAGMENTS);
+        }
+        
+        console.log(`📝 Text mode: fragmented into ${fragments.length} parts (100 chars max, max ${MAX_FRAGMENTS})`);
         
         for (let i = 0; i < fragments.length; i++) {
           const fragment = fragments[i];
