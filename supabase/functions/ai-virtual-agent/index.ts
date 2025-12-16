@@ -188,7 +188,7 @@ const tools = [
     type: "function",
     function: {
       name: "buscar_imoveis",
-      description: "Busca imóveis no catálogo da Smolka Imóveis com base nos critérios do cliente. Use esta função quando o cliente fornecer informações sobre o tipo de imóvel, localização, preço ou número de quartos desejados.",
+      description: "Busca imóveis no catálogo da Smolka Imóveis. IMPORTANTE: Se o cliente usar palavras como 'alugar', 'aluguel', 'locação' ou 'alugo', defina finalidade='locacao'. Se mencionar 'comprar', 'compra' ou 'venda', defina finalidade='venda'. Sempre pergunte se não ficar claro.",
       parameters: {
         type: "object",
         properties: {
@@ -199,7 +199,7 @@ const tools = [
           },
           bairro: {
             type: "string",
-            description: "Nome do bairro ou região desejada (ex: Trindade, Centro, Ingleses, Campeche)"
+            description: "Nome do bairro ou região desejada (ex: Trindade, Centro, Ingleses, Campeche, Lagoa da Conceição)"
           },
           cidade: {
             type: "string",
@@ -207,11 +207,11 @@ const tools = [
           },
           preco_min: {
             type: "number",
-            description: "Valor mínimo em reais (ex: 300000 para R$ 300.000)"
+            description: "Valor mínimo em reais. Para aluguel use valor mensal (ex: 3000 para R$ 3.000/mês). Para venda use valor total (ex: 500000 para R$ 500.000)"
           },
           preco_max: {
             type: "number",
-            description: "Valor máximo em reais (ex: 800000 para R$ 800.000)"
+            description: "Valor máximo em reais. Para aluguel use valor mensal (ex: 8000 para R$ 8.000/mês). Para venda use valor total (ex: 800000)"
           },
           quartos: {
             type: "number",
@@ -219,11 +219,11 @@ const tools = [
           },
           finalidade: {
             type: "string",
-            description: "Finalidade da busca: venda ou locacao",
+            description: "OBRIGATÓRIO. Use 'locacao' para aluguel/alugar/locação. Use 'venda' para comprar/compra/aquisição",
             enum: ["venda", "locacao"]
           }
         },
-        required: []
+        required: ["finalidade"]
       }
     }
   }
