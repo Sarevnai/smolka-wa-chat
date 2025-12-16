@@ -333,13 +333,24 @@ ${config.custom_instructions}`;
 4. Se não puder ou atingir critério de escalonamento, use: "${config.fallback_message}"
 5. Use linguagem ${config.tone === 'formal' ? 'formal mas acolhedora' : config.tone}
 
-⚠️ REGRA CRÍTICA DE FORMATAÇÃO:
-- CADA mensagem deve ter NO MÁXIMO 150 caracteres
-- Se precisar dar mais informações, DIVIDA em várias mensagens curtas
-- NUNCA envie parágrafos longos, use frases curtas e diretas
-- Responda como se estivesse mandando mensagens de WhatsApp: curtas, rápidas e naturais
-- Evite listas longas - prefira perguntar sobre um item de cada vez
-- Se tiver muita informação, priorize o mais relevante e pergunte se quer saber mais`;
+⚠️ REGRA CRÍTICA DE FORMATAÇÃO PARA WHATSAPP:
+- MÁXIMO 80-100 caracteres por frase/mensagem
+- Escreva como se estivesse conversando no WhatsApp: mensagens curtas e diretas
+- UMA ideia por mensagem, não agrupe informações
+- Se tiver várias coisas para dizer, responda com frases separadas
+- NUNCA use parágrafos longos ou listas extensas
+- Prefira perguntar "quer que eu explique mais?" do que explicar tudo de uma vez
+- Seja conciso: menos palavras = melhor comunicação
+- Evite repetir informações que o cliente já sabe
+
+Exemplo BOM:
+"Oi! Tudo bem? 😊"
+"Vi que você tem interesse em imóveis."
+"Posso te ajudar! Está procurando para alugar ou comprar?"
+
+Exemplo RUIM:
+"Olá! Tudo bem? Sou a Helena da Smolka Imóveis e estou aqui para ajudá-lo a encontrar o imóvel perfeito. Trabalhamos com diversos tipos de imóveis como apartamentos, casas e salas comerciais nas regiões de Florianópolis e região."`;
+
 
   // Customer context
   if (contactName && config.use_customer_name && config.rapport_use_name) {
@@ -353,8 +364,8 @@ ${config.custom_instructions}`;
   return prompt;
 }
 
-// Fragment long messages into smaller parts - more aggressive fragmentation
-function fragmentMessage(text: string, maxLength: number = 120): string[] {
+// Fragment long messages into smaller parts - aggressive fragmentation for WhatsApp
+function fragmentMessage(text: string, maxLength: number = 100): string[] {
   if (text.length <= maxLength) return [text];
   
   const fragments: string[] = [];
@@ -622,18 +633,37 @@ serve(async (req) => {
     // Build dynamic system prompt with all new features
     const systemPrompt = buildSystemPrompt(config, contactName, contactType);
 
+    // Determine expected response mode BEFORE calling AI to set appropriate max_tokens
+    let expectedMode: 'text' | 'audio' = 'text';
+    if (config.audio_channel_mirroring && config.audio_enabled) {
+      expectedMode = messageType === 'audio' ? 'audio' : 'text';
+    } else if (config.audio_enabled && config.audio_mode === 'audio_only') {
+      expectedMode = 'audio';
+    }
+
+    // Dynamic max_tokens based on response mode
+    // Text mode: shorter responses that will be fragmented (150 tokens ≈ 120 chars per fragment)
+    // Audio mode: longer, complete responses (audio_max_chars / 3 ≈ tokens)
+    const dynamicMaxTokens = expectedMode === 'audio' 
+      ? Math.ceil((config.audio_max_chars || 400) / 2.5) // ~160 tokens for 400 chars
+      : Math.min(config.max_tokens || 200, 200); // Cap at 200 for text to keep fragments manageable
+
     const estimatedTokens = Math.ceil((systemPrompt.length + conversationHistory.reduce((acc, m) => acc + m.content.length, 0)) / 4);
     console.log('📊 Token estimation:', {
       provider: config.ai_provider,
       model: config.ai_model,
       historyMessages: conversationHistory.length,
       estimatedInputTokens: estimatedTokens,
-      maxOutputTokens: config.max_tokens,
+      expectedMode,
+      dynamicMaxTokens,
       promptLength: systemPrompt.length
     });
 
-    // Call AI
-    const aiMessage = await callAI(config, [
+    // Create a modified config with dynamic max_tokens
+    const aiConfig = { ...config, max_tokens: dynamicMaxTokens };
+
+    // Call AI with adjusted tokens
+    const aiMessage = await callAI(aiConfig, [
       { role: 'system', content: systemPrompt },
       ...conversationHistory
     ]);
@@ -660,10 +690,10 @@ serve(async (req) => {
     }
     
     if (responseMode === 'text') {
-      // TEXT MODE: Fragment into short messages (120 chars)
+      // TEXT MODE: Fragment into short messages (100 chars max)
       if (config.fragment_long_messages && config.humanize_responses) {
-        const fragments = fragmentMessage(aiMessage, 120);
-        console.log(`📝 Text mode: fragmented into ${fragments.length} parts`);
+        const fragments = fragmentMessage(aiMessage, 100);
+        console.log(`📝 Text mode: fragmented into ${fragments.length} parts (100 chars max)`);
         
         for (let i = 0; i < fragments.length; i++) {
           const fragment = fragments[i];
