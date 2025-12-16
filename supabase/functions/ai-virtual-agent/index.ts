@@ -10,6 +10,8 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+type AIProvider = 'lovable' | 'openai';
+
 interface AIAgentConfig {
   agent_name: string;
   company_name: string;
@@ -21,6 +23,10 @@ interface AIAgentConfig {
   custom_instructions: string;
   greeting_message: string;
   fallback_message: string;
+  ai_provider: AIProvider;
+  ai_model: string;
+  max_tokens: number;
+  max_history_messages: number;
 }
 
 const defaultConfig: AIAgentConfig = {
@@ -38,7 +44,11 @@ const defaultConfig: AIAgentConfig = {
   faqs: [],
   custom_instructions: '',
   greeting_message: 'Olá! Sou o assistente virtual da {company_name}. Como posso ajudá-lo?',
-  fallback_message: 'Entendi sua solicitação. Um de nossos atendentes entrará em contato no próximo dia útil para ajudá-lo melhor.'
+  fallback_message: 'Entendi sua solicitação. Um de nossos atendentes entrará em contato no próximo dia útil para ajudá-lo melhor.',
+  ai_provider: 'openai',
+  ai_model: 'gpt-4o-mini',
+  max_tokens: 500,
+  max_history_messages: 5,
 };
 
 const toneDescriptions: Record<string, string> = {
@@ -94,6 +104,84 @@ ${config.custom_instructions}`;
   return prompt;
 }
 
+async function callAI(config: AIAgentConfig, messages: any[]): Promise<string> {
+  const provider = config.ai_provider || 'openai';
+  
+  console.log(`🤖 Using AI provider: ${provider}, model: ${config.ai_model}`);
+  
+  if (provider === 'openai') {
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: config.ai_model || 'gpt-4o-mini',
+        messages,
+        max_tokens: config.max_tokens || 500,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ OpenAI API error:', response.status, errorText);
+      
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded - aguarde alguns segundos');
+      }
+      if (response.status === 402 || response.status === 401) {
+        throw new Error('Erro de autenticação/créditos OpenAI');
+      }
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  } else {
+    // Lovable AI Gateway (Google Gemini)
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: config.ai_model || 'google/gemini-2.5-flash',
+        messages,
+        max_tokens: config.max_tokens || 500,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Lovable AI Gateway error:', response.status, errorText);
+      
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded - aguarde alguns segundos');
+      }
+      if (response.status === 402) {
+        throw new Error('Créditos Lovable esgotados');
+      }
+      throw new Error(`Lovable AI Gateway error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || '';
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -122,19 +210,25 @@ serve(async (req) => {
 
       if (configData?.setting_value) {
         config = { ...defaultConfig, ...configData.setting_value as AIAgentConfig };
-        console.log('📋 Loaded custom AI config:', config.agent_name);
+        console.log('📋 Loaded AI config:', { 
+          provider: config.ai_provider, 
+          model: config.ai_model,
+          maxTokens: config.max_tokens,
+          maxHistory: config.max_history_messages 
+        });
       }
     } catch (e) {
       console.log('Using default AI config');
     }
 
-    // Get conversation history for context
+    // Get conversation history for context (limited by config)
+    const historyLimit = config.max_history_messages || 5;
     const { data: recentMessages } = await supabase
       .from('messages')
       .select('body, direction, created_at')
       .or(`wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber}`)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(historyLimit);
 
     // Build conversation context
     const conversationHistory = recentMessages?.reverse().map(msg => ({
@@ -151,44 +245,21 @@ serve(async (req) => {
     // Build dynamic system prompt
     const systemPrompt = buildSystemPrompt(config, contactName, contactType);
 
-    // Call Lovable AI Gateway
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
-
-    console.log('📤 Calling Lovable AI Gateway...');
-
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...conversationHistory
-        ],
-      }),
+    // Log token estimation
+    const estimatedTokens = Math.ceil((systemPrompt.length + conversationHistory.reduce((acc, m) => acc + m.content.length, 0)) / 4);
+    console.log('📊 Token estimation:', {
+      provider: config.ai_provider,
+      model: config.ai_model,
+      historyMessages: conversationHistory.length,
+      estimatedInputTokens: estimatedTokens,
+      maxOutputTokens: config.max_tokens
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('❌ AI Gateway error:', aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        throw new Error('Rate limit exceeded');
-      }
-      if (aiResponse.status === 402) {
-        throw new Error('Payment required - add credits');
-      }
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const aiMessage = aiData.choices?.[0]?.message?.content;
+    // Call AI with configured provider
+    const aiMessage = await callAI(config, [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory
+    ]);
 
     if (!aiMessage) {
       throw new Error('No response from AI');
@@ -226,6 +297,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: 'AI response sent',
+        provider: config.ai_provider,
+        model: config.ai_model,
         aiMessage: aiMessage.substring(0, 100) + '...'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
