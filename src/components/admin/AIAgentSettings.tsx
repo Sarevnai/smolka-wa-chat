@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Bot, Building2, Save, Plus, Trash2, MessageSquare, AlertTriangle, Sparkles, Eye, HelpCircle } from 'lucide-react';
+import { Bot, Building2, Save, Plus, Trash2, MessageSquare, AlertTriangle, Sparkles, Eye, HelpCircle, Cpu } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -16,6 +16,8 @@ interface FAQ {
   question: string;
   answer: string;
 }
+
+type AIProvider = 'lovable' | 'openai';
 
 interface AIAgentConfig {
   agent_name: string;
@@ -28,7 +30,24 @@ interface AIAgentConfig {
   custom_instructions: string;
   greeting_message: string;
   fallback_message: string;
+  ai_provider: AIProvider;
+  ai_model: string;
+  max_tokens: number;
+  max_history_messages: number;
 }
+
+const providerModels: Record<AIProvider, { value: string; label: string; description: string }[]> = {
+  lovable: [
+    { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Rápido e econômico (recomendado)' },
+    { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Mais capaz, maior custo' },
+    { value: 'google/gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', description: 'Mais barato e rápido' },
+  ],
+  openai: [
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Melhor custo-benefício (recomendado)' },
+    { value: 'gpt-4o', label: 'GPT-4o', description: 'Mais capaz, maior custo' },
+    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', description: 'Alta performance' },
+  ],
+};
 
 const defaultConfig: AIAgentConfig = {
   agent_name: 'Assistente Virtual',
@@ -48,7 +67,11 @@ const defaultConfig: AIAgentConfig = {
   ],
   custom_instructions: '',
   greeting_message: 'Olá! Sou o assistente virtual da {company_name}. Como posso ajudá-lo?',
-  fallback_message: 'Entendi sua solicitação. Um de nossos atendentes entrará em contato no próximo dia útil para ajudá-lo melhor.'
+  fallback_message: 'Entendi sua solicitação. Um de nossos atendentes entrará em contato no próximo dia útil para ajudá-lo melhor.',
+  ai_provider: 'openai',
+  ai_model: 'gpt-4o-mini',
+  max_tokens: 500,
+  max_history_messages: 5,
 };
 
 export function AIAgentSettings() {
@@ -207,8 +230,114 @@ ${config.fallback_message}`;
     );
   }
 
+  const handleProviderChange = (provider: AIProvider) => {
+    const defaultModel = providerModels[provider][0].value;
+    setConfig(prev => ({ ...prev, ai_provider: provider, ai_model: defaultModel }));
+  };
+
   return (
     <div className="space-y-6">
+      {/* AI Provider Settings */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Cpu className="h-5 w-5 text-primary" />
+            <CardTitle>Provedor de IA</CardTitle>
+          </div>
+          <CardDescription>
+            Escolha o provedor e modelo de IA para o agente virtual
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Provedor</Label>
+              <Select
+                value={config.ai_provider}
+                onValueChange={(value) => handleProviderChange(value as AIProvider)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai">
+                    <div className="flex flex-col">
+                      <span>OpenAI</span>
+                      <span className="text-xs text-muted-foreground">Usa sua chave API (créditos próprios)</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="lovable">
+                    <div className="flex flex-col">
+                      <span>Lovable AI</span>
+                      <span className="text-xs text-muted-foreground">Google Gemini (créditos Lovable)</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Modelo</Label>
+              <Select
+                value={config.ai_model}
+                onValueChange={(value) => setConfig(prev => ({ ...prev, ai_model: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {providerModels[config.ai_provider].map(model => (
+                    <SelectItem key={model.value} value={model.value}>
+                      <div className="flex flex-col">
+                        <span>{model.label}</span>
+                        <span className="text-xs text-muted-foreground">{model.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <Separator />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="max-tokens">Limite de Tokens (resposta)</Label>
+              <Input
+                id="max-tokens"
+                type="number"
+                value={config.max_tokens}
+                onChange={(e) => setConfig(prev => ({ ...prev, max_tokens: parseInt(e.target.value) || 500 }))}
+                min={100}
+                max={2000}
+              />
+              <p className="text-xs text-muted-foreground">Controla o tamanho máximo da resposta (~4 chars/token)</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="max-history">Histórico de Mensagens</Label>
+              <Input
+                id="max-history"
+                type="number"
+                value={config.max_history_messages}
+                onChange={(e) => setConfig(prev => ({ ...prev, max_history_messages: parseInt(e.target.value) || 5 }))}
+                min={1}
+                max={20}
+              />
+              <p className="text-xs text-muted-foreground">Quantidade de mensagens anteriores para contexto</p>
+            </div>
+          </div>
+
+          {config.ai_provider === 'openai' && (
+            <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                <strong>Nota:</strong> Usando OpenAI, os custos serão cobrados diretamente na sua conta OpenAI.
+                Monitore o uso em <a href="https://platform.openai.com/usage" target="_blank" rel="noopener" className="underline">platform.openai.com/usage</a>
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Basic Info */}
       <Card>
         <CardHeader>
