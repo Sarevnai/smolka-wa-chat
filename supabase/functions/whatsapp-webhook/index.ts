@@ -344,29 +344,42 @@ async function handleN8NTrigger(phoneNumber: string, messageBody: string, messag
       return;
     }
 
-    // Check business hours
-    const { data: settings } = await supabase
+    // Check for force AI mode (testing mode)
+    const { data: forceAISetting } = await supabase
       .from('system_settings')
       .select('setting_value')
-      .eq('setting_key', 'business_hours')
-      .single();
+      .eq('setting_key', 'n8n_force_ai_mode')
+      .maybeSingle();
 
-    const businessHours = settings?.setting_value as { 
-      start: string; 
-      end: string; 
-      days: number[]; 
-      timezone: string 
-    } | null;
-
-    const isWithinBusinessHours = checkBusinessHours(businessHours);
+    const forceAIMode = forceAISetting?.setting_value === true;
     
-    // Only trigger N8N outside business hours OR if AI is explicitly active
-    if (isWithinBusinessHours && !convState?.is_ai_active) {
-      console.log('⏰ Within business hours - human agents available');
-      return;
+    if (forceAIMode) {
+      console.log('🧪 Force AI mode enabled - bypassing business hours check');
+    } else {
+      // Check business hours only if not in force mode
+      const { data: settings } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('setting_key', 'business_hours')
+        .maybeSingle();
+
+      const businessHours = settings?.setting_value as { 
+        start: string; 
+        end: string; 
+        days: number[]; 
+        timezone: string 
+      } | null;
+
+      const isWithinBusinessHours = checkBusinessHours(businessHours);
+      
+      // Only trigger N8N outside business hours OR if AI is explicitly active
+      if (isWithinBusinessHours && !convState?.is_ai_active) {
+        console.log('⏰ Within business hours - human agents available');
+        return;
+      }
     }
 
-    console.log('🤖 Outside business hours or AI active - triggering N8N');
+    console.log('🤖 Triggering N8N - Outside business hours, AI active, or force mode enabled');
 
     // Get contact info for context
     const { data: contact } = await supabase
