@@ -52,24 +52,13 @@ serve(async (req) => {
 
     console.log('🏠 Vista CRM search params:', params);
 
-    // Build filter object for Vista API
+    // Store tipo for client-side filtering (Vista API categoria filter is unreliable)
+    const tipoFilter = params.tipo?.toLowerCase();
+    
+    // Build filter object for Vista API - only use reliable filters
     const filter: Record<string, any> = {};
     
-    if (params.tipo) {
-      // Map common types to Vista categories
-      const tipoMap: Record<string, string> = {
-        'apartamento': 'Apartamento',
-        'casa': 'Casa',
-        'terreno': 'Terreno',
-        'comercial': 'Comercial',
-        'sala': 'Sala Comercial',
-        'cobertura': 'Cobertura',
-        'kitnet': 'Kitnet',
-        'sobrado': 'Sobrado',
-      };
-      filter['Categoria'] = tipoMap[params.tipo.toLowerCase()] || params.tipo;
-    }
-    
+    // Location filters work well
     if (params.bairro) {
       filter['Bairro'] = params.bairro;
     }
@@ -90,12 +79,10 @@ serve(async (req) => {
       // Use range for bedrooms too [min, max]
       filter['Dormitorios'] = [params.quartos, 10];
     }
-    
-    if (params.finalidade) {
-      filter['Finalidade'] = params.finalidade === 'locacao' ? 'Locação' : 'Venda';
-    }
 
-    // Build request payload for Vista API - using only available fields
+    // Build request payload for Vista API - fetch more to filter client-side
+    const fetchLimit = (params.limit || 3) * 3; // Fetch 3x to have room for filtering
+    
     const pesquisa = {
       fields: [
         'Codigo',
@@ -118,7 +105,7 @@ serve(async (req) => {
       filter,
       paginacao: {
         pagina: 1,
-        quantidade: params.limit || 3
+        quantidade: fetchLimit
       },
       order: { ValorVenda: 'asc' }
     };
@@ -170,22 +157,56 @@ serve(async (req) => {
         
         // Skip if it's pagination info or metadata
         if (codigo === 'paginas' || codigo === 'pagina' || codigo === 'total' || codigo === 'qtd') continue;
+        if (codigo === 'status' || codigo === 'message') continue;
         
-        // Determine price based on finalidade
-        const preco = params.finalidade === 'locacao' 
-          ? parseFloat(prop.ValorLocacao || '0')
-          : parseFloat(prop.ValorVenda || '0');
+        // Client-side category filtering since Vista API filter is unreliable
+        const categoria = (prop.Categoria || '').toLowerCase();
+        if (tipoFilter) {
+          const tipoMatches = 
+            categoria.includes(tipoFilter) || 
+            (tipoFilter === 'apartamento' && (categoria.includes('apto') || categoria.includes('apart'))) ||
+            (tipoFilter === 'casa' && (categoria.includes('casa') || categoria.includes('sobrado'))) ||
+            (tipoFilter === 'terreno' && categoria.includes('terreno')) ||
+            (tipoFilter === 'comercial' && (categoria.includes('comercial') || categoria.includes('sala') || categoria.includes('loja')));
+          
+          if (!tipoMatches) continue;
+        }
         
-        // Skip if price is 0 (usually means it's not for sale/rent in this modality)
-        if (preco === 0) continue;
+        // Determine price - use whichever is available, prefer based on finalidade
+        const valorVenda = parseFloat(prop.ValorVenda || '0');
+        const valorLocacao = parseFloat(prop.ValorLocacao || '0');
         
-        // Format price
+        let preco: number;
+        let modalidade: string;
+        
+        if (params.finalidade === 'locacao') {
+          if (valorLocacao === 0) continue; // Skip if no rental price
+          preco = valorLocacao;
+          modalidade = 'aluguel';
+        } else if (params.finalidade === 'venda') {
+          if (valorVenda === 0) continue; // Skip if no sale price
+          preco = valorVenda;
+          modalidade = 'venda';
+        } else {
+          // No finalidade specified - use whichever is available
+          if (valorVenda > 0) {
+            preco = valorVenda;
+            modalidade = 'venda';
+          } else if (valorLocacao > 0) {
+            preco = valorLocacao;
+            modalidade = 'aluguel';
+          } else {
+            continue; // No price available
+          }
+        }
+        
+        // Format price with modality
         const precoFormatado = preco.toLocaleString('pt-BR', {
           style: 'currency',
           currency: 'BRL',
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
-        });
+        }) + (modalidade === 'aluguel' ? '/mês' : '');
         
         // Get photo - FotoDestaque is the main photo URL
         let fotoDestaque = '';
@@ -234,6 +255,8 @@ serve(async (req) => {
           link,
           caracteristicas,
         });
+        // Respect the user's limit
+        if (properties.length >= (params.limit || 3)) break;
       }
     }
 
