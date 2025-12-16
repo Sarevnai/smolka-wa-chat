@@ -344,6 +344,7 @@ async function sendWhatsAppAudio(to: string, audioUrl: string): Promise<boolean>
         to,
         mediaUrl: audioUrl,
         mediaType: 'audio',
+        filename: 'Mensagem de voz.mp3',
         caption: ''
       }
     });
