@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock, MessageCircle } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock, MessageCircle, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -77,7 +77,13 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const { settings, updateBackground, exportChat, archiveChat, deleteChat } = useChatSettings(phoneNumber);
   const { deleteConversation, isDeleting } = useDeleteConversation();
   const { deleteMessage, isDeleting: isDeletingMessage } = useDeleteMessage();
-  const { markHumanMessage } = useConversationState(phoneNumber);
+  const { 
+    isAIActive, 
+    isLoading: aiLoading, 
+    takeoverConversation, 
+    releaseToAI, 
+    markHumanMessage 
+  } = useConversationState(phoneNumber);
   
   // Message deletion states
   const [messageToDelete, setMessageToDelete] = useState<MessageRow | null>(null);
@@ -458,6 +464,30 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         </div>
         
         <div className="flex items-center gap-1">
+          {/* AI Toggle Button */}
+          <Button
+            variant={isAIActive ? "default" : "outline"}
+            size="sm"
+            onClick={isAIActive ? takeoverConversation : releaseToAI}
+            disabled={aiLoading}
+            className={cn(
+              "h-8 gap-2 mr-2 transition-all",
+              isAIActive && "bg-primary text-primary-foreground"
+            )}
+          >
+            {isAIActive ? (
+              <>
+                <Bot className="h-4 w-4" />
+                <span className="hidden sm:inline">IA Ativa</span>
+              </>
+            ) : (
+              <>
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">Assumir</span>
+              </>
+            )}
+          </Button>
+          
           {messages.length === 0 && (
             <Button
               variant="default"
