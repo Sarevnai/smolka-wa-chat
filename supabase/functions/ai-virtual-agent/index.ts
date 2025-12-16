@@ -10,32 +10,89 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const SYSTEM_PROMPT = `Você é um assistente virtual da Smolka Imóveis, uma administradora de imóveis especializada em locação e gestão de propriedades.
+interface AIAgentConfig {
+  agent_name: string;
+  company_name: string;
+  company_description: string;
+  services: string[];
+  tone: 'formal' | 'casual' | 'friendly' | 'technical';
+  limitations: string[];
+  faqs: { question: string; answer: string }[];
+  custom_instructions: string;
+  greeting_message: string;
+  fallback_message: string;
+}
 
-PERSONALIDADE:
-- Cordial e profissional
-- Objetivo e claro nas respostas
+const defaultConfig: AIAgentConfig = {
+  agent_name: 'Assistente Virtual',
+  company_name: 'Smolka Imóveis',
+  company_description: 'Administradora de imóveis especializada em locação e gestão de propriedades.',
+  services: ['Locação de imóveis', 'Gestão de propriedades', 'Administração de condomínios'],
+  tone: 'formal',
+  limitations: [
+    'Não pode agendar visitas ou compromissos',
+    'Não tem acesso a valores de aluguéis ou taxas',
+    'Não pode negociar condições contratuais',
+    'Não pode acessar dados específicos de contratos'
+  ],
+  faqs: [],
+  custom_instructions: '',
+  greeting_message: 'Olá! Sou o assistente virtual da {company_name}. Como posso ajudá-lo?',
+  fallback_message: 'Entendi sua solicitação. Um de nossos atendentes entrará em contato no próximo dia útil para ajudá-lo melhor.'
+};
+
+const toneDescriptions: Record<string, string> = {
+  formal: 'Formal e profissional',
+  casual: 'Casual e descontraído',
+  friendly: 'Amigável e acolhedor',
+  technical: 'Técnico e preciso'
+};
+
+function buildSystemPrompt(config: AIAgentConfig, contactName?: string, contactType?: string): string {
+  let prompt = `Você é ${config.agent_name} da ${config.company_name}.
+
+PERSONALIDADE E TOM:
+- ${toneDescriptions[config.tone] || 'Formal e profissional'}
+- Cordial e objetivo nas respostas
 - Empático com as necessidades dos clientes
 
-CAPACIDADES:
-- Informar horário de atendimento (08h às 18h, segunda a sexta)
-- Coletar informações básicas do cliente (nome, tipo de demanda)
-- Registrar solicitações para encaminhamento aos atendentes
-- Responder dúvidas gerais sobre serviços da administradora
+SOBRE A EMPRESA:
+${config.company_description}
+
+SERVIÇOS OFERECIDOS:
+${config.services.map(s => `• ${s}`).join('\n')}
 
 LIMITAÇÕES (sempre encaminhe ao atendente humano):
-- NÃO pode agendar visitas ou compromissos
-- NÃO tem acesso a valores de aluguéis ou taxas
-- NÃO pode negociar condições contratuais
-- NÃO pode acessar dados específicos de contratos
+${config.limitations.map(l => `• ${l}`).join('\n')}`;
 
-INSTRUÇÕES:
+  if (config.faqs && config.faqs.length > 0) {
+    prompt += `\n\nPERGUNTAS FREQUENTES (use como referência):
+${config.faqs.map(faq => `P: ${faq.question}\nR: ${faq.answer}`).join('\n\n')}`;
+  }
+
+  if (config.custom_instructions) {
+    prompt += `\n\nINSTRUÇÕES ESPECIAIS:
+${config.custom_instructions}`;
+  }
+
+  prompt += `\n\nINSTRUÇÕES GERAIS:
 1. Sempre cumprimente cordialmente
 2. Identifique a necessidade do cliente
 3. Se puder ajudar, responda objetivamente
-4. Se não puder, informe que um atendente entrará em contato no próximo dia útil
+4. Se não puder, use esta mensagem: "${config.fallback_message}"
 5. Mantenha respostas curtas (máximo 3 parágrafos)
-6. Use linguagem formal mas acolhedora`;
+6. Use linguagem ${config.tone === 'formal' ? 'formal mas acolhedora' : config.tone}`;
+
+  if (contactName) {
+    prompt += `\n\nCONTEXTO DO CLIENTE:
+- Nome: ${contactName}`;
+  }
+  if (contactType) {
+    prompt += `\n- Tipo: ${contactType === 'proprietario' ? 'Proprietário' : 'Inquilino'}`;
+  }
+
+  return prompt;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -52,6 +109,23 @@ serve(async (req) => {
         JSON.stringify({ success: false, error: 'Missing phoneNumber or messageBody' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Load AI agent configuration from database
+    let config = defaultConfig;
+    try {
+      const { data: configData } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('setting_key', 'ai_agent_config')
+        .single();
+
+      if (configData?.setting_value) {
+        config = { ...defaultConfig, ...configData.setting_value as AIAgentConfig };
+        console.log('📋 Loaded custom AI config:', config.agent_name);
+      }
+    } catch (e) {
+      console.log('Using default AI config');
     }
 
     // Get conversation history for context
@@ -74,14 +148,8 @@ serve(async (req) => {
       content: messageBody
     });
 
-    // Add contact context to system prompt
-    let contextualPrompt = SYSTEM_PROMPT;
-    if (contactName) {
-      contextualPrompt += `\n\nCONTEXTO DO CLIENTE:\n- Nome: ${contactName}`;
-    }
-    if (contactType) {
-      contextualPrompt += `\n- Tipo: ${contactType === 'proprietario' ? 'Proprietário' : 'Inquilino'}`;
-    }
+    // Build dynamic system prompt
+    const systemPrompt = buildSystemPrompt(config, contactName, contactType);
 
     // Call Lovable AI Gateway
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -100,7 +168,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: contextualPrompt },
+          { role: 'system', content: systemPrompt },
           ...conversationHistory
         ],
       }),

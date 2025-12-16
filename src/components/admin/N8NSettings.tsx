@@ -7,9 +7,11 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Bot, Clock, Save, TestTube, ExternalLink, Key, Copy, Eye, EyeOff, Sparkles, Workflow } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Bot, Clock, Save, TestTube, ExternalLink, Key, Copy, Eye, EyeOff, Sparkles, Workflow, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AIAgentSettings } from './AIAgentSettings';
 
 interface BusinessHours {
   start: string;
@@ -170,7 +172,19 @@ export function N8NSettings() {
   const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="settings" className="space-y-6">
+      <TabsList className="grid w-full grid-cols-2">
+        <TabsTrigger value="settings" className="gap-2">
+          <Settings2 className="h-4 w-4" />
+          Configurações
+        </TabsTrigger>
+        <TabsTrigger value="agent" className="gap-2">
+          <Bot className="h-4 w-4" />
+          Personalidade do Agente
+        </TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="settings" className="space-y-6">
       {/* Agent Mode Selection */}
       <Card>
         <CardHeader>
@@ -392,6 +406,11 @@ export function N8NSettings() {
           {isLoading ? 'Salvando...' : 'Salvar Configurações'}
         </Button>
       </div>
-    </div>
+      </TabsContent>
+      
+      <TabsContent value="agent">
+        <AIAgentSettings />
+      </TabsContent>
+    </Tabs>
   );
 }
