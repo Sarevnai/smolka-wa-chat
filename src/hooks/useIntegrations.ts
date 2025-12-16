@@ -1,19 +1,36 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export interface Integration {
   id: string;
   name: string;
   description: string;
-  status: 'connected' | 'disconnected' | 'pending';
+  status: 'connected' | 'disconnected' | 'pending' | 'error';
   configPath: string;
   features: string[];
   lastSync?: string;
   errorMessage?: string;
+  icon?: string;
+  isModal?: boolean;
 }
 
 const defaultIntegrations: Integration[] = [
+  {
+    id: 'n8n',
+    name: 'N8N - Agente Virtual',
+    description: 'Automação inteligente com IA para atendimento fora do horário comercial',
+    status: 'disconnected',
+    configPath: '#',
+    icon: '🤖',
+    isModal: true,
+    features: [
+      'Atendimento automatizado 24/7',
+      'Integração com IA',
+      'Horário comercial configurável',
+      'Callback HTTP para mensagens'
+    ]
+  },
   {
     id: 'clickup',
     name: 'ClickUp',
@@ -71,11 +88,32 @@ const defaultIntegrations: Integration[] = [
 export function useIntegrations() {
   const [integrations, setIntegrations] = useState<Integration[]>(defaultIntegrations);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+
+  const checkN8NStatus = async (): Promise<'connected' | 'disconnected'> => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('setting_key, setting_value')
+        .eq('setting_category', 'n8n')
+        .in('setting_key', ['n8n_webhook_url', 'n8n_api_key']);
+
+      if (error) {
+        console.error('Error checking N8N config:', error);
+        return 'disconnected';
+      }
+
+      const webhookUrl = data?.find(s => s.setting_key === 'n8n_webhook_url')?.setting_value;
+      const apiKey = data?.find(s => s.setting_key === 'n8n_api_key')?.setting_value;
+
+      return webhookUrl && apiKey ? 'connected' : 'disconnected';
+    } catch (error) {
+      console.error('Error checking N8N status:', error);
+      return 'disconnected';
+    }
+  };
 
   const checkClickUpStatus = async () => {
     try {
-      // Check if ClickUp configuration exists
       const { data: config, error } = await supabase
         .from('clickup_config')
         .select('*')
@@ -94,7 +132,6 @@ export function useIntegrations() {
   };
 
   const checkWhatsAppStatus = () => {
-    // WhatsApp is always connected since it's the core functionality
     return 'connected';
   };
 
@@ -102,11 +139,16 @@ export function useIntegrations() {
     setLoading(true);
     
     try {
-      const clickupStatus = await checkClickUpStatus();
+      const [n8nStatus, clickupStatus] = await Promise.all([
+        checkN8NStatus(),
+        checkClickUpStatus()
+      ]);
       const whatsappStatus = checkWhatsAppStatus();
 
       setIntegrations(prev => prev.map(integration => {
         switch (integration.id) {
+          case 'n8n':
+            return { ...integration, status: n8nStatus };
           case 'clickup':
             return { ...integration, status: clickupStatus as 'connected' | 'disconnected' };
           case 'whatsapp':
@@ -117,11 +159,7 @@ export function useIntegrations() {
       }));
     } catch (error) {
       console.error('Error loading integrations status:', error);
-      toast({
-        title: "Erro ao carregar integrações",
-        description: "Não foi possível verificar o status das integrações.",
-        variant: "destructive",
-      });
+      toast.error("Erro ao carregar status das integrações");
     } finally {
       setLoading(false);
     }
@@ -163,13 +201,11 @@ export function useIntegrations() {
           : integration
       ));
 
-      toast({
-        title: success ? "Conexão bem-sucedida" : "Falha na conexão",
-        description: success 
-          ? "A integração está funcionando corretamente."
-          : "Verifique suas configurações e tente novamente.",
-        variant: success ? "default" : "destructive",
-      });
+      if (success) {
+        toast.success("Conexão bem-sucedida!");
+      } else {
+        toast.error("Falha na conexão. Verifique suas configurações.");
+      }
 
       return success;
     } catch (error) {
@@ -181,12 +217,7 @@ export function useIntegrations() {
           : integration
       ));
 
-      toast({
-        title: "Erro no teste de conexão",
-        description: "Ocorreu um erro ao testar a conexão.",
-        variant: "destructive",
-      });
-
+      toast.error("Erro ao testar a conexão.");
       return false;
     }
   };
@@ -229,17 +260,10 @@ export function useIntegrations() {
           : integration
       ));
 
-      toast({
-        title: "Integração desconectada",
-        description: "A integração foi desconectada com sucesso.",
-      });
+      toast.success("Integração desconectada com sucesso.");
     } catch (error) {
       console.error(`Error disconnecting ${integrationId}:`, error);
-      toast({
-        title: "Erro ao desconectar",
-        description: "Não foi possível desconectar a integração.",
-        variant: "destructive",
-      });
+      toast.error("Erro ao desconectar integração.");
     }
   };
 

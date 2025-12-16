@@ -32,6 +32,7 @@ interface IntegrationCardProps {
   integration: Integration;
   onTestConnection: (id: string) => Promise<boolean>;
   onDisconnect: (id: string) => Promise<void>;
+  onConfigure?: () => void;
 }
 
 const getStatusIcon = (status: string, isLoading?: boolean) => {
@@ -77,10 +78,11 @@ const getStatusVariant = (status: string): "default" | "secondary" | "destructiv
   }
 };
 
-export function IntegrationCard({ integration, onTestConnection, onDisconnect }: IntegrationCardProps) {
+export function IntegrationCard({ integration, onTestConnection, onDisconnect, onConfigure }: IntegrationCardProps) {
   const isConnected = integration.status === 'connected';
   const isPending = integration.status === 'pending';
   const isDisconnected = integration.status === 'disconnected';
+  const isModal = integration.isModal;
 
   const handleTestConnection = async () => {
     await onTestConnection(integration.id);
@@ -88,6 +90,12 @@ export function IntegrationCard({ integration, onTestConnection, onDisconnect }:
 
   const handleDisconnect = async () => {
     await onDisconnect(integration.id);
+  };
+
+  const handleConfigure = () => {
+    if (isModal && onConfigure) {
+      onConfigure();
+    }
   };
 
   return (
@@ -105,12 +113,16 @@ export function IntegrationCard({ integration, onTestConnection, onDisconnect }:
               isDisconnected && "bg-red-500/10",
               isPending && "bg-yellow-500/10"
             )}>
-              <Settings className={cn(
-                "h-6 w-6",
-                isConnected && "text-green-500",
-                isDisconnected && "text-red-500", 
-                isPending && "text-yellow-500"
-              )} />
+              {integration.icon ? (
+                <span className="text-2xl">{integration.icon}</span>
+              ) : (
+                <Settings className={cn(
+                  "h-6 w-6",
+                  isConnected && "text-green-500",
+                  isDisconnected && "text-red-500", 
+                  isPending && "text-yellow-500"
+                )} />
+              )}
             </div>
             <div>
               <CardTitle className="text-lg">{integration.name}</CardTitle>
@@ -165,12 +177,19 @@ export function IntegrationCard({ integration, onTestConnection, onDisconnect }:
 
       <CardFooter className="pt-4">
         <div className="flex gap-2 w-full">
-          <Button asChild className="flex-1" variant="outline">
-            <Link to={integration.configPath}>
+          {isModal ? (
+            <Button className="flex-1" variant="outline" onClick={handleConfigure}>
               <Settings className="h-4 w-4 mr-2" />
               Configurar
-            </Link>
-          </Button>
+            </Button>
+          ) : (
+            <Button asChild className="flex-1" variant="outline">
+              <Link to={integration.configPath}>
+                <Settings className="h-4 w-4 mr-2" />
+                Configurar
+              </Link>
+            </Button>
+          )}
           
           {isConnected && (
             <>
