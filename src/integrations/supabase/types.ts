@@ -495,6 +495,7 @@ export type Database = {
           last_human_message_at: string | null
           operator_id: string | null
           operator_takeover_at: string | null
+          pending_properties: Json | null
           phone_number: string
           updated_at: string | null
         }
@@ -507,6 +508,7 @@ export type Database = {
           last_human_message_at?: string | null
           operator_id?: string | null
           operator_takeover_at?: string | null
+          pending_properties?: Json | null
           phone_number: string
           updated_at?: string | null
         }
@@ -519,6 +521,7 @@ export type Database = {
           last_human_message_at?: string | null
           operator_id?: string | null
           operator_takeover_at?: string | null
+          pending_properties?: Json | null
           phone_number?: string
           updated_at?: string | null
         }
