@@ -209,7 +209,7 @@ async function processIncomingMessage(message: any, value: any) {
     console.log('🔍 Full message object:', JSON.stringify(message, null, 2));
     console.log('🔍 Full value object:', JSON.stringify(value, null, 2));
 
-    const messageBody = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || '';
+    let messageBody = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || '';
     console.log('💬 Extracted body:', messageBody);
     
     const mediaInfo = await extractMediaInfo(message, value);
@@ -232,6 +232,25 @@ async function processIncomingMessage(message: any, value: any) {
           mediaInfo.url = downloadResponse.data.url;
           mediaInfo.filename = downloadResponse.data.filename;
           mediaInfo.mimeType = downloadResponse.data.contentType;
+          
+          // If audio, transcribe using Whisper
+          if (mediaInfo.type === 'audio' && mediaInfo.url) {
+            try {
+              console.log('🎤 Transcribing audio message...');
+              const { data: transcription, error: transcribeError } = await supabase.functions.invoke('transcribe-audio', {
+                body: { audioUrl: mediaInfo.url }
+              });
+              
+              if (transcription?.success && transcription?.text) {
+                messageBody = transcription.text;
+                console.log('✅ Audio transcribed:', messageBody.substring(0, 100));
+              } else {
+                console.error('❌ Transcription failed:', transcribeError || transcription?.error);
+              }
+            } catch (transcribeErr) {
+              console.error('❌ Error calling transcribe-audio:', transcribeErr);
+            }
+          }
         } else {
           console.error('Failed to download media:', downloadResponse.error);
         }
