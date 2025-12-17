@@ -280,6 +280,43 @@ const tools = [
         required: ["finalidade"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "enviar_lead_c2s",
+      description: "IMPORTANTE: Use esta função SOMENTE quando finalidade=venda (COMPRA de imóvel). Envia o lead qualificado para o sistema C2S dos corretores especializados em vendas. Use APÓS coletar tipo, bairro e faixa de preço do cliente que quer COMPRAR.",
+      parameters: {
+        type: "object",
+        properties: {
+          nome: {
+            type: "string",
+            description: "Nome do cliente (se souber)"
+          },
+          interesse: {
+            type: "string",
+            description: "Descrição do interesse do cliente (ex: 'Apartamento 3 quartos no Centro até 800mil')"
+          },
+          tipo_imovel: {
+            type: "string",
+            description: "Tipo de imóvel desejado"
+          },
+          bairro: {
+            type: "string",
+            description: "Bairro de interesse"
+          },
+          faixa_preco: {
+            type: "string",
+            description: "Faixa de preço informada pelo cliente"
+          },
+          quartos: {
+            type: "number",
+            description: "Número de quartos desejados"
+          }
+        },
+        required: ["interesse"]
+      }
+    }
   }
 ];
 
@@ -488,7 +525,14 @@ ${config.services.map(s => `• ${s}`).join('\n')}`;
   if (config.vista_integration_enabled !== false) {
     prompt += `\n\n🏠 BUSCA DE IMÓVEIS (USE buscar_imoveis):
 Quando tiver 2+ critérios do cliente, USE A FUNÇÃO buscar_imoveis imediatamente!
-Não espere ter todas as informações - comece a buscar com o que tem.`;
+Não espere ter todas as informações - comece a buscar com o que tem.
+
+🏢 ENCAMINHAMENTO PARA C2S (USE enviar_lead_c2s):
+⚠️ QUANDO USAR: Se o cliente quer COMPRAR (finalidade=venda), após qualificar:
+1. Colete: tipo de imóvel, bairro e faixa de preço
+2. Chame a função enviar_lead_c2s com os dados coletados
+3. Informe ao cliente: "Vou te passar para um corretor especializado em vendas! Ele vai entrar em contato 😊"
+4. NÃO continue a conversa após o handoff - o corretor assume daqui`;
   }
 
   // Rapport Techniques (simplified - main rapport is in the 5-step flow)
@@ -726,6 +770,38 @@ function formatPropertyMessage(property: any): string {
   lines.push(`🔗 ${property.link}`);
   
   return lines.join('\n');
+}
+
+// Send lead to C2S system
+async function sendLeadToC2S(params: Record<string, any>, phoneNumber: string, conversationHistory: string, contactName?: string): Promise<{ success: boolean; c2s_lead_id?: string; error?: string }> {
+  try {
+    console.log('🏢 Sending lead to C2S:', params);
+    
+    const { data, error } = await supabase.functions.invoke('c2s-create-lead', {
+      body: {
+        name: params.nome || contactName || 'Lead WhatsApp',
+        phone: phoneNumber,
+        type_negotiation: 'Compra',
+        property_type: params.tipo_imovel,
+        neighborhood: params.bairro,
+        price_range: params.faixa_preco,
+        bedrooms: params.quartos,
+        description: params.interesse,
+        conversation_history: conversationHistory,
+      }
+    });
+
+    if (error) {
+      console.error('❌ C2S send error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Lead sent to C2S:', data);
+    return { success: true, c2s_lead_id: data?.c2s_lead_id };
+  } catch (e) {
+    console.error('❌ Error calling C2S:', e);
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
 }
 
 async function callAIWithTools(config: AIAgentConfig, messages: any[], useTools: boolean = true): Promise<{ content: string; toolCalls?: any[] }> {
@@ -1147,6 +1223,42 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
           // Get AI's response after seeing tool results
           const followUpResult = await callAIWithTools(aiConfig, toolResultMessages, false);
           aiMessage = sanitizeAIMessage(followUpResult.content);
+        }
+        
+        // Handle C2S lead sending tool
+        if (toolCall.function.name === 'enviar_lead_c2s') {
+          const args = JSON.parse(toolCall.function.arguments);
+          console.log('🏢 Tool call: enviar_lead_c2s with args:', args);
+          
+          // Build conversation history string for C2S
+          const historyText = conversationHistory
+            .slice(-10)
+            .map(m => `[${m.role === 'user' ? 'Cliente' : 'Agente'}]: ${m.content}`)
+            .join('\n');
+          
+          const c2sResult = await sendLeadToC2S(args, phoneNumber, historyText, currentContactName);
+          
+          if (c2sResult.success) {
+            console.log(`✅ Lead sent to C2S! ID: ${c2sResult.c2s_lead_id}`);
+            
+            // Set handoff message
+            aiMessage = `Perfeito${currentContactName ? `, ${currentContactName}` : ''}! Vou te passar para um de nossos corretores especializados em vendas 🏡\n\nEle vai entrar em contato pelo WhatsApp em breve! 😊`;
+            
+            // Update conversation state to indicate handoff
+            await supabase
+              .from('conversation_states')
+              .upsert({
+                phone_number: phoneNumber,
+                is_ai_active: false,
+                operator_takeover_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'phone_number' });
+              
+            console.log('🔄 Conversation handed off to C2S/human');
+          } else {
+            console.error('❌ Failed to send to C2S:', c2sResult.error);
+            aiMessage = `Entendi seu interesse${currentContactName ? `, ${currentContactName}` : ''}! Vou anotar seus critérios e um de nossos corretores especializados em vendas vai entrar em contato com você 😊`;
+          }
         }
       }
     }
