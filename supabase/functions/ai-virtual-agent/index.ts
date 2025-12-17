@@ -182,6 +182,60 @@ function getRandomPhrase(type: keyof typeof humanPhrases): string {
   return phrases[Math.floor(Math.random() * phrases.length)];
 }
 
+// Extract customer name from message using regex patterns
+function extractCustomerName(message: string): string | null {
+  const patterns = [
+    // "Sou o/a João", "Sou João"
+    /(?:sou\s+(?:o|a)?\s*)([A-Za-zÀ-ÿ]{2,})/i,
+    // "Me chamo Maria"
+    /(?:me\s+chamo?\s*)([A-Za-zÀ-ÿ]{2,})/i,
+    // "Meu nome é Pedro"
+    /(?:meu\s+nome\s+[eé]\s*)([A-Za-zÀ-ÿ]{2,})/i,
+    // "Pode me chamar de Ana"
+    /(?:pode\s+me\s+chamar\s+de?\s*)([A-Za-zÀ-ÿ]{2,})/i,
+    // "É Carlos" / "Eh Carlos"
+    /^(?:[eé]h?\s+)([A-Za-zÀ-ÿ]{2,})$/i,
+    // Resposta direta curta: "João" ou "Maria" (apenas 1-2 palavras)
+    /^([A-Za-zÀ-ÿ]{2,}(?:\s+[A-Za-zÀ-ÿ]{2,})?)$/,
+  ];
+  
+  // Invalid names - common words that are not names
+  const invalidNames = [
+    'sim', 'não', 'nao', 'ok', 'oi', 'olá', 'ola', 'bom', 'boa', 'dia', 'tarde', 'noite',
+    'obrigado', 'obrigada', 'tchau', 'até', 'ate', 'valeu', 'blz', 'beleza',
+    'quero', 'preciso', 'tenho', 'busco', 'procuro', 'apartamento', 'casa', 'imovel', 'imóvel',
+    'alugar', 'comprar', 'vender', 'aluguel', 'venda', 'locação', 'locacao',
+    'centro', 'trindade', 'ingleses', 'campeche', 'lagoa', 'floripa', 'florianópolis',
+    'texto', 'áudio', 'audio', 'mensagem', 'foto', 'imagem'
+  ];
+  
+  for (const pattern of patterns) {
+    const match = message.trim().match(pattern);
+    if (match && match[1]) {
+      const name = match[1].trim();
+      // Validate: not a common word and has minimum length
+      if (!invalidNames.includes(name.toLowerCase()) && name.length >= 2 && name.length <= 30) {
+        // Capitalize first letter of each word
+        return name.split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+      }
+    }
+  }
+  return null;
+}
+
+// Check if assistant asked for customer name
+function didAskForName(message: string): boolean {
+  const askNamePatterns = [
+    /como\s+(?:posso\s+)?(?:te\s+)?chamar/i,
+    /qual\s+(?:é\s+)?(?:o\s+)?(?:seu\s+)?nome/i,
+    /como\s+(?:é\s+)?(?:o\s+)?(?:seu\s+)?nome/i,
+    /me\s+(?:diz|diga)\s+(?:o\s+)?(?:seu\s+)?nome/i,
+  ];
+  return askNamePatterns.some(pattern => pattern.test(message));
+}
+
 // Tool definitions for OpenAI function calling
 const tools = [
   {
@@ -297,15 +351,117 @@ Você é CORRETORA/ATENDENTE COMERCIAL da ${config.company_name}.
 Seu objetivo é VENDER e ALUGAR imóveis do NOSSO catálogo.
 Você NÃO é assistente genérica. Você é vendedora da Smolka.
 
-✅ O QUE VOCÊ DEVE FAZER:
-- Qualifique rápido (tipo, bairro, preço, quartos)
-- USE buscar_imoveis assim que tiver 2-3 critérios
-- Apresente NOSSOS imóveis com foto e características
-- Se não achar: "No momento não temos essa opção. Quer ajustar a busca?"
-- Foque em FECHAR NEGÓCIO - agendar visita
-
 SOBRE A EMPRESA:
 ${config.company_description}`;
+
+  // ========== FLUXO DE 5 ETAPAS ==========
+  prompt += `
+
+📍📍📍 FLUXO DE ATENDIMENTO EM 5 ETAPAS (SIGA RIGOROSAMENTE) 📍📍📍
+
+📍 ETAPA 1 - SAUDAÇÃO INICIAL (primeira mensagem do cliente)
+Responda com saudação curta que inclua:
+• Seu nome e empresa
+• Avise que ENTENDE TEXTO E ÁUDIO
+• Pergunte se quer comprar ou alugar
+
+Exemplo:
+"Oi! Aqui é a ${config.agent_name} da Smolka 🏠
+Pode me mandar texto ou áudio, eu entendo os dois! 😊
+Você tá buscando imóvel pra comprar ou alugar?"
+
+📍 ETAPA 2 - QUALIFICAÇÃO RÁPIDA (2-4 mensagens)
+Capture as informações UMA por vez:
+1. Finalidade: comprar ou alugar (se não disse)
+2. Tipo: apartamento, casa, etc
+3. Bairro/região de interesse
+4. Faixa de preço (opcional)
+5. Número de quartos (se relevante)`;
+
+  // Instrução de captura de nome
+  if (!contactName && config.rapport_use_name) {
+    prompt += `
+
+⭐ CAPTURA DE NOME (IMPORTANTE PARA RAPPORT):
+- Você ainda NÃO sabe o nome deste cliente
+- Na SEGUNDA ou TERCEIRA mensagem, pergunte naturalmente: "A propósito, como posso te chamar?"
+- Quando o cliente responder o nome, USE-O nas próximas mensagens
+- Responda com: "Prazer, [Nome]! ..." para confirmar que anotou`;
+  }
+
+  if (contactName && config.rapport_use_name) {
+    prompt += `
+
+👤 CLIENTE ATUAL: ${contactName}
+- Use o nome "${contactName}" naturalmente nas interações (1-2x por resposta)
+- Exemplo: "Entendi, ${contactName}!" ou "Perfeito, ${contactName}!"
+- Não exagere no uso do nome, seja natural`;
+  }
+
+  prompt += `
+
+⚠️ REGRA: Com 2 critérios (tipo + bairro OU finalidade + bairro), já chame buscar_imoveis!
+
+📍 ETAPA 3 - BUSCA E APRESENTAÇÃO
+Quando encontrar imóveis:
+1. Envie APENAS uma frase curta: "Achei uma opção boa pra você${contactName ? `, ${contactName}` : ''}!"
+2. O SISTEMA envia foto + características automaticamente
+3. Depois pergunte: "Faz sentido pra você?"
+
+Se não encontrar:
+- "No momento não encontrei com esses critérios. Quer ajustar a busca?"
+
+📍 ETAPA 4 - FOLLOW-UP
+Se cliente GOSTOU:
+- "Ótimo${contactName ? `, ${contactName}` : ''}! Quer que eu agende uma visita pra você conhecer?"
+
+Se cliente NÃO gostou:
+- "Entendi! Quer que eu te mostre outra opção?"
+
+Se cliente tem DÚVIDA:
+- Responda a dúvida específica sobre o imóvel
+- Volte a perguntar se quer agendar visita
+
+📍 ETAPA 5 - AGENDAMENTO
+- Pergunte disponibilidade: "Qual dia e horário seria melhor pra você?"
+- Confirme dados: "Posso confirmar seu telefone?"
+- Finalize: "Perfeito${contactName ? `, ${contactName}` : ''}! Vou passar pra nossa equipe agendar. Em breve entram em contato! 🙌"
+
+📝 EXEMPLO DE CONVERSA IDEAL:
+
+CLIENTE: Oi
+AGENTE: Oi! Aqui é a Helena da Smolka 🏠 Pode me mandar texto ou áudio, eu entendo os dois! Você tá buscando pra comprar ou alugar?
+
+CLIENTE: Quero alugar
+AGENTE: Legal! Qual tipo de imóvel você procura? Apartamento, casa...?
+
+CLIENTE: Apartamento
+AGENTE: A propósito, como posso te chamar?
+
+CLIENTE: Marcos
+AGENTE: Prazer, Marcos! 😊 E qual região de Floripa seria ideal?
+
+CLIENTE: Centro ou Trindade
+AGENTE: E quantos quartos você precisa, Marcos?
+
+CLIENTE: 2 quartos
+[AGENTE CHAMA buscar_imoveis]
+AGENTE: Achei uma opção boa pra você, Marcos!
+[SISTEMA ENVIA FOTO E CARACTERÍSTICAS]
+AGENTE: Faz sentido pra você?
+
+CLIENTE: Gostei!
+AGENTE: Ótimo! Quer agendar uma visita pra conhecer?
+
+CLIENTE: Quero sim
+AGENTE: Qual dia e horário seria melhor pra você, Marcos?
+
+GATILHOS DE TRANSIÇÃO DE ETAPA:
+• Etapa 1 → 2: Cliente respondeu se quer comprar/alugar
+• Etapa 2 → 3: Tem finalidade + (tipo OU bairro) → BUSCAR IMÓVEIS
+• Etapa 3 → 4: Imóvel foi apresentado
+• Etapa 4 → 5: Cliente demonstrou interesse ("gostei", "quero ver", "interessante")
+• Etapa 5 → Fim: Visita agendada ou transferido para atendente`;
 
   // Business Context
   if (config.target_audience) {
@@ -330,193 +486,94 @@ ${config.services.map(s => `• ${s}`).join('\n')}`;
 
   // Vista CRM Integration - Property Search Instructions
   if (config.vista_integration_enabled !== false) {
-    prompt += `\n\n🏠 BUSCA DE IMÓVEIS (FUNÇÃO CRÍTICA):
-Você tem acesso a uma função de busca de imóveis reais no catálogo da Smolka.
-
-FLUXO DE QUALIFICAÇÃO PARA BUSCA:
-1. Primeiro, pergunte qual TIPO de imóvel (apartamento, casa, etc.)
-2. Depois, pergunte qual BAIRRO ou região de interesse
-3. Em seguida, pergunte a FAIXA DE PREÇO
-4. Se relevante, pergunte número de quartos
-
-QUANDO BUSCAR IMÓVEIS:
-- Use a função buscar_imoveis assim que tiver pelo menos 2 critérios do cliente
-- Não espere ter todas as informações - comece a buscar com o que tem
-- Se o cliente disser "quero um apartamento no Centro até 500 mil", já pode buscar!
-
-COMO APRESENTAR RESULTADOS:
-Quando encontrar imóveis, apresente assim:
-1. Mensagem introdutória: "Encontrei uma opção que pode te interessar!"
-2. Use [ENVIAR_FOTO:url] para enviar a foto do imóvel
-3. Depois envie as características em bullets:
-   🏠 *Apartamento em [Bairro]*
-   • X dormitórios (X suíte)
-   • X vagas de garagem
-   • Xm² de área útil
-   • R$ XXX.XXX
-   🔗 [link do imóvel]
-4. Pergunte: "Faz sentido pra você?" ou "Quer conhecer esse?"
-
-Se não encontrar imóveis, diga: "No momento não encontrei opções com esses critérios. Quer que eu ajuste a busca?"`;
+    prompt += `\n\n🏠 BUSCA DE IMÓVEIS (USE buscar_imoveis):
+Quando tiver 2+ critérios do cliente, USE A FUNÇÃO buscar_imoveis imediatamente!
+Não espere ter todas as informações - comece a buscar com o que tem.`;
   }
 
-  // Rapport Techniques
-  if (config.rapport_enabled) {
-    prompt += `\n\nTÉCNICAS DE RAPPORT (aplique naturalmente):`;
-    if (config.rapport_use_name) {
-      prompt += `\n- Use o nome do cliente de forma natural durante a conversa (sem exageros)`;
-    }
-    if (config.rapport_mirror_language) {
-      prompt += `\n- Adapte seu estilo de comunicação ao do cliente (formal/informal)`;
-    }
-    if (config.rapport_show_empathy) {
-      prompt += `\n- Demonstre interesse genuíno nas necessidades do cliente`;
-    }
-    if (config.rapport_validate_emotions) {
-      prompt += `\n- Valide preocupações e emoções do cliente antes de responder objetivamente`;
-    }
+  // Rapport Techniques (simplified - main rapport is in the 5-step flow)
+  if (config.rapport_enabled && config.rapport_mirror_language) {
+    prompt += `\n\nRAPPORT: Adapte seu estilo de comunicação ao do cliente (formal/informal).`;
   }
 
   // Mental Triggers
   if (config.triggers_enabled) {
-    prompt += `\n\nGATILHOS DE CONVERSÃO (use quando apropriado, sem forçar):`;
+    prompt += `\n\nGATILHOS DE CONVERSÃO (use quando apropriado):`;
     if (config.trigger_urgency) {
-      prompt += `\n- Urgência: Crie senso de oportunidade quando houver prazos ou condições especiais`;
+      prompt += `\n- Urgência: Mencione prazos ou condições especiais quando existirem`;
     }
     if (config.trigger_scarcity) {
-      prompt += `\n- Escassez: Mencione disponibilidade limitada de forma honesta quando for real`;
+      prompt += `\n- Escassez: Mencione disponibilidade limitada de forma honesta`;
     }
     if (config.trigger_social_proof && config.social_proof_text) {
-      prompt += `\n- Prova Social: Use quando relevante - "${config.social_proof_text}"`;
+      prompt += `\n- Prova Social: "${config.social_proof_text}"`;
     }
     if (config.trigger_authority && config.authority_text) {
-      prompt += `\n- Autoridade: Mencione quando apropriado - "${config.authority_text}"`;
+      prompt += `\n- Autoridade: "${config.authority_text}"`;
     }
   }
 
   // Objections Handling
   if (config.objections && config.objections.length > 0) {
-    prompt += `\n\nTRATAMENTO DE OBJEÇÕES (quando o cliente apresentar estas objeções, use estas respostas como guia):`;
+    prompt += `\n\nTRATAMENTO DE OBJEÇÕES:`;
     for (const obj of config.objections) {
-      prompt += `\n\nSe o cliente disser: "${obj.objection}"
-Responda algo como: "${obj.response}"`;
+      prompt += `\nSe disser: "${obj.objection}" → Responda: "${obj.response}"`;
     }
-  }
-
-  // SPIN Qualification (adjusted for property search)
-  if (config.spin_enabled) {
-    prompt += `\n\nQUALIFICAÇÃO DE LEADS (use perguntas SPIN para entender melhor o cliente):`;
-    
-    prompt += `\n\nPerguntas de SITUAÇÃO (contexto atual):
-- Você está procurando imóvel para comprar ou alugar?
-- Qual tipo de imóvel procura? Apartamento, casa...?
-- Qual região ou bairro seria ideal pra você?`;
-    
-    prompt += `\n\nPerguntas de PROBLEMA (dores e dificuldades):
-- Qual faixa de preço você tem em mente?
-- Quantos quartos você precisa?
-- Precisa de garagem? Quantas vagas?`;
-
-    prompt += `\n\nIMPORTANTE: Não faça todas as perguntas de uma vez. Conduza naturalmente a conversa, fazendo 1-2 perguntas relevantes por mensagem. Assim que tiver critérios suficientes, USE A FUNÇÃO buscar_imoveis!`;
   }
 
   // Knowledge Base
   if (config.knowledge_base_content) {
-    prompt += `\n\nBASE DE CONHECIMENTO (informações extraídas do nosso site - use como referência):
-${config.knowledge_base_content}`;
+    prompt += `\n\nBASE DE CONHECIMENTO:\n${config.knowledge_base_content}`;
   }
 
   // Limitations
   if (config.limitations && config.limitations.length > 0) {
-    prompt += `\n\nLIMITAÇÕES (sempre encaminhe ao atendente humano):
+    prompt += `\n\nLIMITAÇÕES (encaminhe ao atendente humano):
 ${config.limitations.map(l => `• ${l}`).join('\n')}`;
   }
 
   // Escalation Criteria
   if (config.escalation_criteria && config.escalation_criteria.length > 0) {
-    prompt += `\n\nCRITÉRIOS PARA ESCALONAMENTO (encaminhe para atendente humano se):
+    prompt += `\n\nCRITÉRIOS PARA ESCALONAMENTO:
 ${config.escalation_criteria.map(c => `• ${c}`).join('\n')}`;
   }
 
   // FAQs
   if (config.faqs && config.faqs.length > 0) {
-    prompt += `\n\nPERGUNTAS FREQUENTES (use como referência):
+    prompt += `\n\nPERGUNTAS FREQUENTES:
 ${config.faqs.map(faq => `P: ${faq.question}\nR: ${faq.answer}`).join('\n\n')}`;
   }
 
   // Custom Instructions
   if (config.custom_instructions) {
-    prompt += `\n\nINSTRUÇÕES ESPECIAIS:
-${config.custom_instructions}`;
+    prompt += `\n\nINSTRUÇÕES ESPECIAIS:\n${config.custom_instructions}`;
   }
 
-  // Humanization instructions
+  // Humanization
   if (config.humanize_responses) {
-    prompt += `\n\nESTILO DE COMUNICAÇÃO HUMANIZADO:
-- Use linguagem natural e coloquial (mas educada)
-- Inclua pequenas variações e interjeições naturais como "olha só", "então", "veja bem"
-- Demonstre empatia quando apropriado
-- Faça pausas naturais com "..." em momentos de reflexão
-- Evite respostas robóticas ou muito padronizadas
-- Varie as saudações e despedidas`;
+    prompt += `\n\nESTILO HUMANIZADO:
+- Linguagem natural e coloquial
+- Interjeições como "olha só", "então"
+- Demonstre empatia`;
 
     if (config.emoji_intensity !== 'none') {
-      const emojiLevel = config.emoji_intensity === 'low' ? 'ocasionalmente (1-2 por mensagem)' : 'moderadamente (2-3 por mensagem)';
-      prompt += `\n- Use emojis ${emojiLevel} para tornar a conversa mais amigável`;
+      const emojiLevel = config.emoji_intensity === 'low' ? '1-2 por mensagem' : '2-3 por mensagem';
+      prompt += `\n- Use emojis ${emojiLevel}`;
     }
   }
 
-  prompt += `\n\nINSTRUÇÕES GERAIS:
-1. Sempre cumprimente cordialmente
-2. Identifique a necessidade do cliente usando as técnicas de qualificação
-3. Se puder ajudar, responda objetivamente
-4. Se não puder ou atingir critério de escalonamento, use: "${config.fallback_message}"
-5. Use linguagem ${config.tone === 'formal' ? 'formal mas acolhedora' : config.tone}
+  prompt += `\n\n⚠️ REGRAS DE FORMATAÇÃO PARA WHATSAPP:
+- MÁXIMO 80-100 caracteres por frase
+- Mensagens curtas e diretas
+- UMA ideia por mensagem
+- NUNCA inclua URLs ou links
+- NUNCA use markdown de imagem
+- NUNCA liste características de imóveis (o sistema faz automaticamente)
 
 ⚠️ REGRA DE APRESENTAÇÃO DE IMÓVEIS:
 - NUNCA mostre mais de 1 imóvel por vez
-- Após mostrar um imóvel, SEMPRE pergunte "Faz sentido pra você?"
-- AGUARDE a resposta do cliente antes de mostrar outra opção
-- Se o cliente disser que não gostou ou não faz sentido, pergunte: "Quer que eu te mostre outra opção?"
-- Só busque/mostre outro imóvel APÓS o cliente confirmar que quer ver mais opções
-- Se o cliente gostar, pergunte: "Quer que eu agende uma visita?"
-
-⚠️ REGRA CRÍTICA DE FORMATAÇÃO PARA WHATSAPP:
-- MÁXIMO 80-100 caracteres por frase/mensagem
-- Escreva como se estivesse conversando no WhatsApp: mensagens curtas e diretas
-- UMA ideia por mensagem, não agrupe informações
-- Seja conciso: menos palavras = melhor comunicação
-
-⛔ NUNCA FAÇA ISSO NA RESPOSTA:
-- NUNCA inclua URLs ou links (nem de fotos, nem de sites)
-- NUNCA use markdown de imagem ![...](...)
-- NUNCA liste características de imóveis (o sistema faz isso automaticamente)
-- NUNCA descreva imóveis em detalhes na sua resposta
-- NUNCA envie mais de 2-3 frases por vez
-
-✅ QUANDO ENCONTRAR IMÓVEIS:
-Sua resposta deve ser APENAS uma frase curta de introdução, como:
-- "Encontrei uma opção interessante pra você!"
-- "Vou te mostrar um que costuma agradar!"
-- "Olha só o que achei!"
-O SISTEMA vai enviar a foto e as características automaticamente. Você NÃO precisa descrevê-las.
-
-Exemplo BOM (quando encontra imóvel):
-"Achei uma opção boa pra você! 😊"
-
-Exemplo RUIM (quando encontra imóvel):
-"Encontrei um apartamento de 2 quartos no Centro com 80m², preço de R$ 500.000, veja a foto: ![Apartamento](https://...)"`;
-
-
-
-  // Customer context
-  if (contactName && config.use_customer_name && config.rapport_use_name) {
-    prompt += `\n\nCONTEXTO DO CLIENTE:
-- Nome: ${contactName} (use naturalmente nas interações para criar conexão)`;
-  }
-  if (contactType) {
-    prompt += `\n- Tipo: ${contactType === 'proprietario' ? 'Proprietário' : 'Inquilino'}`;
-  }
+- Após mostrar, SEMPRE pergunte "Faz sentido pra você?"
+- AGUARDE a resposta antes de mostrar outra opção`;
 
   return prompt;
 }
@@ -962,13 +1019,46 @@ serve(async (req) => {
       return true;
     }) || [];
 
+    // ========== NAME DETECTION AND SAVING ==========
+    let currentContactName = contactName;
+    
+    // Check if we should try to extract a name from the current message
+    if (!currentContactName && config.rapport_use_name && conversationHistory.length >= 2) {
+      // Find the last assistant message
+      const lastAssistantMessage = conversationHistory.filter(m => m.role === 'assistant').pop();
+      
+      // Check if the last assistant message asked for the name
+      if (lastAssistantMessage && didAskForName(lastAssistantMessage.content)) {
+        const detectedName = extractCustomerName(messageBody);
+        if (detectedName) {
+          console.log(`👤 Nome detectado na mensagem: "${detectedName}"`);
+          
+          // Save name to database
+          const { error: updateError } = await supabase
+            .from('contacts')
+            .update({ 
+              name: detectedName, 
+              updated_at: new Date().toISOString() 
+            })
+            .eq('phone', phoneNumber);
+          
+          if (updateError) {
+            console.error('❌ Error saving name to contacts:', updateError);
+          } else {
+            console.log(`✅ Nome "${detectedName}" salvo no banco para ${phoneNumber}`);
+            currentContactName = detectedName;
+          }
+        }
+      }
+    }
+
     conversationHistory.push({
       role: 'user',
       content: messageBody
     });
 
-    // Build dynamic system prompt with all new features
-    const systemPrompt = buildSystemPrompt(config, contactName, contactType);
+    // Build dynamic system prompt with all new features (using potentially updated name)
+    const systemPrompt = buildSystemPrompt(config, currentContactName, contactType);
 
     // Determine expected response mode BEFORE calling AI to set appropriate max_tokens
     let expectedMode: 'text' | 'audio' = 'text';
@@ -991,7 +1081,8 @@ serve(async (req) => {
       estimatedInputTokens: estimatedTokens,
       expectedMode,
       dynamicMaxTokens,
-      promptLength: systemPrompt.length
+      promptLength: systemPrompt.length,
+      contactName: currentContactName || '(não identificado)'
     });
 
     // Create a modified config with dynamic max_tokens
