@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.vista-search-properties]
 verify_jwt = false
+
+[functions.c2s-create-lead]
+verify_jwt = true

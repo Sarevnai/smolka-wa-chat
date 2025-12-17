@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock, MessageCircle, Bot, ClipboardList, Target } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock, MessageCircle, Bot, ClipboardList, Target, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,6 +25,7 @@ import { DeleteMessageConfirmation } from "./DeleteMessageConfirmation";
 import { DeletedMessagesTrash } from "./DeletedMessagesTrash";
 import { QuickTemplateSender } from "./QuickTemplateSender";
 import { AIHandoverBanner } from "./AIHandoverBanner";
+import { SendToC2SModal } from "./SendToC2SModal";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useConversationState } from "@/hooks/useConversationState";
 import { useMediaGallery } from "@/hooks/useMediaGallery";
@@ -69,6 +70,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showQuickTemplate, setShowQuickTemplate] = useState(false);
+  const [showC2SModal, setShowC2SModal] = useState(false);
   const [selectedFlags, setSelectedFlags] = useState<FlagType[]>([]);
   
   const { toast } = useToast();
@@ -85,7 +87,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     releaseToAI, 
     markHumanMessage 
   } = useConversationState(phoneNumber);
-  const { viewMode } = useDepartment();
+  const { viewMode, activeDepartment } = useDepartment();
   
   // Message deletion states
   const [messageToDelete, setMessageToDelete] = useState<MessageRow | null>(null);
@@ -478,6 +480,19 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
             </Button>
           )}
           
+          {/* C2S Send button for vendas department */}
+          {activeDepartment === 'vendas' && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowC2SModal(true)}
+              className="gap-2 mr-2 bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Send className="h-4 w-4" />
+              Enviar para C2S
+            </Button>
+          )}
+          
           {/* Template button for new conversations */}
           {messages.length === 0 && (
             <Button
@@ -768,6 +783,21 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         deletionType={deletionType}
         onConfirm={confirmMessageDeletion}
         isDeleting={isDeletingMessage}
+      />
+
+      {/* C2S Modal for vendas */}
+      <SendToC2SModal
+        open={showC2SModal}
+        onOpenChange={setShowC2SModal}
+        phoneNumber={phoneNumber}
+        contactName={contact?.name}
+        contactEmail={contact?.email}
+        contactId={contact?.id}
+        conversationHistory={messages
+          .filter(m => m.body)
+          .slice(-20)
+          .map(m => `[${m.direction === 'inbound' ? 'Cliente' : 'Operador'}]: ${m.body}`)
+          .join('\n')}
       />
     </div>
   );

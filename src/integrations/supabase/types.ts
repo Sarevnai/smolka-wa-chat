@@ -163,6 +163,57 @@ export type Database = {
           },
         ]
       }
+      c2s_integration: {
+        Row: {
+          c2s_lead_id: string | null
+          contact_id: string | null
+          conversation_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          lead_data: Json | null
+          sync_status: string
+          synced_at: string | null
+        }
+        Insert: {
+          c2s_lead_id?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_data?: Json | null
+          sync_status?: string
+          synced_at?: string | null
+        }
+        Update: {
+          c2s_lead_id?: string | null
+          contact_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_data?: Json | null
+          sync_status?: string
+          synced_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "c2s_integration_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "c2s_integration_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_results: {
         Row: {
           campaign_id: string
