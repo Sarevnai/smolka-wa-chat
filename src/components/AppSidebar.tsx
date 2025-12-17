@@ -12,7 +12,11 @@ import {
   Shield,
   LayoutDashboard,
   UserCog,
-  Bot
+  Bot,
+  AlertTriangle,
+  ShoppingBag,
+  Building2,
+  Kanban
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -32,6 +36,9 @@ import {
 } from "@/components/ui/sidebar";
 import { useNewMessages } from "@/hooks/useNewMessages";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useTriageConversations } from "@/hooks/useTriageConversations";
+import { useDepartment } from "@/contexts/DepartmentContext";
+import { DepartmentSelector } from "@/components/department/DepartmentSelector";
 import {
   Collapsible,
   CollapsibleContent,
@@ -41,11 +48,16 @@ import { useState } from "react";
 
 const mainItems = [
   { title: "Dashboard", url: "/", icon: Home, permission: 'canViewDashboard' as const },
-  { title: "Inbox", url: "/inbox", icon: Inbox, badge: "New", permission: 'canViewChats' as const },
   { title: "Conversas", url: "/chat", icon: MessageCircle, hasUnreadCount: true, permission: 'canViewChats' as const },
   { title: "Campanhas", url: "/send", icon: Send, permission: 'canViewCampaigns' as const },
   { title: "Contatos", url: "/contacts", icon: Users, permission: 'canViewContacts' as const },
   { title: "Relatórios", url: "/reports", icon: BarChart3, permission: 'canViewReports' as const },
+];
+
+const pipelineItems = [
+  { title: "Locação", url: "/pipeline/locacao", icon: Home, department: 'locacao' as const },
+  { title: "Vendas", url: "/pipeline/vendas", icon: ShoppingBag, department: 'vendas' as const },
+  { title: "Administrativo", url: "/pipeline/administrativo", icon: Building2, department: 'administrativo' as const },
 ];
 
 const integrationItems = [
@@ -57,7 +69,10 @@ export function AppSidebar() {
   const location = useLocation();
   const { unreadCount } = useNewMessages();
   const permissions = usePermissions();
+  const { count: triageCount } = useTriageConversations();
+  const { isAdmin, userDepartment, activeDepartment } = useDepartment();
   const [integrationsOpen, setIntegrationsOpen] = useState(true);
+  const [pipelinesOpen, setPipelinesOpen] = useState(true);
 
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
@@ -75,15 +90,87 @@ export function AppSidebar() {
     );
   };
 
+  // Filter pipelines based on user access
+  const accessiblePipelines = pipelineItems.filter(item => 
+    isAdmin || userDepartment === item.department
+  );
+
   return (
     <Sidebar collapsible="icon" className={cn(
       "transition-all duration-300 bg-surface-sidebar border-r border-neutral-200",
       collapsed ? "w-14" : "w-64"
     )}>
       <SidebarContent>
+        {/* Department Selector for Admins */}
+        {!collapsed && <DepartmentSelector />}
+
+        {/* Triagem - Only for Admins */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className={getNavClassName('/triage')}>
+                    <Link to="/triage">
+                      <AlertTriangle className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3", 
+                        triageCount > 0 ? "text-amber-500" : ""
+                      )} />
+                      {!collapsed && (
+                        <div className="flex items-center justify-between flex-1">
+                          <span>Triagem</span>
+                          {triageCount > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {triageCount}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Pipelines Section */}
+        {accessiblePipelines.length > 0 && (
+          <Collapsible open={pipelinesOpen} onOpenChange={setPipelinesOpen}>
+            <SidebarGroup>
+              <CollapsibleTrigger asChild>
+                <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Kanban className="h-4 w-4" />
+                    {!collapsed && <span>Pipelines</span>}
+                  </div>
+                  {!collapsed && (
+                    <ChevronRight className={cn("h-4 w-4 transition-transform", pipelinesOpen && "rotate-90")} />
+                  )}
+                </SidebarGroupLabel>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {accessiblePipelines.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild className={getNavClassName(item.url)}>
+                          <Link to={item.url}>
+                            <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                            {!collapsed && <span>{item.title}</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
+
         {/* Main Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel>Navegação Principal</SidebarGroupLabel>
+          <SidebarGroupLabel>Geral</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems
@@ -96,11 +183,6 @@ export function AppSidebar() {
                         {!collapsed && (
                           <div className="flex items-center justify-between flex-1">
                             <span>{item.title}</span>
-                            {item.badge && (
-                              <Badge variant="secondary" className="text-xs">
-                                {item.badge}
-                              </Badge>
-                            )}
                             {item.hasUnreadCount && unreadCount > 0 && (
                               <Badge variant="destructive" className="text-xs">
                                 {unreadCount}
