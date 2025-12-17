@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Database } from '@/integrations/supabase/types';
 
 type DepartmentType = Database['public']['Enums']['department_type'];
@@ -22,11 +23,19 @@ export interface TriageConversation {
 }
 
 export function useTriageConversations() {
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<TriageConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [count, setCount] = useState(0);
 
   const loadTriageConversations = async () => {
+    if (!user) {
+      setLoading(false);
+      setConversations([]);
+      setCount(0);
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -106,10 +115,12 @@ export function useTriageConversations() {
 
   useEffect(() => {
     loadTriageConversations();
-  }, []);
+  }, [user]);
 
   // Subscribe to realtime updates
   useEffect(() => {
+    if (!user) return;
+
     const channel = supabase
       .channel('triage-conversations')
       .on(
@@ -129,7 +140,7 @@ export function useTriageConversations() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
 
   return { conversations, loading, count, reload: loadTriageConversations, assignDepartment };
 }
