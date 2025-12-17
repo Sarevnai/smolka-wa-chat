@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, MessageSquare, ArrowLeft, Volume2, VolumeX, Plus, User, Building2 } from "lucide-react";
+import { Search, MessageSquare, ArrowLeft, Volume2, VolumeX, Plus, User, Building2, Target, ClipboardList } from "lucide-react";
 import { format, parseISO, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ConversationItem } from "./ConversationItem";
+import { ViewModeSwitch } from "./ViewModeSwitch";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import { useQuickTemplate } from "@/hooks/useQuickTemplate";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
+import { useDepartment } from "@/contexts/DepartmentContext";
 import { Loader2 } from "lucide-react";
 import { Database } from "@/integrations/supabase/types";
 
@@ -66,6 +68,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const { profile } = useAuth();
   const permissions = usePermissions();
   const { department: userDepartment, loading: deptLoading } = useUserDepartment();
+  const { viewMode, isAdmin } = useDepartment();
 
   const loadConversations = async () => {
     try {
@@ -487,26 +490,36 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
             </Button>
           )}
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-medium">Chat</h1>
+            <h1 className="text-lg font-medium flex items-center gap-2">
+              {viewMode === 'leads' ? (
+                <>
+                  <Target className="h-4 w-4" />
+                  Leads
+                </>
+              ) : (
+                <>
+                  <ClipboardList className="h-4 w-4" />
+                  Conversas
+                </>
+              )}
+            </h1>
             {userDepartment && !permissions.isAdmin && (
               <Badge variant="secondary" className="text-xs bg-white/20 hover:bg-white/30">
                 <Building2 className="h-3 w-3 mr-1" />
                 {getDepartmentLabel(userDepartment)}
               </Badge>
             )}
-            {permissions.isAdmin && (
-              <Badge variant="secondary" className="text-xs bg-white/20 hover:bg-white/30">
-                Admin
-              </Badge>
-            )}
           </div>
         </div>
         
         <div className="flex items-center gap-2">
+          {/* View Mode Switch for Admins */}
+          <ViewModeSwitch />
+          
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
             <Input
-              placeholder="Pesquisar conversa"
+              placeholder={viewMode === 'leads' ? "Buscar lead..." : "Buscar conversa..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 bg-white/90 border-0 rounded-lg h-8 text-sm text-gray-900 placeholder:text-gray-500"
@@ -526,7 +539,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         </div>
       </div>
       
-      {/* Filter Tabs */}
+      {/* Filter Tabs - Context-aware based on viewMode */}
       <div className="px-4 py-1.5 bg-sidebar border-b border-sidebar-border">
         <div className="flex gap-2">
           <Button 
@@ -542,32 +555,65 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
           >
             Todos
           </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className={cn(
-              "text-xs h-6 px-2 transition-colors",
-              activeFilter === 'inquilino' 
-                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                : "text-muted-foreground hover:bg-sidebar-accent/50"
-            )}
-            onClick={() => setActiveFilter('inquilino')}
-          >
-            Inquilinos
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className={cn(
-              "text-xs h-6 px-2 transition-colors",
-              activeFilter === 'proprietario' 
-                ? "bg-sidebar-accent text-sidebar-accent-foreground" 
-                : "text-muted-foreground hover:bg-sidebar-accent/50"
-            )}
-            onClick={() => setActiveFilter('proprietario')}
-          >
-            Proprietários
-          </Button>
+          {viewMode === 'tasks' ? (
+            <>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn(
+                  "text-xs h-6 px-2 transition-colors",
+                  activeFilter === 'inquilino' 
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                    : "text-muted-foreground hover:bg-sidebar-accent/50"
+                )}
+                onClick={() => setActiveFilter('inquilino')}
+              >
+                Inquilinos
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn(
+                  "text-xs h-6 px-2 transition-colors",
+                  activeFilter === 'proprietario' 
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                    : "text-muted-foreground hover:bg-sidebar-accent/50"
+                )}
+                onClick={() => setActiveFilter('proprietario')}
+              >
+                Proprietários
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn(
+                  "text-xs h-6 px-2 transition-colors",
+                  activeFilter === 'inquilino' 
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                    : "text-muted-foreground hover:bg-sidebar-accent/50"
+                )}
+                onClick={() => setActiveFilter('inquilino')}
+              >
+                Novos
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn(
+                  "text-xs h-6 px-2 transition-colors",
+                  activeFilter === 'proprietario' 
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground" 
+                    : "text-muted-foreground hover:bg-sidebar-accent/50"
+                )}
+                onClick={() => setActiveFilter('proprietario')}
+              >
+                Em negociação
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -594,6 +640,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
                     stageName={conversation.stageName}
                     stageColor={conversation.stageColor}
                     departmentCode={conversation.departmentCode}
+                    viewMode={viewMode}
                   />
                 ))}
               </div>

@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
 type DepartmentType = Database['public']['Enums']['department_type'];
+type ViewMode = 'leads' | 'tasks';
 
 interface DepartmentContextType {
   activeDepartment: DepartmentType | null;
@@ -11,9 +12,25 @@ interface DepartmentContextType {
   setActiveDepartment: (dept: DepartmentType | null) => void;
   isAdmin: boolean;
   loading: boolean;
+  // View mode
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
 }
 
 const DepartmentContext = createContext<DepartmentContextType | undefined>(undefined);
+
+// Auto-detect view mode based on department
+function getDefaultViewMode(department: DepartmentType | null): ViewMode {
+  switch (department) {
+    case 'locacao':
+    case 'vendas':
+      return 'leads';
+    case 'administrativo':
+      return 'tasks';
+    default:
+      return 'leads'; // Default for admins/null
+  }
+}
 
 export function DepartmentProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -21,6 +38,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
   const [activeDepartment, setActiveDepartmentState] = useState<DepartmentType | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewModeState] = useState<ViewMode>('leads');
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -45,14 +63,24 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
         // Load saved preference for admins or use user's department
         if (hasAdmin) {
-          const saved = localStorage.getItem('activeDepartment');
-          if (saved && ['locacao', 'administrativo', 'vendas'].includes(saved)) {
-            setActiveDepartmentState(saved as DepartmentType);
+          const savedDept = localStorage.getItem('activeDepartment');
+          if (savedDept && ['locacao', 'administrativo', 'vendas'].includes(savedDept)) {
+            setActiveDepartmentState(savedDept as DepartmentType);
           } else {
             setActiveDepartmentState(null); // Admin sees all by default
           }
+          
+          // Load saved view mode preference for admins
+          const savedViewMode = localStorage.getItem('viewMode');
+          if (savedViewMode && ['leads', 'tasks'].includes(savedViewMode)) {
+            setViewModeState(savedViewMode as ViewMode);
+          } else {
+            setViewModeState('leads');
+          }
         } else {
           setActiveDepartmentState(deptCode);
+          // Set view mode based on department
+          setViewModeState(getDefaultViewMode(deptCode));
         }
       } catch (error) {
         console.error('Error fetching user department:', error);
@@ -71,6 +99,20 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
     } else {
       localStorage.removeItem('activeDepartment');
     }
+    
+    // Auto-switch view mode when department changes (for admins)
+    if (isAdmin) {
+      const newViewMode = getDefaultViewMode(dept);
+      setViewModeState(newViewMode);
+      localStorage.setItem('viewMode', newViewMode);
+    }
+  };
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    if (isAdmin) {
+      localStorage.setItem('viewMode', mode);
+    }
   };
 
   return (
@@ -79,7 +121,9 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
       userDepartment,
       setActiveDepartment,
       isAdmin,
-      loading
+      loading,
+      viewMode,
+      setViewMode
     }}>
       {children}
     </DepartmentContext.Provider>
@@ -95,7 +139,9 @@ export function useDepartment(): DepartmentContextType {
       userDepartment: null,
       setActiveDepartment: () => {},
       isAdmin: false,
-      loading: true
+      loading: true,
+      viewMode: 'leads',
+      setViewMode: () => {}
     };
   }
   return context;
