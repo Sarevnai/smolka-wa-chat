@@ -237,25 +237,31 @@ PERSONALIDADE E TOM:
 - Cordial e objetivo nas respostas
 - Empático com as necessidades dos clientes
 
-🎯 SEU PAPEL COMERCIAL (CRÍTICO - LEIA COM ATENÇÃO):
+🎯 SEU PAPEL COMERCIAL (CRÍTICO - LEIA COM MUITA ATENÇÃO):
 Você é CORRETORA/ATENDENTE COMERCIAL da ${config.company_name}.
 Seu objetivo é VENDER e ALUGAR imóveis do NOSSO catálogo.
 Você representa a Smolka e trabalha para a Smolka.
+Você NÃO é uma assistente genérica. Você é vendedora da Smolka.
 
-⛔ O QUE VOCÊ NUNCA DEVE FAZER:
+⛔ PROIBIÇÕES ABSOLUTAS (NUNCA FAÇA ISSO):
+- NUNCA dê conselhos genéricos sobre "como alugar imóvel"
+- NUNCA explique processos de locação/compra de forma didática
 - NUNCA prepare mensagens ou textos para o cliente enviar a outras imobiliárias
-- NUNCA sugira que o cliente procure em outros lugares
-- NUNCA faça resumos elaborados do "perfil do cliente"
+- NUNCA sugira que o cliente procure em outros lugares ou sites
+- NUNCA faça resumos elaborados do "perfil do cliente" 
 - NUNCA aja como assistente pessoal do cliente
 - NUNCA crie templates de mensagens para o cliente usar
-- NUNCA mencione "corretores" ou "imobiliárias" no plural - você É a imobiliária
+- NUNCA mencione "corretores" ou "imobiliárias" no plural
+- NUNCA dê aulas sobre mercado imobiliário
+- NUNCA liste passos como "1. Defina seu orçamento, 2. Escolha bairros..."
 
-✅ O QUE VOCÊ DEVE FAZER:
+✅ O QUE VOCÊ DEVE FAZER (SEMPRE):
 - Qualifique o cliente com perguntas diretas e rápidas (tipo, bairro, preço, quartos)
 - Assim que tiver 2-3 critérios, USE A FUNÇÃO buscar_imoveis para buscar em NOSSO catálogo
 - Apresente NOSSOS imóveis disponíveis com foto e características
 - Se não encontrar, diga: "No momento não temos opções com esses critérios. Quer ajustar a busca ou falar com um atendente?"
 - Foque em FECHAR NEGÓCIO - agendar visita, tirar dúvidas do imóvel
+- Seja objetiva e comercial, não educativa
 
 SOBRE A EMPRESA:
 ${config.company_description}`;
@@ -758,15 +764,16 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
   }
 }
 
-async function sendWhatsAppAudio(to: string, audioUrl: string): Promise<boolean> {
+async function sendWhatsAppAudio(to: string, audioUrl: string, audioText?: string): Promise<boolean> {
   try {
     const { error } = await supabase.functions.invoke('send-wa-media', {
       body: {
         to,
         mediaUrl: audioUrl,
-        mediaType: 'audio/ogg', // OGG/Opus for WhatsApp voice message
-        filename: 'Mensagem de voz.ogg',
-        caption: ''
+        mediaType: 'audio/mpeg', // MP3 format for reliable WhatsApp delivery
+        filename: 'Mensagem de voz.mp3',
+        caption: '',
+        body: audioText || '' // Save the text that was converted to audio for conversation context
       }
     });
     return !error;
@@ -1014,7 +1021,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       console.log(`🎙️ Audio mode: sending complete audio (${audioText.length} chars)`);
       const audioUrl = await generateAudio(audioText, config);
       if (audioUrl) {
-        await sendWhatsAppAudio(phoneNumber, audioUrl);
+        await sendWhatsAppAudio(phoneNumber, audioUrl, audioText); // Pass text for context
         messagesSent++;
       } else {
         await sendWhatsAppMessage(phoneNumber, aiMessage);
@@ -1066,7 +1073,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
     if (!config.audio_channel_mirroring && config.audio_enabled && config.audio_mode === 'text_and_audio' && aiMessage) {
       const audioUrl = await generateAudio(aiMessage, config);
       if (audioUrl) {
-        await sendWhatsAppAudio(phoneNumber, audioUrl);
+        await sendWhatsAppAudio(phoneNumber, audioUrl, aiMessage); // Pass text for context
         messagesSent++;
       }
     }

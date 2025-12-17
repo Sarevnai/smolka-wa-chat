@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { to, mediaUrl, mediaType, caption, filename } = await req.json();
+    const { to, mediaUrl, mediaType, caption, filename, body: messageBody } = await req.json();
 
     if (!to || !mediaUrl || !mediaType) {
       return new Response(
@@ -93,13 +93,17 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // For audio messages, use messageBody to preserve conversation context
+    // This allows the AI to "remember" what was said in audio messages
+    const bodyText = messageBody || caption || null;
+    
     const { error: dbError } = await supabase.from('messages').insert({
       wa_message_id: result.messages[0]?.id,
       wa_from: null,
       wa_to: to.replace(/\D/g, ''),
       wa_phone_number_id: phoneNumberId,
       direction: 'outbound',
-      body: caption || null,
+      body: bodyText,
       wa_timestamp: new Date().toISOString(),
       media_type: mediaType,
       media_url: mediaUrl,
