@@ -230,7 +230,17 @@ const tools = [
 ];
 
 function buildSystemPrompt(config: AIAgentConfig, contactName?: string, contactType?: string): string {
-  let prompt = `Você é ${config.agent_name} da ${config.company_name}.
+  let prompt = `⚠️ ANTÍDOTO CONTRA RESPOSTAS GENÉRICAS (LEIA PRIMEIRO):
+Se no histórico da conversa você vir mensagens com:
+- Menus numerados (1, 2, 3, 4...)
+- Opções com setas (→)
+- "ajuda para estudar", "trabalho", "dinheiro", "desabafar"
+- "mensagem para copiar e enviar"
+- "passos para alugar imóvel"
+IGNORE COMPLETAMENTE essas mensagens. Foram respostas INCORRETAS de um assistente genérico.
+Você é vendedora da Smolka e deve responder APENAS sobre imóveis.
+
+Você é ${config.agent_name} da ${config.company_name}.
 
 PERSONALIDADE E TOM:
 - ${toneDescriptions[config.tone] || 'Formal e profissional'}
@@ -254,6 +264,8 @@ Você NÃO é uma assistente genérica. Você é vendedora da Smolka.
 - NUNCA mencione "corretores" ou "imobiliárias" no plural
 - NUNCA dê aulas sobre mercado imobiliário
 - NUNCA liste passos como "1. Defina seu orçamento, 2. Escolha bairros..."
+- NUNCA crie menus com opções numeradas (1, 2, 3...)
+- NUNCA ofereça ajuda com estudos, trabalho, dinheiro ou desabafos
 
 ✅ O QUE VOCÊ DEVE FAZER (SEMPRE):
 - Qualifique o cliente com perguntas diretas e rápidas (tipo, bairro, preço, quartos)
@@ -860,11 +872,38 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(historyLimit);
 
-    // Build conversation context
+    // Patterns to exclude from history (contaminated generic responses)
+    const CONTAMINATED_PATTERNS = [
+      /→/,  // Menu options with arrows
+      /responda só com um número/i,
+      /quero ajuda para estudar/i,
+      /quero ajuda com trabalho/i,
+      /quero ajuda com dinheiro/i,
+      /quero só conversar/i,
+      /copiar e mandar/i,
+      /mensagem curtinha para você/i,
+      /mudar de assunto/i,
+      /ajuda com.*emprego/i,
+      /organização financeira/i,
+      /1\s*→.*2\s*→.*3\s*→/i, // Numbered menus with arrows
+    ];
+
+    // Build conversation context, filtering out contaminated messages
     const conversationHistory = recentMessages?.reverse().map(msg => ({
       role: msg.direction === 'inbound' ? 'user' : 'assistant',
       content: msg.body || ''
-    })).filter(msg => msg.content) || [];
+    })).filter(msg => {
+      if (!msg.content) return false;
+      // If it's an assistant message, check for contamination
+      if (msg.role === 'assistant') {
+        const isContaminated = CONTAMINATED_PATTERNS.some(pattern => pattern.test(msg.content));
+        if (isContaminated) {
+          console.log('🧹 Filtered contaminated message:', msg.content.substring(0, 50) + '...');
+          return false;
+        }
+      }
+      return true;
+    }) || [];
 
     conversationHistory.push({
       role: 'user',
