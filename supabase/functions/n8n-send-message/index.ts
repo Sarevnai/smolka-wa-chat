@@ -15,6 +15,31 @@ function normalizePhoneNumber(phone: string): string {
   return phone.replace(/\D/g, '');
 }
 
+/**
+ * Find active conversation for a phone number
+ */
+async function findActiveConversation(phoneNumber: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('phone_number', phoneNumber)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[n8n-send-message] Error finding conversation:', error);
+      return null;
+    }
+    return data?.id || null;
+  } catch (error) {
+    console.error('[n8n-send-message] Error in findActiveConversation:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -22,9 +47,9 @@ serve(async (req) => {
   }
 
   try {
-    const { to, message, api_key } = await req.json();
+    const { to, message, api_key, conversation_id } = await req.json();
 
-    console.log('[n8n-send-message] Received request:', { to, messageLength: message?.length });
+    console.log('[n8n-send-message] Received request:', { to, messageLength: message?.length, conversation_id });
 
     // Validate required fields
     if (!to || !message || !api_key) {
@@ -122,6 +147,15 @@ serve(async (req) => {
       );
     }
 
+    // 🆕 Find or use provided conversation_id
+    let finalConversationId = conversation_id;
+    if (!finalConversationId) {
+      finalConversationId = await findActiveConversation(normalizedPhone);
+      if (finalConversationId) {
+        console.log(`[n8n-send-message] 📍 Found conversation: ${finalConversationId}`);
+      }
+    }
+
     // Save message to database
     const messageData = {
       wa_message_id: whatsappResult.messages?.[0]?.id || null,
@@ -131,7 +165,8 @@ serve(async (req) => {
       direction: 'outbound',
       body: message,
       wa_timestamp: new Date().toISOString(),
-      raw: { source: 'n8n-agent', whatsapp_response: whatsappResult }
+      raw: { source: 'n8n-agent', whatsapp_response: whatsappResult },
+      conversation_id: finalConversationId, // 🆕 Link to conversation
     };
 
     const { error: insertError } = await supabase
@@ -140,9 +175,16 @@ serve(async (req) => {
 
     if (insertError) {
       console.error('[n8n-send-message] Error saving message to database:', insertError);
-      // Don't fail the request, message was sent successfully
     } else {
-      console.log('[n8n-send-message] Message saved to database');
+      console.log('[n8n-send-message] Message saved to database', { conversation_id: finalConversationId });
+    }
+
+    // Update conversation timestamp
+    if (finalConversationId) {
+      await supabase
+        .from('conversations')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', finalConversationId);
     }
 
     // Update conversation state to mark AI as active
@@ -167,7 +209,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message_id: whatsappResult.messages?.[0]?.id,
-        to: normalizedPhone
+        to: normalizedPhone,
+        conversation_id: finalConversationId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

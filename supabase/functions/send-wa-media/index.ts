@@ -6,13 +6,38 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * Find active conversation for a phone number
+ */
+async function findActiveConversation(supabase: any, phoneNumber: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('phone_number', phoneNumber)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error finding conversation:', error);
+      return null;
+    }
+    return data?.id || null;
+  } catch (error) {
+    console.error('Error in findActiveConversation:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { to, mediaUrl, mediaType, caption, filename, body: messageBody } = await req.json();
+    const { to, mediaUrl, mediaType, caption, filename, body: messageBody, conversation_id } = await req.json();
 
     if (!to || !mediaUrl || !mediaType) {
       return new Response(
@@ -31,7 +56,8 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Sending media to ${to}:`, { mediaUrl, mediaType, filename });
+    const normalizedPhone = to.replace(/\D/g, '');
+    console.log(`Sending media to ${normalizedPhone}:`, { mediaUrl, mediaType, filename, conversation_id });
 
     // Determine media type for WhatsApp API
     let waMediaType = 'document';
@@ -46,7 +72,7 @@ serve(async (req) => {
     // Prepare message payload
     const messagePayload: any = {
       messaging_product: 'whatsapp',
-      to: to.replace(/\D/g, ''), // Remove non-digits
+      to: normalizedPhone,
       type: waMediaType,
       [waMediaType]: {
         link: mediaUrl
@@ -93,14 +119,22 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // 🆕 Find or use provided conversation_id
+    let finalConversationId = conversation_id;
+    if (!finalConversationId) {
+      finalConversationId = await findActiveConversation(supabase, normalizedPhone);
+      if (finalConversationId) {
+        console.log(`📍 Found conversation for media message: ${finalConversationId}`);
+      }
+    }
+
     // For audio messages, use messageBody to preserve conversation context
-    // This allows the AI to "remember" what was said in audio messages
     const bodyText = messageBody || caption || null;
     
     const { error: dbError } = await supabase.from('messages').insert({
       wa_message_id: result.messages[0]?.id,
       wa_from: null,
-      wa_to: to.replace(/\D/g, ''),
+      wa_to: normalizedPhone,
       wa_phone_number_id: phoneNumberId,
       direction: 'outbound',
       body: bodyText,
@@ -110,12 +144,22 @@ serve(async (req) => {
       media_caption: caption || null,
       media_filename: filename || null,
       media_mime_type: mediaType,
-      raw: result
+      raw: result,
+      conversation_id: finalConversationId, // 🆕 Link to conversation
     });
 
     if (dbError) {
       console.error('Database error:', dbError);
-      // Don't fail the request, just log the error
+    } else {
+      console.log('Media message saved to database', { conversation_id: finalConversationId });
+    }
+
+    // 🆕 Update conversation timestamp
+    if (finalConversationId) {
+      await supabase
+        .from('conversations')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', finalConversationId);
     }
 
     return new Response(
