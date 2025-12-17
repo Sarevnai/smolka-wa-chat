@@ -76,8 +76,8 @@ serve(async (req) => {
     }
     
     if (params.quartos) {
-      // Use range for bedrooms too [min, max]
-      filter['Dormitorios'] = [params.quartos, 10];
+      // Use exact match for bedrooms [min, max] with same value
+      filter['Dormitorios'] = [params.quartos, params.quartos];
     }
 
     // Build request payload for Vista API - fetch more to filter client-side
@@ -225,6 +225,12 @@ serve(async (req) => {
         const suites = parseInt(prop.Suites || '0');
         const vagas = parseInt(prop.Vagas || '0');
         const areaUtil = parseFloat(prop.AreaPrivativa || prop.AreaTotal || '0');
+        
+        // Client-side bedroom filtering for exact match
+        if (params.quartos && dormitorios !== params.quartos) {
+          console.log(`⏩ Skipping ${codigo}: has ${dormitorios} quartos, wanted ${params.quartos}`);
+          continue;
+        }
         
         if (dormitorios > 0) {
           const suiteText = suites > 0 ? ` (${suites} suíte${suites > 1 ? 's' : ''})` : '';

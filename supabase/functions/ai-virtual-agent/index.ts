@@ -215,7 +215,7 @@ const tools = [
           },
           quartos: {
             type: "number",
-            description: "Número mínimo de dormitórios desejados"
+            description: "Número EXATO de dormitórios desejados pelo cliente"
           },
           finalidade: {
             type: "string",
