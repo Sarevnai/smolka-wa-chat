@@ -764,8 +764,8 @@ async function sendWhatsAppAudio(to: string, audioUrl: string): Promise<boolean>
       body: {
         to,
         mediaUrl: audioUrl,
-        mediaType: 'audio',
-        filename: 'Mensagem de voz.mp3',
+        mediaType: 'audio/ogg', // OGG/Opus for WhatsApp voice message
+        filename: 'Mensagem de voz.ogg',
         caption: ''
       }
     });

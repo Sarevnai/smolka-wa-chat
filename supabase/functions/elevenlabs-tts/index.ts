@@ -57,7 +57,7 @@ serve(async (req) => {
         body: JSON.stringify({
           text,
           model_id: 'eleven_multilingual_v2',
-          output_format: 'mp3_44100_128',
+          output_format: 'opus_48000_64', // OGG/Opus for WhatsApp voice message
           voice_settings: {
             stability: 0.70,        // Mais consistente, menos variação
             similarity_boost: 0.85, // Maior fidelidade à voz original
@@ -82,12 +82,12 @@ serve(async (req) => {
     console.log('✅ Audio generated:', audioBuffer.byteLength, 'bytes');
 
     // Upload to Supabase Storage
-    const fileName = `ai-audio-${Date.now()}.mp3`;
+    const fileName = `ai-audio-${Date.now()}.ogg`;
     const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from('whatsapp-media')
       .upload(fileName, audioBuffer, {
-        contentType: 'audio/mpeg',
+        contentType: 'audio/ogg',
         upsert: false,
       });
 
