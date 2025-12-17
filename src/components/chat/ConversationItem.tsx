@@ -33,6 +33,9 @@ interface ConversationItemProps {
   unreadCount: number;
   isSelected: boolean;
   onClick: () => void;
+  stageName?: string;
+  stageColor?: string;
+  departmentCode?: string | null;
 }
 
 export function ConversationItem({
@@ -41,7 +44,10 @@ export function ConversationItem({
   messageCount,
   unreadCount,
   isSelected,
-  onClick
+  onClick,
+  stageName,
+  stageColor,
+  departmentCode
 }: ConversationItemProps) {
   const { data: contact } = useContactByPhone(phoneNumber);
   const { deleteConversation, isDeleting } = useDeleteConversation();
@@ -199,6 +205,16 @@ export function ConversationItem({
             )}
             {truncateMessage(lastMessage.body)}
           </p>
+          
+          {stageName && (
+            <Badge 
+              variant="outline" 
+              className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
+              style={{ borderColor: stageColor, color: stageColor }}
+            >
+              {stageName}
+            </Badge>
+          )}
           
           {contact?.contracts && contact.contracts.length > 0 && (
             <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0">
