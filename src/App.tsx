@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { RealtimeMessagesProvider } from "@/contexts/RealtimeMessagesContext";
+import { DepartmentProvider } from "@/contexts/DepartmentContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Inbox from "./pages/Inbox";
@@ -18,6 +19,8 @@ import Profile from "./pages/Profile";
 import ClickUpConfig from "./pages/ClickUpConfig";
 import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
+import Triage from "./pages/Triage";
+import Pipeline from "./pages/Pipeline";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import AuditLogs from "./pages/admin/AuditLogs";
@@ -41,117 +44,133 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="system" storageKey="smolka-theme">
       <AuthProvider>
-        <RealtimeMessagesProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/inbox" element={
-              <ProtectedRoute>
-                <Inbox />
-              </ProtectedRoute>
-            } />
-            <Route path="/chat" element={
-              <ProtectedRoute>
-                <Chat />
-              </ProtectedRoute>
-            } />
-            <Route path="/chat/:phoneNumber" element={
-              <ProtectedRoute>
-                <Chat />
-              </ProtectedRoute>
-            } />
-            <Route path="/send" element={
-              <ProtectedRoute>
-                <Send />
-              </ProtectedRoute>
-            } />
-            <Route path="/contacts" element={
-              <ProtectedRoute>
-                <Contacts />
-              </ProtectedRoute>
-            } />
-            <Route path="/reports" element={
-              <ProtectedRoute>
-                <Reports />
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } />
-            <Route path="/clickup" element={
-              <ProtectedRoute>
-                <ClickUpConfig />
-              </ProtectedRoute>
-            } />
-            <Route path="/integrations" element={
-              <ProtectedRoute>
-                <Integrations />
-              </ProtectedRoute>
-            } />
-          <Route path="/admin" element={
-            <ProtectedRoute>
-              <AdminGuard>
-                <AdminDashboard />
-              </AdminGuard>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/users" element={
-            <ProtectedRoute>
-              <AdminGuard>
-                <UserManagement />
-              </AdminGuard>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/logs" element={
-            <ProtectedRoute>
-              <AdminGuard>
-                <AuditLogs />
-              </AdminGuard>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/permissions" element={
-            <ProtectedRoute>
-              <AdminGuard>
-                <PermissionsMatrix />
-              </AdminGuard>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/user-permissions" element={
-            <ProtectedRoute>
-              <AdminGuard>
-                <UserPermissions />
-              </AdminGuard>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/settings" element={
-            <ProtectedRoute>
-              <AdminGuard>
-                <SystemSettings />
-              </AdminGuard>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/ai-agent" element={
-            <ProtectedRoute>
-              <AdminGuard>
-                <AIAgentConfig />
-              </AdminGuard>
-            </ProtectedRoute>
-          } />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-        </RealtimeMessagesProvider>
-    </AuthProvider>
-  </ThemeProvider>
-</QueryClientProvider>
+        <DepartmentProvider>
+          <RealtimeMessagesProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/inbox" element={
+                    <ProtectedRoute>
+                      <Inbox />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/chat" element={
+                    <ProtectedRoute>
+                      <Chat />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/chat/:phoneNumber" element={
+                    <ProtectedRoute>
+                      <Chat />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/send" element={
+                    <ProtectedRoute>
+                      <Send />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/contacts" element={
+                    <ProtectedRoute>
+                      <Contacts />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/reports" element={
+                    <ProtectedRoute>
+                      <Reports />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/clickup" element={
+                    <ProtectedRoute>
+                      <ClickUpConfig />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/integrations" element={
+                    <ProtectedRoute>
+                      <Integrations />
+                    </ProtectedRoute>
+                  } />
+                  {/* New Routes: Triage and Pipeline */}
+                  <Route path="/triage" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <Triage />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/pipeline/:department" element={
+                    <ProtectedRoute>
+                      <Pipeline />
+                    </ProtectedRoute>
+                  } />
+                  {/* Admin Routes */}
+                  <Route path="/admin" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <AdminDashboard />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/users" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <UserManagement />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/logs" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <AuditLogs />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/permissions" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <PermissionsMatrix />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/user-permissions" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <UserPermissions />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/settings" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <SystemSettings />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/ai-agent" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <AIAgentConfig />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </RealtimeMessagesProvider>
+        </DepartmentProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
 );
 
 export default App;
