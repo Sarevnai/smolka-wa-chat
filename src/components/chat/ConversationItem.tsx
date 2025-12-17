@@ -17,9 +17,12 @@ import { useContactByPhone } from "@/hooks/useContacts";
 import { useDeleteConversation } from "@/hooks/useDeleteConversation";
 import { usePinnedConversations } from "@/hooks/usePinnedConversations";
 import { cn, formatPhoneNumber } from "@/lib/utils";
-import { SparklesIcon, Building2, Key, FileText, MoreVertical, Trash2, Pin, PinOff } from "lucide-react";
+import { SparklesIcon, Building2, Key, FileText, MoreVertical, Trash2, Pin, PinOff, Target, ClipboardList, Star, Flame } from "lucide-react";
 import { DeleteConversationDialog } from "./DeleteConversationDialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+type ViewMode = 'leads' | 'tasks';
 
 interface ConversationItemProps {
   phoneNumber: string;
@@ -36,6 +39,7 @@ interface ConversationItemProps {
   stageName?: string;
   stageColor?: string;
   departmentCode?: string | null;
+  viewMode?: ViewMode;
 }
 
 export function ConversationItem({
@@ -47,12 +51,31 @@ export function ConversationItem({
   onClick,
   stageName,
   stageColor,
-  departmentCode
+  departmentCode,
+  viewMode = 'leads'
 }: ConversationItemProps) {
   const { data: contact } = useContactByPhone(phoneNumber);
   const { deleteConversation, isDeleting } = useDeleteConversation();
   const { togglePin, isPinned } = usePinnedConversations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [openTicketsCount, setOpenTicketsCount] = useState(0);
+
+  // Fetch open tickets count for tasks mode
+  useEffect(() => {
+    if (viewMode !== 'tasks') return;
+    
+    const fetchOpenTickets = async () => {
+      const { count } = await supabase
+        .from('tickets')
+        .select('*', { count: 'exact', head: true })
+        .eq('phone', phoneNumber)
+        .neq('stage', 'concluido');
+      
+      setOpenTicketsCount(count || 0);
+    };
+
+    fetchOpenTickets();
+  }, [phoneNumber, viewMode]);
 
   const handleDeleteConversation = async () => {
     const result = await deleteConversation(phoneNumber);
@@ -129,6 +152,20 @@ export function ConversationItem({
     }
   };
 
+  // Lead temperature indicator (for leads mode)
+  const getLeadTemperature = () => {
+    // Simple heuristic based on message count and recency
+    const daysSinceLastMessage = lastMessage.wa_timestamp 
+      ? (Date.now() - new Date(lastMessage.wa_timestamp).getTime()) / (1000 * 60 * 60 * 24)
+      : 999;
+    
+    if (daysSinceLastMessage < 1 && messageCount > 5) return 'hot';
+    if (daysSinceLastMessage < 3 && messageCount > 2) return 'warm';
+    return 'cold';
+  };
+
+  const temperature = viewMode === 'leads' ? getLeadTemperature() : null;
+
   const typeInfo = getContactTypeInfo(contact?.contact_type);
   const TypeIcon = typeInfo?.icon;
 
@@ -143,7 +180,16 @@ export function ConversationItem({
       {/* Avatar */}
       <div className="relative flex-shrink-0">
         <Avatar className="h-10 w-10">
-          <AvatarFallback className="bg-gray-400 text-white font-medium text-sm">
+          <AvatarFallback className={cn(
+            "text-white font-medium text-sm",
+            viewMode === 'leads' 
+              ? temperature === 'hot' 
+                ? "bg-orange-500" 
+                : temperature === 'warm' 
+                  ? "bg-yellow-500" 
+                  : "bg-gray-400"
+              : "bg-gray-400"
+          )}>
             {displayInitials}
           </AvatarFallback>
         </Avatar>
@@ -170,20 +216,71 @@ export function ConversationItem({
                 </Tooltip>
               </TooltipProvider>
             )}
-            {typeInfo && TypeIcon && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0">
-                      <TypeIcon className="h-3 w-3" />
-                      <span className="hidden sm:inline">{typeInfo.label}</span>
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent className="sm:hidden">
-                    <p>{typeInfo.label}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+            
+            {/* View Mode specific badges */}
+            {viewMode === 'leads' ? (
+              <>
+                {/* Lead temperature indicator */}
+                {temperature === 'hot' && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Flame className="h-3.5 w-3.5 text-orange-500 flex-shrink-0" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Lead quente - alta atividade recente</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {temperature === 'warm' && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Star className="h-3.5 w-3.5 text-yellow-500 flex-shrink-0" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Lead morno - atividade moderada</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Task mode - show contact type prominently */}
+                {typeInfo && TypeIcon && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant={typeInfo.variant} className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0">
+                          <TypeIcon className="h-3 w-3" />
+                          <span className="hidden sm:inline">{typeInfo.label}</span>
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent className="sm:hidden">
+                        <p>{typeInfo.label}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {/* Open tickets indicator */}
+                {openTicketsCount > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0 border-orange-400 text-orange-600">
+                          <ClipboardList className="h-3 w-3" />
+                          {openTicketsCount}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{openTicketsCount} demanda(s) aberta(s)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -206,17 +303,19 @@ export function ConversationItem({
             {truncateMessage(lastMessage.body)}
           </p>
           
-          {stageName && (
+          {/* Stage badge - prominent in leads mode */}
+          {viewMode === 'leads' && stageName && (
             <Badge 
               variant="outline" 
-              className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
-              style={{ borderColor: stageColor, color: stageColor }}
+              className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0 font-medium"
+              style={{ borderColor: stageColor, color: stageColor, backgroundColor: `${stageColor}15` }}
             >
               {stageName}
             </Badge>
           )}
           
-          {contact?.contracts && contact.contracts.length > 0 && (
+          {/* Contract badge - more relevant in tasks mode */}
+          {viewMode === 'tasks' && contact?.contracts && contact.contracts.length > 0 && (
             <Badge variant="outline" className="flex items-center gap-1 text-xs px-1.5 py-0.5 flex-shrink-0">
               <FileText className="h-3 w-3" />
               <span>{contact.contracts[0].contract_number}</span>

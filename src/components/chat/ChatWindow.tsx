@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock, MessageCircle, Bot } from "lucide-react";
+import { User, ArrowLeft, Phone, Building2, Key, FileText, UserPlus, Tags, MoreVertical, Search, Image, Clock, MessageCircle, Bot, ClipboardList, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -32,6 +32,7 @@ import { useChatSettings } from "@/hooks/useChatSettings";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { useRealtimeMessages } from "@/contexts/RealtimeMessagesContext";
+import { useDepartment } from "@/contexts/DepartmentContext";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
 import { DemandClassification } from "./DemandClassification";
@@ -84,6 +85,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     releaseToAI, 
     markHumanMessage 
   } = useConversationState(phoneNumber);
+  const { viewMode } = useDepartment();
   
   // Message deletion states
   const [messageToDelete, setMessageToDelete] = useState<MessageRow | null>(null);
@@ -463,9 +465,23 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
           )}
         </div>
         <div className="flex items-center gap-1">
-          {messages.length === 0 && (
+          {/* Prominent "Criar Demanda" button for tasks mode */}
+          {viewMode === 'tasks' && (
             <Button
               variant="default"
+              size="sm"
+              onClick={() => setShowCreateTicket(true)}
+              className="gap-2 mr-2 bg-primary hover:bg-primary/90"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Criar Demanda
+            </Button>
+          )}
+          
+          {/* Template button for new conversations */}
+          {messages.length === 0 && (
+            <Button
+              variant={viewMode === 'tasks' ? 'outline' : 'default'}
               size="sm"
               onClick={() => setShowQuickTemplate(true)}
               className="gap-2 mr-2"
@@ -622,6 +638,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
               onCreateTicket={() => setShowCreateTicket(true)}
               onViewProfile={() => setShowProfile(true)}
               onDeleteConversation={() => setShowDeleteDialog(true)}
+              viewMode={viewMode}
               disabled={sending}
             />
             

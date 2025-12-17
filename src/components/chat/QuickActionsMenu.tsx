@@ -1,46 +1,84 @@
-import { Ticket, User, Trash2 } from "lucide-react";
+import { Ticket, User, Trash2, Target, ArrowRight, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
+type ViewMode = 'leads' | 'tasks';
 
 interface QuickActionsMenuProps {
   onCreateTicket: () => void;
   onViewProfile: () => void;
   onDeleteConversation: () => void;
+  onAdvanceStage?: () => void;
   disabled?: boolean;
+  viewMode?: ViewMode;
 }
 
 export function QuickActionsMenu({
   onCreateTicket,
   onViewProfile,
   onDeleteConversation,
-  disabled = false
+  onAdvanceStage,
+  disabled = false,
+  viewMode = 'leads'
 }: QuickActionsMenuProps) {
-  const actions = [
+  
+  // Different actions based on view mode
+  const leadsActions = [
     {
-      icon: Ticket,
-      label: "Criar ticket",
-      onClick: onCreateTicket,
-      className: "text-primary hover:bg-primary/10"
+      icon: ArrowRight,
+      label: "Avançar stage",
+      onClick: onAdvanceStage || (() => {}),
+      className: "text-primary hover:bg-primary/10",
+      show: !!onAdvanceStage
     },
     {
       icon: User,
-      label: "Ver perfil do contato",
+      label: "Ver perfil do lead",
       onClick: onViewProfile,
-      className: "text-muted-foreground hover:bg-muted"
+      className: "text-muted-foreground hover:bg-muted",
+      show: true
     },
     {
       icon: Trash2,
       label: "Excluir conversa",
       onClick: onDeleteConversation,
-      className: "text-destructive hover:bg-destructive/10"
+      className: "text-destructive hover:bg-destructive/10",
+      show: true
     }
   ];
+
+  const tasksActions = [
+    {
+      icon: ClipboardList,
+      label: "Criar demanda",
+      onClick: onCreateTicket,
+      className: "text-primary hover:bg-primary/10",
+      show: true
+    },
+    {
+      icon: User,
+      label: "Ver perfil do contato",
+      onClick: onViewProfile,
+      className: "text-muted-foreground hover:bg-muted",
+      show: true
+    },
+    {
+      icon: Trash2,
+      label: "Excluir conversa",
+      onClick: onDeleteConversation,
+      className: "text-destructive hover:bg-destructive/10",
+      show: true
+    }
+  ];
+
+  const actions = viewMode === 'leads' ? leadsActions : tasksActions;
+  const visibleActions = actions.filter(a => a.show);
 
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1 px-1 py-1">
-        {actions.map((action, index) => {
+        {visibleActions.map((action, index) => {
           const Icon = action.icon;
           return (
             <Tooltip key={index}>
