@@ -725,7 +725,7 @@ async function callAIWithTools(config: AIAgentConfig, messages: any[], useTools:
   }
 }
 
-async function generateAudio(text: string, config: AIAgentConfig): Promise<string | null> {
+async function generateAudio(text: string, config: AIAgentConfig): Promise<{ audioUrl: string; isVoiceMessage: boolean } | null> {
   if (!config.audio_enabled) return null;
   
   try {
@@ -744,8 +744,11 @@ async function generateAudio(text: string, config: AIAgentConfig): Promise<strin
       return null;
     }
 
-    console.log('✅ Audio generated:', data.audioUrl);
-    return data.audioUrl;
+    console.log('✅ Audio generated:', data.audioUrl, 'isVoiceMessage:', data.isVoiceMessage);
+    return {
+      audioUrl: data.audioUrl,
+      isVoiceMessage: data.isVoiceMessage || false
+    };
   } catch (e) {
     console.error('❌ Error generating audio:', e);
     return null;
@@ -764,14 +767,18 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
   }
 }
 
-async function sendWhatsAppAudio(to: string, audioUrl: string, audioText?: string): Promise<boolean> {
+async function sendWhatsAppAudio(to: string, audioUrl: string, audioText?: string, isVoiceMessage?: boolean): Promise<boolean> {
   try {
+    // Use appropriate format based on whether it's a native voice message
+    const mediaType = isVoiceMessage ? 'audio/ogg' : 'audio/mpeg';
+    const filename = isVoiceMessage ? 'Mensagem de voz.ogg' : 'Mensagem de voz.mp3';
+    
     const { error } = await supabase.functions.invoke('send-wa-media', {
       body: {
         to,
         mediaUrl: audioUrl,
-        mediaType: 'audio/mpeg', // MP3 format for reliable WhatsApp delivery
-        filename: 'Mensagem de voz.mp3',
+        mediaType,
+        filename,
         caption: '',
         body: audioText || '' // Save the text that was converted to audio for conversation context
       }
@@ -1019,9 +1026,9 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       }
       
       console.log(`🎙️ Audio mode: sending complete audio (${audioText.length} chars)`);
-      const audioUrl = await generateAudio(audioText, config);
-      if (audioUrl) {
-        await sendWhatsAppAudio(phoneNumber, audioUrl, audioText); // Pass text for context
+      const audioResult = await generateAudio(audioText, config);
+      if (audioResult) {
+        await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, audioText, audioResult.isVoiceMessage);
         messagesSent++;
       } else {
         await sendWhatsAppMessage(phoneNumber, aiMessage);
@@ -1071,9 +1078,9 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
 
     // If NOT mirroring, also send audio based on audio_mode
     if (!config.audio_channel_mirroring && config.audio_enabled && config.audio_mode === 'text_and_audio' && aiMessage) {
-      const audioUrl = await generateAudio(aiMessage, config);
-      if (audioUrl) {
-        await sendWhatsAppAudio(phoneNumber, audioUrl, aiMessage); // Pass text for context
+      const audioResult = await generateAudio(aiMessage, config);
+      if (audioResult) {
+        await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, aiMessage, audioResult.isVoiceMessage);
         messagesSent++;
       }
     }
