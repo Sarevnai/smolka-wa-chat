@@ -14,6 +14,32 @@ function normalizePhoneNumber(phone: string): string {
   return phone.replace(/\D/g, '');
 }
 
+/**
+ * Find active conversation for a phone number (for outbound messages)
+ */
+async function findActiveConversation(supabase: any, phoneNumber: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('phone_number', phoneNumber)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error finding conversation:', error);
+      return null;
+    }
+
+    return data?.id || null;
+  } catch (error) {
+    console.error('Error in findActiveConversation:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -21,14 +47,15 @@ serve(async (req) => {
   }
 
   try {
-    const { to, text, interactive, template_name, language_code, components } = await req.json();
+    const { to, text, interactive, template_name, language_code, components, conversation_id } = await req.json();
 
     const normalizedPhone = normalizePhoneNumber(to);
     console.log('Send message request:', { 
       original: to, 
       normalized: normalizedPhone, 
       text, 
-      interactive 
+      interactive,
+      conversation_id // 🆕 Log conversation_id if provided
     });
 
     // Validate input
@@ -180,6 +207,15 @@ serve(async (req) => {
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+      // 🆕 Find or use provided conversation_id
+      let finalConversationId = conversation_id;
+      if (!finalConversationId) {
+        finalConversationId = await findActiveConversation(supabase, normalizedPhone);
+        if (finalConversationId) {
+          console.log(`📍 Found conversation for outbound message: ${finalConversationId}`);
+        }
+      }
+
       const messageData = {
         wa_message_id: result.messages?.[0]?.id || null,
         wa_from: null, // Outbound message, so from is null
@@ -190,7 +226,8 @@ serve(async (req) => {
         wa_timestamp: new Date().toISOString(),
         raw: result,
         created_at: new Date().toISOString(),
-        is_template: !!template_name || !!interactive // Mark as template if template_name or interactive
+        is_template: !!template_name || !!interactive,
+        conversation_id: finalConversationId, // 🆕 Link to conversation
       };
 
       const { error: dbError } = await supabase
@@ -200,7 +237,15 @@ serve(async (req) => {
       if (dbError) {
         console.error('Error saving message to database:', dbError);
       } else {
-        console.log('Message saved to database successfully');
+        console.log('Message saved to database successfully', { conversation_id: finalConversationId });
+      }
+
+      // 🆕 Update conversation timestamp
+      if (finalConversationId) {
+        await supabase
+          .from('conversations')
+          .update({ last_message_at: new Date().toISOString() })
+          .eq('id', finalConversationId);
       }
     } catch (dbError) {
       console.error('Database save error:', dbError);

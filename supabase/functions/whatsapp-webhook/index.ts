@@ -11,6 +11,142 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Department types matching database enum
+type DepartmentType = 'locacao' | 'administrativo' | 'vendas' | null;
+
+interface ConversationRecord {
+  id: string;
+  phone_number: string;
+  department_code: DepartmentType;
+  contact_id: string | null;
+  status: string;
+  stage_id: string | null;
+}
+
+/**
+ * Find an existing active conversation for this phone number, or create a new one.
+ * New conversations start with department_code = NULL (pending triage by Helena).
+ */
+async function findOrCreateConversation(phoneNumber: string): Promise<ConversationRecord | null> {
+  try {
+    // First, try to find an active conversation for this phone number
+    // We look for conversations without department (pending triage) or active ones
+    const { data: existingConv, error: findError } = await supabase
+      .from('conversations')
+      .select('id, phone_number, department_code, contact_id, status, stage_id')
+      .eq('phone_number', phoneNumber)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (findError) {
+      console.error('❌ Error finding conversation:', findError);
+      return null;
+    }
+
+    if (existingConv) {
+      console.log(`✅ Found existing conversation: ${existingConv.id} (department: ${existingConv.department_code || 'pending'})`);
+      return existingConv as ConversationRecord;
+    }
+
+    // No active conversation found, create a new one
+    console.log(`📝 Creating new conversation for: ${phoneNumber}`);
+
+    // First, check if contact exists and get their ID
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('phone', phoneNumber)
+      .maybeSingle();
+
+    // Create conversation with department_code = NULL (pending triage)
+    const { data: newConv, error: createError } = await supabase
+      .from('conversations')
+      .insert({
+        phone_number: phoneNumber,
+        contact_id: contact?.id || null,
+        department_code: null, // Pending triage by Helena
+        status: 'active',
+        last_message_at: new Date().toISOString()
+      })
+      .select('id, phone_number, department_code, contact_id, status, stage_id')
+      .single();
+
+    if (createError) {
+      console.error('❌ Error creating conversation:', createError);
+      return null;
+    }
+
+    console.log(`✅ New conversation created: ${newConv.id} (pending triage)`);
+    return newConv as ConversationRecord;
+
+  } catch (error) {
+    console.error('❌ Error in findOrCreateConversation:', error);
+    return null;
+  }
+}
+
+/**
+ * Update conversation's last_message_at timestamp
+ */
+async function updateConversationTimestamp(conversationId: string) {
+  try {
+    await supabase
+      .from('conversations')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', conversationId);
+  } catch (error) {
+    console.error('Error updating conversation timestamp:', error);
+  }
+}
+
+/**
+ * Assign department to conversation after Helena's triage
+ */
+async function assignDepartmentToConversation(
+  conversationId: string, 
+  department: DepartmentType,
+  qualificationData?: any
+) {
+  try {
+    if (!department) return;
+
+    // Get the first stage for this department
+    const { data: firstStage } = await supabase
+      .from('conversation_stages')
+      .select('id')
+      .eq('department_code', department)
+      .eq('order_index', 1)
+      .maybeSingle();
+
+    const updateData: any = {
+      department_code: department,
+    };
+
+    if (firstStage) {
+      updateData.stage_id = firstStage.id;
+    }
+
+    if (qualificationData) {
+      updateData.qualification_data = qualificationData;
+    }
+
+    const { error } = await supabase
+      .from('conversations')
+      .update(updateData)
+      .eq('id', conversationId);
+
+    if (error) {
+      console.error('❌ Error assigning department:', error);
+    } else {
+      console.log(`✅ Department ${department} assigned to conversation ${conversationId}`);
+    }
+  } catch (error) {
+    console.error('Error in assignDepartmentToConversation:', error);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -260,6 +396,16 @@ async function processIncomingMessage(message: any, value: any) {
       }
     }
 
+    // 🆕 PHASE 3: Find or create conversation BEFORE inserting message
+    const conversation = await findOrCreateConversation(message.from);
+    const conversationId = conversation?.id || null;
+
+    if (conversation) {
+      console.log(`📍 Message will be linked to conversation: ${conversationId} (dept: ${conversation.department_code || 'pending'})`);
+    } else {
+      console.warn('⚠️ Could not find/create conversation - message will be saved without conversation_id');
+    }
+
     // Extract message data
     const messageData = {
       wa_message_id: message.id,
@@ -275,7 +421,8 @@ async function processIncomingMessage(message: any, value: any) {
       media_caption: mediaInfo?.caption || null,
       media_filename: mediaInfo?.filename || null,
       media_mime_type: mediaInfo?.mimeType || null,
-      is_template: false, // Incoming messages are not templates
+      is_template: false,
+      conversation_id: conversationId, // 🆕 Link to conversation
     };
 
     console.log('📝 Dados da mensagem a serem inseridos:', {
@@ -284,7 +431,8 @@ async function processIncomingMessage(message: any, value: any) {
       wa_to: messageData.wa_to,
       direction: messageData.direction,
       body: messageData.body?.substring(0, 50),
-      timestamp: messageData.wa_timestamp
+      timestamp: messageData.wa_timestamp,
+      conversation_id: conversationId // 🆕 Log conversation_id
     });
 
     // Insert into database
@@ -299,14 +447,20 @@ async function processIncomingMessage(message: any, value: any) {
       console.log('✅ Mensagem inserida com sucesso!', {
         id: insertedData?.[0]?.id,
         wa_message_id: messageData.wa_message_id,
-        wa_from: messageData.wa_from
+        wa_from: messageData.wa_from,
+        conversation_id: conversationId
       });
+      
+      // Update conversation timestamp
+      if (conversationId) {
+        await updateConversationTimestamp(conversationId);
+      }
       
       // Ensure contact exists (without auto-triage flow)
       await ensureContactExists(message.from);
       
-      // Check if should trigger N8N virtual agent
-      await handleN8NTrigger(message.from, messageBody, message);
+      // 🆕 Pass conversation info to AI trigger
+      await handleN8NTrigger(message.from, messageBody, message, conversation);
     }
 
   } catch (error) {
@@ -347,8 +501,14 @@ async function ensureContactExists(phoneNumber: string) {
 
 /**
  * Handle AI agent trigger based on business hours, conversation state, and agent mode
+ * 🆕 Now receives conversation info for department assignment
  */
-async function handleN8NTrigger(phoneNumber: string, messageBody: string, message: any) {
+async function handleN8NTrigger(
+  phoneNumber: string, 
+  messageBody: string, 
+  message: any, 
+  conversation: ConversationRecord | null
+) {
   try {
     // Check conversation state - if operator has taken over, don't trigger AI
     const { data: convState } = await supabase
@@ -360,6 +520,13 @@ async function handleN8NTrigger(phoneNumber: string, messageBody: string, messag
     // If operator has taken over this conversation, skip AI
     if (convState?.operator_id && !convState?.is_ai_active) {
       console.log(`⏭️ Skipping AI - operator ${convState.operator_id} handling conversation`);
+      return;
+    }
+
+    // 🆕 If conversation already has a department and is not pending triage, 
+    // only trigger AI if explicitly enabled for that conversation
+    if (conversation?.department_code && !convState?.is_ai_active) {
+      console.log(`⏭️ Conversation ${conversation.id} already assigned to ${conversation.department_code} - human handling`);
       return;
     }
 
@@ -409,6 +576,7 @@ async function handleN8NTrigger(phoneNumber: string, messageBody: string, messag
       .eq('phone', phoneNumber)
       .maybeSingle();
 
+    // 🆕 Enhanced payload with conversation info for Helena's triage
     const agentPayload = {
       phoneNumber,
       messageBody,
@@ -416,7 +584,11 @@ async function handleN8NTrigger(phoneNumber: string, messageBody: string, messag
       contactName: contact?.name,
       contactType: contact?.contact_type,
       mediaUrl: message.media_url || null,
-      mediaType: message.media_type || null
+      mediaType: message.media_type || null,
+      // 🆕 Conversation context for triage
+      conversationId: conversation?.id || null,
+      currentDepartment: conversation?.department_code || null,
+      isPendingTriage: !conversation?.department_code,
     };
 
     // Use native agent or N8N based on configuration
@@ -430,6 +602,15 @@ async function handleN8NTrigger(phoneNumber: string, messageBody: string, messag
       console.error(`❌ Error triggering ${functionName}:`, triggerError);
     } else {
       console.log(`✅ ${functionName} triggered successfully:`, triggerResult);
+      
+      // 🆕 If AI agent returns a department assignment, apply it
+      if (triggerResult?.assignedDepartment && conversation?.id) {
+        await assignDepartmentToConversation(
+          conversation.id,
+          triggerResult.assignedDepartment as DepartmentType,
+          triggerResult.qualificationData
+        );
+      }
     }
 
   } catch (error) {
