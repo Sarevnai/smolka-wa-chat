@@ -86,10 +86,17 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useDepartment() {
+export function useDepartment(): DepartmentContextType {
   const context = useContext(DepartmentContext);
+  // Return safe defaults if used outside provider (e.g., during initial render)
   if (context === undefined) {
-    throw new Error('useDepartment must be used within a DepartmentProvider');
+    return {
+      activeDepartment: null,
+      userDepartment: null,
+      setActiveDepartment: () => {},
+      isAdmin: false,
+      loading: true
+    };
   }
   return context;
 }
