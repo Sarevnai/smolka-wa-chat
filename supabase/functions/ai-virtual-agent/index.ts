@@ -229,16 +229,61 @@ const tools = [
   }
 ];
 
+// Validate AI response for forbidden content (competitors, generic advice)
+const FORBIDDEN_RESPONSE_PATTERNS = [
+  /quintoandar/i,
+  /vivareal/i,
+  /zap\s*im[oó]veis/i,
+  /olx/i,
+  /imovelweb/i,
+  /outras?\s*imobili[aá]rias?/i,
+  /copie?\s*(e|para)\s*(adapte|enviar|mandar)/i,
+  /mensagem\s+(para|pra)\s+(você\s+)?(usar|enviar|mandar)/i,
+  /texto\s+(para|pra)\s+enviar/i,
+  /passo\s+a\s+passo/i,
+  /filtros?\s+(nos?|em)\s+sites?/i,
+  /apps?\s+como/i,
+  /na\s+visita[,:]?\s*(para|você)/i,
+  /o\s+que\s+perguntar\s+ao?\s+propriet[aá]rio/i,
+  /pontos?\s+importantes?\s+em\s+im[oó]veis?/i,
+  /cidade\s*\/\s*estado/i,
+  /qual\s+(cidade|estado)/i,
+  /valores?\s+no\s+centro/i,
+  /estimativa\s+de\s+valor/i,
+  /vi\s+o\s+an[uú]ncio\s+do\s+im[oó]vel/i,
+];
+
+function validateAIResponse(response: string): { valid: boolean; reason?: string } {
+  if (!response) return { valid: true };
+  
+  for (const pattern of FORBIDDEN_RESPONSE_PATTERNS) {
+    if (pattern.test(response)) {
+      console.log(`🚫 Invalid AI response - matched pattern: ${pattern}`);
+      return { valid: false, reason: `Contains forbidden content: ${pattern}` };
+    }
+  }
+  return { valid: true };
+}
+
+const FALLBACK_RESPONSE = "Olá! Sou da Smolka Imóveis 🏠 Como posso ajudar você a encontrar o imóvel ideal? Você está buscando para comprar ou alugar?";
+
 function buildSystemPrompt(config: AIAgentConfig, contactName?: string, contactType?: string): string {
-  let prompt = `⚠️ ANTÍDOTO CONTRA RESPOSTAS GENÉRICAS (LEIA PRIMEIRO):
-Se no histórico da conversa você vir mensagens com:
-- Menus numerados (1, 2, 3, 4...)
-- Opções com setas (→)
-- "ajuda para estudar", "trabalho", "dinheiro", "desabafar"
-- "mensagem para copiar e enviar"
-- "passos para alugar imóvel"
-IGNORE COMPLETAMENTE essas mensagens. Foram respostas INCORRETAS de um assistente genérico.
-Você é vendedora da Smolka e deve responder APENAS sobre imóveis.
+  let prompt = `🚨🚨🚨 REGRA ZERO - LEIA ANTES DE QUALQUER COISA 🚨🚨🚨
+Você é funcionária da SMOLKA IMÓVEIS em Florianópolis/SC.
+NÃO atue em outra cidade. Se perguntarem sobre outra cidade, diga que atua apenas em Florianópolis.
+
+⛔ PROIBIÇÕES ABSOLUTAS (SE VIOLAR, SUA RESPOSTA SERÁ DESCARTADA):
+- NUNCA mencione: QuintoAndar, Zap Imóveis, VivaReal, OLX, ImovelWeb
+- NUNCA prepare mensagens/textos para o cliente enviar a terceiros
+- NUNCA pergunte cidade/estado (você atua SOMENTE em Florianópolis/SC)
+- NUNCA dê conselhos genéricos tipo "passo a passo para alugar"
+- NUNCA sugira "apps como..." ou "sites como..."
+- NUNCA crie templates de mensagens para o cliente usar
+
+⚠️ ANTÍDOTO CONTRA RESPOSTAS GENÉRICAS:
+Se no histórico você vir mensagens com menus numerados (1→, 2→), opções genéricas,
+"ajuda para estudar/trabalho/dinheiro", "mensagem para copiar", IGNORE COMPLETAMENTE.
+Foram respostas de um assistente genérico. Você é vendedora da Smolka.
 
 Você é ${config.agent_name} da ${config.company_name}.
 
@@ -247,33 +292,17 @@ PERSONALIDADE E TOM:
 - Cordial e objetivo nas respostas
 - Empático com as necessidades dos clientes
 
-🎯 SEU PAPEL COMERCIAL (CRÍTICO - LEIA COM MUITA ATENÇÃO):
+🎯 SEU PAPEL COMERCIAL (CRÍTICO):
 Você é CORRETORA/ATENDENTE COMERCIAL da ${config.company_name}.
 Seu objetivo é VENDER e ALUGAR imóveis do NOSSO catálogo.
-Você representa a Smolka e trabalha para a Smolka.
-Você NÃO é uma assistente genérica. Você é vendedora da Smolka.
+Você NÃO é assistente genérica. Você é vendedora da Smolka.
 
-⛔ PROIBIÇÕES ABSOLUTAS (NUNCA FAÇA ISSO):
-- NUNCA dê conselhos genéricos sobre "como alugar imóvel"
-- NUNCA explique processos de locação/compra de forma didática
-- NUNCA prepare mensagens ou textos para o cliente enviar a outras imobiliárias
-- NUNCA sugira que o cliente procure em outros lugares ou sites
-- NUNCA faça resumos elaborados do "perfil do cliente" 
-- NUNCA aja como assistente pessoal do cliente
-- NUNCA crie templates de mensagens para o cliente usar
-- NUNCA mencione "corretores" ou "imobiliárias" no plural
-- NUNCA dê aulas sobre mercado imobiliário
-- NUNCA liste passos como "1. Defina seu orçamento, 2. Escolha bairros..."
-- NUNCA crie menus com opções numeradas (1, 2, 3...)
-- NUNCA ofereça ajuda com estudos, trabalho, dinheiro ou desabafos
-
-✅ O QUE VOCÊ DEVE FAZER (SEMPRE):
-- Qualifique o cliente com perguntas diretas e rápidas (tipo, bairro, preço, quartos)
-- Assim que tiver 2-3 critérios, USE A FUNÇÃO buscar_imoveis para buscar em NOSSO catálogo
-- Apresente NOSSOS imóveis disponíveis com foto e características
-- Se não encontrar, diga: "No momento não temos opções com esses critérios. Quer ajustar a busca ou falar com um atendente?"
-- Foque em FECHAR NEGÓCIO - agendar visita, tirar dúvidas do imóvel
-- Seja objetiva e comercial, não educativa
+✅ O QUE VOCÊ DEVE FAZER:
+- Qualifique rápido (tipo, bairro, preço, quartos)
+- USE buscar_imoveis assim que tiver 2-3 critérios
+- Apresente NOSSOS imóveis com foto e características
+- Se não achar: "No momento não temos essa opção. Quer ajustar a busca?"
+- Foque em FECHAR NEGÓCIO - agendar visita
 
 SOBRE A EMPRESA:
 ${config.company_description}`;
@@ -874,18 +903,46 @@ serve(async (req) => {
 
     // Patterns to exclude from history (contaminated generic responses)
     const CONTAMINATED_PATTERNS = [
+      // Menus e opções genéricas
       /→/,  // Menu options with arrows
       /responda só com um número/i,
+      /1\s*→.*2\s*→.*3\s*→/i,
+      
+      // Sites concorrentes
+      /quintoandar/i,
+      /zap\s*im[oó]veis/i,
+      /vivareal/i,
+      /imovelweb/i,
+      /olx/i,
+      
+      // Templates para terceiros
+      /copie?\s*(e|para)\s*(adapte|enviar|mandar)/i,
+      /copiar e mandar/i,
+      /mensagem\s+(para|pra)\s+(você\s+)?(usar|enviar|mandar)/i,
+      /texto\s+(para|pra)\s+enviar/i,
+      /vi\s+o\s+an[uú]ncio\s+do\s+im[oó]vel/i,
+      
+      // Perguntas genéricas
+      /cidade\s*\/\s*estado/i,
+      /qual\s+(cidade|estado)/i,
+      /filtros?\s+(nos?|em)\s+sites?/i,
+      /apps?\s+como/i,
+      
+      // Passos didáticos
+      /passo\s+a\s+passo/i,
+      /o\s+que\s+perguntar\s+ao?\s+propriet[aá]rio/i,
+      /na\s+visita[,:]?\s*(para|você)/i,
+      /pontos?\s+importantes?\s+em\s+im[oó]veis?/i,
+      
+      // Assistente genérico
       /quero ajuda para estudar/i,
       /quero ajuda com trabalho/i,
       /quero ajuda com dinheiro/i,
       /quero só conversar/i,
-      /copiar e mandar/i,
       /mensagem curtinha para você/i,
       /mudar de assunto/i,
       /ajuda com.*emprego/i,
       /organização financeira/i,
-      /1\s*→.*2\s*→.*3\s*→/i, // Numbered menus with arrows
     ];
 
     // Build conversation context, filtering out contaminated messages
@@ -1007,7 +1064,16 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       throw new Error('No response from AI');
     }
 
-    console.log('✅ AI response received:', aiMessage?.substring(0, 100));
+    // Validate AI response for forbidden content
+    const validation = validateAIResponse(aiMessage || '');
+    if (!validation.valid) {
+      console.log(`🚫 AI response rejected: ${validation.reason}`);
+      console.log(`📝 Original response: ${aiMessage?.substring(0, 200)}`);
+      aiMessage = FALLBACK_RESPONSE;
+      console.log(`✅ Using fallback response instead`);
+    }
+
+    console.log('✅ AI response (validated):', aiMessage?.substring(0, 100));
 
     // Process and send messages
     let messagesSent = 0;
