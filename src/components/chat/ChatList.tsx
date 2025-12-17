@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, MessageSquare, ArrowLeft, Volume2, VolumeX, Plus, User } from "lucide-react";
+import { Search, MessageSquare, ArrowLeft, Volume2, VolumeX, Plus, User, Building2 } from "lucide-react";
 import { format, parseISO, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,11 @@ import { useWhatsAppTemplates } from "@/hooks/useWhatsAppTemplates";
 import { useQuickTemplate } from "@/hooks/useQuickTemplate";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { Loader2 } from "lucide-react";
+import { Database } from "@/integrations/supabase/types";
+
+type DepartmentType = Database['public']['Enums']['department_type'];
 
 interface Conversation {
   phoneNumber: string;
@@ -31,6 +35,10 @@ interface Conversation {
   unreadCount: number;
   contactName?: string;
   contactType?: string;
+  conversationId?: string;
+  departmentCode?: DepartmentType | null;
+  stageName?: string;
+  stageColor?: string;
 }
 
 interface ChatListProps {
@@ -57,74 +65,99 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   const { sendTemplate, isLoading: sendingTemplate } = useQuickTemplate();
   const { profile } = useAuth();
   const permissions = usePermissions();
+  const { department: userDepartment, loading: deptLoading } = useUserDepartment();
 
   const loadConversations = async () => {
     try {
       setLoading(true);
       
-      // Optimized query: Get only the most recent message per conversation
-      // First, get unique phone numbers from recent messages
-      const { data: messages, error } = await supabase
-        .from("messages")
-        .select("*")
-        .order("wa_timestamp", { ascending: false })
-        .limit(200); // Reduced from 1000 for better performance
-
-      if (error) throw error;
-
-      // Group messages by phone number (using wa_from for inbound, wa_to for outbound)
-      const conversationMap = new Map<string, MessageRow[]>();
+      // Query conversations table with department filter
+      // Admins see all, others see only their department or unassigned (NULL)
+      let conversationsQuery = supabase
+        .from("conversations")
+        .select(`
+          id,
+          phone_number,
+          department_code,
+          stage_id,
+          status,
+          last_message_at,
+          contact_id,
+          contacts:contact_id (
+            name,
+            contact_type
+          ),
+          conversation_stages:stage_id (
+            name,
+            color
+          )
+        `)
+        .eq("status", "active")
+        .order("last_message_at", { ascending: false })
+        .limit(100);
       
-      messages?.forEach((message) => {
-        const phoneNumber = message.direction === "inbound" ? message.wa_from : message.wa_to;
-        if (phoneNumber) {
-          if (!conversationMap.has(phoneNumber)) {
-            conversationMap.set(phoneNumber, []);
-          }
-          conversationMap.get(phoneNumber)!.push(message as MessageRow);
-        }
-      });
+      // Filter by department if user is not admin
+      if (!permissions.isAdmin && userDepartment) {
+        conversationsQuery = conversationsQuery.or(`department_code.eq.${userDepartment},department_code.is.null`);
+      } else if (!permissions.isAdmin) {
+        // User has no department, show only unassigned
+        conversationsQuery = conversationsQuery.is("department_code", null);
+      }
+      // Admins see all conversations
 
-      // Get all unique phone numbers
-      const phoneNumbers = Array.from(conversationMap.keys());
+      const { data: conversationsData, error: convError } = await conversationsQuery;
+
+      if (convError) throw convError;
+
+      // Get the last message for each conversation
+      const phoneNumbers = (conversationsData || []).map(c => c.phone_number);
       
-      // Fetch contact names for all phone numbers in a single query
-      const { data: contacts, error: contactsError } = await supabase
-        .from("contacts")
-        .select("phone, name, contact_type")
-        .in("phone", phoneNumbers);
-
-      if (contactsError) {
-        console.error("Error loading contacts:", contactsError);
+      if (phoneNumbers.length === 0) {
+        setConversations([]);
+        setLoading(false);
+        return;
       }
 
-      // Create a map of phone numbers to contact names
-      const contactMap = new Map<string, { name?: string; contact_type?: string }>();
-      contacts?.forEach((contact) => {
-        if (contact.phone) {
-          contactMap.set(contact.phone, {
-            name: contact.name,
-            contact_type: contact.contact_type
-          });
+      // Get last message for each phone number
+      const { data: messages, error: messagesError } = await supabase
+        .from("messages")
+        .select("*")
+        .or(phoneNumbers.map(p => `wa_from.eq.${p},wa_to.eq.${p}`).join(','))
+        .order("wa_timestamp", { ascending: false });
+
+      if (messagesError) throw messagesError;
+
+      // Group messages by phone number and get last one
+      const lastMessageMap = new Map<string, MessageRow>();
+      messages?.forEach((message) => {
+        const phoneNumber = message.direction === "inbound" ? message.wa_from : message.wa_to;
+        if (phoneNumber && !lastMessageMap.has(phoneNumber)) {
+          lastMessageMap.set(phoneNumber, message as MessageRow);
         }
       });
 
-      // Convert to conversation objects with contact names
-      const conversationList: Conversation[] = Array.from(conversationMap.entries()).map(([phoneNumber, messages]) => {
-        const sortedMessages = messages.sort((a, b) => 
-          new Date(b.wa_timestamp || b.created_at || "").getTime() - 
-          new Date(a.wa_timestamp || a.created_at || "").getTime()
-        );
-        
-        const contactInfo = contactMap.get(phoneNumber);
+      // Build conversation list
+      const conversationList: Conversation[] = (conversationsData || []).map((conv: any) => {
+        const lastMessage = lastMessageMap.get(conv.phone_number);
+        const contact = conv.contacts;
+        const stage = conv.conversation_stages;
         
         return {
-          phoneNumber,
-          lastMessage: sortedMessages[0],
-          messageCount: messages.length,
-          unreadCount: 0, // TODO: Implement unread count logic
-          contactName: contactInfo?.name,
-          contactType: contactInfo?.contact_type
+          phoneNumber: conv.phone_number,
+          lastMessage: lastMessage || {
+            id: 0,
+            body: "Nova conversa",
+            wa_timestamp: conv.last_message_at,
+            direction: "inbound",
+          } as MessageRow,
+          messageCount: 0,
+          unreadCount: 0,
+          contactName: contact?.name,
+          contactType: contact?.contact_type,
+          conversationId: conv.id,
+          departmentCode: conv.department_code,
+          stageName: stage?.name,
+          stageColor: stage?.color,
         };
       });
 
@@ -133,11 +166,9 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         const aIsPinned = pinnedConversations.includes(a.phoneNumber);
         const bIsPinned = pinnedConversations.includes(b.phoneNumber);
         
-        // Pinned conversations first
         if (aIsPinned && !bIsPinned) return -1;
         if (!aIsPinned && bIsPinned) return 1;
         
-        // Then sort by last message timestamp
         return new Date(b.lastMessage.wa_timestamp || b.lastMessage.created_at || "").getTime() - 
                new Date(a.lastMessage.wa_timestamp || a.lastMessage.created_at || "").getTime();
       });
@@ -156,8 +187,10 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
   };
 
   useEffect(() => {
-    loadConversations();
-  }, []);
+    if (!deptLoading) {
+      loadConversations();
+    }
+  }, [userDepartment, permissions.isAdmin, deptLoading]);
 
   // Use centralized realtime context
   const { lastMessage } = useRealtimeMessages();
@@ -213,43 +246,9 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         return updated;
       });
     } else {
-      // New conversation - fetch contact info and add to list
-      console.log('🆕 [ChatList] Nova conversa detectada');
-      
-      supabase
-        .from('contacts')
-        .select('name, contact_type')
-        .eq('phone', phoneNumber)
-        .maybeSingle()
-        .then(({ data: contact }) => {
-          const newConversation: Conversation = {
-            phoneNumber,
-            lastMessage,
-            messageCount: 1,
-            unreadCount: selectedContact === phoneNumber ? 0 : 1,
-            contactName: contact?.name,
-            contactType: contact?.contact_type
-          };
-          
-          setConversations(prev => {
-            const isPinned = pinnedConversations.includes(phoneNumber);
-            
-            if (isPinned) {
-              return [newConversation, ...prev];
-            } else {
-              const firstUnpinnedIndex = prev.findIndex(c => 
-                !pinnedConversations.includes(c.phoneNumber)
-              );
-              if (firstUnpinnedIndex >= 0) {
-                const updated = [...prev];
-                updated.splice(firstUnpinnedIndex, 0, newConversation);
-                return updated;
-              } else {
-                return [...prev, newConversation];
-              }
-            }
-          });
-        });
+      // New conversation detected - reload from database to get proper department/stage info
+      console.log('🆕 [ChatList] Nova conversa detectada, recarregando...');
+      loadConversations();
     }
   }, [lastMessage, selectedContact, pinnedConversations]);
 
@@ -467,6 +466,15 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
     return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
 
+  const getDepartmentLabel = (code: DepartmentType | null | undefined): string => {
+    switch (code) {
+      case 'locacao': return 'Locação';
+      case 'vendas': return 'Vendas';
+      case 'administrativo': return 'Administrativo';
+      default: return 'Todos';
+    }
+  };
+
   return (
     <>
       <div className="h-full flex flex-col bg-sidebar relative">
@@ -478,7 +486,20 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
-          <h1 className="text-lg font-medium">Chat</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-medium">Chat</h1>
+            {userDepartment && !permissions.isAdmin && (
+              <Badge variant="secondary" className="text-xs bg-white/20 hover:bg-white/30">
+                <Building2 className="h-3 w-3 mr-1" />
+                {getDepartmentLabel(userDepartment)}
+              </Badge>
+            )}
+            {permissions.isAdmin && (
+              <Badge variant="secondary" className="text-xs bg-white/20 hover:bg-white/30">
+                Admin
+              </Badge>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
@@ -570,6 +591,9 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
                     unreadCount={conversation.unreadCount}
                     isSelected={selectedContact === conversation.phoneNumber}
                     onClick={() => onContactSelect(conversation.phoneNumber)}
+                    stageName={conversation.stageName}
+                    stageColor={conversation.stageColor}
+                    departmentCode={conversation.departmentCode}
                   />
                 ))}
               </div>
