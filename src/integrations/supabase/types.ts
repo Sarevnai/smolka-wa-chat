@@ -485,6 +485,39 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_stages: {
+        Row: {
+          color: string
+          created_at: string | null
+          department_code: Database["public"]["Enums"]["department_type"]
+          id: string
+          is_final: boolean | null
+          name: string
+          order_index: number
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string
+          created_at?: string | null
+          department_code: Database["public"]["Enums"]["department_type"]
+          id?: string
+          is_final?: boolean | null
+          name: string
+          order_index: number
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          department_code?: Database["public"]["Enums"]["department_type"]
+          id?: string
+          is_final?: boolean | null
+          name?: string
+          order_index?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       conversation_states: {
         Row: {
           ai_started_at: string | null
@@ -527,6 +560,79 @@ export type Database = {
         }
         Relationships: []
       }
+      conversations: {
+        Row: {
+          assigned_to: string | null
+          closed_at: string | null
+          closed_reason: string | null
+          contact_id: string | null
+          created_at: string | null
+          department_code: Database["public"]["Enums"]["department_type"] | null
+          id: string
+          last_message_at: string | null
+          phone_number: string
+          qualification_data: Json | null
+          qualification_score: number | null
+          stage_id: string | null
+          status: string
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          closed_at?: string | null
+          closed_reason?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          department_code?:
+            | Database["public"]["Enums"]["department_type"]
+            | null
+          id?: string
+          last_message_at?: string | null
+          phone_number: string
+          qualification_data?: Json | null
+          qualification_score?: number | null
+          stage_id?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          closed_at?: string | null
+          closed_reason?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          department_code?:
+            | Database["public"]["Enums"]["department_type"]
+            | null
+          id?: string
+          last_message_at?: string | null
+          phone_number?: string
+          qualification_data?: Json | null
+          qualification_score?: number | null
+          stage_id?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deleted_messages: {
         Row: {
           can_restore: boolean
@@ -554,6 +660,39 @@ export type Database = {
           id?: string
           message_id?: number
           original_message_data?: Json
+        }
+        Relationships: []
+      }
+      departments: {
+        Row: {
+          code: Database["public"]["Enums"]["department_type"]
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          pipeline_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: Database["public"]["Enums"]["department_type"]
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          pipeline_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: Database["public"]["Enums"]["department_type"]
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          pipeline_type?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -656,6 +795,7 @@ export type Database = {
       messages: {
         Row: {
           body: string | null
+          conversation_id: string | null
           created_at: string | null
           deleted_at: string | null
           deleted_by: string | null
@@ -677,6 +817,7 @@ export type Database = {
         }
         Insert: {
           body?: string | null
+          conversation_id?: string | null
           created_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
@@ -698,6 +839,7 @@ export type Database = {
         }
         Update: {
           body?: string | null
+          conversation_id?: string | null
           created_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
@@ -717,7 +859,15 @@ export type Database = {
           wa_timestamp?: string | null
           wa_to?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pinned_conversations: {
         Row: {
@@ -967,6 +1117,7 @@ export type Database = {
       user_functions: {
         Row: {
           created_at: string
+          department_code: Database["public"]["Enums"]["department_type"] | null
           function: Database["public"]["Enums"]["app_function"]
           id: string
           updated_at: string
@@ -974,6 +1125,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          department_code?:
+            | Database["public"]["Enums"]["department_type"]
+            | null
           function: Database["public"]["Enums"]["app_function"]
           id?: string
           updated_at?: string
@@ -981,6 +1135,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          department_code?:
+            | Database["public"]["Enums"]["department_type"]
+            | null
           function?: Database["public"]["Enums"]["app_function"]
           id?: string
           updated_at?: string
@@ -1110,6 +1267,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_conversation: {
+        Args: { _conversation_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_manage_users: { Args: never; Returns: boolean }
       get_contact_message_stats: {
         Args: { phone_numbers: string[] }
@@ -1122,6 +1283,10 @@ export type Database = {
       get_current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      get_user_department: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["department_type"]
       }
       get_user_effective_permissions: {
         Args: { p_user_id: string }
@@ -1161,6 +1326,7 @@ export type Database = {
       contact_status: "ativo" | "inativo" | "bloqueado"
       contact_type: "proprietario" | "inquilino"
       contract_status: "ativo" | "encerrado" | "suspenso"
+      department_type: "locacao" | "administrativo" | "vendas"
       user_role: "admin" | "user"
     }
     CompositeTypes: {
@@ -1293,6 +1459,7 @@ export const Constants = {
       contact_status: ["ativo", "inativo", "bloqueado"],
       contact_type: ["proprietario", "inquilino"],
       contract_status: ["ativo", "encerrado", "suspenso"],
+      department_type: ["locacao", "administrativo", "vendas"],
       user_role: ["admin", "user"],
     },
   },
