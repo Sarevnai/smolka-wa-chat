@@ -1,0 +1,25 @@
+-- Clean contaminated AI messages that mention competitors or generic advice
+UPDATE messages 
+SET body = '[Mensagem removida - conteúdo inadequado do agente IA]'
+WHERE direction = 'outbound' 
+AND (
+  body ILIKE '%quintoandar%'
+  OR body ILIKE '%vivareal%'
+  OR body ILIKE '%zap imóveis%'
+  OR body ILIKE '%zap imoveis%'
+  OR body ILIKE '%olx%'
+  OR body ILIKE '%imovelweb%'
+  OR body ILIKE '%copie e adapte%'
+  OR body ILIKE '%copiar e mandar%'
+  OR body ILIKE '%mensagem para você usar%'
+  OR body ILIKE '%texto para enviar%'
+  OR body ILIKE '%passo a passo%'
+  OR body ILIKE '%filtros nos sites%'
+  OR body ILIKE '%apps como%'
+  OR body ILIKE '%cidade/estado%'
+  OR body ILIKE '%qual cidade%'
+  OR body ILIKE '%vi o anúncio do imóvel%'
+  OR body ILIKE '%o que perguntar ao proprietário%'
+  OR body ILIKE '%pontos importantes em imóvel%'
+  OR body LIKE '%→%'
+)
