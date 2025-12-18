@@ -485,6 +485,7 @@ export type Database = {
           ai_takeover_at: string | null
           contact_type: Database["public"]["Enums"]["contact_type"] | null
           created_at: string
+          department_code: Database["public"]["Enums"]["department_type"] | null
           description: string | null
           email: string | null
           id: string
@@ -503,6 +504,9 @@ export type Database = {
           ai_takeover_at?: string | null
           contact_type?: Database["public"]["Enums"]["contact_type"] | null
           created_at?: string
+          department_code?:
+            | Database["public"]["Enums"]["department_type"]
+            | null
           description?: string | null
           email?: string | null
           id?: string
@@ -521,6 +525,9 @@ export type Database = {
           ai_takeover_at?: string | null
           contact_type?: Database["public"]["Enums"]["contact_type"] | null
           created_at?: string
+          department_code?:
+            | Database["public"]["Enums"]["department_type"]
+            | null
           description?: string | null
           email?: string | null
           id?: string

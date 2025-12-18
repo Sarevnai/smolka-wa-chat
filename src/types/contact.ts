@@ -1,3 +1,5 @@
+export type DepartmentCode = 'locacao' | 'administrativo' | 'vendas';
+
 export interface Contact {
   id: string;
   name?: string;
@@ -8,6 +10,7 @@ export interface Contact {
   notes?: string;
   rating?: number;
   description?: string;
+  department_code?: DepartmentCode;
   created_at: string;
   updated_at: string;
   contracts?: Contract[];
@@ -41,6 +44,7 @@ export interface CreateContactRequest {
   notes?: string;
   rating?: number;
   description?: string;
+  department_code?: DepartmentCode;
   contracts?: Array<{
     contract_number: string;
     contract_type?: string;
