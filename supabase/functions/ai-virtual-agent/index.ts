@@ -959,46 +959,150 @@ async function updateTriageStage(phoneNumber: string, stage: string): Promise<vo
 }
 
 /**
- * Send greeting message and ask for name
+ * Send greeting message (step 1 of new flow)
+ * Mirrors the communication channel from the start
  */
-async function sendGreetingAndAskName(phoneNumber: string, config: AIAgentConfig): Promise<void> {
-  const greeting = `Oi! Aqui é a ${config.agent_name || 'Nina'} da ${config.company_name || 'Smolka Imóveis'} 🏠
-
-Pode me mandar texto ou áudio, eu entendo os dois! 😊
-
-Antes de continuar, como posso te chamar?`;
-
-  const { error } = await supabase.functions.invoke('send-wa-message', {
-    body: { to: phoneNumber, text: greeting }
-  });
+async function sendGreeting(phoneNumber: string, config: AIAgentConfig, useAudio: boolean = false): Promise<void> {
+  const greetingText = `Olá! Aqui é a ${config.agent_name || 'Nina'} da ${config.company_name || 'Smolka Imóveis'} 🏠`;
   
-  if (error) {
-    console.error('❌ Error sending greeting:', error);
+  if (useAudio && config.audio_enabled) {
+    const audioResult = await generateAudio(greetingText, config);
+    if (audioResult) {
+      await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, greetingText, audioResult.isVoiceMessage);
+    } else {
+      await sendWhatsAppMessage(phoneNumber, greetingText);
+    }
   } else {
-    console.log('✅ Greeting sent, awaiting name');
+    await sendWhatsAppMessage(phoneNumber, greetingText);
+  }
+  
+  console.log('✅ Greeting sent');
+}
+
+/**
+ * Ask for name (step 2 of new flow)
+ */
+async function askForName(phoneNumber: string, config: AIAgentConfig, useAudio: boolean = false): Promise<void> {
+  const askNameText = 'Como você se chama?';
+  
+  await sleep(800);
+  
+  if (useAudio && config.audio_enabled) {
+    const audioResult = await generateAudio(askNameText, config);
+    if (audioResult) {
+      await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, askNameText, audioResult.isVoiceMessage);
+    } else {
+      await sendWhatsAppMessage(phoneNumber, askNameText);
+    }
+  } else {
+    await sendWhatsAppMessage(phoneNumber, askNameText);
+  }
+  
+  console.log('✅ Asked for name');
+}
+
+/**
+ * Send preference question (step 3 of new flow)
+ */
+async function sendPreferenceQuestion(phoneNumber: string, name: string, config: AIAgentConfig, useAudio: boolean = false): Promise<void> {
+  // First confirm the name
+  const confirmText = `Prazer, ${name}! 😊`;
+  
+  if (useAudio && config.audio_enabled) {
+    const audioResult = await generateAudio(confirmText, config);
+    if (audioResult) {
+      await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, confirmText, audioResult.isVoiceMessage);
+    } else {
+      await sendWhatsAppMessage(phoneNumber, confirmText);
+    }
+  } else {
+    await sendWhatsAppMessage(phoneNumber, confirmText);
+  }
+  
+  await sleep(800);
+  
+  // Then ask for preference
+  const preferenceText = 'Você prefere receber as informações por texto ou áudio? 📝🎧';
+  
+  if (useAudio && config.audio_enabled) {
+    const audioResult = await generateAudio(preferenceText, config);
+    if (audioResult) {
+      await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, preferenceText, audioResult.isVoiceMessage);
+    } else {
+      await sendWhatsAppMessage(phoneNumber, preferenceText);
+    }
+  } else {
+    await sendWhatsAppMessage(phoneNumber, preferenceText);
+  }
+  
+  console.log('✅ Preference question sent');
+}
+
+/**
+ * Extract communication preference from message
+ * Returns 'audio', 'texto', or null if not detected
+ */
+function extractCommunicationPreference(message: string, messageType: string): 'audio' | 'texto' | null {
+  const lower = message.toLowerCase();
+  
+  // Explicit audio patterns
+  const audioPatterns = /[aá]udio|voz|ouvir|escutar|falar|falando/i;
+  if (audioPatterns.test(lower)) return 'audio';
+  
+  // Explicit text patterns
+  const textoPatterns = /texto|escrito|ler|mensagem|escrever|escrevendo|digitando/i;
+  if (textoPatterns.test(lower)) return 'texto';
+  
+  // Fallback: infer from message type (rapport)
+  // If user sent audio, they probably prefer audio
+  if (messageType === 'audio') return 'audio';
+  
+  // If user sent text, they probably prefer text
+  if (messageType === 'text') return 'texto';
+  
+  return null;
+}
+
+/**
+ * Save communication preference to contact
+ */
+async function saveContactPreference(phoneNumber: string, preference: 'audio' | 'texto'): Promise<void> {
+  const { error } = await supabase
+    .from('contacts')
+    .update({ 
+      communication_preference: preference,
+      updated_at: new Date().toISOString() 
+    })
+    .eq('phone', phoneNumber);
+    
+  if (error) {
+    console.error('❌ Error saving contact preference:', error);
+  } else {
+    console.log(`✅ Contact preference saved: ${preference}`);
   }
 }
 
 /**
- * Send triage template triagem_ia with personalized greeting
+ * Send triage template triagem_ia (step 4 of new flow)
  */
-async function sendTriageButtons(phoneNumber: string, name: string): Promise<void> {
-  // 1. First send personalized greeting with the name
-  const greetingResponse = await supabase.functions.invoke('send-wa-message', {
-    body: { 
-      to: phoneNumber, 
-      text: `Prazer, ${name}! 😊`
-    }
-  });
+async function sendTriageButtons(phoneNumber: string, config: AIAgentConfig, useAudio: boolean = false): Promise<void> {
+  // Optional: send a brief intro before the template
+  const introText = 'Agora me conta, como posso te ajudar hoje?';
   
-  if (greetingResponse.error) {
-    console.error('❌ Error sending greeting:', greetingResponse.error);
+  if (useAudio && config.audio_enabled) {
+    const audioResult = await generateAudio(introText, config);
+    if (audioResult) {
+      await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, introText, audioResult.isVoiceMessage);
+    } else {
+      await sendWhatsAppMessage(phoneNumber, introText);
+    }
+  } else {
+    await sendWhatsAppMessage(phoneNumber, introText);
   }
   
-  // 2. Small delay to ensure message order
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await sleep(500);
   
-  // 3. Send the triagem_ia template with buttons
+  // Send the triagem_ia template with buttons
   const { error } = await supabase.functions.invoke('send-wa-message', {
     body: { 
       to: phoneNumber, 
@@ -1017,12 +1121,37 @@ async function sendTriageButtons(phoneNumber: string, name: string): Promise<voi
 /**
  * Ask for name again if not detected
  */
-async function askForNameAgain(phoneNumber: string): Promise<void> {
+async function askForNameAgain(phoneNumber: string, config: AIAgentConfig, useAudio: boolean = false): Promise<void> {
   const message = 'Me desculpa, não consegui entender seu nome 😅\n\nPode me dizer como posso te chamar?';
   
-  await supabase.functions.invoke('send-wa-message', {
-    body: { to: phoneNumber, text: message }
-  });
+  if (useAudio && config.audio_enabled) {
+    const audioResult = await generateAudio(message, config);
+    if (audioResult) {
+      await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, message, audioResult.isVoiceMessage);
+    } else {
+      await sendWhatsAppMessage(phoneNumber, message);
+    }
+  } else {
+    await sendWhatsAppMessage(phoneNumber, message);
+  }
+}
+
+/**
+ * Ask for preference again if not detected
+ */
+async function askForPreferenceAgain(phoneNumber: string, config: AIAgentConfig, useAudio: boolean = false): Promise<void> {
+  const message = 'Desculpa, não entendi 😅\nVocê prefere receber por texto ou áudio?';
+  
+  if (useAudio && config.audio_enabled) {
+    const audioResult = await generateAudio(message, config);
+    if (audioResult) {
+      await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, message, audioResult.isVoiceMessage);
+    } else {
+      await sendWhatsAppMessage(phoneNumber, message);
+    }
+  } else {
+    await sendWhatsAppMessage(phoneNumber, message);
+  }
 }
 
 /**
@@ -1042,6 +1171,24 @@ async function saveContactName(phoneNumber: string, name: string): Promise<void>
   } else {
     console.log(`✅ Contact name saved: ${name}`);
   }
+}
+
+/**
+ * Get contact's communication preference from database
+ */
+async function getContactPreference(phoneNumber: string): Promise<'audio' | 'texto' | null> {
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('communication_preference')
+    .eq('phone', phoneNumber)
+    .maybeSingle();
+    
+  if (error) {
+    console.error('❌ Error getting contact preference:', error);
+    return null;
+  }
+  
+  return data?.communication_preference as 'audio' | 'texto' | null;
 }
 
 /**
@@ -1195,8 +1342,12 @@ serve(async (req) => {
     }
 
     // ========== TRIAGE FLOW HANDLING ==========
+    // Determine if we should use audio based on message type (rapport/mirroring)
+    const useAudioForTriage = messageType === 'audio' && config.audio_enabled;
+    
     if (isPendingTriage) {
       console.log('📋 Handling triage flow for pending conversation');
+      console.log(`🔊 Using audio for triage: ${useAudioForTriage} (messageType: ${messageType})`);
       
       // Get current triage stage
       const { data: convState } = await supabase
@@ -1210,8 +1361,12 @@ serve(async (req) => {
 
       // STAGE: GREETING (first message - no stage yet)
       if (!triageStage || triageStage === 'greeting') {
-        console.log('👋 Sending greeting and asking for name');
-        await sendGreetingAndAskName(phoneNumber, config);
+        console.log('👋 Sending greeting (step 1)');
+        await sendGreeting(phoneNumber, config, useAudioForTriage);
+        
+        console.log('❓ Asking for name (step 2)');
+        await askForName(phoneNumber, config, useAudioForTriage);
+        
         await updateTriageStage(phoneNumber, 'awaiting_name');
         
         return new Response(
@@ -1230,21 +1385,53 @@ serve(async (req) => {
           // Save name to contacts
           await saveContactName(phoneNumber, detectedName);
           
-          // Send triage buttons
-          await sendTriageButtons(phoneNumber, detectedName);
-          await updateTriageStage(phoneNumber, 'awaiting_triage');
+          // Send preference question (step 3)
+          await sendPreferenceQuestion(phoneNumber, detectedName, config, useAudioForTriage);
+          await updateTriageStage(phoneNumber, 'awaiting_preference');
           
           return new Response(
-            JSON.stringify({ success: true, action: 'triage_buttons_sent', name: detectedName }),
+            JSON.stringify({ success: true, action: 'preference_question_sent', name: detectedName }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         } else {
           console.log('❓ Name not detected, asking again');
-          await askForNameAgain(phoneNumber);
+          await askForNameAgain(phoneNumber, config, useAudioForTriage);
           // Keep stage as awaiting_name
           
           return new Response(
             JSON.stringify({ success: true, action: 'asked_name_again' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      // STAGE: AWAITING PREFERENCE (new stage)
+      if (triageStage === 'awaiting_preference') {
+        // Try to detect preference from message
+        const preference = extractCommunicationPreference(messageBody, messageType);
+        
+        if (preference) {
+          console.log(`📱 Preference detected: ${preference}`);
+          
+          // Save preference to contact
+          await saveContactPreference(phoneNumber, preference);
+          
+          // Send triage template (step 4)
+          const useAudioForTemplate = preference === 'audio' && config.audio_enabled;
+          await sendTriageButtons(phoneNumber, config, useAudioForTemplate);
+          await updateTriageStage(phoneNumber, 'awaiting_triage');
+          
+          return new Response(
+            JSON.stringify({ success: true, action: 'triage_buttons_sent', preference }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          console.log('❓ Preference not detected, asking again');
+          await askForPreferenceAgain(phoneNumber, config, useAudioForTriage);
+          // Keep stage as awaiting_preference
+          
+          return new Response(
+            JSON.stringify({ success: true, action: 'asked_preference_again' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -1724,14 +1911,24 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
     // Process and send messages
     let messagesSent = 0;
     
-    // Determine response mode based on channel mirroring
+    // Determine response mode based on channel mirroring or saved preference
     let responseMode: 'text' | 'audio' = 'text';
     
     if (config.audio_channel_mirroring && config.audio_enabled) {
+      // Priority 1: Channel mirroring - respond in same format as customer
       responseMode = messageType === 'audio' ? 'audio' : 'text';
       console.log(`🔄 Channel mirroring: customer sent ${messageType} → responding with ${responseMode}`);
     } else if (config.audio_enabled) {
-      responseMode = config.audio_mode === 'audio_only' ? 'audio' : 'text';
+      // Priority 2: Check saved communication preference
+      const savedPreference = await getContactPreference(phoneNumber);
+      if (savedPreference) {
+        responseMode = savedPreference === 'audio' ? 'audio' : 'text';
+        console.log(`📱 Using saved preference: ${savedPreference} → responding with ${responseMode}`);
+      } else {
+        // Priority 3: Fall back to audio_mode config
+        responseMode = config.audio_mode === 'audio_only' ? 'audio' : 'text';
+        console.log(`⚙️ Using config audio_mode: ${config.audio_mode} → responding with ${responseMode}`);
+      }
     }
     
     // Send text response first (if any)

@@ -483,6 +483,7 @@ export type Database = {
         Row: {
           ai_handling: boolean | null
           ai_takeover_at: string | null
+          communication_preference: string | null
           contact_type: Database["public"]["Enums"]["contact_type"] | null
           created_at: string
           department_code: Database["public"]["Enums"]["department_type"] | null
@@ -502,6 +503,7 @@ export type Database = {
         Insert: {
           ai_handling?: boolean | null
           ai_takeover_at?: string | null
+          communication_preference?: string | null
           contact_type?: Database["public"]["Enums"]["contact_type"] | null
           created_at?: string
           department_code?:
@@ -523,6 +525,7 @@ export type Database = {
         Update: {
           ai_handling?: boolean | null
           ai_takeover_at?: string | null
+          communication_preference?: string | null
           contact_type?: Database["public"]["Enums"]["contact_type"] | null
           created_at?: string
           department_code?:
