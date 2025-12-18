@@ -22,6 +22,7 @@ export interface UserWithStatus {
 export function useUserManagement() {
   const [users, setUsers] = useState<UserWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const { toast } = useToast();
 
   const fetchUsers = async () => {
@@ -50,9 +51,6 @@ export function useUserManagement() {
 
       if (statusesError) throw statusesError;
 
-      // TODO: Implement Edge Function with SERVICE_ROLE to fetch emails securely
-      // For now, emails are not shown to avoid 403 errors from admin API on client
-
       // Combinar dados
       const combinedUsers: UserWithStatus[] = profiles?.map(profile => {
         const userFunction = functions?.find(r => r.user_id === profile.user_id);
@@ -61,7 +59,7 @@ export function useUserManagement() {
         return {
           id: profile.id,
           user_id: profile.user_id,
-          email: 'N/A', // Removed to avoid 403 from admin API
+          email: 'N/A', // Email fetched via edge function if needed
           full_name: profile.full_name,
           username: profile.username,
           user_code: profile.user_code,
@@ -88,6 +86,45 @@ export function useUserManagement() {
     }
   };
 
+  const createUser = async (data: {
+    email: string;
+    full_name: string;
+    password: string;
+    function?: AppFunction;
+    department_code?: string;
+  }) => {
+    try {
+      setCreating(true);
+
+      const { data: result, error } = await supabase.functions.invoke('create-user', {
+        body: data,
+      });
+
+      if (error) throw error;
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      toast({
+        title: 'Usuário criado',
+        description: `O usuário ${data.email} foi criado com sucesso.`,
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast({
+        title: 'Erro ao criar usuário',
+        description: error.message || 'Não foi possível criar o usuário.',
+        variant: 'destructive',
+      });
+      throw error;
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const updateUserFunction = async (userId: string, newFunction: AppFunction) => {
     try {
       // Remove function antiga
@@ -111,6 +148,31 @@ export function useUserManagement() {
       toast({
         title: 'Erro ao atualizar função',
         description: 'Não foi possível atualizar a função do usuário.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const removeUserFunction = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_functions')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Função removida',
+        description: 'A função do usuário foi removida com sucesso.',
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error removing function:', error);
+      toast({
+        title: 'Erro ao remover função',
+        description: 'Não foi possível remover a função do usuário.',
         variant: 'destructive',
       });
     }
@@ -205,8 +267,11 @@ export function useUserManagement() {
   return {
     users,
     loading,
+    creating,
     refetch: fetchUsers,
+    createUser,
     updateUserFunction,
+    removeUserFunction,
     toggleUserStatus,
     blockUser,
     unblockUser,

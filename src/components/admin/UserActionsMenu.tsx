@@ -12,7 +12,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Shield, UserCheck, UserX, Ban, Unlock } from 'lucide-react';
+import { MoreVertical, Shield, UserCheck, UserX, Ban, Unlock, UserMinus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +31,7 @@ import { useState } from 'react';
 interface UserActionsMenuProps {
   user: UserWithStatus;
   onUpdateFunction: (userId: string, newFunction: AppFunction) => void;
+  onRemoveFunction: (userId: string) => void;
   onToggleStatus: (userId: string, isActive: boolean) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
@@ -39,6 +40,7 @@ interface UserActionsMenuProps {
 export function UserActionsMenu({
   user,
   onUpdateFunction,
+  onRemoveFunction,
   onToggleStatus,
   onBlock,
   onUnblock,
@@ -72,6 +74,18 @@ export function UserActionsMenu({
             <DropdownMenuItem onClick={() => onUpdateFunction(user.user_id, 'attendant')}>
               {FUNCTION_LABELS.attendant}
             </DropdownMenuItem>
+            {user.function && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => onRemoveFunction(user.user_id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <UserMinus className="mr-2 h-4 w-4" />
+                  Remover Função
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
