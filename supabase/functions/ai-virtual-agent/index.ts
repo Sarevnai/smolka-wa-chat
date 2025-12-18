@@ -931,20 +931,6 @@ async function generateAudio(text: string, config: AIAgentConfig): Promise<{ aud
 
 // ========== TRIAGE FLOW FUNCTIONS ==========
 
-const TRIAGE_INTERACTIVE_MESSAGE = {
-  type: 'button',
-  body: {
-    text: ''  // Will be set dynamically with customer name
-  },
-  action: {
-    buttons: [
-      { type: 'reply', reply: { id: 'btn_locacao', title: '🏠 Quero alugar' } },
-      { type: 'reply', reply: { id: 'btn_vendas', title: '🛒 Quero comprar' } },
-      { type: 'reply', reply: { id: 'btn_admin', title: '📋 Já sou cliente' } }
-    ]
-  }
-};
-
 /**
  * Update triage stage in conversation_states
  */
@@ -989,24 +975,37 @@ Antes de continuar, como posso te chamar?`;
 }
 
 /**
- * Send triage buttons with personalized message
+ * Send triage template triagem_ia with personalized greeting
  */
 async function sendTriageButtons(phoneNumber: string, name: string): Promise<void> {
-  const interactive = {
-    ...TRIAGE_INTERACTIVE_MESSAGE,
-    body: {
-      text: `Prazer, ${name}! 😊\n\nComo posso te ajudar?`
+  // 1. First send personalized greeting with the name
+  const greetingResponse = await supabase.functions.invoke('send-wa-message', {
+    body: { 
+      to: phoneNumber, 
+      text: `Prazer, ${name}! 😊`
     }
-  };
-
+  });
+  
+  if (greetingResponse.error) {
+    console.error('❌ Error sending greeting:', greetingResponse.error);
+  }
+  
+  // 2. Small delay to ensure message order
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // 3. Send the triagem_ia template with buttons
   const { error } = await supabase.functions.invoke('send-wa-message', {
-    body: { to: phoneNumber, interactive }
+    body: { 
+      to: phoneNumber, 
+      template_name: 'triagem_ia',
+      language_code: 'pt_BR'
+    }
   });
   
   if (error) {
-    console.error('❌ Error sending triage buttons:', error);
+    console.error('❌ Error sending triage template:', error);
   } else {
-    console.log('✅ Triage buttons sent');
+    console.log('✅ Triage template triagem_ia sent');
   }
 }
 
@@ -1063,16 +1062,30 @@ function inferDepartmentFromText(text: string): 'locacao' | 'vendas' | 'administ
  */
 async function resendTriageButtonsWithHint(phoneNumber: string, name?: string): Promise<void> {
   const nameGreeting = name ? `, ${name}` : '';
-  const hint = `Desculpa${nameGreeting}, não entendi 😅\n\nPode clicar em uma das opções abaixo?`;
   
-  const interactive = {
-    ...TRIAGE_INTERACTIVE_MESSAGE,
-    body: { text: hint }
-  };
-
+  // 1. Send hint message first
   await supabase.functions.invoke('send-wa-message', {
-    body: { to: phoneNumber, interactive }
+    body: { 
+      to: phoneNumber, 
+      text: `Desculpa${nameGreeting}, não entendi 😅\n\nPode clicar em uma das opções abaixo?`
+    }
   });
+  
+  // 2. Small delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // 3. Resend triagem_ia template
+  const { error } = await supabase.functions.invoke('send-wa-message', {
+    body: { 
+      to: phoneNumber, 
+      template_name: 'triagem_ia',
+      language_code: 'pt_BR'
+    }
+  });
+  
+  if (error) {
+    console.error('❌ Error resending triage template:', error);
+  }
 }
 
 async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {

@@ -24,10 +24,18 @@ interface ConversationRecord {
 }
 
 // ========== TRIAGE BUTTON MAPPING ==========
+// For interactive messages (btn_* IDs)
 const TRIAGE_BUTTON_IDS: Record<string, DepartmentType> = {
   'btn_locacao': 'locacao',
   'btn_vendas': 'vendas', 
   'btn_admin': 'administrativo'
+};
+
+// For template triagem_ia quick_reply buttons (button text matching)
+const TRIAGE_BUTTON_TEXTS: Record<string, DepartmentType> = {
+  'alugar': 'locacao',
+  'comprar': 'vendas',
+  'já sou cliente': 'administrativo'
 };
 
 const DEPARTMENT_WELCOMES: Record<string, string> = {
@@ -37,18 +45,29 @@ const DEPARTMENT_WELCOMES: Record<string, string> = {
 };
 
 /**
- * Extract triage button ID from interactive button_reply
+ * Extract triage button info from interactive button_reply OR template quick_reply
+ * Returns department directly for easier handling
  */
-function extractTriageButtonId(message: any): string | null {
-  // WhatsApp sends button responses in interactive.button_reply
+function extractTriageButtonId(message: any): { buttonId: string, department: DepartmentType } | null {
+  // 1. Check interactive button_reply (for interactive messages)
   const buttonReply = message.interactive?.button_reply;
   if (buttonReply?.id && TRIAGE_BUTTON_IDS[buttonReply.id]) {
-    return buttonReply.id;
+    console.log(`🔘 Interactive button detected: ${buttonReply.id}`);
+    return { buttonId: buttonReply.id, department: TRIAGE_BUTTON_IDS[buttonReply.id] };
   }
   
-  // Also check for direct button.payload format
-  if (message.button?.payload && TRIAGE_BUTTON_IDS[message.button.payload]) {
-    return message.button.payload;
+  // 2. Check button.text (for template quick_reply - triagem_ia)
+  const buttonText = message.button?.text?.toLowerCase()?.trim();
+  if (buttonText && TRIAGE_BUTTON_TEXTS[buttonText]) {
+    console.log(`🔘 Template quick_reply detected: "${buttonText}"`);
+    return { buttonId: buttonText, department: TRIAGE_BUTTON_TEXTS[buttonText] };
+  }
+  
+  // 3. Check button.payload (alternative format for quick_reply)
+  const buttonPayload = message.button?.payload?.toLowerCase()?.trim();
+  if (buttonPayload && TRIAGE_BUTTON_TEXTS[buttonPayload]) {
+    console.log(`🔘 Template quick_reply payload detected: "${buttonPayload}"`);
+    return { buttonId: buttonPayload, department: TRIAGE_BUTTON_TEXTS[buttonPayload] };
   }
   
   return null;
@@ -557,10 +576,10 @@ async function processIncomingMessage(message: any, value: any) {
       
       // ========== TRIAGE BUTTON INTERCEPTION ==========
       // Check if this is a triage button response BEFORE triggering AI
-      const triageButtonId = extractTriageButtonId(message);
-      if (triageButtonId && conversation?.id && !conversation.department_code) {
-        const departmentCode = TRIAGE_BUTTON_IDS[triageButtonId];
-        console.log(`🎯 Triage button clicked: ${triageButtonId} → ${departmentCode}`);
+      const triageInfo = extractTriageButtonId(message);
+      if (triageInfo && conversation?.id && !conversation.department_code) {
+        const departmentCode = triageInfo.department;
+        console.log(`🎯 Triage button clicked: ${triageInfo.buttonId} → ${departmentCode}`);
         
         // Assign department immediately (100% reliable)
         await assignDepartmentToConversation(conversation.id, departmentCode);
