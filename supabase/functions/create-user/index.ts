@@ -105,15 +105,20 @@ Deno.serve(async (req) => {
     // But we need to wait a moment for the trigger to complete
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // 3. Update profile with full_name (in case trigger didn't catch it)
+    // 3. Update profile with full_name and department_code
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({ full_name })
+      .update({ 
+        full_name,
+        department_code: department_code || null,
+      })
       .eq('user_id', userId);
 
     if (profileError) {
       console.error('Error updating profile:', profileError);
       // Non-critical, continue
+    } else {
+      console.log(`Profile updated with department: ${department_code || 'none'}`);
     }
 
     // 4. Insert function if provided

@@ -25,13 +25,11 @@ export function useUserDepartment(): UserDepartment {
       }
 
       try {
-        // Get department from user_functions table
+        // Get department from profiles table
         const { data, error: fetchError } = await supabase
-          .from('user_functions')
+          .from('profiles')
           .select('department_code')
           .eq('user_id', user.id)
-          .not('department_code', 'is', null)
-          .limit(1)
           .maybeSingle();
 
         if (fetchError) throw fetchError;
