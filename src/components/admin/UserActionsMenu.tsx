@@ -12,7 +12,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Shield, UserCheck, UserX, Ban, Unlock, UserMinus } from 'lucide-react';
+import { MoreVertical, Shield, UserCheck, UserX, Ban, Unlock, UserMinus, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +35,7 @@ interface UserActionsMenuProps {
   onToggleStatus: (userId: string, isActive: boolean) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
+  onDelete: (userId: string) => void;
 }
 
 export function UserActionsMenu({
@@ -44,6 +45,7 @@ export function UserActionsMenu({
   onToggleStatus,
   onBlock,
   onUnblock,
+  onDelete,
 }: UserActionsMenuProps) {
   const [blockReason, setBlockReason] = useState('');
 
@@ -150,6 +152,39 @@ export function UserActionsMenu({
             </AlertDialogContent>
           </AlertDialog>
         )}
+
+        <DropdownMenuSeparator />
+
+        {/* Excluir Usuário */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <DropdownMenuItem 
+              onSelect={(e) => e.preventDefault()}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir Usuário
+            </DropdownMenuItem>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir o usuário <strong>{user.full_name || user.username}</strong>? 
+                Esta ação é irreversível e todos os dados do usuário serão removidos permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => onDelete(user.user_id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir Permanentemente
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DropdownMenuContent>
     </DropdownMenu>
   );
