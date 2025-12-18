@@ -407,13 +407,16 @@ Exemplo:
 Pode me mandar texto ou áudio, eu entendo os dois! 😊
 Você tá buscando imóvel pra comprar ou alugar?"
 
-📍 ETAPA 2 - QUALIFICAÇÃO RÁPIDA (2-4 mensagens)
+📍 ETAPA 2 - QUALIFICAÇÃO RÁPIDA (3-4 mensagens)
 Capture as informações UMA por vez:
 1. Finalidade: comprar ou alugar (se não disse)
 2. Tipo: apartamento, casa, etc
 3. Bairro/região de interesse
-4. Faixa de preço (opcional)
-5. Número de quartos (se relevante)`;
+4. Faixa de preço - ⚠️ OBRIGATÓRIO! Pergunte: "Qual valor você pretende pagar por mês?" (locação) ou "Qual sua faixa de valor?" (compra)
+5. Número de quartos (se relevante)
+
+⚠️ REGRA CRÍTICA: NÃO chame buscar_imoveis até ter TIPO + BAIRRO + PREÇO!
+Se o cliente não informou o preço, PERGUNTE antes de buscar.`;
 
   // Instrução de captura de nome
   if (!contactName && config.rapport_use_name) {
@@ -437,7 +440,9 @@ Capture as informações UMA por vez:
 
   prompt += `
 
-⚠️ REGRA: Com 2 critérios (tipo + bairro OU finalidade + bairro), já chame buscar_imoveis!
+⚠️ REGRA CRÍTICA: SÓ chame buscar_imoveis quando tiver TIPO + BAIRRO + FAIXA DE PREÇO!
+Se o cliente não informou quanto quer pagar, pergunte ANTES de buscar.
+Exemplo: "E qual valor você pretende pagar por mês?"
 
 📍 ETAPA 3 - BUSCA E APRESENTAÇÃO
 Quando encontrar imóveis:
@@ -1282,6 +1287,162 @@ serve(async (req) => {
     }
     // ========== END TRIAGE FLOW ==========
 
+    // ========== PENDING PROPERTIES & NEGOTIATION LOGIC ==========
+    // Check if user wants to see another property option
+    const wantsNextOption = /outra|outro|mais|diferente|n[aã]o gostei|n[aã]o curti|pr[oó]xim[oa]|seguinte|tem mais|outras?/i.test(messageBody);
+    
+    if (wantsNextOption) {
+      console.log('🔄 User wants another option, checking pending properties...');
+      
+      // Get current state including pending properties
+      const { data: convState } = await supabase
+        .from('conversation_states')
+        .select('pending_properties, last_search_params, negotiation_pending, suggested_price_max')
+        .eq('phone_number', phoneNumber)
+        .maybeSingle();
+      
+      const pendingProperties = (convState?.pending_properties as any[]) || [];
+      const lastSearchParams = convState?.last_search_params as any;
+      const negotiationPending = convState?.negotiation_pending || false;
+      const suggestedPriceMax = convState?.suggested_price_max;
+      
+      console.log(`📦 Pending properties: ${pendingProperties.length}, Negotiation pending: ${negotiationPending}`);
+      
+      // CASE 1: User accepting price negotiation
+      if (negotiationPending && /sim|pode|ok|beleza|vamos|t[aá]|fechado|aceito|bora|vamo/i.test(messageBody)) {
+        console.log('💰 User accepted higher price, searching with new limit...');
+        
+        const newParams = {
+          ...lastSearchParams,
+          preco_max: suggestedPriceMax
+        };
+        
+        const searchResult = await searchProperties(newParams);
+        
+        if (searchResult.success && searchResult.properties.length > 0) {
+          // Show first property from new search
+          const property = searchResult.properties[0];
+          const remainingProperties = searchResult.properties.slice(1);
+          
+          // Send intro message
+          await sendWhatsAppMessage(phoneNumber, `Boa! Achei mais opções até R$ ${suggestedPriceMax?.toLocaleString('pt-BR')}/mês! 🏠`);
+          await sleep(1500);
+          
+          // Send photo if available
+          if (property.foto_destaque) {
+            await sendWhatsAppImage(phoneNumber, property.foto_destaque);
+            await sleep(1000);
+          }
+          
+          // Send property details
+          const propertyText = formatPropertyMessage(property);
+          await sendWhatsAppMessage(phoneNumber, propertyText);
+          await sleep(1500);
+          await sendWhatsAppMessage(phoneNumber, "Faz sentido pra você? 😊");
+          
+          // Update state with new pending properties and new search params
+          await supabase
+            .from('conversation_states')
+            .update({
+              pending_properties: remainingProperties,
+              last_search_params: newParams,
+              negotiation_pending: false,
+              suggested_price_max: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('phone_number', phoneNumber);
+          
+          return new Response(
+            JSON.stringify({ success: true, action: 'negotiation_accepted', propertiesFound: searchResult.properties.length }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          // No properties even with higher price
+          await sendWhatsAppMessage(phoneNumber, `Infelizmente não encontrei opções mesmo até R$ ${suggestedPriceMax?.toLocaleString('pt-BR')}/mês 😔\nQuer ajustar outros critérios como bairro ou tipo de imóvel?`);
+          
+          await supabase
+            .from('conversation_states')
+            .update({ negotiation_pending: false, suggested_price_max: null, updated_at: new Date().toISOString() })
+            .eq('phone_number', phoneNumber);
+          
+          return new Response(
+            JSON.stringify({ success: true, action: 'no_properties_found_negotiation' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      
+      // CASE 2: Has pending properties - show next one
+      if (pendingProperties.length > 0) {
+        console.log(`📸 Showing next property from ${pendingProperties.length} pending`);
+        
+        const property = pendingProperties[0];
+        const remainingProperties = pendingProperties.slice(1);
+        
+        // Send intro message
+        await sendWhatsAppMessage(phoneNumber, "Olha essa outra opção! 🏠");
+        await sleep(1500);
+        
+        // Send photo if available
+        if (property.foto_destaque) {
+          await sendWhatsAppImage(phoneNumber, property.foto_destaque);
+          await sleep(1000);
+        }
+        
+        // Send property details
+        const propertyText = formatPropertyMessage(property);
+        await sendWhatsAppMessage(phoneNumber, propertyText);
+        await sleep(1500);
+        await sendWhatsAppMessage(phoneNumber, "Faz sentido pra você? 😊");
+        
+        // Update pending properties
+        await supabase
+          .from('conversation_states')
+          .update({
+            pending_properties: remainingProperties,
+            updated_at: new Date().toISOString()
+          })
+          .eq('phone_number', phoneNumber);
+        
+        return new Response(
+          JSON.stringify({ success: true, action: 'showed_next_property', remaining: remainingProperties.length }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // CASE 3: No pending properties and has search params - offer to increase price
+      if (lastSearchParams && lastSearchParams.preco_max) {
+        const currentMax = lastSearchParams.preco_max;
+        const suggestedMax = currentMax + 1000;
+        
+        console.log(`💰 No more properties, starting negotiation: ${currentMax} → ${suggestedMax}`);
+        
+        await sendWhatsAppMessage(phoneNumber, 
+          `Infelizmente não tenho mais opções até R$ ${currentMax.toLocaleString('pt-BR')}/mês 😔\n\n` +
+          `Mas se você puder aumentar um pouquinho, até R$ ${suggestedMax.toLocaleString('pt-BR')}/mês, posso buscar mais opções. O que acha?`
+        );
+        
+        // Save negotiation state
+        await supabase
+          .from('conversation_states')
+          .update({
+            negotiation_pending: true,
+            suggested_price_max: suggestedMax,
+            updated_at: new Date().toISOString()
+          })
+          .eq('phone_number', phoneNumber);
+        
+        return new Response(
+          JSON.stringify({ success: true, action: 'price_negotiation_started', currentMax, suggestedMax }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // CASE 4: No pending, no search params - let AI handle naturally
+      console.log('❓ No pending properties or search params, letting AI handle...');
+    }
+    // ========== END PENDING PROPERTIES & NEGOTIATION ==========
+
     // Config already loaded above, add verbose logging for normal flow
     console.log('📋 Using AI config for normal flow:', { 
       provider: config.ai_provider, 
@@ -1457,6 +1618,18 @@ serve(async (req) => {
           if (searchResult.success && searchResult.properties.length > 0) {
             propertiesToSend = searchResult.properties;
             console.log(`✅ Found ${propertiesToSend.length} properties to present`);
+            
+            // Save search params for future negotiation
+            console.log(`💾 Saving search params for negotiation:`, args);
+            await supabase
+              .from('conversation_states')
+              .upsert({
+                phone_number: phoneNumber,
+                last_search_params: args,
+                negotiation_pending: false,
+                suggested_price_max: null,
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'phone_number' });
           }
           
           // Call AI again with tool results to get proper response
