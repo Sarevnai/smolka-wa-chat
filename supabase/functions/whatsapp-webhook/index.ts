@@ -218,6 +218,7 @@ async function updateConversationTimestamp(conversationId: string) {
 
 /**
  * Assign department to conversation after Helena's triage
+ * Also syncs the department_code to the contact for proper RLS filtering
  */
 async function assignDepartmentToConversation(
   conversationId: string, 
@@ -247,15 +248,33 @@ async function assignDepartmentToConversation(
       updateData.qualification_data = qualificationData;
     }
 
-    const { error } = await supabase
+    // Update conversation with department
+    const { data: updatedConv, error } = await supabase
       .from('conversations')
       .update(updateData)
-      .eq('id', conversationId);
+      .eq('id', conversationId)
+      .select('phone_number, contact_id')
+      .single();
 
     if (error) {
       console.error('❌ Error assigning department:', error);
-    } else {
-      console.log(`✅ Department ${department} assigned to conversation ${conversationId}`);
+      return;
+    }
+    
+    console.log(`✅ Department ${department} assigned to conversation ${conversationId}`);
+
+    // 🆕 SYNC: Also update the contact's department_code for RLS filtering
+    if (updatedConv?.phone_number) {
+      const { error: contactError } = await supabase
+        .from('contacts')
+        .update({ department_code: department })
+        .eq('phone', updatedConv.phone_number);
+
+      if (contactError) {
+        console.error('❌ Error syncing department to contact:', contactError);
+      } else {
+        console.log(`✅ Contact department synced to ${department} for phone ${updatedConv.phone_number}`);
+      }
     }
   } catch (error) {
     console.error('Error in assignDepartmentToConversation:', error);
