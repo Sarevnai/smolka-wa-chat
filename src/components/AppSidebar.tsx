@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   ShoppingBag,
   Building2,
-  Kanban
+  Kanban,
+  TrendingUp
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -281,6 +282,14 @@ export function AppSidebar() {
                     <Link to="/admin/ai-agent">
                       <Bot className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
                       {!collapsed && <span>Agente IA</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className={getNavClassName('/admin/c2s-dashboard')}>
+                    <Link to="/admin/c2s-dashboard">
+                      <TrendingUp className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                      {!collapsed && <span>Dashboard C2S</span>}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
