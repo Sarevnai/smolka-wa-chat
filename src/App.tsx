@@ -71,7 +71,9 @@ const App = () => (
                   } />
                   <Route path="/send" element={
                     <ProtectedRoute>
-                      <Send />
+                      <AdminGuard>
+                        <Send />
+                      </AdminGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="/contacts" element={
@@ -81,7 +83,9 @@ const App = () => (
                   } />
                   <Route path="/reports" element={
                     <ProtectedRoute>
-                      <Reports />
+                      <AdminGuard>
+                        <Reports />
+                      </AdminGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="/profile" element={
@@ -96,7 +100,9 @@ const App = () => (
                   } />
                   <Route path="/integrations" element={
                     <ProtectedRoute>
-                      <Integrations />
+                      <AdminGuard>
+                        <Integrations />
+                      </AdminGuard>
                     </ProtectedRoute>
                   } />
                   {/* New Routes: Triage and Pipeline */}

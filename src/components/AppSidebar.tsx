@@ -48,11 +48,11 @@ import {
 import { useState } from "react";
 
 const mainItems = [
-  { title: "Dashboard", url: "/", icon: Home, permission: 'canViewDashboard' as const },
-  { title: "Conversas", url: "/chat", icon: MessageCircle, hasUnreadCount: true, permission: 'canViewChats' as const },
-  { title: "Campanhas", url: "/send", icon: Send, permission: 'canViewCampaigns' as const },
-  { title: "Contatos", url: "/contacts", icon: Users, permission: 'canViewContacts' as const },
-  { title: "Relatórios", url: "/reports", icon: BarChart3, permission: 'canViewReports' as const },
+  { title: "Dashboard", url: "/", icon: Home, permission: 'canViewDashboard' as const, adminOnly: false },
+  { title: "Conversas", url: "/chat", icon: MessageCircle, hasUnreadCount: true, permission: 'canViewChats' as const, adminOnly: false },
+  { title: "Campanhas", url: "/send", icon: Send, permission: 'canViewCampaigns' as const, adminOnly: true },
+  { title: "Contatos", url: "/contacts", icon: Users, permission: 'canViewContacts' as const, adminOnly: false },
+  { title: "Relatórios", url: "/reports", icon: BarChart3, permission: 'canViewReports' as const, adminOnly: true },
 ];
 
 const pipelineItems = [
@@ -175,7 +175,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems
-                .filter(item => !item.permission || permissions[item.permission])
+                .filter(item => (!item.permission || permissions[item.permission]) && (!item.adminOnly || permissions.isAdmin))
                 .map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild className={getNavClassName(item.url)}>
@@ -199,50 +199,52 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Integrations Section */}
-        <Collapsible open={integrationsOpen} onOpenChange={setIntegrationsOpen}>
-          <SidebarGroup>
-            <CollapsibleTrigger asChild>
-              <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Puzzle className="h-4 w-4" />
-                  {!collapsed && <span>Integrações</span>}
-                </div>
-                {!collapsed && (
-                  <ChevronRight className={cn("h-4 w-4 transition-transform", integrationsOpen && "rotate-90")} />
-                )}
-              </SidebarGroupLabel>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild className={getNavClassName("/integrations")}>
-                      <Link to="/integrations">
-                        <Puzzle className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                        {!collapsed && <span>Todas as Integrações</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuSub>
-                    {integrationItems
-                      .filter(item => !item.permission || permissions[item.permission])
-                      .map((item) => (
-                        <SidebarMenuSubItem key={item.title}>
-                          <SidebarMenuSubButton asChild className={getNavClassName(item.url)}>
-                            <Link to={item.url}>
-                              <item.icon className="h-4 w-4 mr-2" />
-                              {!collapsed && <span>{item.title}</span>}
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                  </SidebarMenuSub>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
+        {/* Integrations Section - Admin Only */}
+        {permissions.isAdmin && (
+          <Collapsible open={integrationsOpen} onOpenChange={setIntegrationsOpen}>
+            <SidebarGroup>
+              <CollapsibleTrigger asChild>
+                <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Puzzle className="h-4 w-4" />
+                    {!collapsed && <span>Integrações</span>}
+                  </div>
+                  {!collapsed && (
+                    <ChevronRight className={cn("h-4 w-4 transition-transform", integrationsOpen && "rotate-90")} />
+                  )}
+                </SidebarGroupLabel>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={getNavClassName("/integrations")}>
+                        <Link to="/integrations">
+                          <Puzzle className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                          {!collapsed && <span>Todas as Integrações</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuSub>
+                      {integrationItems
+                        .filter(item => !item.permission || permissions[item.permission])
+                        .map((item) => (
+                          <SidebarMenuSubItem key={item.title}>
+                            <SidebarMenuSubButton asChild className={getNavClassName(item.url)}>
+                              <Link to={item.url}>
+                                <item.icon className="h-4 w-4 mr-2" />
+                                {!collapsed && <span>{item.title}</span>}
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                    </SidebarMenuSub>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
 
         {/* Seção Administrativa - Apenas para Admins */}
         {permissions.isAdmin && (

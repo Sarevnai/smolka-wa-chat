@@ -252,6 +252,7 @@ export const useCreateContact = () => {
           notes: request.notes,
           rating: request.rating,
           description: request.description,
+          department_code: request.department_code,
           status: 'ativo'
         })
         .select()

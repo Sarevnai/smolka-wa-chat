@@ -6,11 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, X, Phone, Mail, FileText, Heart, Building2, Key } from 'lucide-react';
+import { Plus, X, Phone, Mail, FileText, Heart, Building2, Key, Home, ShoppingBag } from 'lucide-react';
 import { useCreateContact } from '@/hooks/useContacts';
 import { CreateContactRequest } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
 import { normalizePhoneNumber, isValidPhoneNumber } from '@/lib/validation';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useDepartment } from '@/contexts/DepartmentContext';
 
 interface NewContactModalProps {
   open: boolean;
@@ -32,6 +34,7 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
   const [description, setDescription] = useState('');
   const [rating, setRating] = useState<number | undefined>(undefined);
   const [notes, setNotes] = useState('');
+  const [departmentCode, setDepartmentCode] = useState<'locacao' | 'administrativo' | 'vendas' | undefined>(undefined);
   const [contracts, setContracts] = useState<ContractForm[]>([]);
   const [newContract, setNewContract] = useState<ContractForm>({
     contract_number: '',
@@ -40,6 +43,15 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
   });
 
   const createContact = useCreateContact();
+  const { isAdmin } = usePermissions();
+  const { userDepartment } = useDepartment();
+
+  // Set default department for non-admins
+  useEffect(() => {
+    if (!isAdmin && userDepartment && !departmentCode) {
+      setDepartmentCode(userDepartment);
+    }
+  }, [isAdmin, userDepartment, departmentCode]);
 
   // Update phone when initialPhone changes
   useEffect(() => {
@@ -117,7 +129,8 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
       description: description.trim() || undefined,
       rating: rating,
       notes: notes.trim() || undefined,
-      contracts: contracts.length > 0 ? contracts : undefined
+      contracts: contracts.length > 0 ? contracts : undefined,
+      department_code: departmentCode
     };
 
     try {
@@ -136,6 +149,7 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
       setDescription('');
       setRating(undefined);
       setNotes('');
+      setDepartmentCode(isAdmin ? undefined : userDepartment);
       setContracts([]);
       setNewContract({ contract_number: '', contract_type: '', property_code: '' });
       
@@ -220,6 +234,45 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Department Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="department">Setor *</Label>
+              <Select 
+                value={departmentCode || ''} 
+                onValueChange={(value: 'locacao' | 'administrativo' | 'vendas') => setDepartmentCode(value)}
+                disabled={!isAdmin}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="locacao">
+                    <div className="flex items-center gap-2">
+                      <Home className="h-4 w-4" />
+                      Locação
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="vendas">
+                    <div className="flex items-center gap-2">
+                      <ShoppingBag className="h-4 w-4" />
+                      Vendas
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="administrativo">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Administrativo
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {!isAdmin && (
+                <p className="text-xs text-muted-foreground">
+                  Contato será criado no setor {userDepartment === 'locacao' ? 'Locação' : userDepartment === 'vendas' ? 'Vendas' : 'Administrativo'}
+                </p>
+              )}
             </div>
           </div>
 
