@@ -2,9 +2,10 @@ import Layout from '@/components/Layout';
 import { AdminGuard } from '@/components/guards/AdminGuard';
 import { useUserManagement } from '@/hooks/admin/useUserManagement';
 import { UserCard } from '@/components/admin/UserCard';
+import { CreateUserModal } from '@/components/admin/CreateUserModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, RefreshCw, Filter } from 'lucide-react';
+import { Users, RefreshCw, Filter, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import {
   Select,
@@ -20,8 +21,11 @@ export default function UserManagement() {
   const {
     users,
     loading,
+    creating,
     refetch,
+    createUser,
     updateUserFunction,
+    removeUserFunction,
     toggleUserStatus,
     blockUser,
     unblockUser,
@@ -29,6 +33,7 @@ export default function UserManagement() {
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'blocked'>('all');
   const [functionFilter, setFunctionFilter] = useState<'all' | 'admin' | 'manager' | 'attendant' | 'none'>('all');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const filteredUsers = users.filter(user => {
     // Status filter
@@ -42,6 +47,17 @@ export default function UserManagement() {
 
     return true;
   });
+
+  const handleCreateUser = async (data: {
+    email: string;
+    full_name: string;
+    password: string;
+    function?: 'admin' | 'manager' | 'attendant';
+    department_code?: string;
+  }) => {
+    await createUser(data);
+    setCreateModalOpen(false);
+  };
 
   return (
     <AdminGuard>
@@ -58,10 +74,16 @@ export default function UserManagement() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={refetch} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Atualizar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setCreateModalOpen(true)}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Novo Usuário
+              </Button>
+              <Button variant="outline" size="sm" onClick={refetch} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+            </div>
           </div>
 
           {/* Filtros */}
@@ -135,6 +157,7 @@ export default function UserManagement() {
                   key={user.id}
                   user={user}
                   onUpdateFunction={updateUserFunction}
+                  onRemoveFunction={removeUserFunction}
                   onToggleStatus={toggleUserStatus}
                   onBlock={blockUser}
                   onUnblock={unblockUser}
@@ -170,6 +193,13 @@ export default function UserManagement() {
             </CardContent>
           </Card>
         </div>
+
+        <CreateUserModal
+          open={createModalOpen}
+          onOpenChange={setCreateModalOpen}
+          onCreateUser={handleCreateUser}
+          isLoading={creating}
+        />
       </Layout>
     </AdminGuard>
   );

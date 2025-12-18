@@ -10,12 +10,13 @@ import { UserActionsMenu } from './UserActionsMenu';
 interface UserCardProps {
   user: UserWithStatus;
   onUpdateFunction: (userId: string, newFunction: any) => void;
+  onRemoveFunction: (userId: string) => void;
   onToggleStatus: (userId: string, isActive: boolean) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
 }
 
-export function UserCard({ user, onUpdateFunction, onToggleStatus, onBlock, onUnblock }: UserCardProps) {
+export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleStatus, onBlock, onUnblock }: UserCardProps) {
   const getInitials = (name: string | null, username: string) => {
     if (name) {
       const parts = name.split(' ');
@@ -100,6 +101,7 @@ export function UserCard({ user, onUpdateFunction, onToggleStatus, onBlock, onUn
           <UserActionsMenu
             user={user}
             onUpdateFunction={onUpdateFunction}
+            onRemoveFunction={onRemoveFunction}
             onToggleStatus={onToggleStatus}
             onBlock={onBlock}
             onUnblock={onUnblock}
