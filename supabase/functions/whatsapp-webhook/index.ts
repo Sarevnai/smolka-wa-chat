@@ -23,6 +23,102 @@ interface ConversationRecord {
   stage_id: string | null;
 }
 
+// ========== TRIAGE BUTTON MAPPING ==========
+const TRIAGE_BUTTON_IDS: Record<string, DepartmentType> = {
+  'btn_locacao': 'locacao',
+  'btn_vendas': 'vendas', 
+  'btn_admin': 'administrativo'
+};
+
+const DEPARTMENT_WELCOMES: Record<string, string> = {
+  locacao: 'Perfeito! Vou te ajudar a encontrar o imóvel ideal para alugar 🏠\n\nQual tipo de imóvel você procura? Apartamento, casa...?',
+  vendas: 'Ótimo! Vou te ajudar a encontrar o imóvel perfeito para comprar 🏡\n\nQue tipo de imóvel você tem interesse?',
+  administrativo: 'Certo! Estou aqui para te ajudar 📋\n\nPosso auxiliar com boletos, contratos, manutenção ou outras questões. O que você precisa?'
+};
+
+/**
+ * Extract triage button ID from interactive button_reply
+ */
+function extractTriageButtonId(message: any): string | null {
+  // WhatsApp sends button responses in interactive.button_reply
+  const buttonReply = message.interactive?.button_reply;
+  if (buttonReply?.id && TRIAGE_BUTTON_IDS[buttonReply.id]) {
+    return buttonReply.id;
+  }
+  
+  // Also check for direct button.payload format
+  if (message.button?.payload && TRIAGE_BUTTON_IDS[message.button.payload]) {
+    return message.button.payload;
+  }
+  
+  return null;
+}
+
+/**
+ * Update triage stage in conversation_states
+ */
+async function updateTriageStage(phoneNumber: string, stage: string) {
+  const { error } = await supabase
+    .from('conversation_states')
+    .upsert({ 
+      phone_number: phoneNumber, 
+      triage_stage: stage,
+      is_ai_active: true,
+      updated_at: new Date().toISOString()
+    }, { 
+      onConflict: 'phone_number' 
+    });
+    
+  if (error) {
+    console.error('❌ Error updating triage stage:', error);
+  } else {
+    console.log(`✅ Triage stage updated to: ${stage}`);
+  }
+}
+
+/**
+ * Send department welcome message and activate AI
+ */
+async function sendDepartmentWelcomeAndActivateAI(
+  phoneNumber: string, 
+  department: DepartmentType, 
+  conversationId: string
+) {
+  if (!department) return;
+  
+  // Get contact name for personalization
+  const { data: contact } = await supabase
+    .from('contacts')
+    .select('name')
+    .eq('phone', phoneNumber)
+    .maybeSingle();
+  
+  const name = contact?.name || '';
+  let welcomeMessage = DEPARTMENT_WELCOMES[department] || DEPARTMENT_WELCOMES.locacao;
+  
+  // Personalize with name if available
+  if (name) {
+    welcomeMessage = welcomeMessage.replace('Perfeito!', `Perfeito, ${name}!`);
+    welcomeMessage = welcomeMessage.replace('Ótimo!', `Ótimo, ${name}!`);
+    welcomeMessage = welcomeMessage.replace('Certo!', `Certo, ${name}!`);
+  }
+  
+  // Send welcome message
+  const { error } = await supabase.functions.invoke('send-wa-message', {
+    body: {
+      to: phoneNumber,
+      text: welcomeMessage,
+      conversation_id: conversationId
+    }
+  });
+  
+  if (error) {
+    console.error('❌ Error sending department welcome:', error);
+  } else {
+    console.log(`✅ Department welcome sent for ${department}`);
+  }
+}
+
 /**
  * Find an existing active conversation for this phone number, or create a new one.
  * New conversations start with department_code = NULL (pending triage by Helena).
@@ -458,6 +554,30 @@ async function processIncomingMessage(message: any, value: any) {
       
       // Ensure contact exists (without auto-triage flow)
       await ensureContactExists(message.from);
+      
+      // ========== TRIAGE BUTTON INTERCEPTION ==========
+      // Check if this is a triage button response BEFORE triggering AI
+      const triageButtonId = extractTriageButtonId(message);
+      if (triageButtonId && conversation?.id && !conversation.department_code) {
+        const departmentCode = TRIAGE_BUTTON_IDS[triageButtonId];
+        console.log(`🎯 Triage button clicked: ${triageButtonId} → ${departmentCode}`);
+        
+        // Assign department immediately (100% reliable)
+        await assignDepartmentToConversation(conversation.id, departmentCode);
+        
+        // Update triage_stage to completed
+        await updateTriageStage(message.from, 'completed');
+        
+        // Send department welcome + activate AI for follow-up
+        await sendDepartmentWelcomeAndActivateAI(
+          message.from, 
+          departmentCode, 
+          conversation.id
+        );
+        
+        // Don't trigger general AI flow - we've handled the triage
+        return;
+      }
       
       // 🆕 Pass conversation info to AI trigger
       await handleN8NTrigger(message.from, messageBody, message, conversation);

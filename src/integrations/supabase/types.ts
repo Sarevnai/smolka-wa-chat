@@ -581,6 +581,7 @@ export type Database = {
           operator_takeover_at: string | null
           pending_properties: Json | null
           phone_number: string
+          triage_stage: string | null
           updated_at: string | null
         }
         Insert: {
@@ -594,6 +595,7 @@ export type Database = {
           operator_takeover_at?: string | null
           pending_properties?: Json | null
           phone_number: string
+          triage_stage?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -607,6 +609,7 @@ export type Database = {
           operator_takeover_at?: string | null
           pending_properties?: Json | null
           phone_number?: string
+          triage_stage?: string | null
           updated_at?: string | null
         }
         Relationships: []

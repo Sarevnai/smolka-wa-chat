@@ -929,6 +929,152 @@ async function generateAudio(text: string, config: AIAgentConfig): Promise<{ aud
   }
 }
 
+// ========== TRIAGE FLOW FUNCTIONS ==========
+
+const TRIAGE_INTERACTIVE_MESSAGE = {
+  type: 'button',
+  body: {
+    text: ''  // Will be set dynamically with customer name
+  },
+  action: {
+    buttons: [
+      { type: 'reply', reply: { id: 'btn_locacao', title: '🏠 Quero alugar' } },
+      { type: 'reply', reply: { id: 'btn_vendas', title: '🛒 Quero comprar' } },
+      { type: 'reply', reply: { id: 'btn_admin', title: '📋 Já sou cliente' } }
+    ]
+  }
+};
+
+/**
+ * Update triage stage in conversation_states
+ */
+async function updateTriageStage(phoneNumber: string, stage: string): Promise<void> {
+  const { error } = await supabase
+    .from('conversation_states')
+    .upsert({ 
+      phone_number: phoneNumber, 
+      triage_stage: stage,
+      is_ai_active: true,
+      updated_at: new Date().toISOString()
+    }, { 
+      onConflict: 'phone_number' 
+    });
+    
+  if (error) {
+    console.error('❌ Error updating triage stage:', error);
+  } else {
+    console.log(`✅ Triage stage updated to: ${stage}`);
+  }
+}
+
+/**
+ * Send greeting message and ask for name
+ */
+async function sendGreetingAndAskName(phoneNumber: string, config: AIAgentConfig): Promise<void> {
+  const greeting = `Oi! Aqui é a ${config.agent_name || 'Nina'} da ${config.company_name || 'Smolka Imóveis'} 🏠
+
+Pode me mandar texto ou áudio, eu entendo os dois! 😊
+
+Antes de continuar, como posso te chamar?`;
+
+  const { error } = await supabase.functions.invoke('send-wa-message', {
+    body: { to: phoneNumber, text: greeting }
+  });
+  
+  if (error) {
+    console.error('❌ Error sending greeting:', error);
+  } else {
+    console.log('✅ Greeting sent, awaiting name');
+  }
+}
+
+/**
+ * Send triage buttons with personalized message
+ */
+async function sendTriageButtons(phoneNumber: string, name: string): Promise<void> {
+  const interactive = {
+    ...TRIAGE_INTERACTIVE_MESSAGE,
+    body: {
+      text: `Prazer, ${name}! 😊\n\nComo posso te ajudar?`
+    }
+  };
+
+  const { error } = await supabase.functions.invoke('send-wa-message', {
+    body: { to: phoneNumber, interactive }
+  });
+  
+  if (error) {
+    console.error('❌ Error sending triage buttons:', error);
+  } else {
+    console.log('✅ Triage buttons sent');
+  }
+}
+
+/**
+ * Ask for name again if not detected
+ */
+async function askForNameAgain(phoneNumber: string): Promise<void> {
+  const message = 'Me desculpa, não consegui entender seu nome 😅\n\nPode me dizer como posso te chamar?';
+  
+  await supabase.functions.invoke('send-wa-message', {
+    body: { to: phoneNumber, text: message }
+  });
+}
+
+/**
+ * Save contact name to database
+ */
+async function saveContactName(phoneNumber: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('contacts')
+    .update({ 
+      name, 
+      updated_at: new Date().toISOString() 
+    })
+    .eq('phone', phoneNumber);
+    
+  if (error) {
+    console.error('❌ Error saving contact name:', error);
+  } else {
+    console.log(`✅ Contact name saved: ${name}`);
+  }
+}
+
+/**
+ * Infer department from text message (fallback when buttons ignored)
+ */
+function inferDepartmentFromText(text: string): 'locacao' | 'vendas' | 'administrativo' | null {
+  const lower = text.toLowerCase();
+  
+  // Locação patterns
+  if (/alug|locar|loca[çc][aã]o|alugo/.test(lower)) return 'locacao';
+  
+  // Vendas patterns
+  if (/compr|adquir|compra|vender|venda/.test(lower)) return 'vendas';
+  
+  // Administrativo patterns
+  if (/cliente|inquilino|propriet[aá]rio|boleto|contrato|manuten[çc][aã]o|segunda via|pagamento/.test(lower)) return 'administrativo';
+  
+  return null;
+}
+
+/**
+ * Resend triage buttons when user sends text instead of clicking
+ */
+async function resendTriageButtonsWithHint(phoneNumber: string, name?: string): Promise<void> {
+  const nameGreeting = name ? `, ${name}` : '';
+  const hint = `Desculpa${nameGreeting}, não entendi 😅\n\nPode clicar em uma das opções abaixo?`;
+  
+  const interactive = {
+    ...TRIAGE_INTERACTIVE_MESSAGE,
+    body: { text: hint }
+  };
+
+  await supabase.functions.invoke('send-wa-message', {
+    body: { to: phoneNumber, interactive }
+  });
+}
+
 async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
   try {
     const { error } = await supabase.functions.invoke('send-wa-message', {
@@ -987,9 +1133,25 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber, messageBody, messageType, contactName, contactType } = await req.json();
+    const { 
+      phoneNumber, 
+      messageBody, 
+      messageType, 
+      contactName, 
+      contactType,
+      // Triage context from webhook
+      conversationId,
+      currentDepartment,
+      isPendingTriage
+    } = await req.json();
 
-    console.log('🤖 AI Virtual Agent triggered:', { phoneNumber, messageBody, messageType });
+    console.log('🤖 AI Virtual Agent triggered:', { 
+      phoneNumber, 
+      messageBody, 
+      messageType,
+      isPendingTriage,
+      currentDepartment 
+    });
 
     if (!phoneNumber || !messageBody) {
       return new Response(
@@ -1009,21 +1171,116 @@ serve(async (req) => {
 
       if (configData?.setting_value) {
         config = { ...defaultConfig, ...configData.setting_value as AIAgentConfig };
-        console.log('📋 Loaded AI config:', { 
-          provider: config.ai_provider, 
-          model: config.ai_model,
-          humanize: config.humanize_responses,
-          rapport: config.rapport_enabled,
-          triggers: config.triggers_enabled,
-          spin: config.spin_enabled,
-          hasKnowledgeBase: !!config.knowledge_base_content,
-          objectionsCount: config.objections?.length || 0,
-          vistaEnabled: config.vista_integration_enabled !== false
-        });
       }
     } catch (e) {
       console.log('Using default AI config');
     }
+
+    // ========== TRIAGE FLOW HANDLING ==========
+    if (isPendingTriage) {
+      console.log('📋 Handling triage flow for pending conversation');
+      
+      // Get current triage stage
+      const { data: convState } = await supabase
+        .from('conversation_states')
+        .select('triage_stage')
+        .eq('phone_number', phoneNumber)
+        .maybeSingle();
+
+      const triageStage = convState?.triage_stage || null;
+      console.log(`📍 Current triage stage: ${triageStage || 'none'}`);
+
+      // STAGE: GREETING (first message - no stage yet)
+      if (!triageStage || triageStage === 'greeting') {
+        console.log('👋 Sending greeting and asking for name');
+        await sendGreetingAndAskName(phoneNumber, config);
+        await updateTriageStage(phoneNumber, 'awaiting_name');
+        
+        return new Response(
+          JSON.stringify({ success: true, action: 'greeting_sent' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // STAGE: AWAITING NAME
+      if (triageStage === 'awaiting_name') {
+        const detectedName = extractCustomerName(messageBody);
+        
+        if (detectedName) {
+          console.log(`👤 Name detected: ${detectedName}`);
+          
+          // Save name to contacts
+          await saveContactName(phoneNumber, detectedName);
+          
+          // Send triage buttons
+          await sendTriageButtons(phoneNumber, detectedName);
+          await updateTriageStage(phoneNumber, 'awaiting_triage');
+          
+          return new Response(
+            JSON.stringify({ success: true, action: 'triage_buttons_sent', name: detectedName }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          console.log('❓ Name not detected, asking again');
+          await askForNameAgain(phoneNumber);
+          // Keep stage as awaiting_name
+          
+          return new Response(
+            JSON.stringify({ success: true, action: 'asked_name_again' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      // STAGE: AWAITING TRIAGE (user sent text instead of clicking button)
+      if (triageStage === 'awaiting_triage') {
+        // Try to infer department from text
+        const inferredDept = inferDepartmentFromText(messageBody);
+        
+        if (inferredDept) {
+          console.log(`🎯 Inferred department from text: ${inferredDept}`);
+          
+          // Return the inferred department for webhook to assign
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              action: 'department_inferred',
+              assignedDepartment: inferredDept 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          // Could not infer, resend buttons
+          const { data: contact } = await supabase
+            .from('contacts')
+            .select('name')
+            .eq('phone', phoneNumber)
+            .maybeSingle();
+            
+          console.log('❓ Could not infer department, resending buttons');
+          await resendTriageButtonsWithHint(phoneNumber, contact?.name);
+          
+          return new Response(
+            JSON.stringify({ success: true, action: 'triage_buttons_resent' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
+    // ========== END TRIAGE FLOW ==========
+
+    // Config already loaded above, add verbose logging for normal flow
+    console.log('📋 Using AI config for normal flow:', { 
+      provider: config.ai_provider, 
+      model: config.ai_model,
+      humanize: config.humanize_responses,
+      rapport: config.rapport_enabled,
+      triggers: config.triggers_enabled,
+      spin: config.spin_enabled,
+      hasKnowledgeBase: !!config.knowledge_base_content,
+      objectionsCount: config.objections?.length || 0,
+      vistaEnabled: config.vista_integration_enabled !== false
+    });
 
     // Get conversation history for context
     const historyLimit = config.max_history_messages || 5;
