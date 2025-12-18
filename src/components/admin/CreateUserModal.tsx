@@ -62,8 +62,8 @@ export function CreateUserModal({
       email,
       full_name: fullName,
       password,
-      function: userFunction === 'none' ? undefined : userFunction,
-      department_code: userFunction === 'attendant' ? departmentCode : undefined,
+      function: userFunction === 'none' ? undefined : userFunction as 'admin' | 'manager' | 'attendant',
+      department_code: departmentCode as 'locacao' | 'administrativo' | 'vendas',
     });
     
     resetForm();
@@ -76,7 +76,7 @@ export function CreateUserModal({
     onOpenChange(newOpen);
   };
 
-  const isFormValid = email && fullName && password.length >= 6;
+  const isFormValid = email && fullName && password.length >= 6 && departmentCode;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -170,25 +170,27 @@ export function CreateUserModal({
             </Select>
           </div>
 
-          {userFunction === 'attendant' && (
-            <div className="space-y-2">
-              <Label htmlFor="department">Departamento</Label>
-              <Select
-                value={departmentCode}
-                onValueChange={setDepartmentCode}
-                disabled={isLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o departamento" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="locacao">Locação</SelectItem>
-                  <SelectItem value="vendas">Vendas</SelectItem>
-                  <SelectItem value="administrativo">Administrativo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label htmlFor="department">Setor *</Label>
+            <Select
+              value={departmentCode}
+              onValueChange={setDepartmentCode}
+              disabled={isLoading}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o setor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="locacao">Locação</SelectItem>
+                <SelectItem value="administrativo">Administrativo</SelectItem>
+                <SelectItem value="vendas">Vendas</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              O setor determina quais conversas e recursos o usuário terá acesso
+            </p>
+          </div>
 
           <DialogFooter>
             <Button
