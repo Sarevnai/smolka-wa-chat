@@ -10,6 +10,243 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// ========== MAPEAMENTO ESTRUTURADO DE REGIÕES DE FLORIANÓPOLIS ==========
+interface RegionInfo {
+  nome: string;
+  bairros: string[];
+}
+
+const FLORIANOPOLIS_REGIONS: Record<string, RegionInfo> = {
+  norte: {
+    nome: "Região Norte",
+    bairros: [
+      "Ingleses", "Ingleses do Rio Vermelho", "Santinho", "Canasvieiras", 
+      "Jurerê", "Jurerê Internacional", "Daniela", "Cachoeira do Bom Jesus",
+      "Ponta das Canas", "Lagoinha", "Vargem Grande", "Vargem Pequena",
+      "Vargem do Bom Jesus", "Ratones", "Santo Antônio de Lisboa", "Sambaqui",
+      "Praia Brava", "Rio Vermelho", "São João do Rio Vermelho"
+    ]
+  },
+  sul: {
+    nome: "Região Sul", 
+    bairros: [
+      "Campeche", "Rio Tavares", "Morro das Pedras", "Armação", "Armação do Pântano do Sul",
+      "Pântano do Sul", "Ribeirão da Ilha", "Costa de Dentro", "Carianos",
+      "Aeroporto", "Tapera", "Base Aérea", "Alto Ribeirão", "Caeira da Barra do Sul",
+      "Costeira do Pirajubaé", "Saco dos Limões"
+    ]
+  },
+  leste: {
+    nome: "Região Leste",
+    bairros: [
+      "Lagoa da Conceição", "Barra da Lagoa", "Costa da Lagoa", "Canto da Lagoa",
+      "Praia Mole", "Joaquina", "Praia da Joaquina", "Retiro da Lagoa", 
+      "Canto dos Araçás", "Porto da Lagoa"
+    ]
+  },
+  centro: {
+    nome: "Região Central",
+    bairros: [
+      "Centro", "Agronômica", "Trindade", "Córrego Grande", "Pantanal",
+      "Santa Mônica", "Itacorubi", "João Paulo", "Monte Verde", "Saco Grande",
+      "José Mendes", "Prainha", "Carvoeira", "Serrinha"
+    ]
+  },
+  continente: {
+    nome: "Continente",
+    bairros: [
+      "Estreito", "Coqueiros", "Itaguaçu", "Abraão", "Capoeiras", "Bom Abrigo",
+      "Balneário", "Coloninha", "Jardim Atlântico", "Monte Cristo", "Ponte do Imaruim",
+      "Chico Mendes", "Vila Aparecida", "Sapé", "Bela Vista", "Kobrasol"
+    ]
+  }
+};
+
+// Get all neighborhoods as a flat list
+function getAllNeighborhoods(): string[] {
+  const all: string[] = [];
+  for (const region of Object.values(FLORIANOPOLIS_REGIONS)) {
+    all.push(...region.bairros);
+  }
+  return all;
+}
+
+// Find which region a neighborhood belongs to
+function findRegionByNeighborhood(bairro: string): { regionKey: string; regionName: string } | null {
+  const normalizedBairro = bairro.toLowerCase().trim();
+  
+  for (const [key, region] of Object.entries(FLORIANOPOLIS_REGIONS)) {
+    for (const b of region.bairros) {
+      if (b.toLowerCase() === normalizedBairro) {
+        return { regionKey: key, regionName: region.nome };
+      }
+    }
+  }
+  return null;
+}
+
+// Get all neighborhoods in a region
+function getNeighborhoodsByRegion(regiao: string): string[] {
+  const normalizedRegiao = regiao.toLowerCase().trim()
+    .replace(/^região\s+/, '')
+    .replace(/^regiao\s+/, '');
+  
+  const region = FLORIANOPOLIS_REGIONS[normalizedRegiao];
+  return region ? region.bairros : [];
+}
+
+// Calculate similarity between two strings (Levenshtein distance based)
+function stringSimilarity(str1: string, str2: string): number {
+  const s1 = str1.toLowerCase();
+  const s2 = str2.toLowerCase();
+  
+  if (s1 === s2) return 1;
+  if (s1.includes(s2) || s2.includes(s1)) return 0.9;
+  
+  const len1 = s1.length;
+  const len2 = s2.length;
+  const maxLen = Math.max(len1, len2);
+  
+  if (maxLen === 0) return 1;
+  
+  // Simple Levenshtein distance
+  const matrix: number[][] = [];
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  
+  const distance = matrix[len1][len2];
+  return 1 - distance / maxLen;
+}
+
+// Normalize neighborhood name (fix typos)
+function normalizeNeighborhood(input: string): { normalized: string; confidence: number; original: string } {
+  const trimmed = input.trim();
+  const allNeighborhoods = getAllNeighborhoods();
+  
+  // Check for exact match first (case insensitive)
+  const exactMatch = allNeighborhoods.find(n => n.toLowerCase() === trimmed.toLowerCase());
+  if (exactMatch) {
+    return { normalized: exactMatch, confidence: 1.0, original: trimmed };
+  }
+  
+  // Check for partial matches (e.g., "Ingleses" matches "Ingleses do Rio Vermelho")
+  const partialMatch = allNeighborhoods.find(n => 
+    n.toLowerCase().startsWith(trimmed.toLowerCase()) ||
+    trimmed.toLowerCase().startsWith(n.toLowerCase())
+  );
+  if (partialMatch) {
+    return { normalized: partialMatch, confidence: 0.95, original: trimmed };
+  }
+  
+  // Find best match using similarity
+  let bestMatch = trimmed;
+  let bestScore = 0;
+  
+  for (const neighborhood of allNeighborhoods) {
+    const similarity = stringSimilarity(trimmed, neighborhood);
+    if (similarity > bestScore && similarity >= 0.6) {
+      bestScore = similarity;
+      bestMatch = neighborhood;
+    }
+  }
+  
+  return { 
+    normalized: bestMatch, 
+    confidence: bestScore,
+    original: trimmed 
+  };
+}
+
+// Check if input is a region name
+function isRegionName(input: string): boolean {
+  const normalized = input.toLowerCase().trim()
+    .replace(/^região\s+/, '')
+    .replace(/^regiao\s+/, '');
+  
+  return Object.keys(FLORIANOPOLIS_REGIONS).includes(normalized);
+}
+
+// Expand region to neighborhoods or return single neighborhood
+function expandRegionToNeighborhoods(input: string): { 
+  isRegion: boolean;
+  neighborhoods: string[];
+  regionName?: string;
+  suggestion?: string;
+} {
+  const normalized = input.toLowerCase().trim()
+    .replace(/^região\s+/, '')
+    .replace(/^regiao\s+/, '');
+  
+  // Check if it's a region
+  if (FLORIANOPOLIS_REGIONS[normalized]) {
+    const region = FLORIANOPOLIS_REGIONS[normalized];
+    return {
+      isRegion: true,
+      neighborhoods: region.bairros,
+      regionName: region.nome,
+      suggestion: `A ${region.nome} tem ótimas opções! Posso sugerir: ${region.bairros.slice(0, 4).join(', ')}... Tem preferência por algum desses?`
+    };
+  }
+  
+  // Try to normalize as a neighborhood
+  const result = normalizeNeighborhood(input);
+  
+  // If confidence is low, might be a typo - suggest correction
+  if (result.confidence < 0.8 && result.confidence > 0.5) {
+    return {
+      isRegion: false,
+      neighborhoods: [result.normalized],
+      suggestion: `Você quis dizer ${result.normalized}?`
+    };
+  }
+  
+  return {
+    isRegion: false,
+    neighborhoods: [result.normalized]
+  };
+}
+
+// Generate region knowledge for AI prompt
+function generateRegionKnowledge(): string {
+  const lines: string[] = [
+    '\n📍 CONHECIMENTO LOCAL DE FLORIANÓPOLIS (USE SEMPRE):',
+    ''
+  ];
+  
+  for (const [key, region] of Object.entries(FLORIANOPOLIS_REGIONS)) {
+    lines.push(`${region.nome.toUpperCase()}: ${region.bairros.slice(0, 8).join(', ')}${region.bairros.length > 8 ? '...' : ''}`);
+  }
+  
+  lines.push('');
+  lines.push('⚡ QUANDO O CLIENTE MENCIONAR UMA REGIÃO:');
+  lines.push('- Se disser "norte" ou "região norte" → Pergunte: "A região norte tem várias praias! Ingleses, Canasvieiras, Jurerê... Tem alguma preferência?"');
+  lines.push('- Se disser "sul" → Pergunte: "O sul tem o Campeche, Armação, Ribeirão da Ilha... Qual desses te interessa mais?"');
+  lines.push('- Se disser "leste" ou "lagoa" → Pergunte: "A Lagoa da Conceição é incrível! Prefere mais perto da praia ou da vila?"');
+  lines.push('- Se disser "centro" → Pergunte: "No centro, temos Trindade, Agronômica, Itacorubi... Qual região te agrada?"');
+  lines.push('- Se disser "continente" → Pergunte: "No continente, Estreito e Coqueiros são muito procurados. Tem preferência?"');
+  lines.push('');
+  lines.push('⚡ CORREÇÃO DE ERROS DE DIGITAÇÃO:');
+  lines.push('- Se o bairro parecer errado, confirme educadamente: "Você quis dizer [bairro correto]?"');
+  lines.push('- Exemplos: "Tridade" → "Trindade", "Ingleseis" → "Ingleses", "Canasvieras" → "Canasvieiras"');
+  
+  return lines.join('\n');
+}
+
 type AIProvider = 'lovable' | 'openai';
 
 interface Objection {
@@ -253,7 +490,7 @@ const tools = [
           },
           bairro: {
             type: "string",
-            description: "Nome do bairro ou região desejada (ex: Trindade, Centro, Ingleses, Campeche, Lagoa da Conceição)"
+            description: "Nome do bairro de Florianópolis. Se o cliente mencionar uma REGIÃO (norte, sul, leste, centro, continente), peça para especificar um bairro antes de buscar. Bairros válidos incluem: Ingleses, Canasvieiras, Jurerê, Campeche, Lagoa da Conceição, Centro, Trindade, Itacorubi, Estreito, Coqueiros, etc."
           },
           cidade: {
             type: "string",
@@ -522,6 +759,9 @@ ${config.competitive_advantages.map(a => `• ${a}`).join('\n')}`;
   if (config.service_areas && config.service_areas.length > 0) {
     prompt += `\n\nREGIÕES DE ATUAÇÃO:\n${config.service_areas.join(', ')}`;
   }
+  
+  // Add structured region knowledge
+  prompt += generateRegionKnowledge();
 
   prompt += `\n\nSERVIÇOS OFERECIDOS:
 ${config.services.map(s => `• ${s}`).join('\n')}`;
@@ -733,13 +973,36 @@ function sanitizeAIMessage(text: string): string {
   return cleaned;
 }
 
-// Search properties using Vista CRM API
+// Search properties using Vista CRM API - with neighborhood normalization
 async function searchProperties(params: Record<string, any>): Promise<any> {
   try {
-    console.log('🏠 Searching properties with params:', params);
+    // Normalize neighborhood before searching
+    let normalizedParams = { ...params };
+    
+    if (params.bairro) {
+      const expansion = expandRegionToNeighborhoods(params.bairro);
+      
+      // If it's a region, log it but use the first neighborhood for now
+      // (Vista API doesn't support multiple neighborhoods in one query)
+      if (expansion.isRegion) {
+        console.log(`📍 Region detected: ${params.bairro} → ${expansion.regionName}`);
+        console.log(`📍 Contains neighborhoods: ${expansion.neighborhoods.slice(0, 5).join(', ')}...`);
+        // For now, use the most popular neighborhood from that region
+        normalizedParams.bairro = expansion.neighborhoods[0];
+      } else {
+        // Normalize potential typos
+        const normalized = normalizeNeighborhood(params.bairro);
+        if (normalized.confidence < 1.0 && normalized.confidence >= 0.6) {
+          console.log(`📍 Normalized "${params.bairro}" → "${normalized.normalized}" (confidence: ${normalized.confidence.toFixed(2)})`);
+        }
+        normalizedParams.bairro = normalized.normalized;
+      }
+    }
+    
+    console.log('🏠 Searching properties with params:', normalizedParams);
     
     const { data, error } = await supabase.functions.invoke('vista-search-properties', {
-      body: params
+      body: normalizedParams
     });
 
     if (error) {
