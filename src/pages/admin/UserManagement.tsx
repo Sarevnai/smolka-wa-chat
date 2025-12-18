@@ -29,6 +29,7 @@ export default function UserManagement() {
     toggleUserStatus,
     blockUser,
     unblockUser,
+    deleteUser,
   } = useUserManagement();
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'blocked'>('all');
@@ -161,6 +162,7 @@ export default function UserManagement() {
                   onToggleStatus={toggleUserStatus}
                   onBlock={blockUser}
                   onUnblock={unblockUser}
+                  onDelete={deleteUser}
                 />
               ))}
             </div>

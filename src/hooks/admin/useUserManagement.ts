@@ -260,6 +260,34 @@ export function useUserManagement() {
     }
   };
 
+  const deleteUser = async (userId: string) => {
+    try {
+      const { data: result, error } = await supabase.functions.invoke('delete-user', {
+        body: { user_id: userId },
+      });
+
+      if (error) throw error;
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      toast({
+        title: 'Usuário excluído',
+        description: 'O usuário foi excluído permanentemente.',
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'Erro ao excluir usuário',
+        description: error.message || 'Não foi possível excluir o usuário.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -275,5 +303,6 @@ export function useUserManagement() {
     toggleUserStatus,
     blockUser,
     unblockUser,
+    deleteUser,
   };
 }

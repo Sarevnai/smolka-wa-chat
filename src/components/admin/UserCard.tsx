@@ -14,9 +14,10 @@ interface UserCardProps {
   onToggleStatus: (userId: string, isActive: boolean) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
+  onDelete: (userId: string) => void;
 }
 
-export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleStatus, onBlock, onUnblock }: UserCardProps) {
+export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleStatus, onBlock, onUnblock, onDelete }: UserCardProps) {
   const getInitials = (name: string | null, username: string) => {
     if (name) {
       const parts = name.split(' ');
@@ -105,6 +106,7 @@ export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleSta
             onToggleStatus={onToggleStatus}
             onBlock={onBlock}
             onUnblock={onUnblock}
+            onDelete={onDelete}
           />
         </div>
       </CardContent>
