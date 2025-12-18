@@ -577,10 +577,13 @@ export type Database = {
           is_ai_active: boolean | null
           last_ai_message_at: string | null
           last_human_message_at: string | null
+          last_search_params: Json | null
+          negotiation_pending: boolean | null
           operator_id: string | null
           operator_takeover_at: string | null
           pending_properties: Json | null
           phone_number: string
+          suggested_price_max: number | null
           triage_stage: string | null
           updated_at: string | null
         }
@@ -591,10 +594,13 @@ export type Database = {
           is_ai_active?: boolean | null
           last_ai_message_at?: string | null
           last_human_message_at?: string | null
+          last_search_params?: Json | null
+          negotiation_pending?: boolean | null
           operator_id?: string | null
           operator_takeover_at?: string | null
           pending_properties?: Json | null
           phone_number: string
+          suggested_price_max?: number | null
           triage_stage?: string | null
           updated_at?: string | null
         }
@@ -605,10 +611,13 @@ export type Database = {
           is_ai_active?: boolean | null
           last_ai_message_at?: string | null
           last_human_message_at?: string | null
+          last_search_params?: Json | null
+          negotiation_pending?: boolean | null
           operator_id?: string | null
           operator_takeover_at?: string | null
           pending_properties?: Json | null
           phone_number?: string
+          suggested_price_max?: number | null
           triage_stage?: string | null
           updated_at?: string | null
         }
