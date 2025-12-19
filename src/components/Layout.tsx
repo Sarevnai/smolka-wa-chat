@@ -24,7 +24,7 @@ export default function Layout({
     profile,
     signOut
   } = useAuth();
-  
+
   // Initialize keyboard shortcuts
   useKeyboardShortcuts();
   const handleSignOut = async () => {
@@ -34,8 +34,7 @@ export default function Layout({
     if (!user?.email) return 'U';
     return user.email.charAt(0).toUpperCase();
   };
-  return (
-    <SidebarProvider>
+  return <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         
@@ -47,9 +46,7 @@ export default function Layout({
                 <SidebarTrigger />
                 <div className="flex items-center space-x-2">
                   <img src={monogramaLogo} alt="Smolka Logo" className="h-6 w-6" />
-                  <h1 className="text-lg font-bold text-foreground hidden sm:block">
-                    ADM Locação - Central de atendimento
-                  </h1>
+                  <h1 className="text-lg font-bold text-foreground hidden sm:block">Central de atendimento</h1>
                 </div>
               </div>
               
@@ -83,10 +80,12 @@ export default function Layout({
                       </a>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => {
-                      // Trigger keyboard shortcuts help
-                      const event = new KeyboardEvent('keydown', { key: '/' });
-                      window.dispatchEvent(event);
-                    }}>
+                    // Trigger keyboard shortcuts help
+                    const event = new KeyboardEvent('keydown', {
+                      key: '/'
+                    });
+                    window.dispatchEvent(event);
+                  }}>
                       <Keyboard className="mr-2 h-4 w-4" />
                       Atalhos de Teclado
                     </DropdownMenuItem>
@@ -139,9 +138,7 @@ export default function Layout({
 
           {/* Main content */}
           <main className="flex-1 overflow-auto">
-            <div className={cn(
-              !location.pathname.startsWith('/chat') && 'p-6'
-            )}>
+            <div className={cn(!location.pathname.startsWith('/chat') && 'p-6')}>
               {/* Breadcrumbs - only show if NOT chat page */}
               {!location.pathname.startsWith('/chat') && <BreadcrumbNav />}
               
@@ -154,6 +151,5 @@ export default function Layout({
           {!location.pathname.startsWith('/chat/') && <AICommunicatorWidget />}
         </div>
       </div>
-    </SidebarProvider>
-  );
+    </SidebarProvider>;
 }
