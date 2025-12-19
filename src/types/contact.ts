@@ -1,12 +1,20 @@
 export type DepartmentCode = 'locacao' | 'administrativo' | 'vendas';
 
+// Department-specific contact types
+export type LocacaoContactType = 'lead' | 'interessado' | 'qualificado' | 'visitou' | 'proposta';
+export type AdministrativoContactType = 'proprietario' | 'inquilino';
+export type VendasContactType = 'lead' | 'comprador' | 'investidor' | 'proprietario_vendedor' | 'negociacao';
+
+// Union of all contact types (for flexibility)
+export type ContactType = LocacaoContactType | AdministrativoContactType | VendasContactType;
+
 export interface Contact {
   id: string;
   name?: string;
   phone: string;
   email?: string;
   status: 'ativo' | 'inativo' | 'bloqueado';
-  contact_type?: 'proprietario' | 'inquilino';
+  contact_type?: ContactType;
   notes?: string;
   rating?: number;
   description?: string;
@@ -40,7 +48,7 @@ export interface CreateContactRequest {
   name?: string;
   phone: string;
   email?: string;
-  contact_type?: 'proprietario' | 'inquilino';
+  contact_type?: ContactType;
   notes?: string;
   rating?: number;
   description?: string;

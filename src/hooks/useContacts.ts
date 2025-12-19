@@ -123,7 +123,7 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
       }
 
       if (filters?.contactType) {
-        query = query.eq('contact_type', filters.contactType);
+        query = query.eq('contact_type', filters.contactType as any);
       }
 
       if (filters?.rating) {
@@ -248,7 +248,7 @@ export const useCreateContact = () => {
           name: request.name,
           phone: request.phone,
           email: request.email,
-          contact_type: request.contact_type,
+          contact_type: request.contact_type as any,
           notes: request.notes,
           rating: request.rating,
           description: request.description,
@@ -453,7 +453,10 @@ export const useUpdateContact = () => {
     }) => {
       const { data, error } = await supabase
         .from('contacts')
-        .update(updates)
+        .update({
+          ...updates,
+          contact_type: updates.contact_type as any
+        })
         .eq('id', contactId)
         .select()
         .single();

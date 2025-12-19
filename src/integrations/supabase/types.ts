@@ -1404,7 +1404,18 @@ export type Database = {
     Enums: {
       app_function: "admin" | "manager" | "attendant"
       contact_status: "ativo" | "inativo" | "bloqueado"
-      contact_type: "proprietario" | "inquilino"
+      contact_type:
+        | "proprietario"
+        | "inquilino"
+        | "lead"
+        | "interessado"
+        | "qualificado"
+        | "visitou"
+        | "proposta"
+        | "comprador"
+        | "investidor"
+        | "proprietario_vendedor"
+        | "negociacao"
       contract_status: "ativo" | "encerrado" | "suspenso"
       department_type: "locacao" | "administrativo" | "vendas"
       user_role: "admin" | "user"
@@ -1537,7 +1548,19 @@ export const Constants = {
     Enums: {
       app_function: ["admin", "manager", "attendant"],
       contact_status: ["ativo", "inativo", "bloqueado"],
-      contact_type: ["proprietario", "inquilino"],
+      contact_type: [
+        "proprietario",
+        "inquilino",
+        "lead",
+        "interessado",
+        "qualificado",
+        "visitou",
+        "proposta",
+        "comprador",
+        "investidor",
+        "proprietario_vendedor",
+        "negociacao",
+      ],
       contract_status: ["ativo", "encerrado", "suspenso"],
       department_type: ["locacao", "administrativo", "vendas"],
       user_role: ["admin", "user"],

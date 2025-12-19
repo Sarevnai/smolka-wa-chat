@@ -6,13 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, X, Phone, Mail, FileText, Heart, Building2, Key, Home, ShoppingBag } from 'lucide-react';
+import { Plus, X, Phone, Mail, FileText, Heart, Home, ShoppingBag, Building2 } from 'lucide-react';
 import { useCreateContact } from '@/hooks/useContacts';
-import { CreateContactRequest } from '@/types/contact';
+import { CreateContactRequest, ContactType, DepartmentCode } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
 import { normalizePhoneNumber, isValidPhoneNumber } from '@/lib/validation';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useDepartment } from '@/contexts/DepartmentContext';
+import { getContactTypesForDepartment } from '@/lib/departmentConfig';
 
 interface NewContactModalProps {
   open: boolean;
@@ -30,11 +31,11 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
   const [name, setName] = useState('');
   const [phone, setPhone] = useState(initialPhone || '');
   const [email, setEmail] = useState('');
-  const [contactType, setContactType] = useState<'proprietario' | 'inquilino' | undefined>(undefined);
+  const [contactType, setContactType] = useState<ContactType | undefined>(undefined);
   const [description, setDescription] = useState('');
   const [rating, setRating] = useState<number | undefined>(undefined);
   const [notes, setNotes] = useState('');
-  const [departmentCode, setDepartmentCode] = useState<'locacao' | 'administrativo' | 'vendas' | undefined>(undefined);
+  const [departmentCode, setDepartmentCode] = useState<DepartmentCode | undefined>(undefined);
   const [contracts, setContracts] = useState<ContractForm[]>([]);
   const [newContract, setNewContract] = useState<ContractForm>({
     contract_number: '',
@@ -215,25 +216,34 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
 
             <div className="space-y-2">
               <Label htmlFor="contact-type">Tipo de Contato</Label>
-              <Select value={contactType || ''} onValueChange={(value: 'proprietario' | 'inquilino') => setContactType(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="proprietario">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Proprietário
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="inquilino">
-                    <div className="flex items-center gap-2">
-                      <Key className="h-4 w-4" />
-                      Inquilino
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {(() => {
+                const effectiveDept = departmentCode || userDepartment;
+                const deptConfig = getContactTypesForDepartment(effectiveDept);
+                return (
+                  <Select 
+                    value={contactType || ''} 
+                    onValueChange={(value: ContactType) => setContactType(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deptConfig?.types.map((type) => {
+                        const typeConfig = deptConfig.labels[type];
+                        const TypeIcon = typeConfig.icon;
+                        return (
+                          <SelectItem key={type} value={type}>
+                            <div className="flex items-center gap-2">
+                              <TypeIcon className={`h-4 w-4 ${typeConfig.color}`} />
+                              {typeConfig.label}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
             </div>
 
             {/* Department Selector */}
