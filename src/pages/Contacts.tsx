@@ -301,8 +301,8 @@ export default function Contacts() {
                     </div>
                   </div>
 
-                  {/* Contracts - only show for departments that use contracts */}
-                  {uiConfig.showContracts && contact.contracts && contact.contracts.length > 0 && (
+                  {/* Contracts - only show for administrativo department */}
+                  {activeDepartment === 'administrativo' && contact.contracts && contact.contracts.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <FileText className="h-4 w-4 text-muted-foreground" />
