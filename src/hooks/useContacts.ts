@@ -236,6 +236,85 @@ export const useContactStats = () => {
   });
 };
 
+// Department-specific stats hook
+export const useContactStatsByDepartment = (departmentCode?: string) => {
+  return useQuery({
+    queryKey: ['contact-stats-department', departmentCode],
+    queryFn: async () => {
+      if (!departmentCode) return null;
+
+      // Cast to the expected type for Supabase
+      const deptCode = departmentCode as 'locacao' | 'administrativo' | 'vendas';
+
+      // Get total contacts for this department
+      const { count: total } = await supabase
+        .from('contacts')
+        .select('*', { count: 'exact', head: true })
+        .eq('department_code', deptCode);
+
+      // Get active contacts
+      const { count: active } = await supabase
+        .from('contacts')
+        .select('*', { count: 'exact', head: true })
+        .eq('department_code', deptCode)
+        .eq('status', 'ativo');
+
+      // Get counts by contact_type
+      const { data: contacts } = await supabase
+        .from('contacts')
+        .select('contact_type')
+        .eq('department_code', deptCode);
+
+      const typeCountsMap: Record<string, number> = {};
+      contacts?.forEach(c => {
+        if (c.contact_type) {
+          typeCountsMap[c.contact_type] = (typeCountsMap[c.contact_type] || 0) + 1;
+        }
+      });
+
+      // For administrativo, also get contract counts
+      let totalContracts = 0;
+      let activeContracts = 0;
+      
+      if (departmentCode === 'administrativo') {
+        const contactIds = contacts?.map(c => c.contact_type) || [];
+        
+        const { count: contractsCount } = await supabase
+          .from('contact_contracts')
+          .select('*', { count: 'exact', head: true });
+        
+        const { count: activeContractsCount } = await supabase
+          .from('contact_contracts')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'ativo');
+          
+        totalContracts = contractsCount || 0;
+        activeContracts = activeContractsCount || 0;
+      }
+
+      return {
+        total: total || 0,
+        active: active || 0,
+        totalContracts,
+        activeContracts,
+        // Type-specific counts
+        lead: typeCountsMap['lead'] || 0,
+        interessado: typeCountsMap['interessado'] || 0,
+        qualificado: typeCountsMap['qualificado'] || 0,
+        visitou: typeCountsMap['visitou'] || 0,
+        proposta: typeCountsMap['proposta'] || 0,
+        proprietario: typeCountsMap['proprietario'] || 0,
+        inquilino: typeCountsMap['inquilino'] || 0,
+        comprador: typeCountsMap['comprador'] || 0,
+        investidor: typeCountsMap['investidor'] || 0,
+        proprietario_vendedor: typeCountsMap['proprietario_vendedor'] || 0,
+        negociacao: typeCountsMap['negociacao'] || 0,
+      };
+    },
+    enabled: !!departmentCode,
+  });
+};
+
 export const useCreateContact = () => {
   const queryClient = useQueryClient();
 
