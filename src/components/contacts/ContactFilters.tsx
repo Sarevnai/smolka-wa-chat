@@ -3,11 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { X, Filter, Building2, Key, User, Star, Activity, Calendar, FileText } from 'lucide-react';
+import { X, Filter, User, Star, Activity, Calendar, FileText } from 'lucide-react';
+import { useDepartment } from '@/contexts/DepartmentContext';
+import { getContactTypesForDepartment, getContactTypeLabel } from '@/lib/departmentConfig';
+import { ContactType } from '@/types/contact';
 
 export interface ContactFiltersState {
   status?: 'ativo' | 'inativo' | 'bloqueado';
-  contactType?: 'proprietario' | 'inquilino';
+  contactType?: ContactType;
   hasContracts?: boolean;
   rating?: number;
   hasRecentActivity?: boolean;
@@ -20,6 +23,9 @@ interface ContactFiltersProps {
 }
 
 export function ContactFilters({ filters, onFiltersChange, contactCount }: ContactFiltersProps) {
+  const { activeDepartment } = useDepartment();
+  const departmentConfig = getContactTypesForDepartment(activeDepartment || undefined);
+
   const updateFilter = (key: keyof ContactFiltersState, value: any) => {
     onFiltersChange({
       ...filters,
@@ -33,9 +39,23 @@ export function ContactFilters({ filters, onFiltersChange, contactCount }: Conta
 
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
+  // Get contact type label for badge display
+  const getTypeLabel = () => {
+    if (!filters.contactType || !activeDepartment) return null;
+    const typeConfig = getContactTypeLabel(filters.contactType, activeDepartment);
+    return typeConfig ? typeConfig.label : filters.contactType;
+  };
+
+  // Get icon for contact type badge
+  const getTypeIcon = () => {
+    if (!filters.contactType || !activeDepartment) return User;
+    const typeConfig = getContactTypeLabel(filters.contactType, activeDepartment);
+    return typeConfig ? typeConfig.icon : User;
+  };
+
   const filterBadges = [
     { key: 'status', value: filters.status, label: filters.status, icon: Activity },
-    { key: 'contactType', value: filters.contactType, label: filters.contactType === 'proprietario' ? 'Proprietário' : 'Inquilino', icon: filters.contactType === 'proprietario' ? Building2 : Key },
+    { key: 'contactType', value: filters.contactType, label: getTypeLabel(), icon: getTypeIcon() },
     { key: 'hasContracts', value: filters.hasContracts, label: filters.hasContracts ? 'Com Contratos' : 'Sem Contratos', icon: FileText },
     { key: 'rating', value: filters.rating, label: `${filters.rating}+ estrelas`, icon: Star },
     { key: 'hasRecentActivity', value: filters.hasRecentActivity, label: 'Atividade Recente', icon: Calendar }
@@ -115,27 +135,30 @@ export function ContactFilters({ filters, onFiltersChange, contactCount }: Conta
               </Select>
             </div>
 
-            {/* Contact Type Filter */}
+            {/* Contact Type Filter - Dynamic based on department */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Tipo</label>
-              <Select value={filters.contactType || 'all'} onValueChange={(value) => updateFilter('contactType', value)}>
+              <Select 
+                value={filters.contactType || 'all'} 
+                onValueChange={(value) => updateFilter('contactType', value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="proprietario">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Proprietário
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="inquilino">
-                    <div className="flex items-center gap-2">
-                      <Key className="h-4 w-4" />
-                      Inquilino
-                    </div>
-                  </SelectItem>
+                  {departmentConfig?.types.map((type) => {
+                    const typeConfig = departmentConfig.labels[type];
+                    const TypeIcon = typeConfig.icon;
+                    return (
+                      <SelectItem key={type} value={type}>
+                        <div className="flex items-center gap-2">
+                          <TypeIcon className={`h-4 w-4 ${typeConfig.color}`} />
+                          {typeConfig.label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

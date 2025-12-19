@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Search, Filter, MoreVertical, Edit, Trash2, UserPlus, Building2, Key, FileText, Star, User as UserIcon, Phone, Mail, Calendar, Activity, MessageCircle, Users, Upload, Sparkles } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, Calendar, Activity, MessageCircle, Users, Upload, Sparkles, FileText, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { NewContactModal } from "@/components/contacts/NewContactModal";
 import { EditContactModal } from "@/components/contacts/EditContactModal";
@@ -23,6 +22,8 @@ import { formatPhoneNumber } from "@/lib/utils";
 import { getRatingDescription } from "@/lib/contactRating";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
+import { useDepartment } from "@/contexts/DepartmentContext";
+import { getContactTypeLabel } from "@/lib/departmentConfig";
 
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -36,6 +37,7 @@ export default function Contacts() {
   const [showQuickTemplate, setShowQuickTemplate] = useState(false);
   const [quickTemplatePhone, setQuickTemplatePhone] = useState<string>("");
   const navigate = useNavigate();
+  const { activeDepartment } = useDepartment();
   
   const { data: contacts, isLoading } = useContacts(searchTerm, filters);
   const { data: stats, isLoading: statsLoading } = useContactStats();
@@ -55,15 +57,16 @@ export default function Contacts() {
     return '??';
   };
 
-  const getContactTypeInfo = (type?: string) => {
-    switch (type) {
-      case 'proprietario':
-        return { label: 'Proprietário', icon: Building2, variant: 'default' as const };
-      case 'inquilino':
-        return { label: 'Inquilino', icon: Key, variant: 'secondary' as const };
-      default:
-        return null;
-    }
+  const getContactTypeInfo = (contactType?: string) => {
+    if (!contactType || !activeDepartment) return null;
+    const typeConfig = getContactTypeLabel(contactType, activeDepartment);
+    if (!typeConfig) return null;
+    return {
+      label: typeConfig.label,
+      icon: typeConfig.icon,
+      variant: typeConfig.badgeVariant,
+      color: typeConfig.color
+    };
   };
 
   const renderStars = (rating?: number) => {

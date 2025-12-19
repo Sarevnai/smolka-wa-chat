@@ -6,12 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, X, Phone, Mail, FileText, Edit, Heart, Building2, Key } from 'lucide-react';
+import { Plus, X, Phone, Mail, FileText, Edit, Heart } from 'lucide-react';
 import { useUpdateContact, useAddContract } from '@/hooks/useContacts';
-import { Contact } from '@/types/contact';
+import { Contact, ContactType } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
 import { AutoNameDetectionBadge } from './AutoNameDetectionBadge';
 import { normalizePhoneNumber, isValidPhoneNumber } from '@/lib/validation';
+import { useDepartment } from '@/contexts/DepartmentContext';
+import { getContactTypesForDepartment } from '@/lib/departmentConfig';
 
 interface EditContactModalProps {
   open: boolean;
@@ -30,7 +32,7 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'ativo' | 'inativo' | 'bloqueado'>('ativo');
-  const [contactType, setContactType] = useState<'proprietario' | 'inquilino' | undefined>(undefined);
+  const [contactType, setContactType] = useState<ContactType | undefined>(undefined);
   const [description, setDescription] = useState('');
   const [rating, setRating] = useState<number | undefined>(undefined);
   const [notes, setNotes] = useState('');
@@ -39,6 +41,8 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
     contract_type: '',
     property_code: ''
   });
+  
+  const { activeDepartment } = useDepartment();
 
   const updateContact = useUpdateContact();
   const addContract = useAddContract();
@@ -197,25 +201,34 @@ export function EditContactModal({ open, onOpenChange, contact }: EditContactMod
 
             <div className="space-y-2">
               <Label htmlFor="contact-type">Tipo de Contato</Label>
-              <Select value={contactType} onValueChange={(value: 'proprietario' | 'inquilino') => setContactType(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="proprietario">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Proprietário
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="inquilino">
-                    <div className="flex items-center gap-2">
-                      <Key className="h-4 w-4" />
-                      Inquilino
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {(() => {
+                const effectiveDept = contact.department_code || activeDepartment;
+                const deptConfig = getContactTypesForDepartment(effectiveDept || undefined);
+                return (
+                  <Select 
+                    value={contactType || ''} 
+                    onValueChange={(value: ContactType) => setContactType(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {deptConfig?.types.map((type) => {
+                        const typeConfig = deptConfig.labels[type];
+                        const TypeIcon = typeConfig.icon;
+                        return (
+                          <SelectItem key={type} value={type}>
+                            <div className="flex items-center gap-2">
+                              <TypeIcon className={`h-4 w-4 ${typeConfig.color}`} />
+                              {typeConfig.label}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                );
+              })()}
             </div>
           </div>
 
