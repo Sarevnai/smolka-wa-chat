@@ -1418,21 +1418,43 @@ async function askForPreferenceAgain(phoneNumber: string, config: AIAgentConfig,
 }
 
 /**
- * Save contact name to database
+ * Save contact name to database and link to conversation
  */
 async function saveContactName(phoneNumber: string, name: string): Promise<void> {
-  const { error } = await supabase
+  // 1. Update contact name and get the contact ID
+  const { data: contact, error } = await supabase
     .from('contacts')
     .update({ 
       name, 
       updated_at: new Date().toISOString() 
     })
-    .eq('phone', phoneNumber);
+    .eq('phone', phoneNumber)
+    .select('id')
+    .maybeSingle();
     
   if (error) {
     console.error('❌ Error saving contact name:', error);
+    return;
+  }
+  
+  if (!contact) {
+    console.error('❌ Contact not found for phone:', phoneNumber);
+    return;
+  }
+  
+  console.log(`✅ Contact name saved: ${name} (id: ${contact.id})`);
+  
+  // 2. Link contact_id to conversation (if not already linked)
+  const { error: convError } = await supabase
+    .from('conversations')
+    .update({ contact_id: contact.id })
+    .eq('phone_number', phoneNumber)
+    .is('contact_id', null);
+    
+  if (convError) {
+    console.error('❌ Error linking contact to conversation:', convError);
   } else {
-    console.log(`✅ Contact name saved: ${name}`);
+    console.log(`✅ Conversation linked to contact: ${contact.id}`);
   }
 }
 
