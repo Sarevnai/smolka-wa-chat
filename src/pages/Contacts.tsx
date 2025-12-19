@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, Calendar, Activity, MessageCircle, Users, Upload, Sparkles, FileText, Star } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit, Trash2, Phone, Mail, Calendar, MessageCircle, Users, Upload, Sparkles, FileText, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,14 +16,14 @@ import { ImportContactsModal } from "@/components/ImportContactsModal";
 import { BulkMessageModal } from "@/components/contacts/BulkMessageModal";
 import { ContactFilters, ContactFiltersState } from "@/components/contacts/ContactFilters";
 import { QuickTemplateSender } from "@/components/chat/QuickTemplateSender";
-import { useContacts, useContactStats } from "@/hooks/useContacts";
+import { useContacts, useContactStatsByDepartment } from "@/hooks/useContacts";
 import { Contact } from "@/types/contact";
 import { formatPhoneNumber } from "@/lib/utils";
 import { getRatingDescription } from "@/lib/contactRating";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { useDepartment } from "@/contexts/DepartmentContext";
-import { getContactTypeLabel } from "@/lib/departmentConfig";
+import { getContactTypeLabel, getDepartmentUIConfig } from "@/lib/departmentConfig";
 
 export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,8 +39,11 @@ export default function Contacts() {
   const navigate = useNavigate();
   const { activeDepartment } = useDepartment();
   
+  // Get department-specific UI config
+  const uiConfig = getDepartmentUIConfig(activeDepartment);
+  
   const { data: contacts, isLoading } = useContacts(searchTerm, filters);
-  const { data: stats, isLoading: statsLoading } = useContactStats();
+  const { data: stats, isLoading: statsLoading } = useContactStatsByDepartment(activeDepartment);
 
   const handleContactClick = (contact: Contact) => {
     setSelectedContact(contact);
@@ -161,42 +164,21 @@ export default function Contacts() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Total</span>
-                </div>
-                <div className="text-2xl font-bold">{stats?.totalContacts || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Activity className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-muted-foreground">Ativos</span>
-                </div>
-                <div className="text-2xl font-bold text-green-600">{stats?.activeContacts || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Contratos</span>
-                </div>
-                <div className="text-2xl font-bold">{stats?.totalContracts || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-muted-foreground">Contratos Ativos</span>
-                </div>
-                <div className="text-2xl font-bold text-green-600">{stats?.activeContracts || 0}</div>
-              </CardContent>
-            </Card>
+            {uiConfig.stats.map((statConfig) => {
+              const Icon = statConfig.icon;
+              const value = stats?.[statConfig.key as keyof typeof stats] || 0;
+              return (
+                <Card key={statConfig.key}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center space-x-2">
+                      <Icon className={`h-4 w-4 ${statConfig.color || 'text-muted-foreground'}`} />
+                      <span className="text-sm font-medium text-muted-foreground">{statConfig.label}</span>
+                    </div>
+                    <div className={`text-2xl font-bold ${statConfig.color || ''}`}>{value}</div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
 
@@ -208,7 +190,7 @@ export default function Contacts() {
                 <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Buscar por nome, telefone, email ou contrato..." 
+                  placeholder={uiConfig.searchPlaceholder}
                   className="pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -319,8 +301,8 @@ export default function Contacts() {
                     </div>
                   </div>
 
-                  {/* Contracts */}
-                  {contact.contracts && contact.contracts.length > 0 && (
+                  {/* Contracts - only show for departments that use contracts */}
+                  {uiConfig.showContracts && contact.contracts && contact.contracts.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <FileText className="h-4 w-4 text-muted-foreground" />

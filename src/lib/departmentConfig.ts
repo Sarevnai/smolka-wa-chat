@@ -1,6 +1,6 @@
 import { 
   UserPlus, Eye, Star, Home, FileText, Building2, Key, 
-  ShoppingBag, TrendingUp, Target, CheckCircle, Handshake,
+  ShoppingBag, TrendingUp, Handshake, Users, Activity,
   LucideIcon
 } from 'lucide-react';
 
@@ -123,3 +123,58 @@ export type AllContactTypes =
   | 'lead' | 'interessado' | 'qualificado' | 'visitou' | 'proposta'  // locacao
   | 'proprietario' | 'inquilino'  // administrativo
   | 'comprador' | 'investidor' | 'proprietario_vendedor' | 'negociacao';  // vendas
+
+// ============================================
+// UI Configuration per Department
+// ============================================
+
+export interface DepartmentStatsConfig {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  color?: string;
+}
+
+export interface DepartmentUIConfig {
+  stats: DepartmentStatsConfig[];
+  searchPlaceholder: string;
+  showContracts: boolean;
+}
+
+export const DEPARTMENT_CONTACTS_UI: Record<string, DepartmentUIConfig> = {
+  locacao: {
+    stats: [
+      { key: 'total', label: 'Total de Leads', icon: Users },
+      { key: 'lead', label: 'Novos Leads', icon: UserPlus, color: 'text-blue-600' },
+      { key: 'qualificado', label: 'Qualificados', icon: Star, color: 'text-yellow-600' },
+      { key: 'proposta', label: 'Em Proposta', icon: FileText, color: 'text-orange-600' }
+    ],
+    searchPlaceholder: 'Buscar por nome, telefone, email ou bairro...',
+    showContracts: false
+  },
+  administrativo: {
+    stats: [
+      { key: 'total', label: 'Total', icon: Users },
+      { key: 'active', label: 'Ativos', icon: Activity, color: 'text-green-600' },
+      { key: 'totalContracts', label: 'Contratos', icon: FileText },
+      { key: 'activeContracts', label: 'Contratos Ativos', icon: FileText, color: 'text-green-600' }
+    ],
+    searchPlaceholder: 'Buscar por nome, telefone, email ou contrato...',
+    showContracts: true
+  },
+  vendas: {
+    stats: [
+      { key: 'total', label: 'Total de Leads', icon: Users },
+      { key: 'comprador', label: 'Compradores', icon: ShoppingBag, color: 'text-green-600' },
+      { key: 'investidor', label: 'Investidores', icon: TrendingUp, color: 'text-purple-600' },
+      { key: 'negociacao', label: 'Em Negociação', icon: Handshake, color: 'text-yellow-600' }
+    ],
+    searchPlaceholder: 'Buscar por nome, telefone, email ou bairro...',
+    showContracts: false
+  }
+};
+
+export function getDepartmentUIConfig(departmentCode?: string): DepartmentUIConfig {
+  if (!departmentCode) return DEPARTMENT_CONTACTS_UI.administrativo;
+  return DEPARTMENT_CONTACTS_UI[departmentCode] || DEPARTMENT_CONTACTS_UI.administrativo;
+}
