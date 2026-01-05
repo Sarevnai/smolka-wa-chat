@@ -66,6 +66,7 @@ const pipelineItems = [
 
 const marketingItems = [
   { title: "Dashboard", url: "/marketing", icon: LayoutDashboard },
+  { title: "Conversas", url: "/marketing/chat", icon: MessageCircle },
   { title: "Campanhas", url: "/marketing/campaigns", icon: Megaphone },
   { title: "Contatos", url: "/marketing/contacts", icon: Users },
   { title: "Relatórios", url: "/marketing/reports", icon: BarChart3 },
@@ -110,6 +111,9 @@ export function AppSidebar() {
 
   // Show marketing section for admins or marketing users
   const showMarketingSection = isAdmin || permissions.isMarketing;
+  
+  // Pure marketing users (not admins) only see Marketing section
+  const isPureMarketing = permissions.isMarketing && !isAdmin;
 
   return (
     <Sidebar collapsible="icon" className={cn(
@@ -219,35 +223,37 @@ export function AppSidebar() {
           </Collapsible>
         )}
 
-        {/* Main Navigation */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Geral</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainItems
-                .filter(item => (!item.permission || permissions[item.permission]) && (!item.adminOnly || permissions.isAdmin))
-                .map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className={getNavClassName(item.url)}>
-                      <Link to={item.url}>
-                        <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                        {!collapsed && (
-                          <div className="flex items-center justify-between flex-1">
-                            <span>{item.title}</span>
-                            {item.hasUnreadCount && unreadCount > 0 && (
-                              <Badge variant="destructive" className="text-xs">
-                                {unreadCount}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Main Navigation - Hidden for pure Marketing users */}
+        {!isPureMarketing && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Geral</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {mainItems
+                  .filter(item => (!item.permission || permissions[item.permission]) && (!item.adminOnly || permissions.isAdmin))
+                  .map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild className={getNavClassName(item.url)}>
+                        <Link to={item.url}>
+                          <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                          {!collapsed && (
+                            <div className="flex items-center justify-between flex-1">
+                              <span>{item.title}</span>
+                              {item.hasUnreadCount && unreadCount > 0 && (
+                                <Badge variant="destructive" className="text-xs">
+                                  {unreadCount}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Integrations Section - Admin Only */}
         {permissions.isAdmin && (

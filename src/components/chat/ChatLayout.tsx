@@ -2,13 +2,17 @@ import { MessageSquare } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ChatList } from "./ChatList";
 import { ChatWindow } from "./ChatWindow";
+import { Database } from "@/integrations/supabase/types";
+
+type DepartmentType = Database['public']['Enums']['department_type'];
 
 interface ChatLayoutProps {
   selectedContact?: string;
   onContactSelect: (phoneNumber: string) => void;
+  departmentFilter?: DepartmentType;
 }
 
-export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps) {
+export function ChatLayout({ selectedContact, onContactSelect, departmentFilter }: ChatLayoutProps) {
   const isMobile = useIsMobile();
 
   if (isMobile) {
@@ -17,7 +21,7 @@ export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps
         {selectedContact ? (
           <ChatWindow phoneNumber={selectedContact} onBack={() => onContactSelect("")} />
         ) : (
-          <ChatList selectedContact={selectedContact} onContactSelect={onContactSelect} />
+          <ChatList selectedContact={selectedContact} onContactSelect={onContactSelect} departmentFilter={departmentFilter} />
         )}
       </div>
     );
@@ -30,6 +34,7 @@ export function ChatLayout({ selectedContact, onContactSelect }: ChatLayoutProps
         <ChatList 
           selectedContact={selectedContact} 
           onContactSelect={onContactSelect}
+          departmentFilter={departmentFilter}
         />
       </div>
       <div className="flex-1 flex flex-col items-center justify-center min-w-0 w-full">
