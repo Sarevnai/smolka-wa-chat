@@ -26,7 +26,8 @@ import {
 import Layout from "@/components/Layout";
 import { TagManager } from "@/components/marketing/TagManager";
 import { TagSelector } from "@/components/marketing/TagSelector";
-import { useQuery } from "@tanstack/react-query";
+import { ImportMarketingContactsModal } from "@/components/marketing/ImportMarketingContactsModal";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useContactTags, useContactsTagAssignments } from "@/hooks/useContactTags";
 
@@ -34,10 +35,12 @@ type ContactType = "lead" | "prospect" | "engajado" | "campanha" | "all";
 
 export default function MarketingContacts() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<ContactType>("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("contacts");
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const { data: allTags = [] } = useContactTags("marketing");
 
@@ -114,9 +117,9 @@ export default function MarketingContacts() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setImportModalOpen(true)}>
               <Upload className="h-4 w-4 mr-2" />
-              Importar
+              Importar CSV
             </Button>
             <Button className="bg-pink-500 hover:bg-pink-600">
               <Plus className="h-4 w-4 mr-2" />
@@ -296,6 +299,14 @@ export default function MarketingContacts() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <ImportMarketingContactsModal
+          open={importModalOpen}
+          onOpenChange={setImportModalOpen}
+          onImportComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ["marketing-contacts"] });
+          }}
+        />
       </div>
     </Layout>
   );
