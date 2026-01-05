@@ -33,7 +33,7 @@ export default function UserManagement() {
   } = useUserManagement();
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'blocked'>('all');
-  const [functionFilter, setFunctionFilter] = useState<'all' | 'admin' | 'manager' | 'attendant' | 'none'>('all');
+  const [functionFilter, setFunctionFilter] = useState<'all' | 'admin' | 'manager' | 'attendant' | 'marketing' | 'none'>('all');
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const filteredUsers = users.filter(user => {
@@ -53,7 +53,7 @@ export default function UserManagement() {
     email: string;
     full_name: string;
     password: string;
-    function?: 'admin' | 'manager' | 'attendant';
+    function?: 'admin' | 'manager' | 'attendant' | 'marketing';
     department_code?: string;
   }) => {
     await createUser(data);
@@ -125,6 +125,7 @@ export default function UserManagement() {
                       <SelectItem value="admin">{FUNCTION_LABELS.admin}</SelectItem>
                       <SelectItem value="manager">{FUNCTION_LABELS.manager}</SelectItem>
                       <SelectItem value="attendant">{FUNCTION_LABELS.attendant}</SelectItem>
+                      <SelectItem value="marketing">{FUNCTION_LABELS.marketing}</SelectItem>
                       <SelectItem value="none">Sem Função</SelectItem>
                     </SelectContent>
                   </Select>
@@ -190,6 +191,12 @@ export default function UserManagement() {
                 <Badge variant="outline">Atendente</Badge>
                 <span className="text-sm text-muted-foreground">
                   Acesso restrito ao módulo de atendimento e visualização de contatos
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge className="bg-pink-500/10 text-pink-500 border-pink-500/20">Marketing</Badge>
+                <span className="text-sm text-muted-foreground">
+                  Acesso ao setor de Marketing com permissões para campanhas
                 </span>
               </div>
             </CardContent>

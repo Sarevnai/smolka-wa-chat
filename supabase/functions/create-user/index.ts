@@ -9,7 +9,7 @@ interface CreateUserRequest {
   email: string;
   full_name: string;
   password: string;
-  function?: 'admin' | 'manager' | 'attendant';
+  function?: 'admin' | 'manager' | 'attendant' | 'marketing';
   department_code?: 'locacao' | 'administrativo' | 'vendas' | 'marketing';
 }
 

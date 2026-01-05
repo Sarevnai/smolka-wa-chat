@@ -18,6 +18,7 @@ export function usePermissions(): FunctionPermissions & {
   isAdmin: boolean;
   isManager: boolean;
   isAttendant: boolean;
+  isMarketing: boolean;
   loading: boolean;
 } {
   const { profile, loading: authLoading, user } = useAuth();
@@ -102,6 +103,7 @@ export function usePermissions(): FunctionPermissions & {
   const isAdmin = hasFunction('admin');
   const isManager = hasFunction('manager');
   const isAttendant = hasFunction('attendant');
+  const isMarketing = hasFunction('marketing');
 
   // Resource name aliases to match DB schema
   const RESOURCE_ALIASES: Record<string, string> = {
@@ -205,6 +207,31 @@ export function usePermissions(): FunctionPermissions & {
       };
     }
 
+    // Marketing - similar to attendant but with campaign access
+    if (isMarketing) {
+      return {
+        canViewDashboard: true,
+        canViewChats: true,
+        canSendMessages: true,
+        canDeleteMessages: false,
+        canViewContacts: true,
+        canEditContacts: true,
+        canDeleteContacts: false,
+        canViewCampaigns: true,
+        canCreateCampaigns: true,
+        canSendCampaigns: true,
+        canViewReports: true,
+        canViewFinancialReports: false,
+        canManageIntegrations: false,
+        canManageUsers: false,
+        canAccessSettings: false,
+        canCreateTickets: true,
+        canDeleteTickets: false,
+        canViewAllTickets: false,
+        canManageCategories: false,
+      };
+    }
+
     // Attendant (padrão)
     return {
       canViewDashboard: false,
@@ -227,7 +254,7 @@ export function usePermissions(): FunctionPermissions & {
       canViewAllTickets: false,
       canManageCategories: false,
     };
-  }, [isAdmin, isManager, isAttendant, effectivePermissions]);
+  }, [isAdmin, isManager, isAttendant, isMarketing, effectivePermissions]);
 
   const loading = authLoading || permissionsLoading;
 
@@ -238,6 +265,7 @@ export function usePermissions(): FunctionPermissions & {
     isAdmin,
     isManager,
     isAttendant,
+    isMarketing,
     loading,
   };
 }

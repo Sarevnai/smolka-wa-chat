@@ -62,8 +62,8 @@ export function CreateUserModal({
       email,
       full_name: fullName,
       password,
-      function: userFunction === 'none' ? undefined : userFunction as 'admin' | 'manager' | 'attendant',
-      department_code: departmentCode as 'locacao' | 'administrativo' | 'vendas',
+      function: userFunction === 'none' ? undefined : userFunction as 'admin' | 'manager' | 'attendant' | 'marketing',
+      department_code: departmentCode as 'locacao' | 'administrativo' | 'vendas' | 'marketing',
     });
     
     resetForm();
@@ -166,6 +166,7 @@ export function CreateUserModal({
                 <SelectItem value="admin">{FUNCTION_LABELS.admin}</SelectItem>
                 <SelectItem value="manager">{FUNCTION_LABELS.manager}</SelectItem>
                 <SelectItem value="attendant">{FUNCTION_LABELS.attendant}</SelectItem>
+                <SelectItem value="marketing">{FUNCTION_LABELS.marketing}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -185,6 +186,7 @@ export function CreateUserModal({
                 <SelectItem value="locacao">Locação</SelectItem>
                 <SelectItem value="administrativo">Administrativo</SelectItem>
                 <SelectItem value="vendas">Vendas</SelectItem>
+                <SelectItem value="marketing">Marketing</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">

@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 export interface FunctionPermission {
   id: string;
-  function: 'admin' | 'manager' | 'attendant';
+  function: 'admin' | 'manager' | 'attendant' | 'marketing';
   resource: string;
   can_view: boolean;
   can_create: boolean;
@@ -36,7 +36,7 @@ export function useFunctionPermissions() {
   };
 
   const updatePermission = async (
-    userFunction: 'admin' | 'manager' | 'attendant',
+    userFunction: 'admin' | 'manager' | 'attendant' | 'marketing',
     resource: string,
     field: 'can_view' | 'can_create' | 'can_edit' | 'can_delete',
     value: boolean
@@ -63,11 +63,11 @@ export function useFunctionPermissions() {
     }
   };
 
-  const getPermissionsByFunction = (userFunction: 'admin' | 'manager' | 'attendant') => {
+  const getPermissionsByFunction = (userFunction: 'admin' | 'manager' | 'attendant' | 'marketing') => {
     return permissions.filter(p => p.function === userFunction);
   };
 
-  const getPermissionForResource = (userFunction: 'admin' | 'manager' | 'attendant', resource: string) => {
+  const getPermissionForResource = (userFunction: 'admin' | 'manager' | 'attendant' | 'marketing', resource: string) => {
     return permissions.find(p => p.function === userFunction && p.resource === resource);
   };
 
