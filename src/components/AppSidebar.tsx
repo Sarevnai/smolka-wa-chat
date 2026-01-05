@@ -297,6 +297,14 @@ export function AppSidebar() {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild className={getNavClassName('/admin/marketing')}>
+                    <Link to="/admin/marketing">
+                      <Megaphone className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                      {!collapsed && <span>Dashboard Marketing</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

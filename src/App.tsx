@@ -29,6 +29,7 @@ import UserPermissions from "./pages/admin/UserPermissions";
 import SystemSettings from "./pages/admin/SystemSettings";
 import AIAgentConfig from "./pages/admin/AIAgentConfig";
 import C2SDashboard from "./pages/admin/C2SDashboard";
+import MarketingDashboard from "./pages/admin/MarketingDashboard";
 import { AdminGuard } from "./components/guards/AdminGuard";
 
 // Create QueryClient outside component to avoid recreating on hot reload
@@ -173,6 +174,11 @@ const App = () => (
                       <AdminGuard>
                         <C2SDashboard />
                       </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/marketing" element={
+                    <ProtectedRoute>
+                      <MarketingDashboard />
                     </ProtectedRoute>
                   } />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
