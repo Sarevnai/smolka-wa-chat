@@ -37,6 +37,7 @@ import MarketingContacts from "./pages/marketing/MarketingContacts";
 import MarketingCampaigns from "./pages/marketing/MarketingCampaigns";
 import MarketingReports from "./pages/marketing/MarketingReports";
 import MarketingAIConfig from "./pages/marketing/MarketingAIConfig";
+import MarketingChat from "./pages/marketing/MarketingChat";
 
 // Create QueryClient outside component to avoid recreating on hot reload
 const queryClient = new QueryClient({
@@ -130,6 +131,20 @@ const App = () => (
                     <ProtectedRoute>
                       <MarketingGuard>
                         <MarketingDashboard />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/marketing/chat" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <MarketingChat />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/marketing/chat/:phoneNumber" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <MarketingChat />
                       </MarketingGuard>
                     </ProtectedRoute>
                   } />

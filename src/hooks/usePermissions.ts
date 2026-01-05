@@ -207,10 +207,10 @@ export function usePermissions(): FunctionPermissions & {
       };
     }
 
-    // Marketing - similar to attendant but with campaign access
+    // Marketing - acesso exclusivo ao módulo Marketing, sem dashboard geral
     if (isMarketing) {
       return {
-        canViewDashboard: true,
+        canViewDashboard: false,
         canViewChats: true,
         canSendMessages: true,
         canDeleteMessages: false,

@@ -47,9 +47,10 @@ interface ChatListProps {
   onContactSelect: (phoneNumber: string) => void;
   selectedContact?: string;
   onBack?: () => void;
+  departmentFilter?: DepartmentType;
 }
 
-export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListProps) {
+export function ChatList({ onContactSelect, selectedContact, onBack, departmentFilter }: ChatListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,14 +100,17 @@ export function ChatList({ onContactSelect, selectedContact, onBack }: ChatListP
         .order("last_message_at", { ascending: false })
         .limit(100);
       
-      // Filter by department if user is not admin
-      if (!permissions.isAdmin && userDepartment) {
+      // Filter by department - explicit filter takes priority (for isolated modules like Marketing)
+      if (departmentFilter) {
+        conversationsQuery = conversationsQuery.eq("department_code", departmentFilter);
+      } else if (!permissions.isAdmin && userDepartment) {
+        // Standard filter: user sees their department or unassigned
         conversationsQuery = conversationsQuery.or(`department_code.eq.${userDepartment},department_code.is.null`);
       } else if (!permissions.isAdmin) {
         // User has no department, show only unassigned
         conversationsQuery = conversationsQuery.is("department_code", null);
       }
-      // Admins see all conversations
+      // Admins without departmentFilter see all conversations
 
       const { data: conversationsData, error: convError } = await conversationsQuery;
 
