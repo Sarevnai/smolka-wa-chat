@@ -12,7 +12,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Department types matching database enum
-type DepartmentType = 'locacao' | 'administrativo' | 'vendas' | null;
+type DepartmentType = 'locacao' | 'administrativo' | 'vendas' | 'marketing' | null;
 
 interface ConversationRecord {
   id: string;

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, X, Phone, Mail, FileText, Heart, Home, ShoppingBag, Building2 } from 'lucide-react';
+import { Plus, X, Phone, Mail, FileText, Heart, Home, ShoppingBag, Building2, Megaphone } from 'lucide-react';
 import { useCreateContact } from '@/hooks/useContacts';
 import { CreateContactRequest, ContactType, DepartmentCode } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
@@ -251,7 +251,7 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
               <Label htmlFor="department">Setor *</Label>
               <Select 
                 value={departmentCode || ''} 
-                onValueChange={(value: 'locacao' | 'administrativo' | 'vendas') => setDepartmentCode(value)}
+                onValueChange={(value: 'locacao' | 'administrativo' | 'vendas' | 'marketing') => setDepartmentCode(value)}
                 disabled={!isAdmin}
               >
                 <SelectTrigger>
@@ -276,11 +276,22 @@ export function NewContactModal({ open, onOpenChange, initialPhone }: NewContact
                       Administrativo
                     </div>
                   </SelectItem>
+                  <SelectItem value="marketing">
+                    <div className="flex items-center gap-2">
+                      <Megaphone className="h-4 w-4" />
+                      Marketing
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
               {!isAdmin && (
                 <p className="text-xs text-muted-foreground">
-                  Contato será criado no setor {userDepartment === 'locacao' ? 'Locação' : userDepartment === 'vendas' ? 'Vendas' : 'Administrativo'}
+                  Contato será criado no setor {
+                    userDepartment === 'locacao' ? 'Locação' : 
+                    userDepartment === 'vendas' ? 'Vendas' : 
+                    userDepartment === 'marketing' ? 'Marketing' : 
+                    'Administrativo'
+                  }
                 </p>
               )}
             </div>

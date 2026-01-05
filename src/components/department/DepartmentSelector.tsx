@@ -1,4 +1,4 @@
-import { Building2, Home, ShoppingBag, Layers } from 'lucide-react';
+import { Building2, Home, ShoppingBag, Layers, Megaphone } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -16,6 +16,7 @@ const departments: { value: DepartmentType | 'all'; label: string; icon: typeof 
   { value: 'locacao', label: 'Locação', icon: Home },
   { value: 'vendas', label: 'Vendas', icon: ShoppingBag },
   { value: 'administrativo', label: 'Administrativo', icon: Building2 },
+  { value: 'marketing', label: 'Marketing', icon: Megaphone },
 ];
 
 export function DepartmentSelector() {

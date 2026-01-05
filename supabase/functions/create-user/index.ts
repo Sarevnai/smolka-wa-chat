@@ -10,7 +10,7 @@ interface CreateUserRequest {
   full_name: string;
   password: string;
   function?: 'admin' | 'manager' | 'attendant';
-  department_code?: 'locacao' | 'administrativo' | 'vendas';
+  department_code?: 'locacao' | 'administrativo' | 'vendas' | 'marketing';
 }
 
 Deno.serve(async (req) => {
