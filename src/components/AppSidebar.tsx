@@ -18,7 +18,8 @@ import {
   Building2,
   Kanban,
   TrendingUp,
-  Megaphone
+  Megaphone,
+  Tag
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,14 @@ const pipelineItems = [
   { title: "Marketing", url: "/pipeline/marketing", icon: Megaphone, department: 'marketing' as const },
 ];
 
+const marketingItems = [
+  { title: "Dashboard", url: "/marketing", icon: LayoutDashboard },
+  { title: "Campanhas", url: "/marketing/campaigns", icon: Megaphone },
+  { title: "Contatos", url: "/marketing/contacts", icon: Users },
+  { title: "Relatórios", url: "/marketing/reports", icon: BarChart3 },
+  { title: "Agente IA", url: "/marketing/ai-config", icon: Bot },
+];
+
 const integrationItems = [
   { title: "ClickUp", url: "/clickup", icon: Settings, permission: 'canManageIntegrations' as const },
 ];
@@ -76,6 +85,7 @@ export function AppSidebar() {
   const { isAdmin, userDepartment, activeDepartment } = useDepartment();
   const [integrationsOpen, setIntegrationsOpen] = useState(true);
   const [pipelinesOpen, setPipelinesOpen] = useState(true);
+  const [marketingOpen, setMarketingOpen] = useState(true);
 
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
@@ -97,6 +107,9 @@ export function AppSidebar() {
   const accessiblePipelines = pipelineItems.filter(item => 
     isAdmin || userDepartment === item.department
   );
+
+  // Show marketing section for admins or marketing users
+  const showMarketingSection = isAdmin || permissions.isMarketing;
 
   return (
     <Sidebar collapsible="icon" className={cn(
@@ -134,6 +147,41 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+        )}
+
+        {/* Marketing Section - For Marketing users and Admins */}
+        {showMarketingSection && (
+          <Collapsible open={marketingOpen} onOpenChange={setMarketingOpen}>
+            <SidebarGroup>
+              <CollapsibleTrigger asChild>
+                <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between text-pink-600">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="h-4 w-4" />
+                    {!collapsed && <span>Marketing</span>}
+                  </div>
+                  {!collapsed && (
+                    <ChevronRight className={cn("h-4 w-4 transition-transform", marketingOpen && "rotate-90")} />
+                  )}
+                </SidebarGroupLabel>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {marketingItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild className={getNavClassName(item.url)}>
+                          <Link to={item.url}>
+                            <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                            {!collapsed && <span>{item.title}</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
         )}
 
         {/* Pipelines Section */}
@@ -294,14 +342,6 @@ export function AppSidebar() {
                     <Link to="/admin/c2s-dashboard">
                       <TrendingUp className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
                       {!collapsed && <span>Dashboard C2S</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={getNavClassName('/admin/marketing')}>
-                    <Link to="/admin/marketing">
-                      <Megaphone className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                      {!collapsed && <span>Dashboard Marketing</span>}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -29,8 +29,14 @@ import UserPermissions from "./pages/admin/UserPermissions";
 import SystemSettings from "./pages/admin/SystemSettings";
 import AIAgentConfig from "./pages/admin/AIAgentConfig";
 import C2SDashboard from "./pages/admin/C2SDashboard";
-import MarketingDashboard from "./pages/admin/MarketingDashboard";
 import { AdminGuard } from "./components/guards/AdminGuard";
+import { MarketingGuard } from "./components/guards/MarketingGuard";
+// Marketing Module
+import MarketingDashboard from "./pages/marketing/MarketingDashboard";
+import MarketingContacts from "./pages/marketing/MarketingContacts";
+import MarketingCampaigns from "./pages/marketing/MarketingCampaigns";
+import MarketingReports from "./pages/marketing/MarketingReports";
+import MarketingAIConfig from "./pages/marketing/MarketingAIConfig";
 
 // Create QueryClient outside component to avoid recreating on hot reload
 const queryClient = new QueryClient({
@@ -119,6 +125,42 @@ const App = () => (
                       <Pipeline />
                     </ProtectedRoute>
                   } />
+                  {/* Marketing Module Routes */}
+                  <Route path="/marketing" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <MarketingDashboard />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/marketing/contacts" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <MarketingContacts />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/marketing/campaigns" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <MarketingCampaigns />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/marketing/reports" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <MarketingReports />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/marketing/ai-config" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <MarketingAIConfig />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
                   {/* Admin Routes */}
                   <Route path="/admin" element={
                     <ProtectedRoute>
@@ -174,11 +216,6 @@ const App = () => (
                       <AdminGuard>
                         <C2SDashboard />
                       </AdminGuard>
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/marketing" element={
-                    <ProtectedRoute>
-                      <MarketingDashboard />
                     </ProtectedRoute>
                   } />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
