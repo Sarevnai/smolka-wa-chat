@@ -176,6 +176,13 @@ const App = () => (
                       </MarketingGuard>
                     </ProtectedRoute>
                   } />
+                  <Route path="/marketing/send" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <Send />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
                   {/* Admin Routes */}
                   <Route path="/admin" element={
                     <ProtectedRoute>

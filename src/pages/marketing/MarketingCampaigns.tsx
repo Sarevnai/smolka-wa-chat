@@ -118,7 +118,7 @@ export default function MarketingCampaigns() {
               <SyncTemplatesButton />
               <Button 
                 className="bg-white text-pink-600 hover:bg-white/90" 
-                onClick={() => navigate("/send")}
+                onClick={() => navigate("/marketing/send")}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Campanha
