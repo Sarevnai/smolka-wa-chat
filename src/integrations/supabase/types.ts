@@ -1402,7 +1402,7 @@ export type Database = {
       is_manager: { Args: never; Returns: boolean }
     }
     Enums: {
-      app_function: "admin" | "manager" | "attendant"
+      app_function: "admin" | "manager" | "attendant" | "marketing"
       contact_status: "ativo" | "inativo" | "bloqueado"
       contact_type:
         | "proprietario"
@@ -1549,7 +1549,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_function: ["admin", "manager", "attendant"],
+      app_function: ["admin", "manager", "attendant", "marketing"],
       contact_status: ["ativo", "inativo", "bloqueado"],
       contact_type: [
         "proprietario",

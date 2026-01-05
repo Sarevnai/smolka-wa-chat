@@ -36,9 +36,18 @@ export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleSta
         return 'secondary';
       case 'attendant':
         return 'outline';
+      case 'marketing':
+        return 'default'; // Will use custom className for pink
       default:
         return 'outline';
     }
+  };
+
+  const getRoleBadgeClass = (role: string | null) => {
+    if (role === 'marketing') {
+      return 'bg-pink-500/10 text-pink-500 border-pink-500/20';
+    }
+    return '';
   };
 
   return (
@@ -77,7 +86,10 @@ export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleSta
               </div>
 
               <div className="flex items-center gap-2 mt-3">
-                <Badge variant={getRoleBadgeVariant(user.function)}>
+                <Badge 
+                  variant={getRoleBadgeVariant(user.function)} 
+                  className={getRoleBadgeClass(user.function)}
+                >
                   {user.function ? FUNCTION_LABELS[user.function] : 'Sem função'}
                 </Badge>
                 {user.last_login && (

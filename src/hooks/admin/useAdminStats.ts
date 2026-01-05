@@ -11,6 +11,7 @@ export interface AdminStats {
     admin: number;
     manager: number;
     attendant: number;
+    marketing: number;
     none: number;
   };
   totalMessages: number;
@@ -54,7 +55,8 @@ export function useAdminStats() {
       const adminCount = functions?.filter(f => f.function === 'admin').length || 0;
       const managerCount = functions?.filter(f => f.function === 'manager').length || 0;
       const attendantCount = functions?.filter(f => f.function === 'attendant').length || 0;
-      const noneCount = (totalUsers || 0) - (adminCount + managerCount + attendantCount);
+      const marketingCount = functions?.filter(f => f.function === 'marketing').length || 0;
+      const noneCount = (totalUsers || 0) - (adminCount + managerCount + attendantCount + marketingCount);
 
       // Total de mensagens
       const { count: totalMessages } = await supabase
@@ -112,6 +114,7 @@ export function useAdminStats() {
           admin: adminCount,
           manager: managerCount,
           attendant: attendantCount,
+          marketing: marketingCount,
           none: noneCount,
         },
         totalMessages: totalMessages || 0,

@@ -37,6 +37,10 @@ const FUNCTION_INFO = {
   attendant: {
     label: 'Atendente',
     color: 'bg-green-500/10 text-green-500 border-green-500/20'
+  },
+  marketing: {
+    label: 'Marketing',
+    color: 'bg-pink-500/10 text-pink-500 border-pink-500/20'
   }
 };
 
@@ -44,7 +48,7 @@ export default function PermissionsMatrix() {
   const { permissions, loading, updatePermission, getPermissionForResource } = useFunctionPermissions();
 
   const handlePermissionChange = async (
-    userFunction: 'admin' | 'manager' | 'attendant',
+    userFunction: 'admin' | 'manager' | 'attendant' | 'marketing',
     resource: string,
     field: 'can_view' | 'can_create' | 'can_edit' | 'can_delete',
     value: boolean
@@ -71,7 +75,7 @@ export default function PermissionsMatrix() {
       </div>
 
       {/* Tabela para cada function */}
-      {(['admin', 'manager', 'attendant'] as const).map((userFunction) => (
+      {(['admin', 'manager', 'attendant', 'marketing'] as const).map((userFunction) => (
         <Card key={userFunction}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-export type AppFunction = 'admin' | 'manager' | 'attendant';
+export type AppFunction = 'admin' | 'manager' | 'attendant' | 'marketing';
 
 export interface UserFunction {
   id: string;
@@ -33,11 +33,13 @@ export interface FunctionPermissions {
 export const FUNCTION_LABELS: Record<AppFunction, string> = {
   admin: 'Administrador',
   manager: 'Gerente',
-  attendant: 'Atendente'
+  attendant: 'Atendente',
+  marketing: 'Marketing'
 };
 
 export const FUNCTION_DESCRIPTIONS: Record<AppFunction, string> = {
   admin: 'Acesso total à plataforma',
   manager: 'Acesso a dados operacionais',
-  attendant: 'Acesso restrito ao atendimento'
+  attendant: 'Acesso restrito ao atendimento',
+  marketing: 'Acesso ao setor de Marketing'
 };
