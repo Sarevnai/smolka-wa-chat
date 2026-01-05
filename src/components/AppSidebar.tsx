@@ -17,7 +17,8 @@ import {
   ShoppingBag,
   Building2,
   Kanban,
-  TrendingUp
+  TrendingUp,
+  Megaphone
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,7 @@ const pipelineItems = [
   { title: "Locação", url: "/pipeline/locacao", icon: Home, department: 'locacao' as const },
   { title: "Vendas", url: "/pipeline/vendas", icon: ShoppingBag, department: 'vendas' as const },
   { title: "Administrativo", url: "/pipeline/administrativo", icon: Building2, department: 'administrativo' as const },
+  { title: "Marketing", url: "/pipeline/marketing", icon: Megaphone, department: 'marketing' as const },
 ];
 
 const integrationItems = [

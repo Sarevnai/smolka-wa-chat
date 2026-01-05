@@ -1,6 +1,7 @@
 import { 
   UserPlus, Eye, Star, Home, FileText, Building2, Key, 
   ShoppingBag, TrendingUp, Handshake, Users, Activity,
+  Target, Heart, Megaphone,
   LucideIcon
 } from 'lucide-react';
 
@@ -103,6 +104,35 @@ export const DEPARTMENT_CONTACT_TYPES: Record<string, DepartmentContactConfig> =
         badgeVariant: 'default'
       }
     }
+  },
+  marketing: {
+    types: ['lead', 'prospect', 'engajado', 'campanha'],
+    labels: {
+      lead: { 
+        label: 'Lead', 
+        icon: UserPlus, 
+        color: 'text-pink-600',
+        badgeVariant: 'default'
+      },
+      prospect: { 
+        label: 'Prospect', 
+        icon: Target, 
+        color: 'text-purple-600',
+        badgeVariant: 'secondary'
+      },
+      engajado: { 
+        label: 'Engajado', 
+        icon: Heart, 
+        color: 'text-rose-600',
+        badgeVariant: 'default'
+      },
+      campanha: { 
+        label: 'Campanha', 
+        icon: Megaphone, 
+        color: 'text-fuchsia-600',
+        badgeVariant: 'secondary'
+      }
+    }
   }
 };
 
@@ -122,7 +152,8 @@ export function getContactTypeLabel(contactType?: string, departmentCode?: strin
 export type AllContactTypes = 
   | 'lead' | 'interessado' | 'qualificado' | 'visitou' | 'proposta'  // locacao
   | 'proprietario' | 'inquilino'  // administrativo
-  | 'comprador' | 'investidor' | 'proprietario_vendedor' | 'negociacao';  // vendas
+  | 'comprador' | 'investidor' | 'proprietario_vendedor' | 'negociacao'  // vendas
+  | 'prospect' | 'engajado' | 'campanha';  // marketing
 
 // ============================================
 // UI Configuration per Department
@@ -170,6 +201,16 @@ export const DEPARTMENT_CONTACTS_UI: Record<string, DepartmentUIConfig> = {
       { key: 'negociacao', label: 'Em Negociação', icon: Handshake, color: 'text-yellow-600' }
     ],
     searchPlaceholder: 'Buscar por nome, telefone, email ou bairro...',
+    showContracts: false
+  },
+  marketing: {
+    stats: [
+      { key: 'total', label: 'Total de Leads', icon: Users },
+      { key: 'lead', label: 'Novos Leads', icon: UserPlus, color: 'text-pink-600' },
+      { key: 'prospect', label: 'Prospects', icon: Target, color: 'text-purple-600' },
+      { key: 'engajado', label: 'Engajados', icon: Heart, color: 'text-rose-600' }
+    ],
+    searchPlaceholder: 'Buscar por nome, telefone, email ou campanha...',
     showContracts: false
   }
 };

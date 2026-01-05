@@ -1416,8 +1416,11 @@ export type Database = {
         | "investidor"
         | "proprietario_vendedor"
         | "negociacao"
+        | "prospect"
+        | "engajado"
+        | "campanha"
       contract_status: "ativo" | "encerrado" | "suspenso"
-      department_type: "locacao" | "administrativo" | "vendas"
+      department_type: "locacao" | "administrativo" | "vendas" | "marketing"
       user_role: "admin" | "user"
     }
     CompositeTypes: {
@@ -1560,9 +1563,12 @@ export const Constants = {
         "investidor",
         "proprietario_vendedor",
         "negociacao",
+        "prospect",
+        "engajado",
+        "campanha",
       ],
       contract_status: ["ativo", "encerrado", "suspenso"],
-      department_type: ["locacao", "administrativo", "vendas"],
+      department_type: ["locacao", "administrativo", "vendas", "marketing"],
       user_role: ["admin", "user"],
     },
   },

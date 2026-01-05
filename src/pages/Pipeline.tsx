@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Home, ShoppingBag, Building2, ArrowLeft } from 'lucide-react';
+import { Home, ShoppingBag, Building2, Megaphone, ArrowLeft } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { KanbanBoard } from '@/components/pipeline/KanbanBoard';
@@ -14,6 +14,7 @@ const departmentConfig: Record<DepartmentType, { label: string; icon: typeof Hom
   locacao: { label: 'Locação', icon: Home, color: 'bg-blue-500' },
   vendas: { label: 'Vendas', icon: ShoppingBag, color: 'bg-green-500' },
   administrativo: { label: 'Administrativo', icon: Building2, color: 'bg-orange-500' },
+  marketing: { label: 'Marketing', icon: Megaphone, color: 'bg-pink-500' },
 };
 
 export default function Pipeline() {
@@ -23,7 +24,7 @@ export default function Pipeline() {
 
   // Validate department
   const validDepartment = department as DepartmentType;
-  const isValidDepartment = ['locacao', 'vendas', 'administrativo'].includes(validDepartment);
+  const isValidDepartment = ['locacao', 'vendas', 'administrativo', 'marketing'].includes(validDepartment);
 
   // Check access
   const hasAccess = isAdmin || userDepartment === validDepartment;

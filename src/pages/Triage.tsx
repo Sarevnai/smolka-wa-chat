@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, User, Phone, Clock, Home, ShoppingBag, Building2, MessageCircle } from 'lucide-react';
+import { AlertTriangle, User, Phone, Clock, Home, ShoppingBag, Building2, Megaphone, MessageCircle } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ const departments: { value: DepartmentType; label: string; icon: typeof Home; co
   { value: 'locacao', label: 'Locação', icon: Home, color: 'bg-blue-500' },
   { value: 'vendas', label: 'Vendas', icon: ShoppingBag, color: 'bg-green-500' },
   { value: 'administrativo', label: 'Administrativo', icon: Building2, color: 'bg-orange-500' },
+  { value: 'marketing', label: 'Marketing', icon: Megaphone, color: 'bg-pink-500' },
 ];
 
 export default function Triage() {

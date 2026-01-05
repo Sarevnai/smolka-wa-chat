@@ -1,12 +1,13 @@
-export type DepartmentCode = 'locacao' | 'administrativo' | 'vendas';
+export type DepartmentCode = 'locacao' | 'administrativo' | 'vendas' | 'marketing';
 
 // Department-specific contact types
 export type LocacaoContactType = 'lead' | 'interessado' | 'qualificado' | 'visitou' | 'proposta';
 export type AdministrativoContactType = 'proprietario' | 'inquilino';
 export type VendasContactType = 'lead' | 'comprador' | 'investidor' | 'proprietario_vendedor' | 'negociacao';
+export type MarketingContactType = 'lead' | 'prospect' | 'engajado' | 'campanha';
 
 // Union of all contact types (for flexibility)
-export type ContactType = LocacaoContactType | AdministrativoContactType | VendasContactType;
+export type ContactType = LocacaoContactType | AdministrativoContactType | VendasContactType | MarketingContactType;
 
 export interface Contact {
   id: string;
