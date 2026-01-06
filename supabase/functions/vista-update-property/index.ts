@@ -75,18 +75,17 @@ serve(async (req) => {
     }
 
     // Vista CRM API usa PUT para atualizar imóveis no endpoint /imoveis/detalhes
-    // Formato: PUT /imoveis/detalhes?key=API_KEY com body: { cadastro: { Codigo: "XXX", campos... } }
-    const vistaUrl = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}`;
+    // Formato: PUT /imoveis/detalhes?key=API_KEY&imovel=CODIGO com body: { cadastro: { fields: { campos... } } }
+    const vistaUrl = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&imovel=${codigo}`;
     
-    // O Vista espera os dados dentro do parâmetro "cadastro"
+    // O Vista espera: cadastro -> fields -> campos
     const vistaPayload = {
       cadastro: {
-        Codigo: codigo,
-        ...campos
+        fields: campos
       }
     };
 
-    console.log(`[Vista Update] Enviando para Vista (PUT):`, vistaPayload);
+    console.log(`[Vista Update] Enviando para Vista (PUT):`, JSON.stringify(vistaPayload));
     console.log(`[Vista Update] URL:`, vistaUrl);
 
     const vistaResponse = await fetch(vistaUrl, {
