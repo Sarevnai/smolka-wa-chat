@@ -77,15 +77,21 @@ export function useFlowBuilder() {
 
   // Criar novo fluxo
   const createFlowMutation = useMutation({
-    mutationFn: async (data: { name: string; description?: string; department: AIFlow['department'] }) => {
+    mutationFn: async (data: { 
+      name: string; 
+      description?: string; 
+      department: AIFlow['department'];
+      nodes?: CustomFlowNode[];
+      edges?: CustomFlowEdge[];
+    }) => {
       const { data: newFlow, error } = await supabase
         .from('ai_flows')
         .insert({
           name: data.name,
           description: data.description,
           department_code: data.department,
-          nodes: [],
-          edges: [],
+          nodes: (data.nodes || []) as unknown as Json,
+          edges: (data.edges || []) as unknown as Json,
           is_active: false,
           created_by: user?.id,
         })

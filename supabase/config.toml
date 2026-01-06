@@ -92,3 +92,6 @@ verify_jwt = false
 
 [functions.ai-marketing-agent]
 verify_jwt = false
+
+[functions.flow-executor]
+verify_jwt = false

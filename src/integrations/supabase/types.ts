@@ -880,6 +880,110 @@ export type Database = {
         }
         Relationships: []
       }
+      flow_execution_logs: {
+        Row: {
+          action_taken: string | null
+          created_at: string | null
+          duration_ms: number | null
+          execution_id: string | null
+          id: string
+          input_data: Json | null
+          node_id: string
+          node_type: string
+          output_data: Json | null
+        }
+        Insert: {
+          action_taken?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          execution_id?: string | null
+          id?: string
+          input_data?: Json | null
+          node_id: string
+          node_type: string
+          output_data?: Json | null
+        }
+        Update: {
+          action_taken?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          execution_id?: string | null
+          id?: string
+          input_data?: Json | null
+          node_id?: string
+          node_type?: string
+          output_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_execution_logs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "flow_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flow_executions: {
+        Row: {
+          completed_at: string | null
+          context: Json | null
+          conversation_id: string | null
+          current_node_id: string
+          error_message: string | null
+          flow_id: string | null
+          id: string
+          phone_number: string
+          started_at: string | null
+          status: string
+          updated_at: string | null
+          variables: Json | null
+        }
+        Insert: {
+          completed_at?: string | null
+          context?: Json | null
+          conversation_id?: string | null
+          current_node_id: string
+          error_message?: string | null
+          flow_id?: string | null
+          id?: string
+          phone_number: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          completed_at?: string | null
+          context?: Json | null
+          conversation_id?: string | null
+          current_node_id?: string
+          error_message?: string | null
+          flow_id?: string | null
+          id?: string
+          phone_number?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_executions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flow_executions_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "ai_flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       function_permissions: {
         Row: {
           can_create: boolean | null
