@@ -168,8 +168,78 @@ async function checkCampaignSource(phoneNumber: string): Promise<DepartmentType>
 }
 
 /**
+ * 🆕 Generate phone number variations (with/without 9th digit)
+ * Brazilian mobile numbers can have 8 or 9 digits after DDD
+ */
+function getPhoneVariations(phoneNumber: string): string[] {
+  const variations = [phoneNumber];
+  
+  // If starts with 55 and has 12 digits (without 9), add version with 9
+  if (phoneNumber.startsWith('55') && phoneNumber.length === 12) {
+    // Add 9 after DDD: 5548XXXXXXXX -> 55489XXXXXXXX
+    const withNine = phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4);
+    variations.push(withNine);
+    console.log(`📱 Phone variations: ${phoneNumber} + ${withNine}`);
+  }
+  
+  // If starts with 55 and has 13 digits (with 9), add version without 9
+  if (phoneNumber.startsWith('55') && phoneNumber.length === 13) {
+    // Remove 9 after DDD: 55489XXXXXXXX -> 5548XXXXXXXX
+    const withoutNine = phoneNumber.slice(0, 4) + phoneNumber.slice(5);
+    variations.push(withoutNine);
+    console.log(`📱 Phone variations: ${phoneNumber} + ${withoutNine}`);
+  }
+  
+  return variations;
+}
+
+/**
+ * 🆕 Find contact with property data (notes) by checking phone variations
+ * Prioritizes contacts that have notes (property data)
+ */
+async function findContactWithData(phoneNumber: string): Promise<{
+  id: string;
+  name: string | null;
+  notes: string | null;
+  department_code: string | null;
+} | null> {
+  const variations = getPhoneVariations(phoneNumber);
+  
+  // First try: Find contact WITH notes (priority - has property data)
+  const { data: contactWithNotes } = await supabase
+    .from('contacts')
+    .select('id, name, notes, department_code')
+    .in('phone', variations)
+    .not('notes', 'is', null)
+    .limit(1)
+    .maybeSingle();
+  
+  if (contactWithNotes) {
+    console.log(`📇 Found contact WITH notes (property data): ${contactWithNotes.id} for phone ${phoneNumber}`);
+    return contactWithNotes;
+  }
+  
+  // Second try: Find any contact (even without notes)
+  const { data: anyContact } = await supabase
+    .from('contacts')
+    .select('id, name, notes, department_code')
+    .in('phone', variations)
+    .limit(1)
+    .maybeSingle();
+  
+  if (anyContact) {
+    console.log(`📇 Found contact (no notes): ${anyContact.id} for phone ${phoneNumber}`);
+    return anyContact;
+  }
+  
+  console.log(`📇 No contact found for phone variations: ${variations.join(', ')}`);
+  return null;
+}
+
+/**
  * Check if a phone number is responding to a MARKETING campaign (for property confirmation)
  * Returns contact info with notes (property data) if from marketing campaign
+ * 🆕 Now uses findContactWithData to search by phone variations
  */
 async function checkMarketingCampaignSource(phoneNumber: string): Promise<{
   isMarketingCampaign: boolean;
@@ -179,17 +249,19 @@ async function checkMarketingCampaignSource(phoneNumber: string): Promise<{
 } | null> {
   try {
     const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const phoneVariations = getPhoneVariations(phoneNumber);
     
-    // Check if phone received a marketing campaign in last 48h
+    // Check if any phone variation received a marketing campaign in last 48h
     const { data: campaignResult } = await supabase
       .from('campaign_results')
       .select(`
         id,
         campaign_id,
         contact_id,
+        phone,
         campaigns!inner(department_code, name)
       `)
-      .eq('phone', phoneNumber)
+      .in('phone', phoneVariations)
       .eq('campaigns.department_code', 'marketing')
       .gte('sent_at', cutoffTime)
       .order('sent_at', { ascending: false })
@@ -202,12 +274,8 @@ async function checkMarketingCampaignSource(phoneNumber: string): Promise<{
 
     console.log(`📢 Marketing campaign detected for ${phoneNumber}: ${(campaignResult.campaigns as any)?.name}`);
 
-    // Get contact info with notes (contains property data)
-    const { data: contact } = await supabase
-      .from('contacts')
-      .select('id, name, notes')
-      .eq('phone', phoneNumber)
-      .maybeSingle();
+    // 🆕 Use findContactWithData to get contact with notes (property data)
+    const contact = await findContactWithData(phoneNumber);
 
     return {
       isMarketingCampaign: true,

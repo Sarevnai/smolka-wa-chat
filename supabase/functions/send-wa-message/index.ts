@@ -360,6 +360,39 @@ serve(async (req) => {
         canonicalPhone = convResult.canonicalPhone;
       }
 
+      // 🆕 Build message body with template parameters for better visibility
+      let messageBody = text || '';
+      
+      if (template_name && !text) {
+        // Extract parameters from template components
+        let templateParams: string[] = [];
+        
+        if (components && components.length > 0) {
+          for (const component of components) {
+            if (component.type === 'body' && component.parameters) {
+              templateParams = component.parameters.map((p: any) => p.text || '').filter(Boolean);
+            }
+          }
+        }
+        
+        // Format template message with parameters for readability
+        if (templateParams.length > 0) {
+          // For "atualizacao" template: [Nome, Endereço, Valor]
+          if (template_name.toLowerCase().includes('atualizacao') && templateParams.length >= 3) {
+            messageBody = `[Template: ${template_name}]\n\n` +
+              `👤 Nome: ${templateParams[0]}\n` +
+              `📍 Endereço: ${templateParams[1]}\n` +
+              `💰 Valor: ${templateParams[2]}`;
+          } else {
+            // Generic format for other templates
+            messageBody = `[Template: ${template_name}]\n\nParâmetros:\n${templateParams.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
+          }
+          console.log(`📝 Template body formatted with ${templateParams.length} parameters`);
+        } else {
+          messageBody = `[Template: ${template_name}]`;
+        }
+      }
+
       // 🆕 Use canonicalPhone for wa_to (consistency with inbound)
       const messageData = {
         wa_message_id: result.messages?.[0]?.id || null,
@@ -367,7 +400,7 @@ serve(async (req) => {
         wa_to: canonicalPhone, // 🆕 Use canonical phone
         wa_phone_number_id: phoneNumberId,
         direction: 'outbound',
-        body: text || `[Template: ${template_name}]`,
+        body: messageBody,
         wa_timestamp: new Date().toISOString(),
         raw: result,
         created_at: new Date().toISOString(),
