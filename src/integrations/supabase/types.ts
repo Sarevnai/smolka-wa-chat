@@ -119,6 +119,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_flows: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_code: Database["public"]["Enums"]["department_type"]
+          description: string | null
+          edges: Json
+          id: string
+          is_active: boolean
+          name: string
+          nodes: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_code?: Database["public"]["Enums"]["department_type"]
+          description?: string | null
+          edges?: Json
+          id?: string
+          is_active?: boolean
+          name: string
+          nodes?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_code?: Database["public"]["Enums"]["department_type"]
+          description?: string | null
+          edges?: Json
+          id?: string
+          is_active?: boolean
+          name?: string
+          nodes?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_suggestions: {
         Row: {
           confidence_score: number | null
