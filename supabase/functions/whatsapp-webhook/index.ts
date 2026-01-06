@@ -785,12 +785,42 @@ async function handleN8NTrigger(
       return;
     }
 
-    // 🆕 CHECK FOR MARKETING CAMPAIGN FIRST
-    // Marketing campaigns have priority and use specialized AI agent
+    // 🆕 CHECK FOR MARKETING FIRST
+    // Priority 1: Recent marketing campaign (48h)
+    // Priority 2: Contact/conversation with department_code = 'marketing'
+    let isMarketingFlow = false;
+    let marketingContactNotes: string | null = null;
+    let marketingContactName: string | null = null;
+    let marketingContactId: string | null = null;
+
+    // Check for recent marketing campaign first
     const marketingCampaign = await checkMarketingCampaignSource(phoneNumber);
     
     if (marketingCampaign?.isMarketingCampaign) {
-      console.log(`📢 Marketing campaign response detected - routing to ai-marketing-agent`);
+      console.log(`📢 Marketing campaign response detected (within 48h)`);
+      isMarketingFlow = true;
+      marketingContactNotes = marketingCampaign.contactNotes;
+      marketingContactName = marketingCampaign.contactName;
+      marketingContactId = marketingCampaign.contactId;
+    } else {
+      // No recent campaign - check if contact or conversation is from marketing department
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('id, name, notes, department_code')
+        .eq('phone', phoneNumber)
+        .maybeSingle();
+
+      if (contact?.department_code === 'marketing' || conversation?.department_code === 'marketing') {
+        console.log(`📇 Marketing contact/conversation detected via department_code`);
+        isMarketingFlow = true;
+        marketingContactNotes = contact?.notes || null;
+        marketingContactName = contact?.name || null;
+        marketingContactId = contact?.id || null;
+      }
+    }
+    
+    if (isMarketingFlow) {
+      console.log(`📢 Routing to ai-marketing-agent (Nina)`);
       
       // Get recent messages for conversation history
       let conversationHistory: Array<{ role: string; content: string }> = [];
@@ -817,14 +847,14 @@ async function handleN8NTrigger(
       const marketingPayload = {
         phone_number: phoneNumber,
         message: messageBody,
-        contact_name: marketingCampaign.contactName,
-        contact_notes: marketingCampaign.contactNotes,
+        contact_name: marketingContactName,
+        contact_notes: marketingContactNotes,
         conversation_history: conversationHistory,
       };
 
       console.log(`📤 Sending to ai-marketing-agent:`, {
         phone: phoneNumber,
-        hasNotes: !!marketingCampaign.contactNotes,
+        hasNotes: !!marketingContactNotes,
         historyCount: conversationHistory.length
       });
 
