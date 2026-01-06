@@ -157,7 +157,7 @@ export default function FlowBuilder() {
     setHasUnsavedChanges(true);
   }, [selectedNode, nodes, edges, setHasUnsavedChanges]);
 
-  const handleNodesChange = useCallback((newNodes: Node[]) => {
+  const handleNodesChange = useCallback((newNodes: Node<FlowNodeData>[]) => {
     setNodes(newNodes);
     setHasUnsavedChanges(true);
   }, [setHasUnsavedChanges]);
