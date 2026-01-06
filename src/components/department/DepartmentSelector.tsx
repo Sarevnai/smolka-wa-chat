@@ -1,10 +1,9 @@
-import { ChevronDown, Home, ShoppingBag, Building2, Megaphone } from 'lucide-react';
+import { Home, ShoppingBag, Building2, Megaphone } from 'lucide-react';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select';
 import { useDepartment } from '@/contexts/DepartmentContext';
 import { Database } from '@/integrations/supabase/types';
@@ -46,7 +45,8 @@ export function DepartmentSelector() {
             "w-full border-0 bg-transparent text-white",
             "hover:bg-white/10 transition-colors",
             "focus:ring-0 focus:ring-offset-0",
-            "h-12 px-4"
+            "h-12 px-4",
+            "[&>svg]:text-white/70 [&>svg]:opacity-70"
           )}
         >
           <div className="flex items-center gap-3 flex-1">
@@ -55,10 +55,9 @@ export function DepartmentSelector() {
             </div>
             <div className="flex flex-col items-start">
               <span className="text-[10px] uppercase tracking-wider opacity-80">Setor</span>
-              <SelectValue className="font-semibold" />
+              <span className="font-semibold leading-none">{config.label}</span>
             </div>
           </div>
-          <ChevronDown className="h-4 w-4 opacity-70" />
         </SelectTrigger>
         <SelectContent className="bg-popover border border-border shadow-lg z-50">
           {departments.map((dept) => {
