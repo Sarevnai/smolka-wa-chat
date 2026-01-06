@@ -21,6 +21,7 @@ import { SparklesIcon, Building2, Key, FileText, MoreVertical, Trash2, Pin, PinO
 import { DeleteConversationDialog } from "./DeleteConversationDialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate, useParams } from "react-router-dom";
 
 type ViewMode = 'leads' | 'tasks';
 
@@ -41,6 +42,7 @@ interface ConversationItemProps {
   stageColor?: string;
   departmentCode?: string | null;
   viewMode?: ViewMode;
+  onDeleted?: (phoneNumber: string) => void;
 }
 
 export function ConversationItem({
@@ -54,13 +56,16 @@ export function ConversationItem({
   stageName,
   stageColor,
   departmentCode,
-  viewMode = 'leads'
+  viewMode = 'leads',
+  onDeleted
 }: ConversationItemProps) {
   const { data: contact } = useContactByPhone(phoneNumber);
   const { deleteConversation, isDeleting } = useDeleteConversation();
   const { togglePin, isPinned } = usePinnedConversations();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [openTicketsCount, setOpenTicketsCount] = useState(0);
+  const navigate = useNavigate();
+  const { phoneNumber: currentPhone } = useParams<{ phoneNumber?: string }>();
 
   // Fetch open tickets count for tasks mode
   useEffect(() => {
@@ -83,6 +88,12 @@ export function ConversationItem({
     const result = await deleteConversation(phoneNumber, conversationId);
     if (result.success) {
       setShowDeleteDialog(false);
+      onDeleted?.(phoneNumber);
+      
+      // Se estava visualizando esta conversa, voltar para lista
+      if (currentPhone === phoneNumber) {
+        navigate('/chat');
+      }
     }
   };
 

@@ -486,6 +486,11 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
     }
   };
 
+  // Callback para remover conversa do estado local após exclusão
+  const removeConversationFromList = (phoneNumber: string) => {
+    setConversations(prev => prev.filter(c => c.phoneNumber !== phoneNumber));
+  };
+
   return (
     <>
       <div className="h-full flex flex-col bg-sidebar relative">
@@ -650,6 +655,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
                     stageColor={conversation.stageColor}
                     departmentCode={conversation.departmentCode}
                     viewMode={viewMode}
+                    onDeleted={removeConversationFromList}
                   />
                 ))}
               </div>
