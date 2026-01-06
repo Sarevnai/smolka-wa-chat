@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSyncDepartment } from "@/hooks/useSyncDepartment";
 import {
   Users, Plus, Search, Filter, Tag, Download, Upload,
-  ArrowLeft, MoreHorizontal, Phone, Mail
+  ArrowLeft, MoreHorizontal, Phone, Mail, Building
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -254,6 +254,13 @@ export default function MarketingContacts() {
                                 </span>
                               )}
                             </div>
+                            {/* Property data from notes */}
+                            {contact.notes && (
+                              <div className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
+                                <Building className="h-3.5 w-3.5 mt-0.5 shrink-0 text-pink-500" />
+                                <span className="line-clamp-2">{contact.notes}</span>
+                              </div>
+                            )}
                             <div className="mt-2">
                               <TagSelector 
                                 contactId={contact.id} 
