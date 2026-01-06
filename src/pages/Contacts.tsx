@@ -42,8 +42,8 @@ export default function Contacts() {
   // Get department-specific UI config
   const uiConfig = getDepartmentUIConfig(activeDepartment);
   
-  const { data: contacts, isLoading } = useContacts(searchTerm, filters);
-  const { data: stats, isLoading: statsLoading } = useContactStatsByDepartment(activeDepartment);
+  const { data: contacts, isLoading } = useContacts(searchTerm, filters, activeDepartment || undefined);
+  const { data: stats, isLoading: statsLoading } = useContactStatsByDepartment(activeDepartment || undefined);
 
   const handleContactClick = (contact: Contact) => {
     setSelectedContact(contact);
