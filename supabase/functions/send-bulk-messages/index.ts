@@ -178,18 +178,20 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // Check if user is admin
-    const { data: userRole } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
+    // Check if user is admin or marketing
+    const { data: userFunctions } = await supabase
+      .from('user_functions')
+      .select('function')
+      .eq('user_id', user.id);
 
-    if (!userRole || userRole.role !== 'admin') {
-      throw new Error('Only admins can send bulk messages');
+    const functions = userFunctions?.map((f: any) => f.function) || [];
+    const canSendBulk = functions.includes('admin') || functions.includes('marketing');
+
+    if (!canSendBulk) {
+      throw new Error('Only admins or marketing users can send bulk messages');
     }
 
-    console.log(`✅ User authenticated as admin: ${user.email}, role: ${userRole.role}`);
+    console.log(`✅ User authenticated: ${user.email}, functions: ${functions.join(', ')}`);
 
     // Parse request
     const requestData: BulkMessageRequest = await req.json();
