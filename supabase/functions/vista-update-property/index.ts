@@ -15,13 +15,18 @@ interface UpdatePropertyRequest {
 
 // Mapeamento de status para o Vista CRM
 const STATUS_MAP: Record<string, string> = {
-  'Vendido': 'Vendido',
+  // Status de disponibilidade
+  'Venda': 'Venda',
+  'Aluguel': 'Aluguel',
+  'Venda e Aluguel': 'Venda e Aluguel',
+  'Aluguel Temporada': 'Aluguel Temporada',
+  // Status de transação concluída
+  'Vendido Imobiliária': 'Vendido Imobiliária',
   'Vendido Terceiros': 'Vendido Terceiros',
-  'Disponível': 'Disponivel',
-  'Reservado': 'Reservado',
-  'Suspenso': 'Suspenso',
-  'Alugado': 'Alugado',
   'Alugado Terceiros': 'Alugado Terceiros',
+  // Status de pausa
+  'Pendente': 'Pendente',
+  'Suspenso': 'Suspenso',
 };
 
 serve(async (req) => {
