@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,14 +6,18 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Phone, Mail, Heart, Building, MapPin, Home } from 'lucide-react';
-import { useCreateContact } from '@/hooks/useContacts';
+import { useCreateContact, useUpdateContact } from '@/hooks/useContacts';
 import { CreateContactRequest, ContactType } from '@/types/contact';
 import { toast } from '@/hooks/use-toast';
 import { normalizePhoneNumber, isValidPhoneNumber } from '@/lib/validation';
+import { Tables } from '@/integrations/supabase/types';
+
+type Contact = Tables<'contacts'>;
 
 interface NewMarketingContactModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editingContact?: Contact | null;
 }
 
 const PROPERTY_STATUS_OPTIONS = [
@@ -35,7 +39,64 @@ const CONTACT_TYPE_OPTIONS: { value: ContactType; label: string }[] = [
   { value: 'campanha', label: 'Campanha' },
 ];
 
-export function NewMarketingContactModal({ open, onOpenChange }: NewMarketingContactModalProps) {
+// Parse notes to extract property data
+function parseNotesToPropertyData(notes: string | null): {
+  propertyCode: string;
+  propertyAddress: string;
+  propertyNumber: string;
+  propertyNeighborhood: string;
+  propertyCity: string;
+  propertyCep: string;
+  propertyStatus: string;
+  propertyValue: string;
+} {
+  const result = {
+    propertyCode: '',
+    propertyAddress: '',
+    propertyNumber: '',
+    propertyNeighborhood: '',
+    propertyCity: '',
+    propertyCep: '',
+    propertyStatus: '',
+    propertyValue: '',
+  };
+
+  if (!notes) return result;
+
+  const parts = notes.split(' | ');
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+
+    if (trimmed.startsWith('Imóvel:')) {
+      result.propertyCode = trimmed.replace('Imóvel:', '').trim();
+    } else if (trimmed.startsWith('CEP:')) {
+      result.propertyCep = trimmed.replace('CEP:', '').trim();
+    } else if (trimmed.startsWith('Status:')) {
+      const statusLabel = trimmed.replace('Status:', '').trim();
+      const statusOption = PROPERTY_STATUS_OPTIONS.find(s => s.label === statusLabel);
+      result.propertyStatus = statusOption?.value || '';
+    } else if (trimmed.startsWith('Valor:')) {
+      result.propertyValue = trimmed.replace('Valor:', '').replace('R$', '').trim();
+    } else if (trimmed.includes(',') && !trimmed.includes(' - ')) {
+      // Address format: "Rua X, 100"
+      const [addr, num] = trimmed.split(',').map(s => s.trim());
+      result.propertyAddress = addr;
+      result.propertyNumber = num || '';
+    } else if (trimmed.includes(' - ')) {
+      // Location format: "Bairro - Cidade"
+      const [neighborhood, city] = trimmed.split(' - ').map(s => s.trim());
+      result.propertyNeighborhood = neighborhood;
+      result.propertyCity = city || '';
+    }
+  }
+
+  return result;
+}
+
+export function NewMarketingContactModal({ open, onOpenChange, editingContact }: NewMarketingContactModalProps) {
+  const isEditing = !!editingContact;
+
   // Contact fields
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -55,6 +116,32 @@ export function NewMarketingContactModal({ open, onOpenChange }: NewMarketingCon
   const [propertyValue, setPropertyValue] = useState('');
 
   const createContact = useCreateContact();
+  const updateContact = useUpdateContact();
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingContact && open) {
+      setName(editingContact.name || '');
+      setPhone(editingContact.phone || '');
+      setEmail(editingContact.email || '');
+      setContactType(editingContact.contact_type as ContactType || undefined);
+      setDescription(editingContact.description || '');
+      setRating(editingContact.rating || undefined);
+
+      // Parse property data from notes
+      const propertyData = parseNotesToPropertyData(editingContact.notes);
+      setPropertyCode(propertyData.propertyCode);
+      setPropertyAddress(propertyData.propertyAddress);
+      setPropertyNumber(propertyData.propertyNumber);
+      setPropertyNeighborhood(propertyData.propertyNeighborhood);
+      setPropertyCity(propertyData.propertyCity);
+      setPropertyCep(propertyData.propertyCep);
+      setPropertyStatus(propertyData.propertyStatus);
+      setPropertyValue(propertyData.propertyValue);
+    } else if (!open) {
+      resetForm();
+    }
+  }, [editingContact, open]);
 
   const formatCurrency = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -163,35 +250,59 @@ export function NewMarketingContactModal({ open, onOpenChange }: NewMarketingCon
 
     const notes = buildNotesFromProperty();
 
-    const request: CreateContactRequest = {
-      name: name.trim() || undefined,
-      phone: normalizedPhone,
-      email: email.trim() || undefined,
-      contact_type: contactType,
-      description: description.trim() || undefined,
-      rating: rating,
-      notes: notes || undefined,
-      department_code: 'marketing'
-    };
-
     try {
-      await createContact.mutateAsync(request);
+      if (isEditing && editingContact) {
+        await updateContact.mutateAsync({
+          contactId: editingContact.id,
+          updates: {
+            name: name.trim() || null,
+            phone: normalizedPhone,
+            email: email.trim() || null,
+            contact_type: contactType || null,
+            description: description.trim() || null,
+            rating: rating || null,
+            notes: notes || null,
+          }
+        });
 
-      toast({
-        title: "Sucesso",
-        description: "Contato criado com sucesso"
-      });
+        toast({
+          title: "Sucesso",
+          description: "Contato atualizado com sucesso"
+        });
+      } else {
+        const request: CreateContactRequest = {
+          name: name.trim() || undefined,
+          phone: normalizedPhone,
+          email: email.trim() || undefined,
+          contact_type: contactType,
+          description: description.trim() || undefined,
+          rating: rating,
+          notes: notes || undefined,
+          department_code: 'marketing'
+        };
+
+        await createContact.mutateAsync(request);
+
+        toast({
+          title: "Sucesso",
+          description: "Contato criado com sucesso"
+        });
+      }
 
       resetForm();
       onOpenChange(false);
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Erro ao criar contato. Verifique se o telefone já não está cadastrado.",
+        description: isEditing 
+          ? "Erro ao atualizar contato." 
+          : "Erro ao criar contato. Verifique se o telefone já não está cadastrado.",
         variant: "destructive"
       });
     }
   };
+
+  const isPending = createContact.isPending || updateContact.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -199,7 +310,7 @@ export function NewMarketingContactModal({ open, onOpenChange }: NewMarketingCon
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building className="h-5 w-5 text-pink-500" />
-            Novo Contato de Marketing
+            {isEditing ? 'Editar Contato de Marketing' : 'Novo Contato de Marketing'}
           </DialogTitle>
         </DialogHeader>
 
@@ -231,6 +342,7 @@ export function NewMarketingContactModal({ open, onOpenChange }: NewMarketingCon
                     placeholder="+55 11 99999-9999"
                     className="pl-10"
                     required
+                    disabled={isEditing}
                   />
                 </div>
               </div>
@@ -435,10 +547,13 @@ export function NewMarketingContactModal({ open, onOpenChange }: NewMarketingCon
             </Button>
             <Button
               type="submit"
-              disabled={createContact.isPending}
+              disabled={isPending}
               className="flex-1 bg-pink-500 hover:bg-pink-600"
             >
-              {createContact.isPending ? 'Criando...' : 'Criar Contato'}
+              {isPending 
+                ? (isEditing ? 'Salvando...' : 'Criando...') 
+                : (isEditing ? 'Salvar Alterações' : 'Criar Contato')
+              }
             </Button>
           </div>
         </form>
