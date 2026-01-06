@@ -232,21 +232,26 @@ FLUXO DE ATENDIMENTO:
 ⚠️ REGRAS CRÍTICAS - VOCÊ DEVE SEGUIR OBRIGATORIAMENTE:
 ═══════════════════════════════════════════════════════════════════════════════
 
+🔴 REGRA 0 - CÓDIGO DO IMÓVEL É OBRIGATÓRIO:
+   O código do imóvel está nos DADOS DO IMÓVEL acima (ex: Código: ${property?.codigo || 'XXXX'})
+   VOCÊ DEVE SEMPRE incluir o campo "codigo" ao chamar a tool atualizar_imovel!
+   Exemplo: atualizar_imovel(codigo="${property?.codigo || 'XXXX'}", status="Alugado Terceiros", exibir_no_site=false)
+
 🔴 REGRA 1 - USAR TOOLS IMEDIATAMENTE:
    Quando o proprietário disser QUALQUER uma dessas palavras/frases, você DEVE chamar
    a tool atualizar_imovel ANTES de escrever sua resposta:
    
    GATILHOS DE VENDA:
    - "vendeu", "vendi", "vendido", "foi vendido", "consegui vender"
-   → Use: status="Vendido Terceiros", exibir_no_site=false
+   → Use: codigo="${property?.codigo || 'CODIGO'}", status="Vendido Terceiros", exibir_no_site=false
    
    GATILHOS DE ALUGUEL:
    - "alugou", "aluguei", "alugado", "foi alugado", "consegui alugar", "aluguel", "coloquei pra alugar e alugou"
-   → Use: status="Alugado Terceiros", exibir_no_site=false
+   → Use: codigo="${property?.codigo || 'CODIGO'}", status="Alugado Terceiros", exibir_no_site=false
    
    GATILHOS DE INDISPONIBILIDADE:
    - "não está mais disponível", "tirei do mercado", "não quero mais vender"
-   → Use: status="Suspenso", exibir_no_site=false
+   → Use: codigo="${property?.codigo || 'CODIGO'}", status="Suspenso", exibir_no_site=false
 
 🔴 REGRA 2 - INTERPRETAÇÃO CORRETA:
    - "aluguel" ou "alugou" = ALUGADO (NÃO é vendido!)
@@ -256,7 +261,7 @@ FLUXO DE ATENDIMENTO:
 
 🔴 REGRA 3 - NÃO APENAS FALAR:
    ERRADO: "Vou atualizar o sistema" (sem chamar a tool)
-   CERTO: Chamar a tool atualizar_imovel E DEPOIS responder confirmando
+   CERTO: Chamar a tool atualizar_imovel COM O CÓDIGO E DEPOIS responder confirmando
 
 🔴 REGRA 4 - FINALIZAR APÓS ATUALIZAÇÃO:
    Após chamar atualizar_imovel com sucesso, chame também finalizar_atendimento
@@ -286,7 +291,7 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY não configurada');
     }
 
-    const { phone_number, message, contact_name, contact_notes, conversation_history } = await req.json();
+    const { phone_number, message, contact_name, contact_notes, conversation_history, property_data } = await req.json();
 
     if (!phone_number || !message) {
       return new Response(
@@ -297,12 +302,30 @@ serve(async (req) => {
 
     console.log(`[AI Marketing] Processando mensagem de ${phone_number}: ${message}`);
 
-    // Parsear dados do imóvel do notes do contato
-    const propertyData = parsePropertyFromNotes(contact_notes || '');
-    console.log(`[AI Marketing] Dados do imóvel:`, propertyData);
+    // Usar property_data direto se passado, ou parsear do contact_notes
+    let propertyInfo: PropertyData | null = null;
+    
+    if (property_data && typeof property_data === 'object' && property_data.codigo) {
+      // Formato direto passado pelo chamador
+      propertyInfo = {
+        codigo: String(property_data.codigo),
+        endereco: property_data.endereco || '',
+        bairro: property_data.bairro,
+        cidade: property_data.cidade || 'Florianópolis',
+        valor: typeof property_data.valor === 'number' ? property_data.valor : parseFloat(String(property_data.valor).replace(/[^\d]/g, '')) || 0,
+        status: property_data.status || 'Ativo',
+      };
+      console.log(`[AI Marketing] Dados do imóvel (property_data):`, propertyInfo);
+    } else if (contact_notes) {
+      // Parsear dados do imóvel do notes do contato
+      propertyInfo = parsePropertyFromNotes(contact_notes);
+      console.log(`[AI Marketing] Dados do imóvel (contact_notes):`, propertyInfo);
+    } else {
+      console.log(`[AI Marketing] Nenhum dado de imóvel disponível`);
+    }
 
     // Montar histórico de conversa
-    const systemPrompt = generateSystemPrompt(propertyData, contact_name);
+    const systemPrompt = generateSystemPrompt(propertyInfo, contact_name);
     const messages: ConversationMessage[] = [
       { role: 'system', content: systemPrompt }
     ];
@@ -364,7 +387,7 @@ serve(async (req) => {
 
         if (functionName === 'atualizar_imovel') {
           const updateResult = await updatePropertyInVista({
-            codigo: args.codigo || propertyData?.codigo,
+            codigo: args.codigo || propertyInfo?.codigo,
             status: args.status,
             exibir_no_site: args.exibir_no_site,
             valor_venda: args.valor_venda,
@@ -427,7 +450,7 @@ serve(async (req) => {
         escalated,
         finalized,
         vista_updates: vistaUpdates,
-        property_data: propertyData,
+        property_data: propertyInfo,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
