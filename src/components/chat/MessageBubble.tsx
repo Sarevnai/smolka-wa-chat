@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MessageRow } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { MediaMessage } from "./MediaMessage";
@@ -9,9 +9,10 @@ import { MessageStatusIndicator } from "./MessageStatusIndicator";
 import { MessageOptionsDialog } from "./MessageOptionsDialog";
 import { EmojiReactions } from "./EmojiReactions";
 import { WhatsAppDeletedPlaceholder } from "./WhatsAppDeletedPlaceholder";
+import { TemplateBubble } from "./TemplateBubble";
+import { ButtonReplyBubble } from "./ButtonReplyBubble";
 import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -89,6 +90,58 @@ export function MessageBubble({
   const isOutbound = message.direction === "outbound";
   const hasMedia = message.media_type && message.media_type !== 'text';
   const isTemplate = message.is_template;
+
+  // Detect button reply from raw data
+  const buttonReplyInfo = useMemo(() => {
+    const raw = message.raw as Record<string, unknown> | null;
+    if (!raw) return null;
+    
+    // Check for button type message
+    if (raw.type === 'button') {
+      const button = raw.button as { text?: string; payload?: string } | undefined;
+      const context = raw.context as { id?: string } | undefined;
+      
+      if (button?.text) {
+        return {
+          text: button.text,
+          payload: button.payload,
+          contextId: context?.id
+        };
+      }
+    }
+    
+    // Check for interactive button_reply
+    if (raw.type === 'interactive') {
+      const interactive = raw.interactive as { type?: string; button_reply?: { id?: string; title?: string } } | undefined;
+      if (interactive?.type === 'button_reply' && interactive.button_reply) {
+        const context = raw.context as { id?: string } | undefined;
+        return {
+          text: interactive.button_reply.title || interactive.button_reply.id || '',
+          payload: interactive.button_reply.id,
+          contextId: context?.id
+        };
+      }
+    }
+    
+    return null;
+  }, [message.raw]);
+
+  // Extract template name from message body for sent templates
+  const templateInfo = useMemo(() => {
+    if (!isTemplate || !message.body) return null;
+    
+    // Match patterns like "[Template: template_name]" or "Template: template_name"
+    const match = message.body.match(/\[?Template:\s*([^\]]+)\]?/i);
+    if (match) {
+      return {
+        name: match[1].trim(),
+        // Try to get template_id from raw if available
+        id: (message.raw as Record<string, unknown> | null)?.template_id as string | undefined
+      };
+    }
+    
+    return null;
+  }, [isTemplate, message.body, message.raw]);
 
   // Handle deleted messages with WhatsApp-like behavior
   if (deletionInfo.isDeleted) {
@@ -199,13 +252,23 @@ export function MessageBubble({
             </div>
           )}
           
-          {/* Template badge */}
-          {isTemplate && (
-            <div className={cn("px-3 pt-3", hasMedia && "px-3 pt-2")}>
-              <Badge variant="secondary" className="text-xs">
-                Mensagem de template
-              </Badge>
-            </div>
+          {/* Template Display */}
+          {isTemplate && templateInfo && (
+            <TemplateBubble
+              templateName={templateInfo.name}
+              templateId={templateInfo.id}
+              isOutbound={isOutbound}
+            />
+          )}
+
+          {/* Button Reply Display */}
+          {buttonReplyInfo && !isOutbound && (
+            <ButtonReplyBubble
+              buttonText={buttonReplyInfo.text}
+              buttonPayload={buttonReplyInfo.payload}
+              contextMessageId={buttonReplyInfo.contextId}
+              isOutbound={isOutbound}
+            />
           )}
 
           {/* Media Content */}
@@ -234,6 +297,12 @@ export function MessageBubble({
           
           {/* Text Content */}
           {(() => {
+            // Don't show body text for button replies (already shown in ButtonReplyBubble)
+            if (buttonReplyInfo && !isOutbound) return null;
+            
+            // Don't show raw template text if TemplateBubble is displaying it
+            if (isTemplate && templateInfo) return null;
+            
             const body = message.body?.trim();
             const caption = message.media_caption?.trim();
             const mediaType = message.media_type?.toLowerCase();
