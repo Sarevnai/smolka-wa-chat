@@ -7,7 +7,8 @@ import {
   Webhook, 
   Clock, 
   Square,
-  GripVertical
+  GripVertical,
+  TextCursorInput
 } from 'lucide-react';
 import { NODE_PALETTE_ITEMS, FlowNodeType } from '@/types/flow';
 import { cn } from '@/lib/utils';
@@ -20,7 +21,8 @@ const iconMap: Record<string, React.ElementType> = {
   UserPlus,
   Webhook,
   Clock,
-  Square
+  Square,
+  TextCursor: TextCursorInput
 };
 
 interface NodePaletteProps {
