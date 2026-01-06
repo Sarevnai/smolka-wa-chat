@@ -13,6 +13,7 @@ import { EditContactModal } from "@/components/contacts/EditContactModal";
 import { DeleteContactDialog } from "@/components/contacts/DeleteContactDialog";
 import { ContactProfile } from "@/components/contacts/ContactProfile";
 import { ImportContactsModal } from "@/components/ImportContactsModal";
+import { ImportMarketingContactsModal } from "@/components/marketing/ImportMarketingContactsModal";
 import { BulkMessageModal } from "@/components/contacts/BulkMessageModal";
 import { ContactFilters, ContactFiltersState } from "@/components/contacts/ContactFilters";
 import { QuickTemplateSender } from "@/components/chat/QuickTemplateSender";
@@ -459,10 +460,18 @@ export default function Contacts() {
           onOpenChange={setShowNewContactModal} 
         />
 
-        <ImportContactsModal
-          open={showImportModal}
-          onOpenChange={setShowImportModal}
-        />
+        {/* Use Marketing-specific import modal when in marketing department */}
+        {activeDepartment === 'marketing' ? (
+          <ImportMarketingContactsModal
+            open={showImportModal}
+            onOpenChange={setShowImportModal}
+          />
+        ) : (
+          <ImportContactsModal
+            open={showImportModal}
+            onOpenChange={setShowImportModal}
+          />
+        )}
 
         <BulkMessageModal
           open={showBulkMessageModal}

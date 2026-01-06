@@ -142,28 +142,6 @@ function parseContactData(csvLine: string[]): ContactData | null {
   };
 }
 
-// Embedded CSV data - this is the uploaded contacts file
-const CSV_DATA = `First Name,Last Name,Display Name,Nickname,E-mail Address,E-mail 2 Address,E-mail 3 Address,Home Phone,Business Phone,Home Fax,Business Fax,Pager,Mobile Phone,Home Street,Home Address 2,Home City,Home State,Home Postal Code,Home Country,Business Address,Business Address 2,Business City,Business State,Business Postal Code,Business Country,Country Code,Related name,Job Title,Department,Organization,Notes,Birthday,Anniversary,Gender,Web Page,Web Page 2,Categories
-Administrativo,Mesquita,Administrativo Mesquita,,,,,+55 48 98801-8382,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Agnes Pp 379,,Agnes Pp 379,,,,,,,,,,+5548998279420,,,,,,,,,,,,,,,,,Agnes Atendimento ao Cliente,,,,,,,
-Alberto,Rezende,Alberto Rezende,,,,,+55 31 99137-1310,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Aldre,,Aldre,,,,,+5548996622696,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Alex,Malafaia inq 303,Alex Malafaia inq 303,,,,,+5511983541686,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Alexandre pp 454,,Alexandre pp 454,,,,,+55 11 97369-0693,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Alexandre Rezende inq 446,,Alexandre Rezende inq 446,,,,,+55 48 99659-6912,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Alice Mps Fiança / título,,Alice Mps Fiança / título,,,,,+5548988176841,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Aline esposa Erick inq 379,,Aline esposa Erick inq 379,,,,,+55 48 99904-5697,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Aline INQ 460,,Aline INQ 460,,,,,+55 48 99803-7398,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Amazilio inq 461,,Amazilio inq 461,,,,,+55 48 99182-3360,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-amilton pp 474,,amilton pp 474,,,,,+55 48 99984-4988,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Ana Lucia V,Moretto Cont 422,Ana Lucia V Moretto Cont 422,,,,,,,,,,+5548999602125,,,,,,,,,,,,,,,,,,,,,,,,
-Andrea,PP 402,Andrea PP 402,,,,,+5548991226090,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Andreia,,Andreia,,,,,+55 48 99610-7250,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Andrey,,Andrey,,,,,+55 48 99963-8913,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Ani marri,,Ani marri,,,,,+5548996316207,,,,,,,,,,,,,,,,,,,,,,Ani marri,,,,,,,
-Ariane inq 379,,Ariane inq 379,,,,,+55 11 99129-4655,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Arthur,,Arthur,,,,,+55 48 99699-0104,,,,,,,,,,,,,,,,,,,,,,,,,,,,,`;
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -178,8 +156,8 @@ serve(async (req) => {
 
     console.log('Starting contact import process...');
 
-    // Try to read CSV from request body; fallback to embedded CSV_DATA
-    let csvText = CSV_DATA;
+    // Read CSV from request body - NO FALLBACK to embedded data
+    let csvText = '';
     try {
       const contentType = req.headers.get('content-type') || '';
       if (req.method === 'POST') {
@@ -198,7 +176,22 @@ serve(async (req) => {
         }
       }
     } catch (e) {
-      console.warn('Failed to parse request body, using fallback CSV_DATA:', e?.message);
+      console.error('Failed to parse request body:', e?.message);
+    }
+
+    // Return error if no CSV provided
+    if (!csvText || csvText.trim().length === 0) {
+      console.error('No CSV data provided in request');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Nenhum CSV fornecido. Faça upload de um arquivo CSV válido.' 
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const lines = csvText.split(/\r?\n/);

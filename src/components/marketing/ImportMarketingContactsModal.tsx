@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -108,6 +108,13 @@ export function ImportMarketingContactsModal({
     setImportProgress(0);
     setImportResult(null);
   };
+
+  // Reset state when modal opens to prevent stale data
+  useEffect(() => {
+    if (open) {
+      resetState();
+    }
+  }, [open]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
