@@ -69,7 +69,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
   const { profile } = useAuth();
   const permissions = usePermissions();
   const { department: userDepartment, loading: deptLoading } = useUserDepartment();
-  const { viewMode, isAdmin } = useDepartment();
+  const { viewMode, isAdmin, activeDepartment } = useDepartment();
 
   const loadConversations = async () => {
     try {
@@ -101,16 +101,20 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
         .limit(100);
       
       // Filter by department - explicit filter takes priority (for isolated modules like Marketing)
+      // For admins, use activeDepartment from the switcher if available
+      const effectiveDepartment = departmentFilter || (isAdmin ? activeDepartment : userDepartment);
+      
       if (departmentFilter) {
+        // Explicit filter (e.g., Marketing module) - strict filter
         conversationsQuery = conversationsQuery.eq("department_code", departmentFilter);
-      } else if (!permissions.isAdmin && userDepartment) {
-        // Standard filter: user sees their department or unassigned
-        conversationsQuery = conversationsQuery.or(`department_code.eq.${userDepartment},department_code.is.null`);
-      } else if (!permissions.isAdmin) {
-        // User has no department, show only unassigned
+      } else if (effectiveDepartment) {
+        // Filter by effective department, also include unassigned for triage
+        conversationsQuery = conversationsQuery.or(`department_code.eq.${effectiveDepartment},department_code.is.null`);
+      } else if (!isAdmin) {
+        // Non-admin with no department, show only unassigned
         conversationsQuery = conversationsQuery.is("department_code", null);
       }
-      // Admins without departmentFilter see all conversations
+      // Admins with no activeDepartment selected see all conversations
 
       const { data: conversationsData, error: convError } = await conversationsQuery;
 
@@ -197,7 +201,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
     if (!deptLoading) {
       loadConversations();
     }
-  }, [userDepartment, permissions.isAdmin, deptLoading]);
+  }, [userDepartment, permissions.isAdmin, deptLoading, activeDepartment]);
 
   // Use centralized realtime context
   const { lastMessage } = useRealtimeMessages();

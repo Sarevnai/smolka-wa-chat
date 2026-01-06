@@ -2,6 +2,12 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode, useC
 import { supabase } from '@/integrations/supabase/client';
 import { MessageRow } from '@/lib/messages';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
+import { useDepartment } from '@/contexts/DepartmentContext';
+import { useUserDepartment } from '@/hooks/useUserDepartment';
+import { getConversationDepartmentCached } from '@/hooks/useConversationDepartment';
+import { Database } from '@/integrations/supabase/types';
+
+type DepartmentType = Database['public']['Enums']['department_type'];
 
 interface RealtimeMessagesContextType {
   lastMessage: MessageRow | null;
@@ -20,6 +26,11 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
   const [lastMessage, setLastMessage] = useState<MessageRow | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { playNotificationSound } = useNotificationSound();
+  const { activeDepartment, isAdmin } = useDepartment();
+  const { department: userDepartment } = useUserDepartment();
+  
+  // Determine effective department for filtering notifications
+  const effectiveDepartment: DepartmentType | null = isAdmin ? activeDepartment : userDepartment;
   
   // Use refs for stable callbacks and deduplication
   const seenMessageIds = useRef(new Set<number>());
@@ -126,14 +137,30 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
           
           console.log(`📢 [RealtimeContext] Total de callbacks notificados: ${notifiedCount}`);
           
-          // Play notification sound for inbound messages
+          // Play notification sound for inbound messages (filtered by department)
           if (newMessage.direction === 'inbound') {
             const currentPhone = (currentConversation || '').replace(/\D/g, '');
             
             // Play sound if not in current conversation or window not focused
             if (!currentConversation || messageFrom !== currentPhone || !document.hasFocus()) {
-              console.log('🔊 [RealtimeContext] Tocando som de notificação');
-              playNotificationSound();
+              // Check if message belongs to user's department before playing sound
+              const checkDepartmentAndPlaySound = async () => {
+                if (effectiveDepartment && (newMessage as any).conversation_id) {
+                  const msgDepartment = await getConversationDepartmentCached((newMessage as any).conversation_id);
+                  // Only play if message is from user's department or pending triage (null)
+                  if (msgDepartment === effectiveDepartment || msgDepartment === null) {
+                    console.log('🔊 [RealtimeContext] Tocando som (departamento corresponde)');
+                    playNotificationSound();
+                  } else {
+                    console.log('🔇 [RealtimeContext] Som não tocado (departamento diferente):', msgDepartment, '!=', effectiveDepartment);
+                  }
+                } else {
+                  // No department filter, play sound for all
+                  console.log('🔊 [RealtimeContext] Tocando som de notificação');
+                  playNotificationSound();
+                }
+              };
+              checkDepartmentAndPlaySound();
             }
           }
         }
@@ -186,7 +213,7 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
       console.log('🔌 [RealtimeContext] Removendo canal global');
       supabase.removeChannel(channel);
     };
-  }, [currentConversation, playNotificationSound]);
+  }, [currentConversation, playNotificationSound, effectiveDepartment]);
 
   return (
     <RealtimeMessagesContext.Provider value={{ lastMessage, subscribeToPhone, isConnected }}>
