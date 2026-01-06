@@ -15,27 +15,82 @@ function normalizePhoneNumber(phone: string): string {
 }
 
 /**
- * Find active conversation for a phone number (for outbound messages)
+ * Find or create an active conversation for a phone number
+ * @param phoneNumber - The original phone number from frontend
+ * @param waId - The normalized wa_id returned by WhatsApp API (optional)
  */
-async function findActiveConversation(supabase: any, phoneNumber: string): Promise<string | null> {
+async function findOrCreateConversation(
+  supabase: any, 
+  phoneNumber: string, 
+  waId?: string
+): Promise<string | null> {
   try {
-    const { data, error } = await supabase
+    // Build query to search both phone formats
+    const phonesToSearch = [phoneNumber];
+    if (waId && waId !== phoneNumber) {
+      phonesToSearch.push(waId);
+    }
+    
+    console.log(`🔍 Searching conversation for phones: ${phonesToSearch.join(', ')}`);
+    
+    // Try to find existing active conversation
+    const { data: existing, error: findError } = await supabase
       .from('conversations')
       .select('id')
-      .eq('phone_number', phoneNumber)
+      .in('phone_number', phonesToSearch)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (error) {
-      console.error('Error finding conversation:', error);
+    if (findError) {
+      console.error('Error finding conversation:', findError);
+    }
+
+    if (existing) {
+      console.log(`✅ Found existing conversation: ${existing.id}`);
+      return existing.id;
+    }
+
+    // No existing conversation - create a new one
+    console.log(`🆕 No active conversation found, creating new one...`);
+    
+    // Use waId (WhatsApp normalized) if available, otherwise use original phone
+    const finalPhoneNumber = waId || phoneNumber;
+    
+    // Try to find existing contact
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id')
+      .in('phone', phonesToSearch)
+      .limit(1)
+      .maybeSingle();
+
+    const contactId = contact?.id || null;
+    console.log(`📇 Contact ID: ${contactId || 'none (will be null)'}`);
+
+    // Create new conversation
+    const { data: newConv, error: createError } = await supabase
+      .from('conversations')
+      .insert({
+        phone_number: finalPhoneNumber,
+        status: 'active',
+        contact_id: contactId,
+        department_code: null, // Awaiting triage
+        last_message_at: new Date().toISOString()
+      })
+      .select('id')
+      .single();
+
+    if (createError) {
+      console.error('Error creating conversation:', createError);
       return null;
     }
 
-    return data?.id || null;
+    console.log(`🆕 Created new conversation: ${newConv.id} for phone: ${finalPhoneNumber}`);
+    return newConv.id;
   } catch (error) {
-    console.error('Error in findActiveConversation:', error);
+    console.error('Error in findOrCreateConversation:', error);
     return null;
   }
 }
@@ -207,13 +262,14 @@ serve(async (req) => {
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-      // 🆕 Find or use provided conversation_id
+      // Get wa_id from WhatsApp response (normalized phone number)
+      const waId = result.contacts?.[0]?.wa_id || normalizedPhone;
+      console.log(`📱 WhatsApp wa_id: ${waId} (original: ${normalizedPhone})`);
+
+      // Find or create conversation
       let finalConversationId = conversation_id;
       if (!finalConversationId) {
-        finalConversationId = await findActiveConversation(supabase, normalizedPhone);
-        if (finalConversationId) {
-          console.log(`📍 Found conversation for outbound message: ${finalConversationId}`);
-        }
+        finalConversationId = await findOrCreateConversation(supabase, normalizedPhone, waId);
       }
 
       const messageData = {
