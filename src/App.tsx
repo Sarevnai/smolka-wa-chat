@@ -38,6 +38,7 @@ import MarketingCampaigns from "./pages/marketing/MarketingCampaigns";
 import MarketingReports from "./pages/marketing/MarketingReports";
 import MarketingAIConfig from "./pages/marketing/MarketingAIConfig";
 import MarketingChat from "./pages/marketing/MarketingChat";
+import FlowBuilder from "./pages/admin/FlowBuilder";
 
 // Create QueryClient outside component to avoid recreating on hot reload
 const queryClient = new QueryClient({
@@ -173,6 +174,13 @@ const App = () => (
                     <ProtectedRoute>
                       <MarketingGuard>
                         <MarketingAIConfig />
+                      </MarketingGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/marketing/flow-builder" element={
+                    <ProtectedRoute>
+                      <MarketingGuard>
+                        <FlowBuilder />
                       </MarketingGuard>
                     </ProtectedRoute>
                   } />
