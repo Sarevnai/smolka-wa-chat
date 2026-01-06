@@ -1,11 +1,22 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, User, Phone, Clock, Home, ShoppingBag, Building2, Megaphone, MessageCircle } from 'lucide-react';
+import { AlertTriangle, User, Phone, Clock, Home, ShoppingBag, Building2, Megaphone, MessageCircle, Trash2 } from 'lucide-react';
 import Layout from '@/components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useTriageConversations } from '@/hooks/useTriageConversations';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -23,7 +34,9 @@ const departments: { value: DepartmentType; label: string; icon: typeof Home; co
 
 export default function Triage() {
   const navigate = useNavigate();
-  const { conversations, loading, assignDepartment } = useTriageConversations();
+  const { conversations, loading, assignDepartment, deleteConversation } = useTriageConversations();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
 
   const handleAssign = async (conversationId: string, department: DepartmentType) => {
     const success = await assignDepartment(conversationId, department);
@@ -36,6 +49,25 @@ export default function Triage() {
 
   const handleOpenChat = (phoneNumber: string) => {
     navigate(`/chat/${phoneNumber}`);
+  };
+
+  const handleDeleteClick = (conversationId: string) => {
+    setConversationToDelete(conversationId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!conversationToDelete) return;
+    
+    const success = await deleteConversation(conversationToDelete);
+    if (success) {
+      toast.success('Conversa excluída com sucesso');
+    } else {
+      toast.error('Erro ao excluir conversa');
+    }
+    
+    setDeleteDialogOpen(false);
+    setConversationToDelete(null);
   };
 
   return (
@@ -129,6 +161,15 @@ export default function Triage() {
                               {dept.label}
                             </Button>
                           ))}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="justify-start text-destructive hover:text-destructive hover:bg-destructive/10 mt-2"
+                            onClick={() => handleDeleteClick(conversation.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -138,6 +179,27 @@ export default function Triage() {
             </div>
           </ScrollArea>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Conversa</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir esta conversa? Esta ação não pode ser desfeita e todas as mensagens serão perdidas.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

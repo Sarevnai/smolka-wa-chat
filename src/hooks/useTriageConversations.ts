@@ -113,6 +113,32 @@ export function useTriageConversations() {
     }
   };
 
+  const deleteConversation = async (conversationId: string) => {
+    try {
+      // First delete all messages associated with this conversation
+      const { error: messagesError } = await supabase
+        .from('messages')
+        .delete()
+        .eq('conversation_id', conversationId);
+
+      if (messagesError) throw messagesError;
+
+      // Then delete the conversation itself
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+      
+      await loadTriageConversations();
+      return true;
+    } catch (err) {
+      console.error('Error deleting conversation:', err);
+      return false;
+    }
+  };
+
   useEffect(() => {
     loadTriageConversations();
   }, [user]);
@@ -142,5 +168,5 @@ export function useTriageConversations() {
     };
   }, [user]);
 
-  return { conversations, loading, count, reload: loadTriageConversations, assignDepartment };
+  return { conversations, loading, count, reload: loadTriageConversations, assignDepartment, deleteConversation };
 }
