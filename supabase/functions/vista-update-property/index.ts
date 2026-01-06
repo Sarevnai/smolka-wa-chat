@@ -37,7 +37,7 @@ serve(async (req) => {
 
   try {
     const VISTA_API_KEY = Deno.env.get('VISTA_CRM_API_KEY') || '528befe6fac66b81ffce206dc0edc756';
-    const VISTA_HOST = 'lkaimobi-rest.vistahost.com.br';
+    const VISTA_API_URL = Deno.env.get('VISTA_CRM_URL') || 'http://lkaimobi-rest.vistahost.com.br';
 
     const body: UpdatePropertyRequest = await req.json();
     const { codigo, status, exibir_no_site, valor_venda, motivo } = body;
@@ -51,41 +51,44 @@ serve(async (req) => {
 
     console.log(`[Vista Update] Atualizando imóvel ${codigo}:`, { status, exibir_no_site, valor_venda, motivo });
 
-    // Montar campos a atualizar
-    const fields: Record<string, any> = {};
+    // Montar campos a atualizar no formato que o Vista espera
+    const campos: Record<string, any> = {};
 
     if (status) {
-      fields.Status = STATUS_MAP[status] || status;
+      campos.Status = STATUS_MAP[status] || status;
     }
 
     if (exibir_no_site !== undefined) {
-      fields.ExibirNoSite = exibir_no_site ? 'Sim' : 'Nao';
+      campos.ExibirNoSite = exibir_no_site ? 'Sim' : 'Nao';
     }
 
     if (valor_venda !== undefined) {
-      fields.ValorVenda = valor_venda;
+      campos.ValorVenda = valor_venda;
     }
 
     // Se não há campos para atualizar
-    if (Object.keys(fields).length === 0) {
+    if (Object.keys(campos).length === 0) {
       return new Response(
         JSON.stringify({ success: false, error: 'Nenhum campo para atualizar' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Fazer requisição para Vista CRM
-    const vistaUrl = `http://${VISTA_HOST}/imoveis/alterar?key=${VISTA_API_KEY}`;
+    // Vista CRM API usa PUT para atualizar imóveis no endpoint /imoveis/detalhes
+    // Formato: PUT /imoveis/detalhes?key=API_KEY com body: { Codigo: "XXX", campos... }
+    const vistaUrl = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}`;
     
+    // O Vista espera os campos diretamente no body junto com o código
     const vistaPayload = {
-      imovel: codigo,
-      fields: fields
+      Codigo: codigo,
+      ...campos
     };
 
-    console.log(`[Vista Update] Enviando para Vista:`, vistaPayload);
+    console.log(`[Vista Update] Enviando para Vista (PUT):`, vistaPayload);
+    console.log(`[Vista Update] URL:`, vistaUrl);
 
     const vistaResponse = await fetch(vistaUrl, {
-      method: 'POST',
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -111,7 +114,7 @@ serve(async (req) => {
           error: 'Erro ao atualizar no Vista CRM',
           details: parsedResult,
           codigo,
-          campos_enviados: fields
+          campos_enviados: campos
         }),
         { status: vistaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -123,7 +126,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: `Imóvel ${codigo} atualizado com sucesso`,
-        campos_atualizados: fields,
+        campos_atualizados: campos,
         motivo: motivo || 'Atualização via AI Marketing Agent',
         vista_response: parsedResult
       }),
