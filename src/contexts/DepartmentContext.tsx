@@ -64,10 +64,11 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
         // Load saved preference for admins or use user's department
         if (hasAdmin) {
           const savedDept = localStorage.getItem('activeDepartment');
-          if (savedDept && ['locacao', 'administrativo', 'vendas'].includes(savedDept)) {
+          // Default to 'locacao' if no valid department saved
+          if (savedDept && ['locacao', 'administrativo', 'vendas', 'marketing'].includes(savedDept)) {
             setActiveDepartmentState(savedDept as DepartmentType);
           } else {
-            setActiveDepartmentState(null); // Admin sees all by default
+            setActiveDepartmentState('locacao'); // Default to locacao instead of null
           }
           
           // Load saved view mode preference for admins

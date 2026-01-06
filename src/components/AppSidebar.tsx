@@ -1,25 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { 
-  Home, 
-  Inbox, 
-  MessageCircle, 
-  Send, 
-  Users, 
-  BarChart3, 
-  Settings,
-  Puzzle,
-  ChevronRight,
   Shield,
   LayoutDashboard,
   UserCog,
   Bot,
-  AlertTriangle,
-  ShoppingBag,
-  Building2,
-  Kanban,
   TrendingUp,
-  Megaphone,
-  Tag
+  Puzzle,
+  Settings,
+  ChevronRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -42,6 +30,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useTriageConversations } from "@/hooks/useTriageConversations";
 import { useDepartment } from "@/contexts/DepartmentContext";
 import { DepartmentSelector } from "@/components/department/DepartmentSelector";
+import { getDepartmentConfig, DEPARTMENT_SIDEBAR_CONFIG } from "@/lib/sidebarConfig";
 import {
   Collapsible,
   CollapsibleContent,
@@ -49,32 +38,8 @@ import {
 } from "@/components/ui/collapsible";
 import { useState } from "react";
 
-const mainItems = [
-  { title: "Dashboard", url: "/", icon: Home, permission: 'canViewDashboard' as const, adminOnly: false },
-  { title: "Conversas", url: "/chat", icon: MessageCircle, hasUnreadCount: true, permission: 'canViewChats' as const, adminOnly: false },
-  { title: "Campanhas", url: "/send", icon: Send, permission: 'canViewCampaigns' as const, adminOnly: true },
-  { title: "Contatos", url: "/contacts", icon: Users, permission: 'canViewContacts' as const, adminOnly: false },
-  { title: "Relatórios", url: "/reports", icon: BarChart3, permission: 'canViewReports' as const, adminOnly: true },
-];
-
-const pipelineItems = [
-  { title: "Locação", url: "/pipeline/locacao", icon: Home, department: 'locacao' as const },
-  { title: "Vendas", url: "/pipeline/vendas", icon: ShoppingBag, department: 'vendas' as const },
-  { title: "Administrativo", url: "/pipeline/administrativo", icon: Building2, department: 'administrativo' as const },
-  { title: "Marketing", url: "/pipeline/marketing", icon: Megaphone, department: 'marketing' as const },
-];
-
-const marketingItems = [
-  { title: "Dashboard", url: "/marketing", icon: LayoutDashboard },
-  { title: "Conversas", url: "/marketing/chat", icon: MessageCircle },
-  { title: "Campanhas", url: "/marketing/campaigns", icon: Megaphone },
-  { title: "Contatos", url: "/marketing/contacts", icon: Users },
-  { title: "Relatórios", url: "/marketing/reports", icon: BarChart3 },
-  { title: "Agente IA", url: "/marketing/ai-config", icon: Bot },
-];
-
 const integrationItems = [
-  { title: "ClickUp", url: "/clickup", icon: Settings, permission: 'canManageIntegrations' as const },
+  { title: "ClickUp", url: "/clickup", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -84,36 +49,40 @@ export function AppSidebar() {
   const permissions = usePermissions();
   const { count: triageCount } = useTriageConversations();
   const { isAdmin, userDepartment, activeDepartment } = useDepartment();
-  const [integrationsOpen, setIntegrationsOpen] = useState(true);
-  const [pipelinesOpen, setPipelinesOpen] = useState(true);
-  const [marketingOpen, setMarketingOpen] = useState(true);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
 
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
+  
+  // Determine which department to show
+  const effectiveDepartment = isAdmin 
+    ? (activeDepartment || 'locacao') 
+    : (userDepartment || 'locacao');
+  
+  const config = getDepartmentConfig(effectiveDepartment);
+
   const isActive = (path: string) => {
     if (path === "/") return currentPath === "/";
+    if (path === "/marketing") return currentPath === "/marketing" && !currentPath.includes("/marketing/");
     return currentPath.startsWith(path);
   };
 
   const getNavClassName = (path: string) => {
+    const active = isActive(path);
     return cn(
       "w-full justify-start transition-all duration-200",
-      isActive(path)
-        ? "bg-gold-primary/12 border-l-3 border-gold-primary text-gold-primary font-semibold hover:bg-gold-primary/20"
+      active
+        ? cn("border-l-3 font-semibold", config.bgLight, config.textColor, config.borderColor)
         : "hover:bg-neutral-100 text-neutral-700 hover:text-neutral-900"
     );
   };
 
-  // Filter pipelines based on user access
-  const accessiblePipelines = pipelineItems.filter(item => 
-    isAdmin || userDepartment === item.department
-  );
-
-  // Show marketing section for admins or marketing users
-  const showMarketingSection = isAdmin || permissions.isMarketing;
-  
-  // Pure marketing users (not admins) only see Marketing section
-  const isPureMarketing = permissions.isMarketing && !isAdmin;
+  const getBadgeCount = (badgeType?: 'unread' | 'triage') => {
+    if (badgeType === 'unread') return unreadCount;
+    if (badgeType === 'triage') return triageCount;
+    return 0;
+  };
 
   return (
     <Sidebar collapsible="icon" className={cn(
@@ -122,138 +91,69 @@ export function AppSidebar() {
     )}>
       <SidebarContent>
         {/* Department Selector for Admins */}
-        {!collapsed && <DepartmentSelector />}
-
-        {/* Triagem - Only for Admins */}
-        {isAdmin && (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={getNavClassName('/triage')}>
-                    <Link to="/triage">
-                      <AlertTriangle className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3", 
-                        triageCount > 0 ? "text-amber-500" : ""
-                      )} />
-                      {!collapsed && (
-                        <div className="flex items-center justify-between flex-1">
-                          <span>Triagem</span>
-                          {triageCount > 0 && (
-                            <Badge variant="destructive" className="text-xs">
-                              {triageCount}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+        {!collapsed && isAdmin && <DepartmentSelector />}
+        
+        {/* Department Header for non-admins */}
+        {!collapsed && !isAdmin && (
+          <div className={cn(
+            "mx-3 my-3 rounded-lg overflow-hidden p-4",
+            "bg-gradient-to-r",
+            config.gradient
+          )}>
+            <div className="flex items-center gap-3 text-white">
+              <div className="p-1.5 bg-white/20 rounded-md">
+                <config.icon className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-wider opacity-80">Setor</span>
+                <span className="font-semibold">{config.label}</span>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* Marketing Section - For Marketing users and Admins */}
-        {showMarketingSection && (
-          <Collapsible open={marketingOpen} onOpenChange={setMarketingOpen}>
-            <SidebarGroup>
-              <CollapsibleTrigger asChild>
-                <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between text-pink-600">
-                  <div className="flex items-center gap-2">
-                    <Megaphone className="h-4 w-4" />
-                    {!collapsed && <span>Marketing</span>}
-                  </div>
-                  {!collapsed && (
-                    <ChevronRight className={cn("h-4 w-4 transition-transform", marketingOpen && "rotate-90")} />
-                  )}
-                </SidebarGroupLabel>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {marketingItems.map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton asChild className={getNavClassName(item.url)}>
-                          <Link to={item.url}>
-                            <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                            {!collapsed && <span>{item.title}</span>}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
-        )}
-
-        {/* Pipelines Section */}
-        {accessiblePipelines.length > 0 && (
-          <Collapsible open={pipelinesOpen} onOpenChange={setPipelinesOpen}>
-            <SidebarGroup>
-              <CollapsibleTrigger asChild>
-                <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Kanban className="h-4 w-4" />
-                    {!collapsed && <span>Pipelines</span>}
-                  </div>
-                  {!collapsed && (
-                    <ChevronRight className={cn("h-4 w-4 transition-transform", pipelinesOpen && "rotate-90")} />
-                  )}
-                </SidebarGroupLabel>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {accessiblePipelines.map((item) => (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton asChild className={getNavClassName(item.url)}>
-                          <Link to={item.url}>
-                            <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                            {!collapsed && <span>{item.title}</span>}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </CollapsibleContent>
-            </SidebarGroup>
-          </Collapsible>
-        )}
-
-        {/* Main Navigation - Hidden for pure Marketing users */}
-        {!isPureMarketing && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Geral</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {mainItems
-                  .filter(item => (!item.permission || permissions[item.permission]) && (!item.adminOnly || permissions.isAdmin))
-                  .map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild className={getNavClassName(item.url)}>
-                        <Link to={item.url}>
-                          <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                          {!collapsed && (
-                            <div className="flex items-center justify-between flex-1">
-                              <span>{item.title}</span>
-                              {item.hasUnreadCount && unreadCount > 0 && (
-                                <Badge variant="destructive" className="text-xs">
-                                  {unreadCount}
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        {/* Main Department Items */}
+        <SidebarGroup>
+          <SidebarGroupLabel className={cn("flex items-center gap-2", config.textColor)}>
+            <config.icon className="h-4 w-4" />
+            {!collapsed && <span>{config.label}</span>}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {config.items.map((item) => {
+                const badgeCount = getBadgeCount(item.badge);
+                const showBadge = badgeCount > 0;
+                
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild className={getNavClassName(item.url)}>
+                      <Link to={item.url}>
+                        <item.icon className={cn(
+                          "h-5 w-5", 
+                          collapsed ? "mx-auto" : "mr-3",
+                          item.badge === 'triage' && badgeCount > 0 ? "text-amber-500" : ""
+                        )} />
+                        {!collapsed && (
+                          <div className="flex items-center justify-between flex-1">
+                            <span>{item.title}</span>
+                            {showBadge && (
+                              <Badge 
+                                variant={item.badge === 'triage' ? "destructive" : "destructive"} 
+                                className="text-xs"
+                              >
+                                {badgeCount}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         {/* Integrations Section - Admin Only */}
         {permissions.isAdmin && (
@@ -282,18 +182,16 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuSub>
-                      {integrationItems
-                        .filter(item => !item.permission || permissions[item.permission])
-                        .map((item) => (
-                          <SidebarMenuSubItem key={item.title}>
-                            <SidebarMenuSubButton asChild className={getNavClassName(item.url)}>
-                              <Link to={item.url}>
-                                <item.icon className="h-4 w-4 mr-2" />
-                                {!collapsed && <span>{item.title}</span>}
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
+                      {integrationItems.map((item) => (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton asChild className={getNavClassName(item.url)}>
+                            <Link to={item.url}>
+                              <item.icon className="h-4 w-4 mr-2" />
+                              {!collapsed && <span>{item.title}</span>}
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
                     </SidebarMenuSub>
                   </SidebarMenu>
                 </SidebarGroupContent>
@@ -302,58 +200,69 @@ export function AppSidebar() {
           </Collapsible>
         )}
 
-        {/* Seção Administrativa - Apenas para Admins */}
+        {/* Administrative Section - Admin Only */}
         {permissions.isAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="flex items-center gap-2 text-primary">
-              <Shield className="h-4 w-4" />
-              {!collapsed && <span>Administração</span>}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={getNavClassName('/admin')}>
-                    <Link to="/admin">
-                      <LayoutDashboard className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                      {!collapsed && <span>Dashboard Admin</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={getNavClassName('/admin/users')}>
-                    <Link to="/admin/users">
-                      <UserCog className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                      {!collapsed && <span>Gestão de Usuários</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={getNavClassName('/admin/user-permissions')}>
-                    <Link to="/admin/user-permissions">
-                      <Shield className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                      {!collapsed && <span>Permissões por Usuário</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={getNavClassName('/admin/ai-agent')}>
-                    <Link to="/admin/ai-agent">
-                      <Bot className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                      {!collapsed && <span>Agente IA</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild className={getNavClassName('/admin/c2s-dashboard')}>
-                    <Link to="/admin/c2s-dashboard">
-                      <TrendingUp className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                      {!collapsed && <span>Dashboard C2S</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <Collapsible open={adminOpen} onOpenChange={setAdminOpen}>
+            <SidebarGroup>
+              <CollapsibleTrigger asChild>
+                <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between text-primary">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {!collapsed && <span>Administração</span>}
+                  </div>
+                  {!collapsed && (
+                    <ChevronRight className={cn("h-4 w-4 transition-transform", adminOpen && "rotate-90")} />
+                  )}
+                </SidebarGroupLabel>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={getNavClassName('/admin')}>
+                        <Link to="/admin">
+                          <LayoutDashboard className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                          {!collapsed && <span>Dashboard Admin</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={getNavClassName('/admin/users')}>
+                        <Link to="/admin/users">
+                          <UserCog className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                          {!collapsed && <span>Gestão de Usuários</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={getNavClassName('/admin/user-permissions')}>
+                        <Link to="/admin/user-permissions">
+                          <Shield className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                          {!collapsed && <span>Permissões por Usuário</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={getNavClassName('/admin/ai-agent')}>
+                        <Link to="/admin/ai-agent">
+                          <Bot className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                          {!collapsed && <span>Agente IA</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={getNavClassName('/admin/c2s-dashboard')}>
+                        <Link to="/admin/c2s-dashboard">
+                          <TrendingUp className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                          {!collapsed && <span>Dashboard C2S</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
         )}
       </SidebarContent>
     </Sidebar>
