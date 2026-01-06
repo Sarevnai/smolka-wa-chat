@@ -462,14 +462,14 @@ export function ImportMarketingContactsModal({
                 <div className="space-y-2">
                   <Label>Nome</Label>
                   <Select
-                    value={columnMapping.name}
-                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, name: v }))}
+                    value={columnMapping.name || "__none__"}
+                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, name: v === "__none__" ? "" : v }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a coluna" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value="__none__">Nenhum</SelectItem>
                       {headers.map((header, i) => (
                         <SelectItem key={i} value={i.toString()}>
                           {header || `Coluna ${i + 1}`}
@@ -482,14 +482,14 @@ export function ImportMarketingContactsModal({
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <Select
-                    value={columnMapping.email}
-                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, email: v }))}
+                    value={columnMapping.email || "__none__"}
+                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, email: v === "__none__" ? "" : v }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a coluna" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value="__none__">Nenhum</SelectItem>
                       {headers.map((header, i) => (
                         <SelectItem key={i} value={i.toString()}>
                           {header || `Coluna ${i + 1}`}
@@ -502,14 +502,14 @@ export function ImportMarketingContactsModal({
                 <div className="space-y-2">
                   <Label>Observações</Label>
                   <Select
-                    value={columnMapping.notes}
-                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, notes: v }))}
+                    value={columnMapping.notes || "__none__"}
+                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, notes: v === "__none__" ? "" : v }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a coluna" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value="__none__">Nenhum</SelectItem>
                       {headers.map((header, i) => (
                         <SelectItem key={i} value={i.toString()}>
                           {header || `Coluna ${i + 1}`}
