@@ -15,6 +15,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { FlowNodeType, FlowNodeData, CustomFlowEdge, NODE_PALETTE_ITEMS } from '@/types/flow';
+import { nodeTypes } from './nodes';
 import type { Node } from '@xyflow/react';
 
 // Nó inicial padrão
@@ -24,9 +25,10 @@ const initialEdges: CustomFlowEdge[] = [];
 interface FlowBuilderCanvasProps {
   onNodesChange?: (nodes: Node<FlowNodeData>[]) => void;
   onEdgesChange?: (edges: CustomFlowEdge[]) => void;
+  onNodeSelect?: (nodeId: string | null) => void;
 }
 
-function FlowCanvas({ onNodesChange, onEdgesChange }: FlowBuilderCanvasProps) {
+function FlowCanvas({ onNodesChange, onEdgesChange, onNodeSelect }: FlowBuilderCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<Node<FlowNodeData>>(initialNodes);
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(initialEdges);
@@ -61,26 +63,29 @@ function FlowCanvas({ onNodesChange, onEdgesChange }: FlowBuilderCanvasProps) {
       
       const newNode: Node<FlowNodeData> = {
         id: `${type}-${Date.now()}`,
-        type: 'default', // Usaremos tipos customizados depois
+        type, // Usa o tipo customizado
         position,
         data: { 
           label: paletteItem?.label || type,
           config: getDefaultConfig(type)
         },
-        style: {
-          background: getNodeBackground(type),
-          border: '2px solid',
-          borderColor: getNodeBorderColor(type),
-          borderRadius: '8px',
-          padding: '10px 20px',
-          minWidth: '150px',
-        }
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
     [screenToFlowPosition, setNodes]
   );
+
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      onNodeSelect?.(node.id);
+    },
+    [onNodeSelect]
+  );
+
+  const onPaneClick = useCallback(() => {
+    onNodeSelect?.(null);
+  }, [onNodeSelect]);
 
   return (
     <div ref={reactFlowWrapper} className="flex-1 h-full">
@@ -92,6 +97,9 @@ function FlowCanvas({ onNodesChange, onEdgesChange }: FlowBuilderCanvasProps) {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
+        nodeTypes={nodeTypes}
         fitView
         className="bg-muted/30"
         defaultEdgeOptions={{
@@ -127,7 +135,10 @@ function getDefaultConfig(type: FlowNodeType): Record<string, unknown> {
     case 'message':
       return { text: '', delay: 0 };
     case 'condition':
-      return { conditionType: 'keyword', branches: [] };
+      return { conditionType: 'keyword', branches: [
+        { id: '1', label: 'Sim', value: 'yes' },
+        { id: '2', label: 'Não', value: 'no' },
+      ]};
     case 'action':
       return { actionType: 'update_vista' };
     case 'escalation':
@@ -154,21 +165,6 @@ function getNodeBackground(type: FlowNodeType | string): string {
     delay: '#64748b',
     end: '#ef4444',
     default: '#6b7280'
-  };
-  return colors[type] || colors.default;
-}
-
-function getNodeBorderColor(type: FlowNodeType | string): string {
-  const colors: Record<string, string> = {
-    start: '#16a34a',
-    message: '#2563eb',
-    condition: '#ca8a04',
-    action: '#9333ea',
-    escalation: '#ea580c',
-    integration: '#4f46e5',
-    delay: '#475569',
-    end: '#dc2626',
-    default: '#4b5563'
   };
   return colors[type] || colors.default;
 }
