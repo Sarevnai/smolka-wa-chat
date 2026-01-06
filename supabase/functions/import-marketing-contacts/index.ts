@@ -52,6 +52,8 @@ serve(async (req) => {
 
     for (const contact of contacts) {
       try {
+        console.log(`📝 Processing contact:`, { phone: contact.phone, hasName: !!contact.name, hasEmail: !!contact.email });
+        
         // Check if contact exists
         const { data: existing } = await supabase
           .from('contacts')
@@ -60,17 +62,19 @@ serve(async (req) => {
           .maybeSingle();
 
         if (existing) {
-          // Update existing contact
+          // Build update object - only include non-empty fields
+          const updateData: Record<string, any> = {
+            department_code: 'marketing',
+            contact_type: defaultContactType,
+            updated_at: new Date().toISOString(),
+          };
+          if (contact.name) updateData.name = contact.name;
+          if (contact.email) updateData.email = contact.email;
+          if (contact.notes) updateData.notes = contact.notes;
+
           const { error: updateError } = await supabase
             .from('contacts')
-            .update({
-              name: contact.name || undefined,
-              email: contact.email || undefined,
-              notes: contact.notes || undefined,
-              department_code: 'marketing',
-              contact_type: defaultContactType,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq('id', existing.id);
 
           if (updateError) throw updateError;
@@ -78,12 +82,13 @@ serve(async (req) => {
           // Assign tags
           if (tagIds.length > 0) {
             for (const tagId of tagIds) {
-              await supabase
+              const { error: tagError } = await supabase
                 .from('contact_tag_assignments')
                 .upsert(
                   { contact_id: existing.id, tag_id: tagId },
-                  { onConflict: 'contact_id,tag_id' }
+                  { onConflict: 'contact_id,tag_id', ignoreDuplicates: true }
                 );
+              if (tagError) console.warn(`⚠️ Tag assignment error for ${contact.phone}:`, tagError);
             }
           }
 
@@ -110,9 +115,10 @@ serve(async (req) => {
           // Assign tags
           if (tagIds.length > 0 && newContact) {
             for (const tagId of tagIds) {
-              await supabase
+              const { error: tagError } = await supabase
                 .from('contact_tag_assignments')
                 .insert({ contact_id: newContact.id, tag_id: tagId });
+              if (tagError) console.warn(`⚠️ Tag assignment error for new contact ${contact.phone}:`, tagError);
             }
           }
 
