@@ -275,6 +275,7 @@ export type Database = {
         Row: {
           created_at: string
           delivered_count: number | null
+          department_code: string | null
           failed_count: number | null
           header_media_id: string | null
           header_media_mime: string | null
@@ -295,6 +296,7 @@ export type Database = {
         Insert: {
           created_at?: string
           delivered_count?: number | null
+          department_code?: string | null
           failed_count?: number | null
           header_media_id?: string | null
           header_media_mime?: string | null
@@ -315,6 +317,7 @@ export type Database = {
         Update: {
           created_at?: string
           delivered_count?: number | null
+          department_code?: string | null
           failed_count?: number | null
           header_media_id?: string | null
           header_media_mime?: string | null
