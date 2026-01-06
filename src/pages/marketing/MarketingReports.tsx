@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSyncDepartment } from "@/hooks/useSyncDepartment";
 import { 
   BarChart3, ArrowLeft, TrendingUp, Users, Megaphone, 
   Download, Calendar, Clock
@@ -27,6 +28,8 @@ import {
 const COLORS = ['#ec4899', '#8b5cf6', '#f97316', '#22c55e', '#3b82f6'];
 
 export default function MarketingReports() {
+  useSyncDepartment('marketing');
+  
   const navigate = useNavigate();
   const [period, setPeriod] = useState<number>(30);
   const { data: reports, isLoading, refetch } = useMarketingReports(period);
