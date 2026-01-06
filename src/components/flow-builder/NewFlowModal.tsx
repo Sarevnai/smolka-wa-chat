@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { FileCheck, Users, HelpCircle, Calendar, Sparkles } from 'lucide-react';
+import { FileCheck, Users, HelpCircle, Calendar, Sparkles, Home } from 'lucide-react';
 import { AIFlow, CustomFlowNode, CustomFlowEdge } from '@/types/flow';
 import { FLOW_TEMPLATES, FlowTemplate } from '@/lib/flowTemplates';
 
@@ -29,14 +29,16 @@ const categoryIcons: Record<FlowTemplate['category'], React.ReactNode> = {
   confirmacao: <FileCheck className="h-4 w-4" />,
   qualificacao: <Users className="h-4 w-4" />,
   atendimento: <HelpCircle className="h-4 w-4" />,
-  vendas: <Calendar className="h-4 w-4" />
+  vendas: <Calendar className="h-4 w-4" />,
+  proprietarios: <Home className="h-4 w-4" />
 };
 
 const categoryLabels: Record<FlowTemplate['category'], string> = {
   confirmacao: 'Confirmação',
   qualificacao: 'Qualificação',
   atendimento: 'Atendimento',
-  vendas: 'Vendas'
+  vendas: 'Vendas',
+  proprietarios: 'Proprietários'
 };
 
 export function NewFlowModal({ open, onOpenChange, onConfirm, isLoading }: NewFlowModalProps) {

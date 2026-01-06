@@ -7,7 +7,8 @@ import {
   Users, 
   HelpCircle, 
   Calendar,
-  ArrowRight
+  ArrowRight,
+  Home
 } from 'lucide-react';
 import { FLOW_TEMPLATES, FlowTemplate } from '@/lib/flowTemplates';
 
@@ -21,21 +22,24 @@ const categoryIcons: Record<FlowTemplate['category'], React.ReactNode> = {
   confirmacao: <FileCheck className="h-5 w-5" />,
   qualificacao: <Users className="h-5 w-5" />,
   atendimento: <HelpCircle className="h-5 w-5" />,
-  vendas: <Calendar className="h-5 w-5" />
+  vendas: <Calendar className="h-5 w-5" />,
+  proprietarios: <Home className="h-5 w-5" />
 };
 
 const categoryLabels: Record<FlowTemplate['category'], string> = {
   confirmacao: 'Confirmação',
   qualificacao: 'Qualificação',
   atendimento: 'Atendimento',
-  vendas: 'Vendas'
+  vendas: 'Vendas',
+  proprietarios: 'Proprietários'
 };
 
 const categoryColors: Record<FlowTemplate['category'], string> = {
   confirmacao: 'bg-green-500',
   qualificacao: 'bg-blue-500',
   atendimento: 'bg-purple-500',
-  vendas: 'bg-orange-500'
+  vendas: 'bg-orange-500',
+  proprietarios: 'bg-amber-600'
 };
 
 export function TemplatePickerModal({ open, onOpenChange, onSelect }: TemplatePickerModalProps) {
