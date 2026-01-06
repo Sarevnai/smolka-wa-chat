@@ -35,6 +35,64 @@ export function QuickTemplateSender({
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<string>("");
 
+  // Parse property data from notes field (marketing contacts)
+  // Format: "Imóvel: {código} | {rua}, {número} | {bairro} - {cidade} | CEP: {cep} | Status: {status} | Valor: {valor}"
+  const parsePropertyFromNotes = (notes: string | null): {
+    propertyCode: string;
+    address: string;
+    neighborhood: string;
+    city: string;
+    cep: string;
+    status: string;
+    value: string;
+    fullAddress: string;
+  } => {
+    const result = {
+      propertyCode: '',
+      address: '',
+      neighborhood: '',
+      city: '',
+      cep: '',
+      status: '',
+      value: '',
+      fullAddress: '',
+    };
+    
+    if (!notes) return result;
+    
+    // Split by pipe separator
+    const parts = notes.split('|').map(p => p.trim());
+    
+    for (const part of parts) {
+      if (part.startsWith('Imóvel:')) {
+        result.propertyCode = part.replace('Imóvel:', '').trim();
+      } else if (part.startsWith('CEP:')) {
+        result.cep = part.replace('CEP:', '').trim();
+      } else if (part.startsWith('Status:')) {
+        result.status = part.replace('Status:', '').trim();
+      } else if (part.startsWith('Valor:')) {
+        result.value = part.replace('Valor:', '').trim();
+      } else if (part.includes(' - ') && !part.startsWith('Imóvel')) {
+        // "Bairro - Cidade" format
+        const [neighborhood, city] = part.split(' - ').map(s => s.trim());
+        result.neighborhood = neighborhood || '';
+        result.city = city || '';
+      } else if (part.includes(',') && !part.startsWith('Imóvel')) {
+        // "Rua, Número" format - this is the street address
+        result.address = part;
+      }
+    }
+    
+    // Build full formatted address: "Rua X, 100 - Bairro - CEP: 88000-000"
+    result.fullAddress = [
+      result.address,
+      result.neighborhood,
+      result.cep ? `CEP: ${result.cep}` : ''
+    ].filter(Boolean).join(' - ');
+    
+    return result;
+  };
+
   // Extract placeholders from template (supports both named and numeric)
   const extractPlaceholders = (template: WhatsAppTemplate): string[] => {
     const bodyComponent = template.components.find(c => c.type === 'BODY');
@@ -51,6 +109,9 @@ export function QuickTemplateSender({
       const placeholders = extractPlaceholders(selectedTemplate);
       const autoFilled: Record<string, string> = {};
       
+      // Parse property data from notes (for marketing contacts)
+      const propertyData = parsePropertyFromNotes(contact?.notes || null);
+      
       // Auto-fill for named variables
       if (placeholders.includes('nome') && contact?.name) {
         autoFilled['nome'] = contact.name;
@@ -63,6 +124,16 @@ export function QuickTemplateSender({
       }
       if (placeholders.includes('imovel') && contact?.contracts?.[0]?.property_code) {
         autoFilled['imovel'] = contact.contracts[0].property_code;
+      }
+      
+      // Auto-fill endereco from property notes
+      if (placeholders.includes('endereco') && propertyData.fullAddress) {
+        autoFilled['endereco'] = propertyData.fullAddress;
+      }
+      
+      // Auto-fill valor from property notes
+      if (placeholders.includes('valor') && propertyData.value) {
+        autoFilled['valor'] = propertyData.value;
       }
       
       // Auto-fill for numeric variables (backward compatibility)
@@ -219,6 +290,10 @@ export function QuickTemplateSender({
                     hint = ' (Número do contrato)';
                   } else if (placeholder === 'imovel' || placeholder === '3') {
                     hint = ' (Código do imóvel)';
+                  } else if (placeholder === 'endereco') {
+                    hint = ' (Endereço do imóvel)';
+                  } else if (placeholder === 'valor') {
+                    hint = ' (Valor do imóvel)';
                   }
                   
                   return (
