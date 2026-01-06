@@ -113,11 +113,7 @@ export function AppSidebar() {
         )}
 
         {/* Main Department Items */}
-        <SidebarGroup>
-          <SidebarGroupLabel className={cn("flex items-center gap-2", config.textColor)}>
-            <config.icon className="h-4 w-4" />
-            {!collapsed && <span>{config.label}</span>}
-          </SidebarGroupLabel>
+      <SidebarGroup className="mt-2">
           <SidebarGroupContent>
             <SidebarMenu>
               {config.items.map((item) => {
