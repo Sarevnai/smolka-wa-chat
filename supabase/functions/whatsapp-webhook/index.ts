@@ -882,12 +882,11 @@ async function handleN8NTrigger(
       return;
     }
 
-    // 🆕 If conversation already has a department and is not pending triage, 
-    // only trigger AI if explicitly enabled for that conversation
-    if (conversation?.department_code && !convState?.is_ai_active) {
-      console.log(`⏭️ Conversation ${conversation.id} already assigned to ${conversation.department_code} - human handling`);
-      return;
-    }
+    // 🆕 OPTION B: AI responds to ALL conversations outside business hours
+    // Only skip if operator has manually taken over (checked above at line 783-786)
+    // Department assignment no longer prevents AI from responding
+    console.log(`📋 Conversation department: ${conversation?.department_code || 'pending'} - will check business hours`);
+
 
     // Load all relevant settings at once
     const { data: allSettings } = await supabase
