@@ -168,6 +168,60 @@ async function checkCampaignSource(phoneNumber: string): Promise<DepartmentType>
 }
 
 /**
+ * Check if a phone number is responding to a MARKETING campaign (for property confirmation)
+ * Returns contact info with notes (property data) if from marketing campaign
+ */
+async function checkMarketingCampaignSource(phoneNumber: string): Promise<{
+  isMarketingCampaign: boolean;
+  contactNotes: string | null;
+  contactName: string | null;
+  contactId: string | null;
+} | null> {
+  try {
+    const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    
+    // Check if phone received a marketing campaign in last 48h
+    const { data: campaignResult } = await supabase
+      .from('campaign_results')
+      .select(`
+        id,
+        campaign_id,
+        contact_id,
+        campaigns!inner(department_code, name)
+      `)
+      .eq('phone', phoneNumber)
+      .eq('campaigns.department_code', 'marketing')
+      .gte('sent_at', cutoffTime)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!campaignResult) {
+      return null;
+    }
+
+    console.log(`📢 Marketing campaign detected for ${phoneNumber}: ${(campaignResult.campaigns as any)?.name}`);
+
+    // Get contact info with notes (contains property data)
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id, name, notes')
+      .eq('phone', phoneNumber)
+      .maybeSingle();
+
+    return {
+      isMarketingCampaign: true,
+      contactNotes: contact?.notes || null,
+      contactName: contact?.name || null,
+      contactId: contact?.id || null,
+    };
+  } catch (error) {
+    console.error('❌ Error checking marketing campaign source:', error);
+    return null;
+  }
+}
+
+/**
  * Find an existing active conversation for this phone number, or create a new one.
  * New conversations start with department_code = NULL (pending triage by Helena).
  * If the phone comes from a recent campaign, inherit the campaign's department.
@@ -709,6 +763,7 @@ async function ensureContactExists(phoneNumber: string) {
 /**
  * Handle AI agent trigger based on business hours, conversation state, and agent mode
  * 🆕 Now receives conversation info for department assignment
+ * 🆕 Routes marketing campaign responses to ai-marketing-agent
  */
 async function handleN8NTrigger(
   phoneNumber: string, 
@@ -727,6 +782,103 @@ async function handleN8NTrigger(
     // If operator has taken over this conversation, skip AI
     if (convState?.operator_id && !convState?.is_ai_active) {
       console.log(`⏭️ Skipping AI - operator ${convState.operator_id} handling conversation`);
+      return;
+    }
+
+    // 🆕 CHECK FOR MARKETING CAMPAIGN FIRST
+    // Marketing campaigns have priority and use specialized AI agent
+    const marketingCampaign = await checkMarketingCampaignSource(phoneNumber);
+    
+    if (marketingCampaign?.isMarketingCampaign) {
+      console.log(`📢 Marketing campaign response detected - routing to ai-marketing-agent`);
+      
+      // Get recent messages for conversation history
+      let conversationHistory: Array<{ role: string; content: string }> = [];
+      if (conversation?.id) {
+        const { data: recentMessages } = await supabase
+          .from('messages')
+          .select('body, direction, created_at')
+          .eq('conversation_id', conversation.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (recentMessages) {
+          conversationHistory = recentMessages
+            .reverse()
+            .filter(msg => msg.body)
+            .map(msg => ({
+              role: msg.direction === 'inbound' ? 'user' : 'assistant',
+              content: msg.body || ''
+            }));
+        }
+      }
+
+      // Build payload for marketing agent
+      const marketingPayload = {
+        phone_number: phoneNumber,
+        message: messageBody,
+        contact_name: marketingCampaign.contactName,
+        contact_notes: marketingCampaign.contactNotes,
+        conversation_history: conversationHistory,
+      };
+
+      console.log(`📤 Sending to ai-marketing-agent:`, {
+        phone: phoneNumber,
+        hasNotes: !!marketingCampaign.contactNotes,
+        historyCount: conversationHistory.length
+      });
+
+      const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-marketing-agent', {
+        body: marketingPayload
+      });
+
+      if (aiError) {
+        console.error('❌ Error calling ai-marketing-agent:', aiError);
+      } else {
+        console.log('✅ ai-marketing-agent response:', aiResult);
+        
+        // Send AI response back to WhatsApp
+        if (aiResult?.response) {
+          const { error: sendError } = await supabase.functions.invoke('send-wa-message', {
+            body: {
+              to: phoneNumber,
+              text: aiResult.response,
+              conversation_id: conversation?.id
+            }
+          });
+          
+          if (sendError) {
+            console.error('❌ Error sending marketing agent response:', sendError);
+          } else {
+            console.log('✅ Marketing agent response sent to WhatsApp');
+          }
+        }
+
+        // Handle escalation to human
+        if (aiResult?.escalated) {
+          console.log('🔄 Marketing conversation escalated to human');
+          await supabase
+            .from('conversation_states')
+            .upsert({
+              phone_number: phoneNumber,
+              is_ai_active: false,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'phone_number' });
+        }
+
+        // Handle conversation finalization
+        if (aiResult?.finalized) {
+          console.log(`✅ Marketing conversation finalized: ${aiResult.finalization_type}`);
+          // Mark replied_at in campaign_results
+          await supabase
+            .from('campaign_results')
+            .update({ replied_at: new Date().toISOString() })
+            .eq('phone', phoneNumber)
+            .is('replied_at', null);
+        }
+      }
+
+      // Don't continue to regular agent - marketing agent handled it
       return;
     }
 
