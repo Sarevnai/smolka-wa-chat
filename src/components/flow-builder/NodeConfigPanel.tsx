@@ -1,4 +1,4 @@
-import { X, Play, MessageCircle, GitBranch, Zap, UserPlus, Webhook, Clock, Square, LucideIcon } from 'lucide-react';
+import { X, Play, MessageCircle, GitBranch, Zap, UserPlus, Webhook, Clock, Square, TextCursor, LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -14,7 +14,8 @@ import {
   EscalationNodeConfig,
   IntegrationNodeConfig,
   DelayNodeConfig,
-  EndNodeConfig
+  EndNodeConfig,
+  InputNodeConfig
 } from '@/types/flow';
 import {
   StartConfig,
@@ -24,7 +25,8 @@ import {
   EscalationConfig,
   IntegrationConfig,
   DelayConfig,
-  EndConfig
+  EndConfig,
+  InputConfig
 } from './config';
 import { NODE_PALETTE_ITEMS } from '@/types/flow';
 
@@ -36,7 +38,8 @@ const iconMap: Record<string, LucideIcon> = {
   UserPlus,
   Webhook,
   Clock,
-  Square
+  Square,
+  TextCursor
 };
 
 interface NodeConfigPanelProps {
@@ -119,6 +122,13 @@ export function NodeConfigPanel({
           <EndConfig 
             config={config as EndNodeConfig} 
             onChange={onConfigChange as (config: EndNodeConfig) => void} 
+          />
+        );
+      case 'input':
+        return (
+          <InputConfig 
+            config={config as InputNodeConfig} 
+            onChange={onConfigChange as (config: InputNodeConfig) => void} 
           />
         );
       default:

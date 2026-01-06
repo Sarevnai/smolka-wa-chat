@@ -6,3 +6,4 @@ export { EscalationConfig } from './EscalationConfig';
 export { IntegrationConfig } from './IntegrationConfig';
 export { DelayConfig } from './DelayConfig';
 export { EndConfig } from './EndConfig';
+export { InputConfig } from './InputConfig';

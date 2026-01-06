@@ -1,20 +1,14 @@
 import { memo } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
 import { GitBranch } from 'lucide-react';
-import { FlowNodeData } from '@/types/flow';
+import { FlowNodeData, ConditionBranch } from '@/types/flow';
 import { cn } from '@/lib/utils';
-
-interface Branch {
-  id: string;
-  label: string;
-  value: string;
-}
 
 function ConditionNodeComponent({ data, selected }: NodeProps) {
   const nodeData = data as FlowNodeData;
   const config = nodeData.config as { 
     conditionType?: string; 
-    branches?: Branch[];
+    branches?: ConditionBranch[];
   };
 
   const branches = config.branches || [
@@ -32,18 +26,24 @@ function ConditionNodeComponent({ data, selected }: NodeProps) {
         return 'Por horário';
       case 'tag':
         return 'Por tag';
+      case 'variable':
+        return 'Por variável';
       default:
         return 'Condição';
     }
   };
 
+  // Calcular largura baseada no número de branches
+  const minWidth = Math.max(200, branches.length * 80);
+
   return (
     <div
       className={cn(
-        "min-w-[200px] rounded-xl shadow-lg transition-all duration-200",
+        "rounded-xl shadow-lg transition-all duration-200",
         "bg-card border-2 border-yellow-500",
         selected && "ring-2 ring-primary ring-offset-2"
       )}
+      style={{ minWidth: `${minWidth}px` }}
     >
       {/* Target Handle */}
       <Handle
@@ -65,15 +65,20 @@ function ConditionNodeComponent({ data, selected }: NodeProps) {
         </p>
 
         {/* Branches */}
-        <div className="flex justify-around gap-2">
-          {branches.map((branch, index) => (
+        <div className="flex justify-around gap-2 flex-wrap">
+          {branches.map((branch) => (
             <div 
               key={branch.id} 
-              className="flex flex-col items-center"
+              className="flex flex-col items-center min-w-[60px]"
             >
-              <span className="text-xs font-medium text-foreground mb-1">
+              <span className="text-xs font-medium text-foreground mb-1 text-center truncate max-w-[80px]" title={branch.label}>
                 {branch.label}
               </span>
+              {branch.keywords && branch.keywords.length > 0 && (
+                <span className="text-[10px] text-muted-foreground mb-1 truncate max-w-[80px]" title={branch.keywords.join(', ')}>
+                  {branch.keywords.slice(0, 2).join(', ')}...
+                </span>
+              )}
               <Handle
                 type="source"
                 position={Position.Bottom}
