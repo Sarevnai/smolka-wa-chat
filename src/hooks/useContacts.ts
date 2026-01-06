@@ -85,11 +85,11 @@ export const useContactsForSelection = (searchTerm?: string, filters?: ContactFi
   });
 };
 
-export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) => {
+export const useContacts = (searchTerm?: string, filters?: ContactFiltersState, departmentCode?: string) => {
   return useQuery({
-    queryKey: ["contacts", searchTerm, filters],
+    queryKey: ["contacts", searchTerm, filters, departmentCode],
     queryFn: async () => {
-      console.log("Fetching contacts with optimized query...", { searchTerm, filters });
+      console.log("Fetching contacts with optimized query...", { searchTerm, filters, departmentCode });
 
       // Build base query
       let query = supabase
@@ -99,6 +99,11 @@ export const useContacts = (searchTerm?: string, filters?: ContactFiltersState) 
           contact_contracts (*)
         `)
         .order('updated_at', { ascending: false });
+
+      // Filter by department if specified
+      if (departmentCode) {
+        query = query.eq('department_code', departmentCode as any);
+      }
 
       // Apply search term
       if (searchTerm && searchTerm.trim()) {
