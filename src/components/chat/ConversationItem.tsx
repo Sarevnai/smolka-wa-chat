@@ -26,6 +26,7 @@ type ViewMode = 'leads' | 'tasks';
 
 interface ConversationItemProps {
   phoneNumber: string;
+  conversationId?: string;
   lastMessage: {
     body: string | null;
     direction: string;
@@ -44,6 +45,7 @@ interface ConversationItemProps {
 
 export function ConversationItem({
   phoneNumber,
+  conversationId,
   lastMessage,
   messageCount,
   unreadCount,
@@ -78,7 +80,7 @@ export function ConversationItem({
   }, [phoneNumber, viewMode]);
 
   const handleDeleteConversation = async () => {
-    const result = await deleteConversation(phoneNumber);
+    const result = await deleteConversation(phoneNumber, conversationId);
     if (result.success) {
       setShowDeleteDialog(false);
     }
