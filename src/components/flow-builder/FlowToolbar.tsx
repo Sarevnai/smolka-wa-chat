@@ -7,13 +7,21 @@ import {
   ZoomIn, 
   ZoomOut, 
   Maximize2,
-  ArrowLeft
+  ArrowLeft,
+  FolderOpen,
+  Plus,
+  Rocket,
+  RocketIcon,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 interface FlowToolbarProps {
   flowName: string;
+  onFlowNameChange?: (name: string) => void;
   onSave: () => void;
   onTest: () => void;
   onUndo: () => void;
@@ -21,13 +29,21 @@ interface FlowToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitView: () => void;
+  onOpenFlowList?: () => void;
+  onNewFlow?: () => void;
+  onPublish?: () => void;
   canUndo: boolean;
   canRedo: boolean;
   isSaving: boolean;
+  hasUnsavedChanges?: boolean;
+  isActive?: boolean;
+  isPublishing?: boolean;
+  hasFlow?: boolean;
 }
 
 export function FlowToolbar({
   flowName,
+  onFlowNameChange,
   onSave,
   onTest,
   onUndo,
@@ -35,9 +51,16 @@ export function FlowToolbar({
   onZoomIn,
   onZoomOut,
   onFitView,
+  onOpenFlowList,
+  onNewFlow,
+  onPublish,
   canUndo,
   canRedo,
-  isSaving
+  isSaving,
+  hasUnsavedChanges,
+  isActive,
+  isPublishing,
+  hasFlow
 }: FlowToolbarProps) {
   const navigate = useNavigate();
 
@@ -56,13 +79,46 @@ export function FlowToolbar({
         
         <Separator orientation="vertical" className="h-6" />
         
-        <div>
-          <h1 className="font-semibold text-lg">{flowName || 'Novo Fluxo'}</h1>
-          <p className="text-xs text-muted-foreground">Flow Builder</p>
+        <div className="flex items-center gap-2">
+          {onFlowNameChange ? (
+            <Input
+              value={flowName}
+              onChange={(e) => onFlowNameChange(e.target.value)}
+              className="h-8 w-48 font-semibold"
+              placeholder="Nome do fluxo"
+            />
+          ) : (
+            <h1 className="font-semibold text-lg">{flowName || 'Novo Fluxo'}</h1>
+          )}
+          {hasUnsavedChanges && (
+            <Badge variant="secondary" className="text-xs">Não salvo</Badge>
+          )}
+          {isActive && (
+            <Badge variant="default" className="text-xs gap-1">
+              <RocketIcon className="h-3 w-3" />
+              Ativo
+            </Badge>
+          )}
         </div>
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Flow management */}
+        {onOpenFlowList && (
+          <Button variant="ghost" size="sm" onClick={onOpenFlowList} className="gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Abrir
+          </Button>
+        )}
+        {onNewFlow && (
+          <Button variant="ghost" size="sm" onClick={onNewFlow} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo
+          </Button>
+        )}
+
+        <Separator orientation="vertical" className="h-6" />
+
         {/* Zoom controls */}
         <div className="flex items-center gap-1 mr-2">
           <Button variant="ghost" size="icon" onClick={onZoomOut}>
@@ -101,14 +157,42 @@ export function FlowToolbar({
         <Separator orientation="vertical" className="h-6" />
 
         {/* Actions */}
-        <Button variant="outline" size="sm" onClick={onTest} className="gap-2">
+        <Button variant="outline" size="sm" onClick={onTest} className="gap-2" disabled={!hasFlow}>
           <Play className="h-4 w-4" />
           Testar
         </Button>
-        <Button size="sm" onClick={onSave} disabled={isSaving} className="gap-2">
-          <Save className="h-4 w-4" />
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={onSave} 
+          disabled={isSaving || !hasFlow} 
+          className="gap-2"
+        >
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
           {isSaving ? 'Salvando...' : 'Salvar'}
         </Button>
+
+        {onPublish && hasFlow && (
+          <Button 
+            size="sm" 
+            onClick={onPublish} 
+            disabled={isPublishing}
+            className="gap-2"
+            variant={isActive ? 'secondary' : 'default'}
+          >
+            {isPublishing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Rocket className="h-4 w-4" />
+            )}
+            {isActive ? 'Despublicar' : 'Publicar'}
+          </Button>
+        )}
       </div>
     </div>
   );

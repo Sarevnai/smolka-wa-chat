@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -18,21 +18,44 @@ import { FlowNodeType, FlowNodeData, CustomFlowEdge, NODE_PALETTE_ITEMS } from '
 import { nodeTypes } from './nodes';
 import type { Node } from '@xyflow/react';
 
-// Nó inicial padrão
-const initialNodes: Node<FlowNodeData>[] = [];
-const initialEdges: CustomFlowEdge[] = [];
-
 interface FlowBuilderCanvasProps {
   onNodesChange?: (nodes: Node<FlowNodeData>[]) => void;
   onEdgesChange?: (edges: CustomFlowEdge[]) => void;
   onNodeSelect?: (nodeId: string | null) => void;
+  initialNodes?: Node<FlowNodeData>[];
+  initialEdges?: CustomFlowEdge[];
 }
 
-function FlowCanvas({ onNodesChange, onEdgesChange, onNodeSelect }: FlowBuilderCanvasProps) {
+function FlowCanvas({ 
+  onNodesChange, 
+  onEdgesChange, 
+  onNodeSelect,
+  initialNodes = [],
+  initialEdges = []
+}: FlowBuilderCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<Node<FlowNodeData>>(initialNodes);
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(initialEdges);
   const { screenToFlowPosition } = useReactFlow();
+  const isInitialized = useRef(false);
+
+  // Sync with external state when initialNodes/initialEdges change
+  useEffect(() => {
+    if (initialNodes.length > 0 || initialEdges.length > 0 || !isInitialized.current) {
+      setNodes(initialNodes);
+      setEdges(initialEdges);
+      isInitialized.current = true;
+    }
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+  // Notify parent of changes
+  useEffect(() => {
+    onNodesChange?.(nodes);
+  }, [nodes, onNodesChange]);
+
+  useEffect(() => {
+    onEdgesChange?.(edges);
+  }, [edges, onEdgesChange]);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -63,7 +86,7 @@ function FlowCanvas({ onNodesChange, onEdgesChange, onNodeSelect }: FlowBuilderC
       
       const newNode: Node<FlowNodeData> = {
         id: `${type}-${Date.now()}`,
-        type, // Usa o tipo customizado
+        type,
         position,
         data: { 
           label: paletteItem?.label || type,
