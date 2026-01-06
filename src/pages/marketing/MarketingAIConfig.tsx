@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Bot, ArrowLeft, Save, Sparkles, MessageSquare, 
-  Target, Users, Zap, Clock
+  Target, Users, Zap, Clock, Building, CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,11 @@ interface MarketingAIConfig {
   escalation_keywords: string[];
   working_hours: { start: string; end: string };
   fallback_message: string;
+  // Configurações de Campanha de Confirmação de Imóveis
+  property_confirmation_enabled: boolean;
+  property_confirmation_message: string;
+  auto_update_vista: boolean;
+  remove_from_site_when_sold: boolean;
 }
 
 const defaultConfig: MarketingAIConfig = {
@@ -63,6 +68,11 @@ const defaultConfig: MarketingAIConfig = {
   escalation_keywords: ["falar com humano", "atendente", "gerente", "reclamação"],
   working_hours: { start: "08:00", end: "18:00" },
   fallback_message: "No momento estou fora do horário de atendimento. Retornarei em breve!",
+  // Defaults para confirmação de imóveis
+  property_confirmation_enabled: true,
+  property_confirmation_message: "Olá! 🏠 Aqui é a Nina da Smolka Imóveis. Estou entrando em contato sobre o seu imóvel no endereço [ENDEREÇO]. O imóvel ainda está disponível para venda?",
+  auto_update_vista: true,
+  remove_from_site_when_sold: true,
 };
 
 export default function MarketingAIConfig() {
@@ -415,6 +425,100 @@ export default function MarketingAIConfig() {
                   />
                   <Button onClick={addEscalation}>Adicionar</Button>
                 </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Property Confirmation Campaign */}
+          <AccordionItem value="property-confirmation" className="border rounded-lg px-4">
+            <AccordionTrigger>
+              <div className="flex items-center gap-2">
+                <Building className="h-5 w-5 text-emerald-500" />
+                <span>Confirmação de Imóveis (Vista CRM)</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Habilitar campanhas de confirmação</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Permite que a IA confirme disponibilidade e valor de imóveis com proprietários
+                  </p>
+                </div>
+                <Switch
+                  checked={config.property_confirmation_enabled}
+                  onCheckedChange={(property_confirmation_enabled) =>
+                    setConfig((prev) => ({ ...prev, property_confirmation_enabled }))
+                  }
+                />
+              </div>
+
+              <Separator />
+
+              <div>
+                <Label>Mensagem Inicial da Campanha</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Use [ENDEREÇO] e [VALOR] como variáveis
+                </p>
+                <Textarea
+                  value={config.property_confirmation_message}
+                  onChange={(e) => setConfig((prev) => ({ ...prev, property_confirmation_message: e.target.value }))}
+                  placeholder="Olá! 🏠 Estou entrando em contato sobre o seu imóvel..."
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Ações Automáticas no Vista CRM</Label>
+                
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <div>
+                      <span className="text-sm font-medium">Atualizar Vista automaticamente</span>
+                      <p className="text-xs text-muted-foreground">
+                        Atualiza status e valor do imóvel quando confirmado pelo proprietário
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={config.auto_update_vista}
+                    onCheckedChange={(auto_update_vista) =>
+                      setConfig((prev) => ({ ...prev, auto_update_vista }))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Building className="h-4 w-4 text-orange-500" />
+                    <div>
+                      <span className="text-sm font-medium">Remover do site quando vendido</span>
+                      <p className="text-xs text-muted-foreground">
+                        Define "Exibir no Site = Não" quando o imóvel for marcado como vendido
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={config.remove_from_site_when_sold}
+                    onCheckedChange={(remove_from_site_when_sold) =>
+                      setConfig((prev) => ({ ...prev, remove_from_site_when_sold }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Como funciona:</h4>
+                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
+                  <li>Crie uma campanha com contatos importados (com dados do imóvel)</li>
+                  <li>A IA envia a mensagem inicial perguntando sobre disponibilidade</li>
+                  <li>O proprietário responde e a IA confirma valor ou atualiza status</li>
+                  <li>O Vista CRM é atualizado automaticamente</li>
+                </ol>
               </div>
             </AccordionContent>
           </AccordionItem>
