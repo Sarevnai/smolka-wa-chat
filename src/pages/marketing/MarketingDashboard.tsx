@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { 
+import { useSyncDepartment } from "@/hooks/useSyncDepartment";
+import {
   Users, Megaphone, TrendingUp, Target, BarChart3, 
   Plus, RefreshCw, Send, Bot, Tags
 } from "lucide-react";
@@ -20,6 +21,8 @@ import {
 const COLORS = ['#ec4899', '#8b5cf6', '#f97316', '#22c55e'];
 
 export default function MarketingDashboard() {
+  useSyncDepartment('marketing');
+  
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: metrics, isLoading, refetch } = useMarketingMetrics();

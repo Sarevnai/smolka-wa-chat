@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
+import { useSyncDepartment } from "@/hooks/useSyncDepartment";
+import {
   Users, Plus, Search, Filter, Tag, Download, Upload,
   ArrowLeft, MoreHorizontal, Phone, Mail
 } from "lucide-react";
@@ -34,6 +35,8 @@ import { useContactTags, useContactsTagAssignments } from "@/hooks/useContactTag
 type ContactType = "lead" | "prospect" | "engajado" | "campanha" | "all";
 
 export default function MarketingContacts() {
+  useSyncDepartment('marketing');
+  
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");

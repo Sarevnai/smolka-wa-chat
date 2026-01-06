@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { 
+import { useSyncDepartment } from "@/hooks/useSyncDepartment";
+import {
   Megaphone, Plus, Search, BarChart3, Send, CheckCircle, 
   MessageCircle, TrendingUp, Filter, LayoutDashboard, List
 } from "lucide-react";
@@ -42,6 +43,8 @@ const statusColors: Record<string, string> = {
 };
 
 export default function MarketingCampaigns() {
+  useSyncDepartment('marketing');
+  
   const [mainTab, setMainTab] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
