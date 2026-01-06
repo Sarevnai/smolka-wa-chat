@@ -3,22 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Clock, Save, TestTube, ExternalLink, Key, Copy, Eye, EyeOff, Sparkles, Workflow, Settings2 } from 'lucide-react';
+import { Bot, Save, TestTube, ExternalLink, Key, Copy, Eye, EyeOff, Sparkles, Workflow, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AIAgentSettings } from './AIAgentSettings';
-
-interface BusinessHours {
-  start: string;
-  end: string;
-  days: number[];
-  timezone: string;
-}
 
 type AgentMode = 'native' | 'n8n';
 
@@ -26,13 +18,6 @@ export function N8NSettings() {
   const [agentMode, setAgentMode] = useState<AgentMode>('native');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [forceAIMode, setForceAIMode] = useState(false);
-  const [businessHours, setBusinessHours] = useState<BusinessHours>({
-    start: '08:00',
-    end: '18:00',
-    days: [1, 2, 3, 4, 5],
-    timezone: 'America/Sao_Paulo'
-  });
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -48,7 +33,7 @@ export function N8NSettings() {
       const { data: settings } = await supabase
         .from('system_settings')
         .select('setting_key, setting_value')
-        .in('setting_key', ['n8n_webhook_url', 'n8n_api_key', 'n8n_force_ai_mode', 'business_hours', 'ai_agent_mode']);
+        .in('setting_key', ['n8n_webhook_url', 'n8n_api_key', 'ai_agent_mode']);
 
       settings?.forEach((setting) => {
         const raw = setting.setting_value as any;
@@ -65,16 +50,6 @@ export function N8NSettings() {
             const key = raw?.value ?? (typeof raw === 'string' ? raw : '');
             setApiKey(key.replace(/^"|"$/g, ''));
             break;
-          case 'n8n_force_ai_mode':
-            setForceAIMode(raw?.value === true || raw === true);
-            break;
-          case 'business_hours':
-            if (raw && typeof raw === 'object' && !raw.value) {
-              setBusinessHours(raw as BusinessHours);
-            } else if (raw?.value && typeof raw.value === 'object') {
-              setBusinessHours(raw.value as BusinessHours);
-            }
-            break;
         }
       });
     } catch (error) {
@@ -89,8 +64,6 @@ export function N8NSettings() {
         { setting_key: 'ai_agent_mode', setting_category: 'n8n', setting_value: { value: agentMode } },
         { setting_key: 'n8n_webhook_url', setting_category: 'n8n', setting_value: webhookUrl?.trim() ? { value: webhookUrl.trim() } : null },
         { setting_key: 'n8n_api_key', setting_category: 'n8n', setting_value: apiKey?.trim() ? { value: apiKey.trim() } : null },
-        { setting_key: 'n8n_force_ai_mode', setting_category: 'n8n', setting_value: { value: forceAIMode } },
-        { setting_key: 'business_hours', setting_category: 'n8n', setting_value: businessHours },
       ];
 
       for (const setting of settingsToSave) {
@@ -162,15 +135,6 @@ export function N8NSettings() {
     }
   };
 
-  const toggleDay = (day: number) => {
-    setBusinessHours(prev => ({
-      ...prev,
-      days: prev.days.includes(day) ? prev.days.filter(d => d !== day) : [...prev.days, day].sort()
-    }));
-  };
-
-  const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-
   return (
     <Tabs defaultValue="settings" className="space-y-6">
       <TabsList className="grid w-full grid-cols-2">
@@ -193,7 +157,7 @@ export function N8NSettings() {
             <CardTitle>Modo do Agente Virtual</CardTitle>
           </div>
           <CardDescription>
-            Escolha como o agente virtual irá responder automaticamente fora do horário comercial
+            Escolha como o agente virtual irá processar as mensagens
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -211,7 +175,7 @@ export function N8NSettings() {
                   <Badge variant="secondary" className="ml-2">Recomendado</Badge>
                 </Label>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Usa IA integrada (Google Gemini) diretamente no Supabase. Mais rápido, confiável e sem dependências externas.
+                  Usa IA integrada diretamente no Supabase. Mais rápido, confiável e sem dependências externas.
                 </p>
               </div>
             </div>
@@ -319,84 +283,12 @@ export function N8NSettings() {
         </Card>
       )}
 
-      {/* Business Hours */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
-            <CardTitle>Horário Comercial</CardTitle>
-          </div>
-          <CardDescription>
-            O agente IA será ativado automaticamente fora deste horário
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start-time">Início</Label>
-              <Input
-                id="start-time"
-                type="time"
-                value={businessHours.start}
-                onChange={(e) => setBusinessHours(prev => ({ ...prev, start: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end-time">Fim</Label>
-              <Input
-                id="end-time"
-                type="time"
-                value={businessHours.end}
-                onChange={(e) => setBusinessHours(prev => ({ ...prev, end: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Dias de Atendimento</Label>
-            <div className="flex flex-wrap gap-2">
-              {dayNames.map((name, index) => (
-                <Badge
-                  key={index}
-                  variant={businessHours.days.includes(index) ? 'default' : 'outline'}
-                  className="cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => toggleDay(index)}
-                >
-                  {name}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-            <div className="flex-1">
-              <p className="text-sm font-medium flex items-center gap-2">
-                <TestTube className="h-4 w-4 text-amber-500" />
-                Modo de Teste (Forçar IA)
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Quando ativo, TODAS as mensagens são enviadas para IA, ignorando o horário comercial
-              </p>
-            </div>
-            <Switch checked={forceAIMode} onCheckedChange={setForceAIMode} />
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Resumo</p>
-              <p className="text-xs text-muted-foreground">
-                Atendimento humano: {businessHours.start} - {businessHours.end}
-                {' '}({dayNames.filter((_, i) => businessHours.days.includes(i)).join(', ')})
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {forceAIMode ? '⚠️ Modo teste ativo - todas as mensagens vão para IA' : 'Agente IA: fora do horário comercial'}
-              </p>
-            </div>
-          </div>
+      {/* Info Card - Redirect to Agent Config for Schedule */}
+      <Card className="border-dashed">
+        <CardContent className="py-4">
+          <p className="text-sm text-muted-foreground text-center">
+            💡 Os horários de automação da IA são configurados na aba <strong>"Personalidade do Agente"</strong> → seção "Horários de Automação"
+          </p>
         </CardContent>
       </Card>
 

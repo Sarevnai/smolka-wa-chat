@@ -39,6 +39,25 @@ interface VoiceOption {
 type AIProvider = 'lovable' | 'openai';
 type EmojiIntensity = 'none' | 'low' | 'medium';
 type AudioMode = 'text_only' | 'audio_only' | 'text_and_audio';
+type AIOperationMode = 'always_active' | 'business_hours_only' | 'outside_hours_only' | 'scheduled';
+
+interface DaySchedule {
+  enabled: boolean;
+  periods: { start: string; end: string }[];
+}
+
+interface AIScheduleConfig {
+  mode: AIOperationMode;
+  timezone: string;
+  default_hours: {
+    start: string;
+    end: string;
+    days: number[];
+  };
+  custom_schedule: Record<number, DaySchedule>;
+  force_ai_mode: boolean;
+  pause_periods: { start: string; end: string; reason?: string }[];
+}
 
 interface AIAgentConfig {
   agent_name: string;
@@ -100,6 +119,8 @@ interface AIAgentConfig {
   spin_implication_questions: string[];
   spin_need_questions: string[];
   escalation_criteria: string[];
+  // Schedule Config (NEW)
+  schedule_config: AIScheduleConfig;
 }
 
 const providerModels: Record<AIProvider, { value: string; label: string; description: string }[]> = {
@@ -134,6 +155,27 @@ const categoryLabels: Record<string, string> = {
   'generated': 'Vozes Geradas',
   'professional': 'Profissionais',
   'other': 'Outras',
+};
+
+const defaultScheduleConfig: AIScheduleConfig = {
+  mode: 'outside_hours_only',
+  timezone: 'America/Sao_Paulo',
+  default_hours: {
+    start: '08:00',
+    end: '18:00',
+    days: [1, 2, 3, 4, 5],
+  },
+  custom_schedule: {
+    0: { enabled: false, periods: [] },
+    1: { enabled: true, periods: [{ start: '08:00', end: '18:00' }] },
+    2: { enabled: true, periods: [{ start: '08:00', end: '18:00' }] },
+    3: { enabled: true, periods: [{ start: '08:00', end: '18:00' }] },
+    4: { enabled: true, periods: [{ start: '08:00', end: '18:00' }] },
+    5: { enabled: true, periods: [{ start: '08:00', end: '18:00' }] },
+    6: { enabled: false, periods: [] },
+  },
+  force_ai_mode: false,
+  pause_periods: [],
 };
 
 const defaultConfig: AIAgentConfig = {
@@ -223,6 +265,8 @@ const defaultConfig: AIAgentConfig = {
     'Cliente insatisfeito ou reclamação',
     'Solicitação fora do horário comercial que requer ação imediata',
   ],
+  // Schedule Config
+  schedule_config: defaultScheduleConfig,
 };
 
 export function AIAgentSettings() {
@@ -626,7 +670,274 @@ ${config.custom_instructions ? `INSTRUÇÕES ESPECIAIS:\n${config.custom_instruc
         </CardContent>
       </Card>
 
-      {/* Business Context - NEW */}
+      {/* AI Schedule Configuration - NEW */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-blue-500" />
+            <CardTitle>Horários de Automação</CardTitle>
+          </div>
+          <CardDescription>Configure quando o agente IA deve estar ativo</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Operation Mode */}
+          <div className="space-y-3">
+            <Label>Modo de Operação</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                { value: 'always_active', label: 'Sempre Ativa', description: 'IA responde 24/7', icon: '🤖' },
+                { value: 'outside_hours_only', label: 'Fora do Horário', description: 'IA ativa fora do expediente', icon: '🌙' },
+                { value: 'business_hours_only', label: 'Horário Comercial', description: 'IA ativa apenas no expediente', icon: '☀️' },
+                { value: 'scheduled', label: 'Personalizado', description: 'Configure horários por dia', icon: '📅' },
+              ].map((mode) => (
+                <div
+                  key={mode.value}
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    config.schedule_config.mode === mode.value
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                  onClick={() => setConfig(prev => ({
+                    ...prev,
+                    schedule_config: { ...prev.schedule_config, mode: mode.value as AIOperationMode }
+                  }))}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{mode.icon}</span>
+                    <div>
+                      <p className="font-medium">{mode.label}</p>
+                      <p className="text-xs text-muted-foreground">{mode.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Default Hours - shown for business_hours_only and outside_hours_only */}
+          {(config.schedule_config.mode === 'business_hours_only' || config.schedule_config.mode === 'outside_hours_only') && (
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Horário Comercial</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Início</Label>
+                  <Input
+                    type="time"
+                    value={config.schedule_config.default_hours.start}
+                    onChange={(e) => setConfig(prev => ({
+                      ...prev,
+                      schedule_config: {
+                        ...prev.schedule_config,
+                        default_hours: { ...prev.schedule_config.default_hours, start: e.target.value }
+                      }
+                    }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Fim</Label>
+                  <Input
+                    type="time"
+                    value={config.schedule_config.default_hours.end}
+                    onChange={(e) => setConfig(prev => ({
+                      ...prev,
+                      schedule_config: {
+                        ...prev.schedule_config,
+                        default_hours: { ...prev.schedule_config.default_hours, end: e.target.value }
+                      }
+                    }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Dias de Expediente</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
+                    <Badge
+                      key={index}
+                      variant={config.schedule_config.default_hours.days.includes(index) ? 'default' : 'outline'}
+                      className="cursor-pointer hover:opacity-80 transition-opacity px-3 py-1"
+                      onClick={() => {
+                        const days = config.schedule_config.default_hours.days;
+                        const newDays = days.includes(index)
+                          ? days.filter(d => d !== index)
+                          : [...days, index].sort();
+                        setConfig(prev => ({
+                          ...prev,
+                          schedule_config: {
+                            ...prev.schedule_config,
+                            default_hours: { ...prev.schedule_config.default_hours, days: newDays }
+                          }
+                        }));
+                      }}
+                    >
+                      {day}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Custom Schedule - shown for scheduled mode */}
+          {config.schedule_config.mode === 'scheduled' && (
+            <div className="space-y-4">
+              <Label className="text-base font-medium">Horários Personalizados</Label>
+              <div className="space-y-3">
+                {['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'].map((day, index) => {
+                  const daySchedule = config.schedule_config.custom_schedule[index] || { enabled: false, periods: [] };
+                  return (
+                    <div key={index} className="flex items-center gap-4 p-3 rounded-lg bg-muted/30">
+                      <div className="w-24">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={daySchedule.enabled}
+                            onCheckedChange={(checked) => {
+                              const newSchedule = { ...config.schedule_config.custom_schedule };
+                              newSchedule[index] = {
+                                ...daySchedule,
+                                enabled: checked,
+                                periods: checked && daySchedule.periods.length === 0 
+                                  ? [{ start: '08:00', end: '18:00' }]
+                                  : daySchedule.periods
+                              };
+                              setConfig(prev => ({
+                                ...prev,
+                                schedule_config: { ...prev.schedule_config, custom_schedule: newSchedule }
+                              }));
+                            }}
+                          />
+                          <span className={`text-sm ${daySchedule.enabled ? 'font-medium' : 'text-muted-foreground'}`}>
+                            {day.slice(0, 3)}
+                          </span>
+                        </div>
+                      </div>
+                      {daySchedule.enabled && (
+                        <div className="flex flex-wrap gap-2 flex-1">
+                          {daySchedule.periods.map((period, pIndex) => (
+                            <div key={pIndex} className="flex items-center gap-1 bg-background rounded-md p-1">
+                              <Input
+                                type="time"
+                                value={period.start}
+                                className="w-24 h-8 text-sm"
+                                onChange={(e) => {
+                                  const newSchedule = { ...config.schedule_config.custom_schedule };
+                                  newSchedule[index].periods[pIndex].start = e.target.value;
+                                  setConfig(prev => ({
+                                    ...prev,
+                                    schedule_config: { ...prev.schedule_config, custom_schedule: newSchedule }
+                                  }));
+                                }}
+                              />
+                              <span className="text-muted-foreground">-</span>
+                              <Input
+                                type="time"
+                                value={period.end}
+                                className="w-24 h-8 text-sm"
+                                onChange={(e) => {
+                                  const newSchedule = { ...config.schedule_config.custom_schedule };
+                                  newSchedule[index].periods[pIndex].end = e.target.value;
+                                  setConfig(prev => ({
+                                    ...prev,
+                                    schedule_config: { ...prev.schedule_config, custom_schedule: newSchedule }
+                                  }));
+                                }}
+                              />
+                              {daySchedule.periods.length > 1 && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => {
+                                    const newSchedule = { ...config.schedule_config.custom_schedule };
+                                    newSchedule[index].periods = daySchedule.periods.filter((_, i) => i !== pIndex);
+                                    setConfig(prev => ({
+                                      ...prev,
+                                      schedule_config: { ...prev.schedule_config, custom_schedule: newSchedule }
+                                    }));
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => {
+                              const newSchedule = { ...config.schedule_config.custom_schedule };
+                              newSchedule[index].periods.push({ start: '14:00', end: '18:00' });
+                              setConfig(prev => ({
+                                ...prev,
+                                schedule_config: { ...prev.schedule_config, custom_schedule: newSchedule }
+                              }));
+                            }}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Período
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Test Mode */}
+          <div className="flex items-center justify-between p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <div className="flex-1">
+              <p className="text-sm font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Modo de Teste (Forçar IA)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Quando ativo, TODAS as mensagens são processadas pela IA, ignorando os horários configurados
+              </p>
+            </div>
+            <Switch
+              checked={config.schedule_config.force_ai_mode}
+              onCheckedChange={(checked) => setConfig(prev => ({
+                ...prev,
+                schedule_config: { ...prev.schedule_config, force_ai_mode: checked }
+              }))}
+            />
+          </div>
+
+          {/* Status Preview */}
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm font-medium mb-2">📊 Resumo da Configuração</p>
+            {config.schedule_config.force_ai_mode ? (
+              <p className="text-sm text-amber-600">
+                ⚠️ Modo teste ativo - IA responde a TODAS as mensagens
+              </p>
+            ) : config.schedule_config.mode === 'always_active' ? (
+              <p className="text-sm text-green-600">
+                ✅ IA ativa 24 horas por dia, 7 dias por semana
+              </p>
+            ) : config.schedule_config.mode === 'outside_hours_only' ? (
+              <p className="text-sm text-blue-600">
+                🌙 IA ativa fora do horário comercial ({config.schedule_config.default_hours.start} - {config.schedule_config.default_hours.end})
+              </p>
+            ) : config.schedule_config.mode === 'business_hours_only' ? (
+              <p className="text-sm text-blue-600">
+                ☀️ IA ativa apenas no horário comercial ({config.schedule_config.default_hours.start} - {config.schedule_config.default_hours.end})
+              </p>
+            ) : (
+              <p className="text-sm text-purple-600">
+                📅 IA com horários personalizados por dia da semana
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
