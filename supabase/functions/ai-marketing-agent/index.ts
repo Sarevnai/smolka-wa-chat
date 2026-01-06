@@ -115,8 +115,18 @@ const tools = [
           },
           status: {
             type: "string",
-            description: "Novo status do imóvel",
-            enum: ["Vendido", "Vendido Terceiros", "Disponível", "Reservado", "Suspenso", "Alugado", "Alugado Terceiros"]
+            description: "Novo status do imóvel no Vista CRM",
+            enum: [
+              "Venda",
+              "Aluguel",
+              "Venda e Aluguel",
+              "Aluguel Temporada",
+              "Vendido Imobiliária",
+              "Vendido Terceiros",
+              "Alugado Terceiros",
+              "Pendente",
+              "Suspenso"
+            ]
           },
           exibir_no_site: {
             type: "boolean",
@@ -212,7 +222,8 @@ FLUXO DE ATENDIMENTO:
 3️⃣ SE IMÓVEL NÃO ESTÁ DISPONÍVEL:
    - Pergunte: "O imóvel foi vendido pela Smolka ou por outra imobiliária/diretamente?"
    - Se vendido por terceiros: Use atualizar_imovel com status="Vendido Terceiros" e exibir_no_site=false
-   - Se vendido pela Smolka: Use atualizar_imovel com status="Vendido"
+   - Se vendido pela Smolka: Use atualizar_imovel com status="Vendido Imobiliária" e exibir_no_site=false
+   - Se alugado por terceiros: Use atualizar_imovel com status="Alugado Terceiros" e exibir_no_site=false
 
 4️⃣ OUTRAS SOLICITAÇÕES:
    - Use escalar_para_humano e avise que um atendente entrará em contato
