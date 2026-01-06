@@ -28,6 +28,7 @@ import Layout from "@/components/Layout";
 import { TagManager } from "@/components/marketing/TagManager";
 import { TagSelector } from "@/components/marketing/TagSelector";
 import { ImportMarketingContactsModal } from "@/components/marketing/ImportMarketingContactsModal";
+import { NewMarketingContactModal } from "@/components/marketing/NewMarketingContactModal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useContactTags, useContactsTagAssignments } from "@/hooks/useContactTags";
@@ -44,6 +45,7 @@ export default function MarketingContacts() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("contacts");
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [newContactModalOpen, setNewContactModalOpen] = useState(false);
 
   const { data: allTags = [] } = useContactTags("marketing");
 
@@ -124,7 +126,10 @@ export default function MarketingContacts() {
               <Upload className="h-4 w-4 mr-2" />
               Importar CSV
             </Button>
-            <Button className="bg-pink-500 hover:bg-pink-600">
+            <Button 
+              className="bg-pink-500 hover:bg-pink-600"
+              onClick={() => setNewContactModalOpen(true)}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Novo Contato
             </Button>
@@ -316,6 +321,11 @@ export default function MarketingContacts() {
           onImportComplete={() => {
             queryClient.invalidateQueries({ queryKey: ["marketing-contacts"] });
           }}
+        />
+
+        <NewMarketingContactModal
+          open={newContactModalOpen}
+          onOpenChange={setNewContactModalOpen}
         />
       </div>
     </Layout>
