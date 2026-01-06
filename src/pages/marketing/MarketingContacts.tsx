@@ -32,8 +32,10 @@ import { NewMarketingContactModal } from "@/components/marketing/NewMarketingCon
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useContactTags, useContactsTagAssignments } from "@/hooks/useContactTags";
+import { Tables } from "@/integrations/supabase/types";
 
 type ContactType = "lead" | "prospect" | "engajado" | "campanha" | "all";
+type Contact = Tables<'contacts'>;
 
 export default function MarketingContacts() {
   useSyncDepartment('marketing');
@@ -46,6 +48,7 @@ export default function MarketingContacts() {
   const [activeTab, setActiveTab] = useState("contacts");
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [newContactModalOpen, setNewContactModalOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
 
   const { data: allTags = [] } = useContactTags("marketing");
 
@@ -284,7 +287,12 @@ export default function MarketingContacts() {
                               <DropdownMenuItem onClick={() => navigate(`/chat/${contact.phone}`)}>
                                 Abrir Conversa
                               </DropdownMenuItem>
-                              <DropdownMenuItem>Editar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setEditingContact(contact);
+                                setNewContactModalOpen(true);
+                              }}>
+                                Editar
+                              </DropdownMenuItem>
                               <DropdownMenuItem>Adicionar a Campanha</DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive">
                                 Excluir
@@ -325,7 +333,11 @@ export default function MarketingContacts() {
 
         <NewMarketingContactModal
           open={newContactModalOpen}
-          onOpenChange={setNewContactModalOpen}
+          onOpenChange={(open) => {
+            setNewContactModalOpen(open);
+            if (!open) setEditingContact(null);
+          }}
+          editingContact={editingContact}
         />
       </div>
     </Layout>
