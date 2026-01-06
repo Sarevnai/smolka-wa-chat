@@ -9,6 +9,7 @@ export type FlowNodeType =
   | 'escalation'
   | 'integration'
   | 'delay'
+  | 'input'
   | 'end';
 
 // Configuração específica para cada tipo de nó
@@ -24,23 +25,30 @@ export interface MessageNodeConfig {
   useClientName?: boolean;
 }
 
+// Branch com keywords individuais para detecção semântica
+export interface ConditionBranch {
+  id: string;
+  label: string;
+  value: string;
+  keywords?: string[]; // Keywords específicas para esta branch
+}
+
 export interface ConditionNodeConfig {
-  conditionType: 'keyword' | 'intent' | 'time' | 'tag';
-  keywords?: string[];
+  conditionType: 'keyword' | 'intent' | 'time' | 'tag' | 'variable';
+  keywords?: string[]; // Keywords globais (legado)
   intent?: string;
   timeRange?: { start: string; end: string };
-  branches: Array<{
-    id: string;
-    label: string;
-    value: string;
-  }>;
+  variableName?: string; // Para checar valor de variável
+  branches: ConditionBranch[];
 }
 
 export interface ActionNodeConfig {
-  actionType: 'update_vista' | 'add_tag' | 'remove_tag' | 'update_contact';
+  actionType: 'update_vista' | 'add_tag' | 'remove_tag' | 'update_contact' | 'set_variable';
   vistaFields?: Record<string, string>;
   tagId?: string;
   contactFields?: Record<string, string>;
+  variableName?: string;
+  variableValue?: string;
 }
 
 export interface EscalationNodeConfig {
@@ -62,6 +70,15 @@ export interface DelayNodeConfig {
   unit: 'seconds' | 'minutes' | 'hours';
 }
 
+// Novo: Input Node para capturar resposta do usuário
+export interface InputNodeConfig {
+  variableName: string;
+  expectedType: 'text' | 'number' | 'currency' | 'yes_no' | 'email' | 'phone';
+  prompt?: string; // Mensagem opcional antes de capturar
+  timeout?: number; // Segundos para timeout
+  timeoutAction?: 'retry' | 'skip' | 'escalate';
+}
+
 export interface EndNodeConfig {
   message?: string;
   closeConversation?: boolean;
@@ -76,6 +93,7 @@ export type FlowNodeConfig =
   | EscalationNodeConfig
   | IntegrationNodeConfig
   | DelayNodeConfig
+  | InputNodeConfig
   | EndNodeConfig;
 
 // Dados do nó no React Flow
@@ -131,6 +149,13 @@ export const NODE_PALETTE_ITEMS: NodePaletteItem[] = [
     description: 'Enviar mensagem ao cliente',
     icon: 'MessageCircle',
     color: 'bg-blue-500'
+  },
+  {
+    type: 'input',
+    label: 'Capturar Resposta',
+    description: 'Aguardar e capturar resposta',
+    icon: 'TextCursor',
+    color: 'bg-cyan-500'
   },
   {
     type: 'condition',

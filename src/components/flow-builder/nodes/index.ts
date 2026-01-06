@@ -6,6 +6,7 @@ import { EscalationNode } from './EscalationNode';
 import { IntegrationNode } from './IntegrationNode';
 import { DelayNode } from './DelayNode';
 import { EndNode } from './EndNode';
+import { InputNode } from './InputNode';
 
 export const nodeTypes = {
   start: StartNode,
@@ -16,6 +17,7 @@ export const nodeTypes = {
   integration: IntegrationNode,
   delay: DelayNode,
   end: EndNode,
+  input: InputNode,
 };
 
 export {
@@ -27,4 +29,5 @@ export {
   IntegrationNode,
   DelayNode,
   EndNode,
+  InputNode,
 };
