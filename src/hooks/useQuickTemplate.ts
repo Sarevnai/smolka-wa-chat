@@ -113,8 +113,17 @@ export const useQuickTemplate = () => {
         description: "Janela de conversação aberta por 24 horas."
       });
       
-      // Invalidate messages query to refresh chat
+      // 🆕 Use canonical phone from response for invalidation
+      const canonicalPhone = data?.conversation_phone || variables.phoneNumber;
+      
+      // Invalidate messages query for both phones (in case they differ)
       queryClient.invalidateQueries({ queryKey: ["messages", variables.phoneNumber] });
+      if (canonicalPhone !== variables.phoneNumber) {
+        queryClient.invalidateQueries({ queryKey: ["messages", canonicalPhone] });
+      }
+      
+      // Invalidate conversations to refresh sidebar
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
       
       // Save to recent templates
       const recentTemplates = JSON.parse(

@@ -15,84 +15,160 @@ function normalizePhoneNumber(phone: string): string {
 }
 
 /**
+ * Find best matching contact for phone numbers
+ * Priority: normalizedPhone > waId
+ */
+async function findContact(
+  supabase: any,
+  normalizedPhone: string,
+  waId?: string
+): Promise<{ id: string; name: string | null; department_code: string | null } | null> {
+  // Try normalized phone first
+  const { data: contactByNormalized } = await supabase
+    .from('contacts')
+    .select('id, name, department_code')
+    .eq('phone', normalizedPhone)
+    .maybeSingle();
+
+  if (contactByNormalized) {
+    console.log(`📇 Contact found by normalizedPhone: ${contactByNormalized.id} (dept: ${contactByNormalized.department_code})`);
+    return contactByNormalized;
+  }
+
+  // Try waId if different
+  if (waId && waId !== normalizedPhone) {
+    const { data: contactByWaId } = await supabase
+      .from('contacts')
+      .select('id, name, department_code')
+      .eq('phone', waId)
+      .maybeSingle();
+
+    if (contactByWaId) {
+      console.log(`📇 Contact found by waId: ${contactByWaId.id} (dept: ${contactByWaId.department_code})`);
+      return contactByWaId;
+    }
+  }
+
+  console.log(`📇 No contact found for phones: ${normalizedPhone}, ${waId || 'N/A'}`);
+  return null;
+}
+
+/**
  * Find or create an active conversation for a phone number
- * @param phoneNumber - The original phone number from frontend
- * @param waId - The normalized wa_id returned by WhatsApp API (optional)
+ * Auto-heals department_code and contact_id mismatches
  */
 async function findOrCreateConversation(
   supabase: any, 
-  phoneNumber: string, 
-  waId?: string
-): Promise<string | null> {
-  try {
-    // Build query to search both phone formats
-    const phonesToSearch = [phoneNumber];
-    if (waId && waId !== phoneNumber) {
-      phonesToSearch.push(waId);
-    }
-    
-    console.log(`🔍 Searching conversation for phones: ${phonesToSearch.join(', ')}`);
-    
-    // Try to find existing active conversation
-    const { data: existing, error: findError } = await supabase
+  normalizedPhone: string, 
+  waId: string,
+  contact: { id: string; name: string | null; department_code: string | null } | null
+): Promise<{ conversationId: string; canonicalPhone: string }> {
+  const canonicalPhone = waId || normalizedPhone;
+  
+  console.log(`🔍 findOrCreateConversation:`, {
+    normalizedPhone,
+    waId,
+    canonicalPhone,
+    contactId: contact?.id,
+    contactDept: contact?.department_code
+  });
+
+  // Strategy: Search by normalizedPhone first, then waId
+  let existingConversation = null;
+
+  // 1. Try normalizedPhone
+  const { data: convByNormalized } = await supabase
+    .from('conversations')
+    .select('id, phone_number, department_code, contact_id')
+    .eq('phone_number', normalizedPhone)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (convByNormalized) {
+    existingConversation = convByNormalized;
+    console.log(`✅ Found conversation by normalizedPhone: ${convByNormalized.id}`);
+  }
+
+  // 2. If not found, try waId
+  if (!existingConversation && waId && waId !== normalizedPhone) {
+    const { data: convByWaId } = await supabase
       .from('conversations')
-      .select('id')
-      .in('phone_number', phonesToSearch)
+      .select('id, phone_number, department_code, contact_id')
+      .eq('phone_number', waId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (findError) {
-      console.error('Error finding conversation:', findError);
+    if (convByWaId) {
+      existingConversation = convByWaId;
+      console.log(`✅ Found conversation by waId: ${convByWaId.id}`);
     }
-
-    if (existing) {
-      console.log(`✅ Found existing conversation: ${existing.id}`);
-      return existing.id;
-    }
-
-    // No existing conversation - create a new one
-    console.log(`🆕 No active conversation found, creating new one...`);
-    
-    // Use waId (WhatsApp normalized) if available, otherwise use original phone
-    const finalPhoneNumber = waId || phoneNumber;
-    
-    // Try to find existing contact
-    const { data: contact } = await supabase
-      .from('contacts')
-      .select('id')
-      .in('phone', phonesToSearch)
-      .limit(1)
-      .maybeSingle();
-
-    const contactId = contact?.id || null;
-    console.log(`📇 Contact ID: ${contactId || 'none (will be null)'}`);
-
-    // Create new conversation
-    const { data: newConv, error: createError } = await supabase
-      .from('conversations')
-      .insert({
-        phone_number: finalPhoneNumber,
-        status: 'active',
-        contact_id: contactId,
-        department_code: null, // Awaiting triage
-        last_message_at: new Date().toISOString()
-      })
-      .select('id')
-      .single();
-
-    if (createError) {
-      console.error('Error creating conversation:', createError);
-      return null;
-    }
-
-    console.log(`🆕 Created new conversation: ${newConv.id} for phone: ${finalPhoneNumber}`);
-    return newConv.id;
-  } catch (error) {
-    console.error('Error in findOrCreateConversation:', error);
-    return null;
   }
+
+  // 3. Auto-heal existing conversation if needed
+  if (existingConversation) {
+    const updates: Record<string, any> = {};
+    
+    // Heal department_code if contact has one and conversation doesn't match
+    if (contact?.department_code && existingConversation.department_code !== contact.department_code) {
+      console.log(`🔧 Auto-healing department: ${existingConversation.department_code} → ${contact.department_code}`);
+      updates.department_code = contact.department_code;
+    }
+    
+    // Heal contact_id if different or null
+    if (contact?.id && existingConversation.contact_id !== contact.id) {
+      console.log(`🔧 Auto-healing contact_id: ${existingConversation.contact_id} → ${contact.id}`);
+      updates.contact_id = contact.id;
+    }
+
+    // Apply updates if any
+    if (Object.keys(updates).length > 0) {
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update(updates)
+        .eq('id', existingConversation.id);
+
+      if (updateError) {
+        console.error('Error auto-healing conversation:', updateError);
+      } else {
+        console.log(`✅ Conversation auto-healed:`, updates);
+      }
+    }
+
+    return { 
+      conversationId: existingConversation.id, 
+      canonicalPhone: existingConversation.phone_number 
+    };
+  }
+
+  // 4. No existing conversation - create new one
+  console.log(`🆕 Creating new conversation...`);
+  
+  const { data: newConv, error: createError } = await supabase
+    .from('conversations')
+    .insert({
+      phone_number: canonicalPhone,
+      status: 'active',
+      contact_id: contact?.id || null,
+      department_code: contact?.department_code || null, // 🆕 Inherit from contact
+      last_message_at: new Date().toISOString()
+    })
+    .select('id, phone_number')
+    .single();
+
+  if (createError) {
+    console.error('Error creating conversation:', createError);
+    throw new Error('Failed to create conversation');
+  }
+
+  console.log(`🆕 Created conversation: ${newConv.id} (phone: ${newConv.phone_number}, dept: ${contact?.department_code || 'null'})`);
+  return { 
+    conversationId: newConv.id, 
+    canonicalPhone: newConv.phone_number 
+  };
 }
 
 serve(async (req) => {
@@ -105,12 +181,13 @@ serve(async (req) => {
     const { to, text, interactive, template_name, language_code, components, conversation_id } = await req.json();
 
     const normalizedPhone = normalizePhoneNumber(to);
-    console.log('Send message request:', { 
+    console.log('📤 Send message request:', { 
       original: to, 
       normalized: normalizedPhone, 
-      text, 
-      interactive,
-      conversation_id // 🆕 Log conversation_id if provided
+      hasText: !!text,
+      hasInteractive: !!interactive,
+      hasTemplate: !!template_name,
+      conversation_id
     });
 
     // Validate input
@@ -254,9 +331,12 @@ serve(async (req) => {
       );
     }
 
-    console.log('Message sent successfully:', result);
+    console.log('✅ Message sent successfully:', result);
 
     // Save the sent message to database
+    let finalConversationId: string | null = null;
+    let canonicalPhone: string = normalizedPhone;
+
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -266,16 +346,25 @@ serve(async (req) => {
       const waId = result.contacts?.[0]?.wa_id || normalizedPhone;
       console.log(`📱 WhatsApp wa_id: ${waId} (original: ${normalizedPhone})`);
 
-      // Find or create conversation
-      let finalConversationId = conversation_id;
-      if (!finalConversationId) {
-        finalConversationId = await findOrCreateConversation(supabase, normalizedPhone, waId);
+      // Find best matching contact
+      const contact = await findContact(supabase, normalizedPhone, waId);
+
+      // Find or create conversation (with auto-heal)
+      if (conversation_id) {
+        finalConversationId = conversation_id;
+        canonicalPhone = waId || normalizedPhone;
+        console.log(`📋 Using provided conversation_id: ${conversation_id}`);
+      } else {
+        const convResult = await findOrCreateConversation(supabase, normalizedPhone, waId, contact);
+        finalConversationId = convResult.conversationId;
+        canonicalPhone = convResult.canonicalPhone;
       }
 
+      // 🆕 Use canonicalPhone for wa_to (consistency with inbound)
       const messageData = {
         wa_message_id: result.messages?.[0]?.id || null,
         wa_from: null, // Outbound message, so from is null
-        wa_to: normalizedPhone,
+        wa_to: canonicalPhone, // 🆕 Use canonical phone
         wa_phone_number_id: phoneNumberId,
         direction: 'outbound',
         body: text || `[Template: ${template_name}]`,
@@ -283,7 +372,7 @@ serve(async (req) => {
         raw: result,
         created_at: new Date().toISOString(),
         is_template: !!template_name || !!interactive,
-        conversation_id: finalConversationId, // 🆕 Link to conversation
+        conversation_id: finalConversationId,
       };
 
       const { error: dbError } = await supabase
@@ -293,10 +382,13 @@ serve(async (req) => {
       if (dbError) {
         console.error('Error saving message to database:', dbError);
       } else {
-        console.log('Message saved to database successfully', { conversation_id: finalConversationId });
+        console.log('✅ Message saved to database', { 
+          conversation_id: finalConversationId,
+          wa_to: canonicalPhone
+        });
       }
 
-      // 🆕 Update conversation timestamp
+      // Update conversation timestamp
       if (finalConversationId) {
         await supabase
           .from('conversations')
@@ -307,11 +399,13 @@ serve(async (req) => {
       console.error('Database save error:', dbError);
     }
 
-    // Return success response
+    // 🆕 Return success response with conversation info
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Mensagem enviada com sucesso' 
+        message: 'Mensagem enviada com sucesso',
+        conversation_id: finalConversationId,
+        conversation_phone: canonicalPhone // 🆕 Return canonical phone for frontend navigation
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
