@@ -139,8 +139,38 @@ async function sendDepartmentWelcomeAndActivateAI(
 }
 
 /**
+ * Check if a phone number recently received a campaign message (last 48h)
+ * Returns the department_code of the campaign if found
+ */
+async function checkCampaignSource(phoneNumber: string): Promise<DepartmentType> {
+  try {
+    const cutoffTime = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    
+    const { data } = await supabase
+      .from('campaign_results')
+      .select('campaign_id, campaigns!inner(department_code)')
+      .eq('phone', phoneNumber)
+      .gte('sent_at', cutoffTime)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (data?.campaigns?.department_code) {
+      console.log(`📢 Phone ${phoneNumber} is from campaign with department: ${data.campaigns.department_code}`);
+      return data.campaigns.department_code as DepartmentType;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ Error checking campaign source:', error);
+    return null;
+  }
+}
+
+/**
  * Find an existing active conversation for this phone number, or create a new one.
  * New conversations start with department_code = NULL (pending triage by Helena).
+ * If the phone comes from a recent campaign, inherit the campaign's department.
  */
 async function findOrCreateConversation(phoneNumber: string): Promise<ConversationRecord | null> {
   try {
@@ -168,20 +198,30 @@ async function findOrCreateConversation(phoneNumber: string): Promise<Conversati
     // No active conversation found, create a new one
     console.log(`📝 Creating new conversation for: ${phoneNumber}`);
 
-    // First, check if contact exists and get their ID
+    // 🆕 Check if this phone is responding to a recent campaign
+    const campaignDepartment = await checkCampaignSource(phoneNumber);
+
+    // Check if contact exists and get their ID
     const { data: contact } = await supabase
       .from('contacts')
-      .select('id')
+      .select('id, department_code')
       .eq('phone', phoneNumber)
       .maybeSingle();
 
-    // Create conversation with department_code = NULL (pending triage)
+    // Determine department: campaign > contact > null (pending triage)
+    const departmentCode = campaignDepartment || contact?.department_code || null;
+    
+    if (campaignDepartment) {
+      console.log(`📢 New conversation from campaign - assigning department: ${campaignDepartment}`);
+    }
+
+    // Create conversation with the determined department
     const { data: newConv, error: createError } = await supabase
       .from('conversations')
       .insert({
         phone_number: phoneNumber,
         contact_id: contact?.id || null,
-        department_code: null, // Pending triage by Helena
+        department_code: departmentCode,
         status: 'active',
         last_message_at: new Date().toISOString()
       })
@@ -193,7 +233,16 @@ async function findOrCreateConversation(phoneNumber: string): Promise<Conversati
       return null;
     }
 
-    console.log(`✅ New conversation created: ${newConv.id} (pending triage)`);
+    // 🆕 If department came from campaign, also update the contact
+    if (campaignDepartment && contact?.id) {
+      await supabase
+        .from('contacts')
+        .update({ department_code: campaignDepartment })
+        .eq('id', contact.id);
+      console.log(`✅ Contact department synced to ${campaignDepartment}`);
+    }
+
+    console.log(`✅ New conversation created: ${newConv.id} (department: ${departmentCode || 'pending triage'})`);
     return newConv as ConversationRecord;
 
   } catch (error) {

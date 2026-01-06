@@ -277,109 +277,74 @@ export function ImportMarketingContactsModal({
 
     setStep("importing");
     setIsImporting(true);
-    setImportProgress(0);
+    setImportProgress(10);
 
-    let inserted = 0;
-    let updated = 0;
-    const errors: string[] = [];
-    const total = selectedContacts.length;
+    try {
+      // Use Edge Function to bypass RLS and import contacts securely
+      const contactsToImport = selectedContacts.map(c => ({
+        phone: c.phone,
+        name: c.name,
+        email: c.email,
+        notes: c.notes,
+        contact_type: defaultContactType,
+      }));
 
-    for (let i = 0; i < selectedContacts.length; i++) {
-      const contact = selectedContacts[i];
-      
-      try {
-        // Check if contact exists
-        const { data: existing } = await supabase
-          .from("contacts")
-          .select("id")
-          .eq("phone", contact.phone)
-          .maybeSingle();
+      setImportProgress(30);
 
-        if (existing) {
-          // Update existing
-          const { error } = await supabase
-            .from("contacts")
-            .update({
-              name: contact.name || undefined,
-              email: contact.email || undefined,
-              notes: contact.notes || undefined,
-              department_code: "marketing",
-              contact_type: defaultContactType,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", existing.id);
-
-          if (error) throw error;
-
-          // Assign tags
-          if (selectedTagIds.length > 0) {
-            for (const tagId of selectedTagIds) {
-              await supabase
-                .from("contact_tag_assignments")
-                .upsert({ contact_id: existing.id, tag_id: tagId }, { onConflict: "contact_id,tag_id" });
-            }
-          }
-
-          updated++;
-        } else {
-          // Insert new
-          const { data: newContact, error } = await supabase
-            .from("contacts")
-            .insert({
-              phone: contact.phone,
-              name: contact.name || null,
-              email: contact.email || null,
-              notes: contact.notes || null,
-              department_code: "marketing",
-              contact_type: defaultContactType,
-              status: "ativo",
-            })
-            .select("id")
-            .single();
-
-          if (error) throw error;
-
-          // Assign tags
-          if (selectedTagIds.length > 0 && newContact) {
-            for (const tagId of selectedTagIds) {
-              await supabase
-                .from("contact_tag_assignments")
-                .insert({ contact_id: newContact.id, tag_id: tagId });
-            }
-          }
-
-          inserted++;
+      const { data, error } = await supabase.functions.invoke('import-marketing-contacts', {
+        body: {
+          contacts: contactsToImport,
+          defaultContactType,
+          tagIds: selectedTagIds,
         }
-      } catch (err: any) {
-        errors.push(`${contact.phone}: ${err.message}`);
+      });
+
+      setImportProgress(90);
+
+      if (error) {
+        throw new Error(error.message || 'Erro ao importar contatos');
       }
 
-      setImportProgress(Math.round(((i + 1) / total) * 100));
-    }
+      const result: ImportResult = {
+        success: data.success,
+        totalProcessed: data.totalProcessed,
+        inserted: data.inserted,
+        updated: data.updated,
+        errors: data.errors || [],
+        summary: data.summary,
+      };
 
-    const result: ImportResult = {
-      success: errors.length === 0,
-      totalProcessed: total,
-      inserted,
-      updated,
-      errors,
-      summary: `${inserted} novos contatos criados, ${updated} atualizados.`,
-    };
+      setImportResult(result);
+      setImportProgress(100);
+      setIsImporting(false);
+      setStep("result");
 
-    setImportResult(result);
-    setIsImporting(false);
-    setStep("result");
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ["marketing-contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["marketing-metrics"] });
 
-    // Refresh queries
-    queryClient.invalidateQueries({ queryKey: ["marketing-contacts"] });
-    queryClient.invalidateQueries({ queryKey: ["marketing-metrics"] });
-
-    if (result.success) {
+      if (result.success) {
+        toast({
+          title: "Importação concluída",
+          description: result.summary,
+        });
+        onImportComplete?.();
+      } else if (result.errors.length > 0) {
+        toast({
+          title: "Importação com erros",
+          description: `${result.inserted + result.updated} processados, ${result.errors.length} erros`,
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      console.error("Import error:", err);
+      setIsImporting(false);
+      setStep("preview");
       toast({
-        title: "Importação concluída",
-        description: result.summary,
+        title: "Erro na importação",
+        description: err.message || "Não foi possível importar os contatos.",
+        variant: "destructive",
       });
-      onImportComplete?.();
     }
   };
 

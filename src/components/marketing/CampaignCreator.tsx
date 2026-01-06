@@ -142,6 +142,7 @@ export default function CampaignCreator({ onCampaignCreated, compact = false }: 
         target_contacts: Array.from(selectedContacts),
         scheduled_at: scheduledAt?.toISOString(),
         status: scheduledAt ? "scheduled" : "draft",
+        department_code: "marketing", // Auto-assign marketing department
       };
 
       if (selectedTemplate && isOfficialWhatsAppTemplate(selectedTemplate)) {
