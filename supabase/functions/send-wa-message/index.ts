@@ -375,6 +375,34 @@ serve(async (req) => {
         conversation_id: finalConversationId,
       };
 
+      // 🆕 FIRST: Update department_code BEFORE inserting message (to avoid race condition with realtime)
+      if (finalConversationId) {
+        if (template_name && template_name.toLowerCase().includes('atualizacao')) {
+          console.log(`📢 Template "atualizacao" detected - forcing department_code = 'marketing' BEFORE message insert`);
+          
+          const { error: deptError } = await supabase
+            .from('conversations')
+            .update({ 
+              department_code: 'marketing',
+              last_message_at: new Date().toISOString()
+            })
+            .eq('id', finalConversationId);
+          
+          if (deptError) {
+            console.error('Error setting marketing department:', deptError);
+          } else {
+            console.log(`✅ Conversation ${finalConversationId} set to marketing department`);
+          }
+        } else {
+          // Regular timestamp update for non-atualizacao templates
+          await supabase
+            .from('conversations')
+            .update({ last_message_at: new Date().toISOString() })
+            .eq('id', finalConversationId);
+        }
+      }
+
+      // SECOND: Insert message (triggers realtime event - department already set)
       const { error: dbError } = await supabase
         .from('messages')
         .insert([messageData]);
@@ -386,30 +414,6 @@ serve(async (req) => {
           conversation_id: finalConversationId,
           wa_to: canonicalPhone
         });
-      }
-
-      // Update conversation timestamp
-      if (finalConversationId) {
-        await supabase
-          .from('conversations')
-          .update({ last_message_at: new Date().toISOString() })
-          .eq('id', finalConversationId);
-
-        // 🆕 Force marketing department for "atualizacao" template
-        if (template_name && template_name.toLowerCase().includes('atualizacao')) {
-          console.log(`📢 Template "atualizacao" detected - forcing department_code = 'marketing'`);
-          
-          const { error: deptError } = await supabase
-            .from('conversations')
-            .update({ department_code: 'marketing' })
-            .eq('id', finalConversationId);
-          
-          if (deptError) {
-            console.error('Error setting marketing department:', deptError);
-          } else {
-            console.log(`✅ Conversation ${finalConversationId} set to marketing department`);
-          }
-        }
       }
     } catch (dbError) {
       console.error('Database save error:', dbError);
