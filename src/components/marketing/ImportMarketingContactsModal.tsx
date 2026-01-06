@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Upload, CheckCircle, XCircle, Info, FileSpreadsheet, 
-  ArrowRight, ChevronLeft, ChevronRight, AlertCircle
+  ArrowRight, ChevronLeft, ChevronRight, AlertCircle, Building, ChevronDown
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,11 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useContactTags } from "@/hooks/useContactTags";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface ImportResult {
   success: boolean;
@@ -46,6 +51,10 @@ interface ParsedContact {
   email?: string;
   contact_type?: string;
   notes?: string;
+  // Property fields for display
+  property_code?: string;
+  property_address?: string;
+  property_value?: string;
   selected: boolean;
 }
 
@@ -54,6 +63,15 @@ interface ColumnMapping {
   name: string;
   email: string;
   notes: string;
+  // Property fields
+  property_code: string;
+  property_address: string;
+  property_number: string;
+  property_neighborhood: string;
+  property_city: string;
+  property_zipcode: string;
+  property_status: string;
+  property_value: string;
 }
 
 type ContactType = "lead" | "prospect" | "engajado" | "campanha";
@@ -65,7 +83,21 @@ interface ImportMarketingContactsModalProps {
 }
 
 const REQUIRED_FIELDS = ["phone"] as const;
-const OPTIONAL_FIELDS = ["name", "email", "notes"] as const;
+
+const DEFAULT_MAPPING: ColumnMapping = {
+  phone: "",
+  name: "",
+  email: "",
+  notes: "",
+  property_code: "",
+  property_address: "",
+  property_number: "",
+  property_neighborhood: "",
+  property_city: "",
+  property_zipcode: "",
+  property_status: "",
+  property_value: "",
+};
 
 export function ImportMarketingContactsModal({ 
   open, 
@@ -77,18 +109,14 @@ export function ImportMarketingContactsModal({
   const [fileName, setFileName] = useState<string>("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
-  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
-    phone: "",
-    name: "",
-    email: "",
-    notes: "",
-  });
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>(DEFAULT_MAPPING);
   const [parsedContacts, setParsedContacts] = useState<ParsedContact[]>([]);
   const [defaultContactType, setDefaultContactType] = useState<ContactType>("lead");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [showPropertyFields, setShowPropertyFields] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -100,13 +128,14 @@ export function ImportMarketingContactsModal({
     setFileName("");
     setHeaders([]);
     setRows([]);
-    setColumnMapping({ phone: "", name: "", email: "", notes: "" });
+    setColumnMapping(DEFAULT_MAPPING);
     setParsedContacts([]);
     setDefaultContactType("lead");
     setSelectedTagIds([]);
     setIsImporting(false);
     setImportProgress(0);
     setImportResult(null);
+    setShowPropertyFields(false);
   };
 
   // Reset state when modal opens to prevent stale data
@@ -176,14 +205,17 @@ export function ImportMarketingContactsModal({
     setRows(dataRows);
 
     // Auto-detect column mapping
-    const autoMapping: ColumnMapping = { phone: "", name: "", email: "", notes: "" };
+    const autoMapping: ColumnMapping = { ...DEFAULT_MAPPING };
+    let hasPropertyFields = false;
     
     headerRow.forEach((header, index) => {
       const h = header.toLowerCase().trim();
+      
+      // Contact fields
       if (h.includes("phone") || h.includes("telefone") || h.includes("celular") || h.includes("mobile") || h.includes("whatsapp")) {
         if (!autoMapping.phone) autoMapping.phone = index.toString();
       }
-      if (h.includes("name") || h.includes("nome") || h === "display name" || h === "display_name") {
+      if (h.includes("name") || h.includes("nome") || h === "display name" || h === "display_name" || h.includes("proprietário nome") || h.includes("proprietario nome")) {
         if (!autoMapping.name) autoMapping.name = index.toString();
       }
       if (h.includes("email") || h.includes("e-mail")) {
@@ -192,9 +224,60 @@ export function ImportMarketingContactsModal({
       if (h.includes("note") || h.includes("notes") || h.includes("observ") || h.includes("obs")) {
         if (!autoMapping.notes) autoMapping.notes = index.toString();
       }
+      
+      // Property fields
+      if (h.includes("código") || h.includes("codigo") || h === "codigo imovel" || h === "código imóvel" || h === "cod") {
+        if (!autoMapping.property_code) {
+          autoMapping.property_code = index.toString();
+          hasPropertyFields = true;
+        }
+      }
+      if (h.includes("endereço") || h.includes("endereco") || h.includes("logradouro") || h.includes("rua")) {
+        if (!autoMapping.property_address) {
+          autoMapping.property_address = index.toString();
+          hasPropertyFields = true;
+        }
+      }
+      if (h === "número" || h === "numero" || h === "nº" || h === "num") {
+        if (!autoMapping.property_number) {
+          autoMapping.property_number = index.toString();
+          hasPropertyFields = true;
+        }
+      }
+      if (h.includes("bairro")) {
+        if (!autoMapping.property_neighborhood) {
+          autoMapping.property_neighborhood = index.toString();
+          hasPropertyFields = true;
+        }
+      }
+      if (h.includes("cidade") || h.includes("city") || h === "municipio" || h === "município") {
+        if (!autoMapping.property_city) {
+          autoMapping.property_city = index.toString();
+          hasPropertyFields = true;
+        }
+      }
+      if (h.includes("cep") || h.includes("zipcode") || h.includes("zip")) {
+        if (!autoMapping.property_zipcode) {
+          autoMapping.property_zipcode = index.toString();
+          hasPropertyFields = true;
+        }
+      }
+      if (h.includes("status") || h.includes("situação") || h.includes("situacao")) {
+        if (!autoMapping.property_status) {
+          autoMapping.property_status = index.toString();
+          hasPropertyFields = true;
+        }
+      }
+      if (h.includes("valor") || h.includes("preço") || h.includes("preco") || h.includes("price") || h.includes("value")) {
+        if (!autoMapping.property_value) {
+          autoMapping.property_value = index.toString();
+          hasPropertyFields = true;
+        }
+      }
     });
 
     setColumnMapping(autoMapping);
+    setShowPropertyFields(hasPropertyFields);
     setStep("mapping");
   };
 
@@ -220,6 +303,64 @@ export function ImportMarketingContactsModal({
     return cleanPhone;
   };
 
+  const formatCurrency = (value: string): string => {
+    if (!value) return "";
+    const num = parseFloat(value.replace(/[^\d.,]/g, "").replace(",", "."));
+    if (isNaN(num)) return value;
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(2).replace(".", ",") + "M";
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(0) + "K";
+    }
+    return num.toLocaleString("pt-BR");
+  };
+
+  const buildPropertyNotes = (row: string[]): string => {
+    const parts: string[] = [];
+    
+    // Property code
+    const codeIndex = columnMapping.property_code ? parseInt(columnMapping.property_code) : -1;
+    const code = codeIndex >= 0 ? row[codeIndex]?.trim() : "";
+    if (code) parts.push(`Imóvel: ${code}`);
+    
+    // Address
+    const addressIndex = columnMapping.property_address ? parseInt(columnMapping.property_address) : -1;
+    const numberIndex = columnMapping.property_number ? parseInt(columnMapping.property_number) : -1;
+    const address = addressIndex >= 0 ? row[addressIndex]?.trim() : "";
+    const number = numberIndex >= 0 ? row[numberIndex]?.trim() : "";
+    if (address) {
+      parts.push(number ? `${address}, ${number}` : address);
+    }
+    
+    // Neighborhood and City
+    const neighborhoodIndex = columnMapping.property_neighborhood ? parseInt(columnMapping.property_neighborhood) : -1;
+    const cityIndex = columnMapping.property_city ? parseInt(columnMapping.property_city) : -1;
+    const neighborhood = neighborhoodIndex >= 0 ? row[neighborhoodIndex]?.trim() : "";
+    const city = cityIndex >= 0 ? row[cityIndex]?.trim() : "";
+    if (neighborhood || city) {
+      const locationParts = [neighborhood, city].filter(Boolean);
+      parts.push(locationParts.join(" - "));
+    }
+    
+    // CEP
+    const zipIndex = columnMapping.property_zipcode ? parseInt(columnMapping.property_zipcode) : -1;
+    const zip = zipIndex >= 0 ? row[zipIndex]?.trim() : "";
+    if (zip) parts.push(`CEP: ${zip}`);
+    
+    // Status
+    const statusIndex = columnMapping.property_status ? parseInt(columnMapping.property_status) : -1;
+    const status = statusIndex >= 0 ? row[statusIndex]?.trim() : "";
+    if (status) parts.push(`Status: ${status}`);
+    
+    // Value
+    const valueIndex = columnMapping.property_value ? parseInt(columnMapping.property_value) : -1;
+    const value = valueIndex >= 0 ? row[valueIndex]?.trim() : "";
+    if (value) parts.push(`Valor: R$ ${formatCurrency(value)}`);
+    
+    return parts.join(" | ");
+  };
+
   const applyMapping = () => {
     if (!columnMapping.phone) {
       toast({
@@ -243,12 +384,25 @@ export function ImportMarketingContactsModal({
       const phone = formatPhoneNumber(rawPhone);
       if (phone.length < 10) return;
 
+      // Build notes from property fields
+      const propertyNotes = buildPropertyNotes(row);
+      const existingNotes = notesIndex >= 0 ? row[notesIndex] : undefined;
+      const combinedNotes = [propertyNotes, existingNotes].filter(Boolean).join(" | ");
+
+      // Extract property fields for preview
+      const codeIndex = columnMapping.property_code ? parseInt(columnMapping.property_code) : -1;
+      const addressIndex = columnMapping.property_address ? parseInt(columnMapping.property_address) : -1;
+      const valueIndex = columnMapping.property_value ? parseInt(columnMapping.property_value) : -1;
+
       contacts.push({
         phone,
         name: nameIndex >= 0 ? row[nameIndex] : undefined,
         email: emailIndex >= 0 ? row[emailIndex] : undefined,
-        notes: notesIndex >= 0 ? row[notesIndex] : undefined,
+        notes: combinedNotes || undefined,
         contact_type: defaultContactType,
+        property_code: codeIndex >= 0 ? row[codeIndex] : undefined,
+        property_address: addressIndex >= 0 ? row[addressIndex] : undefined,
+        property_value: valueIndex >= 0 ? row[valueIndex] : undefined,
         selected: true,
       });
     });
@@ -360,9 +514,40 @@ export function ImportMarketingContactsModal({
     onOpenChange(false);
   };
 
+  // Check if any property fields are mapped
+  const hasPropertyData = useMemo(() => {
+    return columnMapping.property_code || columnMapping.property_address || 
+           columnMapping.property_neighborhood || columnMapping.property_city ||
+           columnMapping.property_value || columnMapping.property_status;
+  }, [columnMapping]);
+
+  const renderColumnSelect = (field: keyof ColumnMapping, label: string, required = false) => (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1">
+        {label} {required && <span className="text-destructive">*</span>}
+      </Label>
+      <Select
+        value={columnMapping[field] || "__none__"}
+        onValueChange={(v) => setColumnMapping(prev => ({ ...prev, [field]: v === "__none__" ? "" : v }))}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Selecione a coluna" />
+        </SelectTrigger>
+        <SelectContent>
+          {!required && <SelectItem value="__none__">Nenhum</SelectItem>}
+          {headers.map((header, i) => (
+            <SelectItem key={i} value={i.toString()}>
+              {header || `Coluna ${i + 1}`}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-pink-500" />
@@ -411,6 +596,9 @@ export function ImportMarketingContactsModal({
                       Colunas opcionais: nome, email, observações.
                     </p>
                     <p className="text-sm text-muted-foreground">
+                      <strong>Dados de imóveis:</strong> código, endereço, número, bairro, cidade, CEP, status, valor.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
                       Separadores aceitos: vírgula (,) ou ponto e vírgula (;)
                     </p>
                   </div>
@@ -436,181 +624,141 @@ export function ImportMarketingContactsModal({
 
           {/* Step 2: Column Mapping */}
           {step === "mapping" && (
-            <div className="space-y-4 p-4">
-              <div className="rounded-lg border p-3 bg-muted/50">
-                <p className="text-sm">
-                  <strong>{rows.length}</strong> linhas encontradas no arquivo.
-                  Mapeie as colunas abaixo:
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
-                    Telefone <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={columnMapping.phone}
-                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, phone: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a coluna" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {headers.map((header, i) => (
-                        <SelectItem key={i} value={i.toString()}>
-                          {header || `Coluna ${i + 1}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <ScrollArea className="h-[500px]">
+              <div className="space-y-4 p-4">
+                <div className="rounded-lg border p-3 bg-muted/50">
+                  <p className="text-sm">
+                    <strong>{rows.length}</strong> linhas encontradas no arquivo.
+                    Mapeie as colunas abaixo:
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Select
-                    value={columnMapping.name || "__none__"}
-                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, name: v === "__none__" ? "" : v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a coluna" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Nenhum</SelectItem>
-                      {headers.map((header, i) => (
-                        <SelectItem key={i} value={i.toString()}>
-                          {header || `Coluna ${i + 1}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {/* Basic contact fields */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-muted-foreground">Dados do Contato</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {renderColumnSelect("phone", "Telefone", true)}
+                    {renderColumnSelect("name", "Nome")}
+                    {renderColumnSelect("email", "Email")}
+                    {renderColumnSelect("notes", "Observações")}
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Select
-                    value={columnMapping.email || "__none__"}
-                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, email: v === "__none__" ? "" : v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a coluna" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Nenhum</SelectItem>
-                      {headers.map((header, i) => (
-                        <SelectItem key={i} value={i.toString()}>
-                          {header || `Coluna ${i + 1}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Select
-                    value={columnMapping.notes || "__none__"}
-                    onValueChange={(v) => setColumnMapping(prev => ({ ...prev, notes: v === "__none__" ? "" : v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a coluna" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Nenhum</SelectItem>
-                      {headers.map((header, i) => (
-                        <SelectItem key={i} value={i.toString()}>
-                          {header || `Coluna ${i + 1}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="border-t pt-4 space-y-4">
-                <div className="space-y-2">
-                  <Label>Tipo de contato padrão</Label>
-                  <Select
-                    value={defaultContactType}
-                    onValueChange={(v) => setDefaultContactType(v as ContactType)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="prospect">Prospect</SelectItem>
-                      <SelectItem value="engajado">Engajado</SelectItem>
-                      <SelectItem value="campanha">Campanha</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {availableTags.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Atribuir tags aos contatos importados</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {availableTags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedTagIds(prev =>
-                              prev.includes(tag.id)
-                                ? prev.filter(id => id !== tag.id)
-                                : [...prev, tag.id]
-                            );
-                          }}
-                          className={`px-3 py-1 rounded-full text-sm transition-all border ${
-                            selectedTagIds.includes(tag.id)
-                              ? "ring-2 ring-offset-1 ring-primary"
-                              : "opacity-70 hover:opacity-100"
-                          }`}
-                          style={{
-                            backgroundColor: tag.color + "20",
-                            color: tag.color,
-                            borderColor: tag.color,
-                          }}
-                        >
-                          {tag.name}
-                        </button>
-                      ))}
+                {/* Property fields - collapsible */}
+                <Collapsible open={showPropertyFields} onOpenChange={setShowPropertyFields}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      <span className="flex items-center gap-2">
+                        <Building className="h-4 w-4" />
+                        Dados do Imóvel
+                        {hasPropertyData && (
+                          <Badge variant="secondary" className="text-xs">
+                            Mapeado
+                          </Badge>
+                        )}
+                      </span>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${showPropertyFields ? "rotate-180" : ""}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      {renderColumnSelect("property_code", "Código do Imóvel")}
+                      {renderColumnSelect("property_address", "Endereço")}
+                      {renderColumnSelect("property_number", "Número")}
+                      {renderColumnSelect("property_neighborhood", "Bairro")}
+                      {renderColumnSelect("property_city", "Cidade")}
+                      {renderColumnSelect("property_zipcode", "CEP")}
+                      {renderColumnSelect("property_status", "Status")}
+                      {renderColumnSelect("property_value", "Valor")}
                     </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                <div className="border-t pt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Tipo de contato padrão</Label>
+                    <Select
+                      value={defaultContactType}
+                      onValueChange={(v) => setDefaultContactType(v as ContactType)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="lead">Lead</SelectItem>
+                        <SelectItem value="prospect">Prospect</SelectItem>
+                        <SelectItem value="engajado">Engajado</SelectItem>
+                        <SelectItem value="campanha">Campanha</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {availableTags.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Atribuir tags aos contatos importados</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {availableTags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTagIds(prev =>
+                                prev.includes(tag.id)
+                                  ? prev.filter(id => id !== tag.id)
+                                  : [...prev, tag.id]
+                              );
+                            }}
+                            className={`px-3 py-1 rounded-full text-sm transition-all border ${
+                              selectedTagIds.includes(tag.id)
+                                ? "ring-2 ring-offset-1 ring-primary"
+                                : "opacity-70 hover:opacity-100"
+                            }`}
+                            style={{
+                              backgroundColor: tag.color + "20",
+                              color: tag.color,
+                              borderColor: tag.color,
+                            }}
+                          >
+                            {tag.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Preview of first rows */}
+                {rows.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Prévia das primeiras linhas:</Label>
+                    <ScrollArea className="h-32 border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {headers.map((h, i) => (
+                              <TableHead key={i} className="text-xs whitespace-nowrap">
+                                {h || `Col ${i + 1}`}
+                              </TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rows.slice(0, 3).map((row, i) => (
+                            <TableRow key={i}>
+                              {row.map((cell, j) => (
+                                <TableCell key={j} className="text-xs py-1">
+                                  {cell?.slice(0, 30) || "-"}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
                   </div>
                 )}
               </div>
-
-              {/* Preview of first rows */}
-              {rows.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Prévia das primeiras linhas:</Label>
-                  <ScrollArea className="h-32 border rounded-md">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          {headers.map((h, i) => (
-                            <TableHead key={i} className="text-xs whitespace-nowrap">
-                              {h || `Col ${i + 1}`}
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {rows.slice(0, 3).map((row, i) => (
-                          <TableRow key={i}>
-                            {row.map((cell, j) => (
-                              <TableCell key={j} className="text-xs py-1">
-                                {cell?.slice(0, 30) || "-"}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                </div>
-              )}
-            </div>
+            </ScrollArea>
           )}
 
           {/* Step 3: Preview */}
@@ -639,8 +787,8 @@ export function ImportMarketingContactsModal({
                       <TableHead className="w-12"></TableHead>
                       <TableHead>Telefone</TableHead>
                       <TableHead>Nome</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Observações</TableHead>
+                      {hasPropertyData && <TableHead>Imóvel</TableHead>}
+                      <TableHead>Dados do Imóvel</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -659,9 +807,15 @@ export function ImportMarketingContactsModal({
                           {contact.phone}
                         </TableCell>
                         <TableCell>{contact.name || "-"}</TableCell>
-                        <TableCell className="text-sm">{contact.email || "-"}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                          {contact.notes || "-"}
+                        {hasPropertyData && (
+                          <TableCell className="text-sm font-medium">
+                            {contact.property_code || "-"}
+                          </TableCell>
+                        )}
+                        <TableCell className="text-sm text-muted-foreground max-w-[300px]">
+                          <div className="truncate" title={contact.notes}>
+                            {contact.notes || "-"}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
