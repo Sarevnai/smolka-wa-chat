@@ -640,6 +640,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
                   <ConversationItem
                     key={conversation.phoneNumber}
                     phoneNumber={conversation.phoneNumber}
+                    conversationId={conversation.conversationId}
                     lastMessage={conversation.lastMessage}
                     messageCount={conversation.messageCount}
                     unreadCount={conversation.unreadCount}
