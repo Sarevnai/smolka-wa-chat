@@ -1,13 +1,14 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { FlowToolbar } from '@/components/flow-builder/FlowToolbar';
 import { NodePalette } from '@/components/flow-builder/NodePalette';
-import { FlowBuilderCanvas } from '@/components/flow-builder/FlowBuilderCanvas';
+import { FlowBuilderCanvas, type FlowBuilderCanvasRef } from '@/components/flow-builder/FlowBuilderCanvas';
 import { NodeConfigPanel } from '@/components/flow-builder/NodeConfigPanel';
 import { FlowListModal } from '@/components/flow-builder/FlowListModal';
 import { NewFlowModal } from '@/components/flow-builder/NewFlowModal';
 import { FlowNodeType, FlowNodeConfig, CustomFlowNode, CustomFlowEdge, FlowNodeData } from '@/types/flow';
 import { toast } from 'sonner';
 import { useFlowBuilder } from '@/hooks/useFlowBuilder';
+import type { LayoutDirection } from '@/lib/flowLayout';
 import type { Node } from '@xyflow/react';
 
 interface SelectedNodeInfo {
@@ -44,6 +45,7 @@ export default function FlowBuilder() {
   const [showNewFlow, setShowNewFlow] = useState(false);
   const [nodes, setNodes] = useState<Node<FlowNodeData>[]>([]);
   const [edges, setEdges] = useState<CustomFlowEdge[]>([]);
+  const canvasRef = useRef<FlowBuilderCanvasRef>(null);
 
   // Sync local state with current flow
   useEffect(() => {
@@ -97,6 +99,12 @@ export default function FlowBuilder() {
   const handleFitView = useCallback(() => {
     // Controlado pelo ReactFlow internamente
   }, []);
+
+  const handleAutoLayout = useCallback((direction: LayoutDirection) => {
+    canvasRef.current?.autoLayout(direction);
+    setHasUnsavedChanges(true);
+    toast.success(`Layout ${direction === 'TB' ? 'vertical' : 'horizontal'} aplicado`);
+  }, [setHasUnsavedChanges]);
 
   const handleNodeSelect = useCallback((nodeId: string | null) => {
     if (!nodeId) {
@@ -197,6 +205,7 @@ export default function FlowBuilder() {
         onOpenFlowList={() => setShowFlowList(true)}
         onNewFlow={() => setShowNewFlow(true)}
         onPublish={handlePublish}
+        onAutoLayout={handleAutoLayout}
         canUndo={false}
         canRedo={false}
         isSaving={isSaving}
@@ -210,6 +219,7 @@ export default function FlowBuilder() {
         <NodePalette onDragStart={handleDragStart} />
         
         <FlowBuilderCanvas 
+          ref={canvasRef}
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onNodeSelect={handleNodeSelect}

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -16,7 +16,12 @@ import '@xyflow/react/dist/style.css';
 
 import { FlowNodeType, FlowNodeData, CustomFlowEdge, NODE_PALETTE_ITEMS } from '@/types/flow';
 import { nodeTypes } from './nodes';
+import { getLayoutedElements, type LayoutDirection } from '@/lib/flowLayout';
 import type { Node } from '@xyflow/react';
+
+export interface FlowBuilderCanvasRef {
+  autoLayout: (direction?: LayoutDirection) => void;
+}
 
 interface FlowBuilderCanvasProps {
   onNodesChange?: (nodes: Node<FlowNodeData>[]) => void;
@@ -26,18 +31,37 @@ interface FlowBuilderCanvasProps {
   initialEdges?: CustomFlowEdge[];
 }
 
-function FlowCanvas({ 
+const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({ 
   onNodesChange, 
   onEdgesChange, 
   onNodeSelect,
   initialNodes = [],
   initialEdges = []
-}: FlowBuilderCanvasProps) {
+}, ref) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<Node<FlowNodeData>>(initialNodes);
   const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(initialEdges);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const isInitialized = useRef(false);
+
+  // Auto-layout function
+  const handleAutoLayout = useCallback((direction: LayoutDirection = 'TB') => {
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      nodes,
+      edges,
+      direction
+    );
+    setNodes([...layoutedNodes]);
+    setEdges([...layoutedEdges] as CustomFlowEdge[]);
+    
+    // Ajustar visualização após um pequeno delay para garantir que o layout foi aplicado
+    setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50);
+  }, [nodes, edges, setNodes, setEdges, fitView]);
+
+  // Expor função via ref
+  useImperativeHandle(ref, () => ({
+    autoLayout: handleAutoLayout
+  }), [handleAutoLayout]);
 
   // Sync with external state when initialNodes/initialEdges change
   useEffect(() => {
@@ -139,16 +163,20 @@ function FlowCanvas({
       </ReactFlow>
     </div>
   );
-}
+});
 
-// Wrapper com Provider
-export function FlowBuilderCanvas(props: FlowBuilderCanvasProps) {
+FlowCanvas.displayName = 'FlowCanvas';
+
+// Wrapper com Provider e forwardRef
+export const FlowBuilderCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>((props, ref) => {
   return (
     <ReactFlowProvider>
-      <FlowCanvas {...props} />
+      <FlowCanvas ref={ref} {...props} />
     </ReactFlowProvider>
   );
-}
+});
+
+FlowBuilderCanvas.displayName = 'FlowBuilderCanvas';
 
 // Funções auxiliares
 function getDefaultConfig(type: FlowNodeType): Record<string, unknown> {

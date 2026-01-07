@@ -12,12 +12,22 @@ import {
   Plus,
   Rocket,
   RocketIcon,
-  Loader2
+  Loader2,
+  LayoutGrid,
+  ArrowDown,
+  ArrowRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import type { LayoutDirection } from '@/lib/flowLayout';
 
 interface FlowToolbarProps {
   flowName: string;
@@ -32,6 +42,7 @@ interface FlowToolbarProps {
   onOpenFlowList?: () => void;
   onNewFlow?: () => void;
   onPublish?: () => void;
+  onAutoLayout?: (direction: LayoutDirection) => void;
   canUndo: boolean;
   canRedo: boolean;
   isSaving: boolean;
@@ -54,6 +65,7 @@ export function FlowToolbar({
   onOpenFlowList,
   onNewFlow,
   onPublish,
+  onAutoLayout,
   canUndo,
   canRedo,
   isSaving,
@@ -131,6 +143,31 @@ export function FlowToolbar({
             <Maximize2 className="h-4 w-4" />
           </Button>
         </div>
+
+        {/* Auto Layout */}
+        {onAutoLayout && (
+          <>
+            <Separator orientation="vertical" className="h-6" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2" disabled={!hasFlow}>
+                  <LayoutGrid className="h-4 w-4" />
+                  Organizar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onAutoLayout('TB')}>
+                  <ArrowDown className="h-4 w-4 mr-2" />
+                  Layout Vertical
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onAutoLayout('LR')}>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Layout Horizontal
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
 
         <Separator orientation="vertical" className="h-6" />
 
