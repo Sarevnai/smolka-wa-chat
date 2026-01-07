@@ -5,7 +5,7 @@ import { FlowNodeData, InputNodeConfig } from '@/types/flow';
 import { cn } from '@/lib/utils';
 
 function InputNodeComponent({ data, selected }: NodeProps) {
-  const nodeData = data as FlowNodeData;
+  const nodeData = data as FlowNodeData & { isTestActive?: boolean; wasTestVisited?: boolean };
   const config = nodeData.config as InputNodeConfig;
 
   const getTypeLabel = (type?: string) => {
@@ -27,12 +27,18 @@ function InputNodeComponent({ data, selected }: NodeProps) {
     }
   };
 
+  const isTestActive = nodeData.isTestActive;
+  const wasTestVisited = nodeData.wasTestVisited;
+
   return (
     <div
       className={cn(
-        "min-w-[180px] rounded-xl shadow-lg transition-all duration-200",
+        "min-w-[180px] rounded-xl shadow-lg",
+        "transition-[border-color,box-shadow,ring-color,opacity] duration-200",
         "bg-card border-2 border-cyan-500",
-        selected && "ring-2 ring-primary ring-offset-2"
+        selected && "ring-2 ring-primary ring-offset-2",
+        isTestActive && "ring-4 ring-green-500 node-test-pulse",
+        wasTestVisited && "opacity-75"
       )}
     >
       {/* Target Handle */}

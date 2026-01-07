@@ -1,52 +1,50 @@
-import { useCallback, useRef, useEffect, useImperativeHandle, forwardRef, useMemo } from 'react';
+import { useCallback, useImperativeHandle, forwardRef, useMemo, DragEvent } from 'react';
 import {
   ReactFlow,
   Controls,
   Background,
   MiniMap,
-  useNodesState,
-  useEdgesState,
   addEdge,
   Connection,
   BackgroundVariant,
   ReactFlowProvider,
   useReactFlow,
+  applyNodeChanges,
+  applyEdgeChanges,
+  NodeChange,
+  EdgeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { FlowNodeType, FlowNodeData, CustomFlowEdge, NODE_PALETTE_ITEMS } from '@/types/flow';
 import { nodeTypes } from './nodes';
 import { getLayoutedElements, type LayoutDirection } from '@/lib/flowLayout';
-import type { Node } from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
 
 export interface FlowBuilderCanvasRef {
   autoLayout: (direction?: LayoutDirection) => void;
 }
 
 interface FlowBuilderCanvasProps {
-  onNodesChange?: (nodes: Node<FlowNodeData>[]) => void;
-  onEdgesChange?: (edges: CustomFlowEdge[]) => void;
+  nodes: Node<FlowNodeData>[];
+  edges: CustomFlowEdge[];
+  onNodesChange: (nodes: Node<FlowNodeData>[]) => void;
+  onEdgesChange: (edges: CustomFlowEdge[]) => void;
   onNodeSelect?: (nodeId: string | null) => void;
-  initialNodes?: Node<FlowNodeData>[];
-  initialEdges?: CustomFlowEdge[];
   activeTestNodeId?: string | null;
   visitedTestNodes?: string[];
 }
 
 const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({ 
+  nodes,
+  edges,
   onNodesChange, 
   onEdgesChange, 
   onNodeSelect,
-  initialNodes = [],
-  initialEdges = [],
   activeTestNodeId = null,
   visitedTestNodes = [],
 }, ref) => {
-  const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChangeInternal] = useNodesState<Node<FlowNodeData>>(initialNodes);
-  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState(initialEdges);
   const { screenToFlowPosition, fitView } = useReactFlow();
-  const isInitialized = useRef(false);
 
   // Inject test state into nodes - memoized to prevent re-initialization issues
   const nodesWithTestState = useMemo(() => 
@@ -68,50 +66,45 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
       edges,
       direction
     );
-    setNodes([...layoutedNodes]);
-    setEdges([...layoutedEdges] as CustomFlowEdge[]);
+    onNodesChange([...layoutedNodes] as Node<FlowNodeData>[]);
+    onEdgesChange([...layoutedEdges] as CustomFlowEdge[]);
     
-    // Ajustar visualização após um pequeno delay para garantir que o layout foi aplicado
     setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50);
-  }, [nodes, edges, setNodes, setEdges, fitView]);
+  }, [nodes, edges, onNodesChange, onEdgesChange, fitView]);
 
-  // Expor função via ref
+  // Expose function via ref
   useImperativeHandle(ref, () => ({
     autoLayout: handleAutoLayout
   }), [handleAutoLayout]);
 
-  // Sync with external state when initialNodes/initialEdges change
-  useEffect(() => {
-    if (initialNodes.length > 0 || initialEdges.length > 0 || !isInitialized.current) {
-      setNodes(initialNodes);
-      setEdges(initialEdges);
-      isInitialized.current = true;
-    }
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
-
-  // Notify parent of changes
-  useEffect(() => {
-    onNodesChange?.(nodes);
+  // Handle node changes from ReactFlow (drag, select, etc.)
+  const handleNodesChangeInternal = useCallback((changes: NodeChange[]) => {
+    const nextNodes = applyNodeChanges(changes, nodes);
+    onNodesChange(nextNodes as Node<FlowNodeData>[]);
   }, [nodes, onNodesChange]);
 
-  useEffect(() => {
-    onEdgesChange?.(edges);
+  // Handle edge changes from ReactFlow
+  const handleEdgesChangeInternal = useCallback((changes: EdgeChange[]) => {
+    const nextEdges = applyEdgeChanges(changes, edges);
+    onEdgesChange(nextEdges as CustomFlowEdge[]);
   }, [edges, onEdgesChange]);
 
+  // Handle new connections
   const onConnect = useCallback(
     (params: Connection) => {
-      setEdges((eds) => addEdge({ ...params, animated: true }, eds));
+      const newEdges = addEdge({ ...params, animated: true }, edges);
+      onEdgesChange(newEdges as CustomFlowEdge[]);
     },
-    [setEdges]
+    [edges, onEdgesChange]
   );
 
-  const onDragOver = useCallback((event: React.DragEvent) => {
+  const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
   const onDrop = useCallback(
-    (event: React.DragEvent) => {
+    (event: DragEvent) => {
       event.preventDefault();
 
       const type = event.dataTransfer.getData('application/reactflow') as FlowNodeType;
@@ -135,9 +128,9 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
         },
       };
 
-      setNodes((nds) => [...nds, newNode]);
+      onNodesChange([...nodes, newNode]);
     },
-    [screenToFlowPosition, setNodes]
+    [screenToFlowPosition, nodes, onNodesChange]
   );
 
   const onNodeClick = useCallback(
@@ -152,12 +145,12 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
   }, [onNodeSelect]);
 
   return (
-    <div ref={reactFlowWrapper} className="flex-1 h-full">
+    <div className="flex-1 h-full">
       <ReactFlow
         nodes={nodesWithTestState}
         edges={edges}
-        onNodesChange={onNodesChangeInternal}
-        onEdgesChange={onEdgesChangeInternal}
+        onNodesChange={handleNodesChangeInternal}
+        onEdgesChange={handleEdgesChangeInternal}
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
@@ -190,7 +183,7 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
 
 FlowCanvas.displayName = 'FlowCanvas';
 
-// Wrapper com Provider e forwardRef
+// Wrapper with Provider and forwardRef
 export const FlowBuilderCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>((props, ref) => {
   return (
     <ReactFlowProvider>
@@ -201,7 +194,7 @@ export const FlowBuilderCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCan
 
 FlowBuilderCanvas.displayName = 'FlowBuilderCanvas';
 
-// Funções auxiliares
+// Helper functions
 function getDefaultConfig(type: FlowNodeType): Record<string, unknown> {
   switch (type) {
     case 'start':
