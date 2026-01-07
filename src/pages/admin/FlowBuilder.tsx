@@ -215,11 +215,11 @@ export default function FlowBuilder() {
         
         <FlowBuilderCanvas 
           ref={canvasRef}
+          nodes={nodes}
+          edges={edges}
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onNodeSelect={handleNodeSelect}
-          initialNodes={nodes}
-          initialEdges={edges}
           activeTestNodeId={testCurrentNodeId}
           visitedTestNodes={testVisitedNodes}
         />
