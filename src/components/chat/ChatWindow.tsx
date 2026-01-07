@@ -139,17 +139,21 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     console.log('🔍 [ChatWindow] Inscrevendo-se para mensagens de:', phoneNumber);
 
     const unsubscribe = subscribeToPhone(phoneNumber, (newMessage) => {
-      console.log('📨 [ChatWindow] Nova mensagem recebida:', newMessage.id);
+      console.log('📨 [ChatWindow] Mensagem recebida:', newMessage.id);
       
       setMessages(prev => {
-        // Check for duplicates
-        const exists = prev.some(msg => msg.id === newMessage.id);
-        if (exists) {
-          console.log('⚠️ [ChatWindow] Mensagem duplicada, ignorando');
-          return prev;
+        // Check if message already exists (for UPDATE events)
+        const existingIndex = prev.findIndex(msg => msg.id === newMessage.id);
+        
+        if (existingIndex !== -1) {
+          // Message exists - this is an UPDATE (e.g., status change)
+          console.log('🔄 [ChatWindow] Atualizando mensagem existente:', newMessage.id);
+          const updated = [...prev];
+          updated[existingIndex] = newMessage;
+          return updated;
         }
         
-        // Add and sort by timestamp
+        // New message - add and sort by timestamp
         const updated = [...prev, newMessage].sort((a, b) => 
           new Date(a.wa_timestamp || a.created_at || "").getTime() - 
           new Date(b.wa_timestamp || b.created_at || "").getTime()
@@ -159,7 +163,7 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
         return updated;
       });
       
-      // Scroll to bottom
+      // Scroll to bottom only for new messages (not updates)
       requestAnimationFrame(() => {
         setTimeout(scrollToBottom, 100);
       });

@@ -165,13 +165,49 @@ export function MessageBubble({
     }
   };
 
-  // Simulate message status (in production, this would come from real data)
-  const getMessageStatus = () => {
+  // Get real message status from raw data (WhatsApp webhook updates)
+  const messageStatus = useMemo(() => {
     if (!isOutbound) return null;
-    // Random status for demo (replace with real logic)
-    const statuses = ['sent', 'delivered', 'read'] as const;
-    return statuses[Math.floor(Math.random() * statuses.length)];
-  };
+    
+    const raw = message.raw as Record<string, unknown> | null;
+    const statusData = raw?.status as Record<string, unknown> | undefined;
+    
+    // Check for status from webhook update
+    if (statusData?.status) {
+      const status = statusData.status as string;
+      if (['sent', 'delivered', 'read', 'failed'].includes(status)) {
+        return status as 'sent' | 'delivered' | 'read' | 'failed';
+      }
+    }
+    
+    // Fallback: if message was just sent (has wa_message_id), show as sent
+    if (message.wa_message_id) {
+      return 'sent' as const;
+    }
+    
+    // No wa_message_id yet = still sending
+    return 'sending' as const;
+  }, [isOutbound, message.raw, message.wa_message_id]);
+
+  // Get error details for failed messages
+  const errorDetails = useMemo(() => {
+    if (messageStatus !== 'failed') return null;
+    
+    const raw = message.raw as Record<string, unknown> | null;
+    const statusData = raw?.status as Record<string, unknown> | undefined;
+    const errors = statusData?.errors as Array<Record<string, unknown>> | undefined;
+    
+    if (errors && errors.length > 0) {
+      const firstError = errors[0];
+      return {
+        code: firstError.code as number | undefined,
+        title: firstError.title as string | undefined,
+        message: firstError.message as string | undefined,
+        details: firstError.details as string | undefined,
+      };
+    }
+    return null;
+  }, [messageStatus, message.raw]);
 
   const handleReply = (message: MessageRow) => {
     onReply?.(message);
@@ -341,8 +377,18 @@ export function MessageBubble({
             <span className="text-[11px] font-medium">
               {formatTime(message.wa_timestamp || message.created_at || "")}
             </span>
-            {isOutbound && (
-              <MessageStatusIndicator status={getMessageStatus()} />
+            {isOutbound && messageStatus && (
+              <div className="flex items-center gap-1">
+                <MessageStatusIndicator status={messageStatus} />
+                {errorDetails && (
+                  <span 
+                    className="text-[9px] text-red-500 cursor-help" 
+                    title={`Erro ${errorDetails.code}: ${errorDetails.title || errorDetails.message}\n${errorDetails.details || ''}`}
+                  >
+                    ({errorDetails.code})
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
