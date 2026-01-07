@@ -74,13 +74,16 @@ serve(async (req) => {
       );
     }
 
-    // Vista CRM API - usando flag ignorar_duplicidade para evitar validação de endereço
-    const vistaUrl = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&imovel=${codigo}&ignorar_duplicidade=1`;
+    // Vista CRM API - usando múltiplas estratégias para bypass de duplicidade
+    const vistaUrl = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&imovel=${codigo}&ignorar_duplicidade=1&force=1`;
     
     // O Vista espera: cadastro -> fields -> campos
+    // Adiciona flag de bypass no body também (algumas versões do Vista requerem isso)
     const vistaPayload = {
       cadastro: {
-        fields: campos
+        fields: campos,
+        ignorar_duplicidade: "1",
+        force: true
       }
     };
 
@@ -102,9 +105,9 @@ serve(async (req) => {
 
     let methodUsed = 'PATCH';
 
-    // Fallback para PUT se PATCH não for suportado (405 Method Not Allowed)
-    if (vistaResponse.status === 405) {
-      console.log(`[Vista Update] PATCH não suportado (405), tentando PUT...`);
+    // Fallback para PUT se PATCH não for suportado (405, 404, ou mensagem de Method Not Allowed)
+    if (vistaResponse.status === 405 || vistaResponse.status === 404) {
+      console.log(`[Vista Update] PATCH não suportado (${vistaResponse.status}), tentando PUT...`);
       vistaResponse = await fetch(vistaUrl, {
         method: 'PUT',
         headers: {
@@ -131,15 +134,33 @@ serve(async (req) => {
 
     if (!vistaResponse.ok) {
       console.error(`[Vista Update] Erro da API Vista:`, vistaResult);
+      
+      // Detectar erro de duplicidade e extrair código do imóvel duplicado
+      let duplicateCode = null;
+      let errorMessage = 'Erro ao atualizar no Vista CRM';
+      
+      if (parsedResult?.message && Array.isArray(parsedResult.message)) {
+        const duplicityMsg = parsedResult.message.find((m: any) => typeof m === 'string' && m.includes('duplicidade'));
+        const codeObj = parsedResult.message.find((m: any) => typeof m === 'object' && m.Codigo);
+        
+        if (duplicityMsg && codeObj) {
+          duplicateCode = codeObj.Codigo;
+          errorMessage = `Conflito de duplicidade no Vista CRM: O imóvel ${codigo} tem endereço idêntico ao imóvel ${duplicateCode}. É necessário corrigir o endereço de um dos imóveis diretamente no Vista CRM.`;
+          console.error(`[Vista Update] ⚠️ Duplicidade detectada: imóvel ${codigo} conflita com imóvel ${duplicateCode}`);
+        }
+      }
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Erro ao atualizar no Vista CRM',
+          error: errorMessage,
           details: parsedResult,
           codigo,
+          duplicate_codigo: duplicateCode,
           campos_enviados: campos,
           metodo_usado: methodUsed,
-          tempo_resposta_ms: responseTime
+          tempo_resposta_ms: responseTime,
+          sugestao: duplicateCode ? `Acesse o Vista CRM e verifique o imóvel ${duplicateCode} para resolver o conflito de endereço.` : null
         }),
         { status: vistaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
