@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { LucideIcon } from 'lucide-react';
 
 function ActionNodeComponent({ data, selected }: NodeProps) {
-  const nodeData = data as FlowNodeData;
+  const nodeData = data as FlowNodeData & { isTestActive?: boolean; wasTestVisited?: boolean };
   const config = nodeData.config as { actionType?: string; vistaFields?: Record<string, string> };
 
   const getActionInfo = (type?: string): { label: string; icon: LucideIcon } => {
@@ -35,6 +35,8 @@ function ActionNodeComponent({ data, selected }: NodeProps) {
       color="#a855f7"
       borderColor="#9333ea"
       selected={selected}
+      isTestActive={nodeData.isTestActive}
+      wasTestVisited={nodeData.wasTestVisited}
     >
       <div className="flex items-center gap-2">
         <ActionIcon className="h-4 w-4 text-purple-500" />

@@ -6,7 +6,7 @@ import { FlowNodeData } from '@/types/flow';
 import { Badge } from '@/components/ui/badge';
 
 function EndNodeComponent({ data, selected }: NodeProps) {
-  const nodeData = data as FlowNodeData;
+  const nodeData = data as FlowNodeData & { isTestActive?: boolean; wasTestVisited?: boolean };
   const config = nodeData.config as { 
     message?: string;
     closeConversation?: boolean;
@@ -20,6 +20,8 @@ function EndNodeComponent({ data, selected }: NodeProps) {
       borderColor="#dc2626"
       selected={selected}
       showSourceHandle={false}
+      isTestActive={nodeData.isTestActive}
+      wasTestVisited={nodeData.wasTestVisited}
     >
       <div className="space-y-2">
         {config.message && (

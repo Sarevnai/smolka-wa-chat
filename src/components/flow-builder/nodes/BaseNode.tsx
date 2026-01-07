@@ -1,7 +1,7 @@
 import { memo, ReactNode } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { cn } from '@/lib/utils';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, Check } from 'lucide-react';
 
 interface BaseNodeProps {
   label: string;
@@ -14,6 +14,8 @@ interface BaseNodeProps {
   showSourceHandle?: boolean;
   showTargetHandle?: boolean;
   sourceHandleCount?: number;
+  isTestActive?: boolean;
+  wasTestVisited?: boolean;
 }
 
 function BaseNodeComponent({
@@ -27,16 +29,27 @@ function BaseNodeComponent({
   showSourceHandle = true,
   showTargetHandle = true,
   sourceHandleCount = 1,
+  isTestActive = false,
+  wasTestVisited = false,
 }: BaseNodeProps) {
   return (
     <div
       className={cn(
-        "min-w-[180px] rounded-xl shadow-lg transition-all duration-200",
+        "min-w-[180px] rounded-xl shadow-lg transition-all duration-200 relative",
         "bg-card border-2",
-        selected && "ring-2 ring-primary ring-offset-2"
+        selected && "ring-2 ring-primary ring-offset-2",
+        isTestActive && "ring-4 ring-green-500 animate-pulse",
+        wasTestVisited && !isTestActive && "opacity-75"
       )}
-      style={{ borderColor }}
+      style={{ borderColor: isTestActive ? '#22c55e' : borderColor }}
     >
+      {/* Visited checkmark */}
+      {wasTestVisited && !isTestActive && (
+        <div className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center z-10">
+          <Check className="h-3 w-3 text-white" />
+        </div>
+      )}
+
       {/* Target Handle (entrada) */}
       {showTargetHandle && (
         <Handle

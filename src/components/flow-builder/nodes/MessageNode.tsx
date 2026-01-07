@@ -5,7 +5,7 @@ import { BaseNode } from './BaseNode';
 import { FlowNodeData } from '@/types/flow';
 
 function MessageNodeComponent({ data, selected }: NodeProps) {
-  const nodeData = data as FlowNodeData;
+  const nodeData = data as FlowNodeData & { isTestActive?: boolean; wasTestVisited?: boolean };
   const config = nodeData.config as { text?: string; delay?: number };
 
   return (
@@ -15,6 +15,8 @@ function MessageNodeComponent({ data, selected }: NodeProps) {
       color="#3b82f6"
       borderColor="#2563eb"
       selected={selected}
+      isTestActive={nodeData.isTestActive}
+      wasTestVisited={nodeData.wasTestVisited}
     >
       <div className="space-y-1">
         <p className="text-xs text-foreground line-clamp-2">
