@@ -811,8 +811,10 @@ async function processIncomingMessage(message: any, value: any) {
         return;
       }
       
-      // ========== FASE 3: FLOW BUILDER EXECUTION ==========
-      // Check if there's an active flow for this conversation's department
+      // ========== FASE 3: FLOW BUILDER EXECUTION (TEMPORARIAMENTE DESATIVADO) ==========
+      // Desativado para permitir que a Nina responda diretamente
+      // TODO: Reativar quando o FlowBuilder estiver pronto para produção
+      /*
       if (conversation?.department_code) {
         try {
           console.log(`🔄 Checking for active flow in department: ${conversation.department_code}`);
@@ -844,6 +846,8 @@ async function processIncomingMessage(message: any, value: any) {
           console.log(`⚠️ Flow executor call failed (non-blocking):`, flowErr);
         }
       }
+      */
+      console.log(`⏭️ FlowBuilder desativado - passando direto para AI agents`);
       
       // 🆕 Pass conversation info to AI trigger
       await handleN8NTrigger(message.from, messageBody, message, conversation);
