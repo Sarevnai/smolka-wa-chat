@@ -48,6 +48,19 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
   const { screenToFlowPosition, fitView } = useReactFlow();
   const isInitialized = useRef(false);
 
+  // Inject test state into nodes - memoized to prevent re-initialization issues
+  const nodesWithTestState = useMemo(() => 
+    nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        isTestActive: activeTestNodeId === node.id,
+        wasTestVisited: visitedTestNodes.includes(node.id) && activeTestNodeId !== node.id,
+      }
+    })),
+    [nodes, activeTestNodeId, visitedTestNodes]
+  );
+
   // Auto-layout function
   const handleAutoLayout = useCallback((direction: LayoutDirection = 'TB') => {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
@@ -125,19 +138,6 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
       setNodes((nds) => [...nds, newNode]);
     },
     [screenToFlowPosition, setNodes]
-  );
-
-  // Inject test state into nodes - memoized to prevent re-initialization issues
-  const nodesWithTestState = useMemo(() => 
-    nodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        isTestActive: activeTestNodeId === node.id,
-        wasTestVisited: visitedTestNodes.includes(node.id) && activeTestNodeId !== node.id,
-      }
-    })),
-    [nodes, activeTestNodeId, visitedTestNodes]
   );
 
   const onNodeClick = useCallback(
