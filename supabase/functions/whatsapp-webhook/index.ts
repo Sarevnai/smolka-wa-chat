@@ -906,14 +906,12 @@ async function handleN8NTrigger(
       marketingContactId = marketingCampaign.contactId;
     } else {
       // No recent campaign - check if contact or conversation is from marketing department
-      const { data: contact } = await supabase
-        .from('contacts')
-        .select('id, name, notes, department_code')
-        .eq('phone', phoneNumber)
-        .maybeSingle();
+      // Use findContactWithData to search by phone variations (handles 9th digit issue)
+      const contact = await findContactWithData(phoneNumber);
 
       if (contact?.department_code === 'marketing' || conversation?.department_code === 'marketing') {
         console.log(`📇 Marketing contact/conversation detected via department_code`);
+        console.log(`📇 Found contact: ${contact?.id} with phone variation, hasNotes: ${!!contact?.notes}`);
         isMarketingFlow = true;
         marketingContactNotes = contact?.notes || null;
         marketingContactName = contact?.name || null;
