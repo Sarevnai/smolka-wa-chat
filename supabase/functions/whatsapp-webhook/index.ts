@@ -788,6 +788,40 @@ async function processIncomingMessage(message: any, value: any) {
         return;
       }
       
+      // ========== FASE 3: FLOW BUILDER EXECUTION ==========
+      // Check if there's an active flow for this conversation's department
+      if (conversation?.department_code) {
+        try {
+          console.log(`🔄 Checking for active flow in department: ${conversation.department_code}`);
+          
+          const { data: flowResult, error: flowError } = await supabase.functions.invoke('flow-executor', {
+            body: {
+              phone_number: message.from,
+              message: messageBody,
+              conversation_id: conversation.id,
+              department_code: conversation.department_code
+            }
+          });
+          
+          if (flowError) {
+            console.log(`⚠️ Flow executor error (non-blocking):`, flowError);
+          } else if (flowResult?.success) {
+            console.log(`✅ Flow executor processed message:`, {
+              response: flowResult.response?.substring(0, 50),
+              escalated: flowResult.escalated
+            });
+            
+            // If flow handled the message, skip other AI agents
+            if (flowResult.response || flowResult.escalated) {
+              console.log(`🎯 Flow handled this message - skipping other AI agents`);
+              return;
+            }
+          }
+        } catch (flowErr) {
+          console.log(`⚠️ Flow executor call failed (non-blocking):`, flowErr);
+        }
+      }
+      
       // 🆕 Pass conversation info to AI trigger
       await handleN8NTrigger(message.from, messageBody, message, conversation);
     }
