@@ -579,7 +579,7 @@ function extractNameFromMessage(messageBody: string): string | null {
 
 async function processMessageStatus(status: any) {
   try {
-    console.log('Processing message status:', status);
+    console.log('📊 Processing message status:', status);
     
     const waMessageId = status.id;
     const statusType = status.status; // sent, delivered, read, failed
@@ -605,7 +605,11 @@ async function processMessageStatus(status: any) {
           updateData.read_at = timestamp;
           break;
         case 'failed':
-          updateData.error_message = status.errors?.[0]?.title || 'Failed to deliver';
+          // Store full error details for campaigns
+          const errorInfo = status.errors?.[0];
+          updateData.error_message = errorInfo 
+            ? `${errorInfo.code}: ${errorInfo.title || errorInfo.message}${errorInfo.details ? ` - ${errorInfo.details}` : ''}`
+            : 'Failed to deliver';
           break;
       }
       
@@ -627,13 +631,32 @@ async function processMessageStatus(status: any) {
       }
     }
     
-    // Store status in messages raw data
-    await supabase
+    // 🆕 PRESERVE ORIGINAL RAW DATA: Merge status into existing raw instead of overwriting
+    // First, fetch the existing message to preserve its raw data
+    const { data: existingMessage } = await supabase
       .from('messages')
-      .update({ 
-        raw: { status: status }
-      })
+      .select('raw')
+      .eq('wa_message_id', waMessageId)
+      .maybeSingle();
+    
+    // Merge existing raw with new status data
+    const existingRaw = (existingMessage?.raw as Record<string, unknown>) || {};
+    const mergedRaw = {
+      ...existingRaw,
+      status: status // Add/update status field while preserving other data
+    };
+    
+    // Update message with merged raw data
+    const { error: updateError } = await supabase
+      .from('messages')
+      .update({ raw: mergedRaw })
       .eq('wa_message_id', waMessageId);
+    
+    if (updateError) {
+      console.error('❌ Error updating message status:', updateError);
+    } else {
+      console.log(`✅ Message ${waMessageId} status updated to: ${statusType}`);
+    }
       
   } catch (error) {
     console.error('Error processing message status:', error);
