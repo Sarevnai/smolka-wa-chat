@@ -22,6 +22,7 @@ const iconMap: Record<string, React.ElementType> = {
   Webhook,
   Clock,
   Square,
+  TextCursorInput,
   TextCursor: TextCursorInput
 };
 
@@ -41,7 +42,7 @@ export function NodePalette({ onDragStart }: NodePaletteProps) {
       
       <div className="space-y-2">
         {NODE_PALETTE_ITEMS.map((item) => {
-          const Icon = iconMap[item.icon];
+          const Icon = iconMap[item.icon] ?? Square;
           
           return (
             <div

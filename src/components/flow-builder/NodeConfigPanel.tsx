@@ -1,4 +1,4 @@
-import { X, Play, MessageCircle, GitBranch, Zap, UserPlus, Webhook, Clock, Square, TextCursor, LucideIcon } from 'lucide-react';
+import { X, Play, MessageCircle, GitBranch, Zap, UserPlus, Webhook, Clock, Square, TextCursorInput, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -39,7 +39,7 @@ const iconMap: Record<string, LucideIcon> = {
   Webhook,
   Clock,
   Square,
-  TextCursor
+  TextCursor: TextCursorInput
 };
 
 interface NodeConfigPanelProps {

@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { NodeProps, Handle, Position } from '@xyflow/react';
-import { TextCursor } from 'lucide-react';
+import { TextCursorInput } from 'lucide-react';
 import { FlowNodeData, InputNodeConfig } from '@/types/flow';
 import { cn } from '@/lib/utils';
 
@@ -44,7 +44,7 @@ function InputNodeComponent({ data, selected }: NodeProps) {
 
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 rounded-t-lg bg-cyan-500">
-        <TextCursor className="h-4 w-4 text-white" />
+        <TextCursorInput className="h-4 w-4 text-white" />
         <span className="font-medium text-white text-sm">{nodeData.label}</span>
       </div>
 
