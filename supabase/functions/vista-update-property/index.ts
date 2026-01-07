@@ -74,9 +74,8 @@ serve(async (req) => {
       );
     }
 
-    // Vista CRM API usa PUT para atualizar imóveis no endpoint /imoveis/detalhes
-    // Formato: PUT /imoveis/detalhes?key=API_KEY&imovel=CODIGO com body: { cadastro: { fields: { campos... } } }
-    const vistaUrl = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&imovel=${codigo}`;
+    // Vista CRM API - usando flag ignorar_duplicidade para evitar validação de endereço
+    const vistaUrl = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&imovel=${codigo}&ignorar_duplicidade=1`;
     
     // O Vista espera: cadastro -> fields -> campos
     const vistaPayload = {
@@ -85,11 +84,15 @@ serve(async (req) => {
       }
     };
 
-    console.log(`[Vista Update] Enviando para Vista (PUT):`, JSON.stringify(vistaPayload));
+    console.log(`[Vista Update] Tentando PATCH com bypass de duplicidade...`);
     console.log(`[Vista Update] URL:`, vistaUrl);
+    console.log(`[Vista Update] Payload:`, JSON.stringify(vistaPayload));
 
-    const vistaResponse = await fetch(vistaUrl, {
-      method: 'PUT',
+    const startTime = Date.now();
+    
+    // Primeiro, tentar PATCH (atualização parcial)
+    let vistaResponse = await fetch(vistaUrl, {
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -97,8 +100,27 @@ serve(async (req) => {
       body: JSON.stringify(vistaPayload),
     });
 
+    let methodUsed = 'PATCH';
+
+    // Fallback para PUT se PATCH não for suportado (405 Method Not Allowed)
+    if (vistaResponse.status === 405) {
+      console.log(`[Vista Update] PATCH não suportado (405), tentando PUT...`);
+      vistaResponse = await fetch(vistaUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(vistaPayload),
+      });
+      methodUsed = 'PUT (fallback)';
+    }
+
+    const responseTime = Date.now() - startTime;
     const vistaResult = await vistaResponse.text();
-    console.log(`[Vista Update] Resposta Vista (${vistaResponse.status}):`, vistaResult);
+    
+    console.log(`[Vista Update] Método usado: ${methodUsed}`);
+    console.log(`[Vista Update] Resposta Vista (${vistaResponse.status}) em ${responseTime}ms:`, vistaResult);
 
     let parsedResult;
     try {
@@ -115,13 +137,15 @@ serve(async (req) => {
           error: 'Erro ao atualizar no Vista CRM',
           details: parsedResult,
           codigo,
-          campos_enviados: campos
+          campos_enviados: campos,
+          metodo_usado: methodUsed,
+          tempo_resposta_ms: responseTime
         }),
         { status: vistaResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[Vista Update] Imóvel ${codigo} atualizado com sucesso`);
+    console.log(`[Vista Update] ✅ Imóvel ${codigo} atualizado com sucesso via ${methodUsed}`);
 
     return new Response(
       JSON.stringify({ 
@@ -129,7 +153,9 @@ serve(async (req) => {
         message: `Imóvel ${codigo} atualizado com sucesso`,
         campos_atualizados: campos,
         motivo: motivo || 'Atualização via AI Marketing Agent',
-        vista_response: parsedResult
+        vista_response: parsedResult,
+        metodo_usado: methodUsed,
+        tempo_resposta_ms: responseTime
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
