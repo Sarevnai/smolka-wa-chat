@@ -5,6 +5,7 @@ import { FlowBuilderCanvas, type FlowBuilderCanvasRef } from '@/components/flow-
 import { NodeConfigPanel } from '@/components/flow-builder/NodeConfigPanel';
 import { FlowListModal } from '@/components/flow-builder/FlowListModal';
 import { NewFlowModal } from '@/components/flow-builder/NewFlowModal';
+import { FlowTestPanel } from '@/components/flow-builder/FlowTestPanel';
 import { FlowNodeType, FlowNodeConfig, CustomFlowNode, CustomFlowEdge, FlowNodeData } from '@/types/flow';
 import { toast } from 'sonner';
 import { useFlowBuilder } from '@/hooks/useFlowBuilder';
@@ -43,8 +44,11 @@ export default function FlowBuilder() {
   const [selectedNode, setSelectedNode] = useState<SelectedNodeInfo | null>(null);
   const [showFlowList, setShowFlowList] = useState(false);
   const [showNewFlow, setShowNewFlow] = useState(false);
+  const [showTestPanel, setShowTestPanel] = useState(false);
   const [nodes, setNodes] = useState<Node<FlowNodeData>[]>([]);
   const [edges, setEdges] = useState<CustomFlowEdge[]>([]);
+  const [testCurrentNodeId, setTestCurrentNodeId] = useState<string | null>(null);
+  const [testVisitedNodes, setTestVisitedNodes] = useState<string[]>([]);
   const canvasRef = useRef<FlowBuilderCanvasRef>(null);
 
   // Sync local state with current flow
@@ -66,7 +70,6 @@ export default function FlowBuilder() {
   const handleSave = useCallback(async () => {
     if (!currentFlow) return;
     
-    // Update the flow with current nodes/edges before saving
     setCurrentFlow({
       ...currentFlow,
       nodes: nodes as CustomFlowNode[],
@@ -77,28 +80,20 @@ export default function FlowBuilder() {
   }, [currentFlow, nodes, edges, saveFlow, setCurrentFlow]);
 
   const handleTest = useCallback(() => {
-    toast.info('Modo de teste será implementado na próxima fase');
-  }, []);
+    if (!currentFlow) {
+      toast.error('Selecione um fluxo primeiro');
+      return;
+    }
+    setTestCurrentNodeId(null);
+    setTestVisitedNodes([]);
+    setShowTestPanel(true);
+  }, [currentFlow]);
 
-  const handleUndo = useCallback(() => {
-    // TODO: Implementar undo
-  }, []);
-
-  const handleRedo = useCallback(() => {
-    // TODO: Implementar redo
-  }, []);
-
-  const handleZoomIn = useCallback(() => {
-    // Controlado pelo ReactFlow internamente
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    // Controlado pelo ReactFlow internamente
-  }, []);
-
-  const handleFitView = useCallback(() => {
-    // Controlado pelo ReactFlow internamente
-  }, []);
+  const handleUndo = useCallback(() => {}, []);
+  const handleRedo = useCallback(() => {}, []);
+  const handleZoomIn = useCallback(() => {}, []);
+  const handleZoomOut = useCallback(() => {}, []);
+  const handleFitView = useCallback(() => {}, []);
 
   const handleAutoLayout = useCallback((direction: LayoutDirection) => {
     canvasRef.current?.autoLayout(direction);
@@ -225,6 +220,8 @@ export default function FlowBuilder() {
           onNodeSelect={handleNodeSelect}
           initialNodes={nodes}
           initialEdges={edges}
+          activeTestNodeId={testCurrentNodeId}
+          visitedTestNodes={testVisitedNodes}
         />
 
         {selectedNode && (
@@ -257,6 +254,16 @@ export default function FlowBuilder() {
         onOpenChange={setShowNewFlow}
         onConfirm={handleCreateFlow}
         isLoading={isCreating}
+      />
+
+      <FlowTestPanel
+        open={showTestPanel}
+        onOpenChange={setShowTestPanel}
+        flow={currentFlow}
+        currentNodeId={testCurrentNodeId}
+        visitedNodes={testVisitedNodes}
+        onCurrentNodeChange={setTestCurrentNodeId}
+        onVisitedNodesChange={setTestVisitedNodes}
       />
     </div>
   );

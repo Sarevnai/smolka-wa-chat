@@ -29,6 +29,8 @@ interface FlowBuilderCanvasProps {
   onNodeSelect?: (nodeId: string | null) => void;
   initialNodes?: Node<FlowNodeData>[];
   initialEdges?: CustomFlowEdge[];
+  activeTestNodeId?: string | null;
+  visitedTestNodes?: string[];
 }
 
 const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({ 
@@ -36,7 +38,9 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
   onEdgesChange, 
   onNodeSelect,
   initialNodes = [],
-  initialEdges = []
+  initialEdges = [],
+  activeTestNodeId = null,
+  visitedTestNodes = [],
 }, ref) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState<Node<FlowNodeData>>(initialNodes);
@@ -123,6 +127,16 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
     [screenToFlowPosition, setNodes]
   );
 
+  // Inject test state into nodes
+  const nodesWithTestState = nodes.map(node => ({
+    ...node,
+    data: {
+      ...node.data,
+      isTestActive: activeTestNodeId === node.id,
+      wasTestVisited: visitedTestNodes.includes(node.id) && activeTestNodeId !== node.id,
+    }
+  }));
+
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       onNodeSelect?.(node.id);
@@ -137,7 +151,7 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
   return (
     <div ref={reactFlowWrapper} className="flex-1 h-full">
       <ReactFlow
-        nodes={nodes}
+        nodes={nodesWithTestState}
         edges={edges}
         onNodesChange={onNodesChangeInternal}
         onEdgesChange={onEdgesChangeInternal}
@@ -157,7 +171,11 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
         <Controls className="bg-card border rounded-lg" />
         <MiniMap 
           className="bg-card border rounded-lg" 
-          nodeColor={(node) => getNodeBackground(node.type as FlowNodeType)}
+          nodeColor={(node) => {
+            if (activeTestNodeId === node.id) return '#22c55e';
+            if (visitedTestNodes.includes(node.id)) return '#86efac';
+            return getNodeBackground(node.type as FlowNodeType);
+          }}
         />
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
       </ReactFlow>

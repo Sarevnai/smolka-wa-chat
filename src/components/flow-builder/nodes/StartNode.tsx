@@ -6,7 +6,7 @@ import { FlowNodeData } from '@/types/flow';
 import { Badge } from '@/components/ui/badge';
 
 function StartNodeComponent({ data, selected }: NodeProps) {
-  const nodeData = data as FlowNodeData;
+  const nodeData = data as FlowNodeData & { isTestActive?: boolean; wasTestVisited?: boolean };
   const config = nodeData.config as { trigger?: string };
 
   const getTriggerLabel = (trigger?: string) => {
@@ -30,6 +30,8 @@ function StartNodeComponent({ data, selected }: NodeProps) {
       borderColor="#16a34a"
       selected={selected}
       showTargetHandle={false}
+      isTestActive={nodeData.isTestActive}
+      wasTestVisited={nodeData.wasTestVisited}
     >
       <Badge variant="secondary" className="text-xs">
         {getTriggerLabel(config.trigger)}
