@@ -95,3 +95,9 @@ verify_jwt = false
 
 [functions.flow-executor]
 verify_jwt = false
+
+[functions.admin-reset-password]
+verify_jwt = true
+
+[functions.delete-user]
+verify_jwt = true
