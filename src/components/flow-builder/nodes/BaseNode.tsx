@@ -35,10 +35,11 @@ function BaseNodeComponent({
   return (
     <div
       className={cn(
-        "min-w-[180px] rounded-xl shadow-lg transition-all duration-200 relative",
+        "min-w-[180px] rounded-xl shadow-lg relative",
         "bg-card border-2",
+        "transition-[border-color,box-shadow,ring-color,opacity] duration-200",
         selected && "ring-2 ring-primary ring-offset-2",
-        isTestActive && "ring-4 ring-green-500 animate-pulse",
+        isTestActive && "ring-4 ring-green-500 node-test-pulse",
         wasTestVisited && !isTestActive && "opacity-75"
       )}
       style={{ borderColor: isTestActive ? '#22c55e' : borderColor }}
