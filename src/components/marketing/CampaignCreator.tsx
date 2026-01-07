@@ -19,6 +19,30 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { validateFullCampaign, normalizePhoneNumber } from "@/lib/validation";
 
+// Helper para extrair dados do imóvel das notes do contato
+const parsePropertyFromNotes = (notes: string | null): Record<string, string> => {
+  if (!notes) return {};
+  
+  const result: Record<string, string> = {};
+  
+  // Formato: "Imóvel: CODE | ENDERECO | BAIRRO - CIDADE | CEP: XXX | Status: XXX | Valor: R$ XXX"
+  const parts = notes.split(' | ');
+  
+  // Extrair endereço (partes do meio, excluindo código do imóvel, Status e Valor)
+  if (parts.length >= 3) {
+    const enderecoParts = parts.slice(1).filter(p => !p.startsWith('CEP:') && !p.startsWith('Status:') && !p.startsWith('Valor:'));
+    result.endereco = enderecoParts.join(' - ');
+  }
+  
+  // Extrair valor
+  const valorMatch = notes.match(/Valor:\s*(R\$\s*[\d.,]+)/);
+  if (valorMatch) {
+    result.valor = valorMatch[1];
+  }
+  
+  return result;
+};
+
 interface CampaignCreatorProps {
   onCampaignCreated?: () => void;
   compact?: boolean;
@@ -161,7 +185,7 @@ export default function CampaignCreator({ onCampaignCreated, compact = false }: 
       if (!scheduledAt) {
         const { data: selectedContactObjects, error: contactsError } = await supabase
           .from('contacts')
-          .select('id, phone, name')
+          .select('id, phone, name, notes')
           .in('id', Array.from(selectedContacts));
 
         if (contactsError) {
@@ -182,12 +206,19 @@ export default function CampaignCreator({ onCampaignCreated, compact = false }: 
           .map(contact => {
             const variables: Record<string, string> = { ...customTemplateVariables };
             
+            // Extrair dados do imóvel das notes do contato
+            const propertyData = parsePropertyFromNotes(contact.notes);
+            
             templateVariables.forEach(varName => {
               if (!variables[varName] || variables[varName] === '') {
                 if (varName === 'nome' || varName === 'name') {
                   variables[varName] = contact.name || '[Sem nome]';
                 } else if (varName === 'user' || varName === 'usuario') {
                   variables[varName] = profile?.full_name || 'Equipe Smolka';
+                } else if (varName === 'endereco') {
+                  variables[varName] = propertyData.endereco || '[Endereço não disponível]';
+                } else if (varName === 'valor') {
+                  variables[varName] = propertyData.valor || '[Valor não disponível]';
                 }
               }
             });
