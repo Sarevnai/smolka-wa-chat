@@ -121,12 +121,12 @@ async function getOrCreateExecution(
   departmentCode: string
 ): Promise<FlowExecution | null> {
   
-  // Buscar execução ativa existente
+  // Buscar execução ativa existente (incluindo waiting_input)
   const { data: existingExecution } = await supabase
     .from('flow_executions')
     .select('*')
     .eq('phone_number', phoneNumber)
-    .in('status', ['running', 'waiting_response'])
+    .in('status', ['running', 'waiting_response', 'waiting_input'])
     .order('started_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -267,22 +267,50 @@ async function executeFlow(
 
       case 'condition': {
         const conditionType = config.conditionType as string;
-        const branches = (config.branches as Array<{ id: string; label: string; value: string }>) || [];
+        const branches = (config.branches as Array<{ 
+          id: string; 
+          label: string; 
+          value: string;
+          keywords?: string[];
+        }>) || [];
         let matchedBranch: string | null = null;
 
         if (conditionType === 'keyword') {
-          const keywords = (config.keywords as string[]) || [];
           const messageLower = userMessage.toLowerCase();
           
-          for (const keyword of keywords) {
-            if (messageLower.includes(keyword.toLowerCase())) {
-              matchedBranch = branches.find(b => b.value === 'yes')?.id || branches[0]?.id;
-              break;
+          // FASE 2: Verificar keywords POR BRANCH primeiro
+          for (const branch of branches) {
+            const branchKeywords = branch.keywords || [];
+            
+            if (branchKeywords.length > 0) {
+              for (const keyword of branchKeywords) {
+                if (messageLower.includes(keyword.toLowerCase())) {
+                  matchedBranch = branch.id;
+                  console.log(`[FlowExecutor] Branch "${branch.label}" matched by keyword: "${keyword}"`);
+                  break;
+                }
+              }
+            }
+            
+            if (matchedBranch) break;
+          }
+          
+          // Fallback para keywords globais (compatibilidade legado)
+          if (!matchedBranch) {
+            const globalKeywords = (config.keywords as string[]) || [];
+            for (const keyword of globalKeywords) {
+              if (messageLower.includes(keyword.toLowerCase())) {
+                matchedBranch = branches.find(b => b.value === 'yes')?.id || branches[0]?.id;
+                console.log(`[FlowExecutor] Matched by global keyword: "${keyword}"`);
+                break;
+              }
             }
           }
           
-          if (!matchedBranch) {
-            matchedBranch = branches.find(b => b.value === 'no')?.id || branches[1]?.id;
+          // Default: último branch se nenhum match (branch padrão)
+          if (!matchedBranch && branches.length > 0) {
+            matchedBranch = branches[branches.length - 1].id;
+            console.log(`[FlowExecutor] No match, using default branch: "${branches[branches.length - 1].label}"`);
           }
         } else if (conditionType === 'intent') {
           // Usar IA para detectar intenção
@@ -294,6 +322,23 @@ async function executeFlow(
           const start = parseInt((config.timeRange as { start: string })?.start?.split(':')[0] || '9');
           const end = parseInt((config.timeRange as { end: string })?.end?.split(':')[0] || '18');
           matchedBranch = (hour >= start && hour < end) ? branches[0]?.id : branches[1]?.id;
+        } else if (conditionType === 'variable') {
+          // Checar valor de variável capturada
+          const variableName = config.variableName as string;
+          const variableValue = variables[variableName];
+          console.log(`[FlowExecutor] Checking variable "${variableName}" = "${variableValue}"`);
+          
+          for (const branch of branches) {
+            // Comparar value da branch com valor da variável
+            if (branch.value && String(variableValue).toLowerCase().includes(branch.value.toLowerCase())) {
+              matchedBranch = branch.id;
+              break;
+            }
+          }
+          
+          if (!matchedBranch && branches.length > 0) {
+            matchedBranch = branches[branches.length - 1].id;
+          }
         }
 
         await logExecution(supabase, execution.id, currentNodeId, 'condition', 'evaluated', 
@@ -302,8 +347,11 @@ async function executeFlow(
           Date.now() - startTime
         );
 
-        // Buscar próximo nó baseado no branch
-        const nextEdge = edges.find(e => e.source === currentNodeId && e.sourceHandle === matchedBranch);
+        // Buscar próximo nó baseado no branch (suporta prefixo 'branch-')
+        const nextEdge = edges.find(e => 
+          e.source === currentNodeId && 
+          (e.sourceHandle === `branch-${matchedBranch}` || e.sourceHandle === matchedBranch)
+        );
         if (nextEdge) {
           currentNodeId = nextEdge.target;
         } else {
@@ -497,6 +545,110 @@ async function executeFlow(
           } else {
             maxIterations = 0;
           }
+        }
+        break;
+      }
+
+      // FASE 1: Suporte ao Input Node - Capturar respostas do usuário
+      case 'input': {
+        const variableName = config.variableName as string;
+        const expectedType = config.expectedType as string;
+        const timeout = (config.timeout as number) || 300;
+        const timeoutAction = (config.timeoutAction as string) || 'retry';
+        
+        console.log(`[FlowExecutor] Input node: waiting for ${variableName} (type: ${expectedType})`);
+        
+        // Se estamos retomando de waiting_input, capturar o valor
+        if (execution.status === 'waiting_input') {
+          let capturedValue: unknown = userMessage;
+          let isValid = true;
+          
+          // Validar e converter valor baseado em expectedType
+          if (expectedType === 'number') {
+            const numValue = parseFloat(userMessage.replace(/\D/g, ''));
+            if (isNaN(numValue)) {
+              isValid = false;
+            } else {
+              capturedValue = numValue;
+            }
+          } else if (expectedType === 'currency') {
+            // Extrair valor monetário: "500 mil" -> 500000, "R$ 1.200.000" -> 1200000
+            const cleaned = userMessage.replace(/[^\d,\.kmil]/gi, '');
+            let numValue = parseFloat(cleaned.replace(',', '.'));
+            if (userMessage.toLowerCase().includes('mil')) {
+              numValue = numValue * 1000;
+            } else if (userMessage.toLowerCase().includes('milh')) {
+              numValue = numValue * 1000000;
+            }
+            capturedValue = isNaN(numValue) ? userMessage : numValue;
+          } else if (expectedType === 'yes_no') {
+            const lower = userMessage.toLowerCase();
+            if (['sim', 'yes', 'ok', 'pode', 's', 'claro', 'positivo'].some(k => lower.includes(k))) {
+              capturedValue = true;
+            } else if (['não', 'nao', 'no', 'n', 'nunca', 'negativo'].some(k => lower.includes(k))) {
+              capturedValue = false;
+            } else {
+              capturedValue = userMessage;
+            }
+          } else if (expectedType === 'email') {
+            const emailMatch = userMessage.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+            capturedValue = emailMatch ? emailMatch[0] : userMessage;
+          } else if (expectedType === 'phone') {
+            capturedValue = userMessage.replace(/\D/g, '');
+          }
+          
+          // Salvar variável
+          variables[variableName] = capturedValue;
+          console.log(`[FlowExecutor] Captured ${variableName} = ${capturedValue}`);
+          
+          await logExecution(supabase, execution.id, currentNodeId, 'input', 'captured', 
+            { variableName, expectedType, rawInput: userMessage }, 
+            { value: capturedValue, isValid }, 
+            Date.now() - startTime
+          );
+          
+          // Atualizar status para running
+          await supabase
+            .from('flow_executions')
+            .update({
+              status: 'running',
+              variables
+            })
+            .eq('id', execution.id);
+          
+          // Avançar para próximo nó
+          const nextNode = getNextNode(currentNodeId, edges);
+          if (nextNode) {
+            currentNodeId = nextNode;
+          } else {
+            maxIterations = 0;
+          }
+        } else {
+          // Primeira vez neste nó - pausar e aguardar input
+          console.log(`[FlowExecutor] Pausing for user input: ${variableName}`);
+          
+          await supabase
+            .from('flow_executions')
+            .update({
+              status: 'waiting_input',
+              current_node_id: currentNodeId,
+              variables,
+              context: { 
+                ...execution.context, 
+                waiting_for: variableName, 
+                timeout_at: Date.now() + (timeout * 1000),
+                timeout_action: timeoutAction
+              }
+            })
+            .eq('id', execution.id);
+          
+          await logExecution(supabase, execution.id, currentNodeId, 'input', 'waiting', 
+            { variableName, expectedType, timeout }, 
+            { status: 'waiting_input' }, 
+            Date.now() - startTime
+          );
+          
+          maxIterations = 0; // Sair do loop e aguardar próxima mensagem
         }
         break;
       }
