@@ -162,6 +162,8 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
+        snapToGrid
+        snapGrid={[20, 20]}
         className="bg-muted/30"
         defaultEdgeOptions={{
           animated: true,
