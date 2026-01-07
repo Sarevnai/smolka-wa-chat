@@ -187,6 +187,7 @@ serve(async (req) => {
       hasText: !!text,
       hasInteractive: !!interactive,
       hasTemplate: !!template_name,
+      language_code,
       conversation_id
     });
 
@@ -207,6 +208,33 @@ serve(async (req) => {
     // Get WhatsApp API credentials from secrets
     const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
     const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
+    
+    // 🆕 If template_name provided, lookup correct language from database
+    let resolvedLanguageCode = language_code || 'pt_BR';
+    
+    if (template_name) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      console.log(`🔍 Looking up template "${template_name}" in database...`);
+      
+      const { data: templateData, error: templateError } = await supabase
+        .from('whatsapp_templates')
+        .select('language, status')
+        .eq('template_name', template_name)
+        .eq('status', 'active')
+        .maybeSingle();
+      
+      if (templateError) {
+        console.error('Error looking up template:', templateError);
+      } else if (templateData) {
+        resolvedLanguageCode = templateData.language;
+        console.log(`✅ Template found! Using language: ${resolvedLanguageCode}`);
+      } else {
+        console.log(`⚠️ Template "${template_name}" not found in database, using provided/default: ${resolvedLanguageCode}`);
+      }
+    }
     
     if (!accessToken || !phoneNumberId) {
       return new Response(
@@ -293,7 +321,7 @@ serve(async (req) => {
       
       whatsappPayload.template = {
         name: template_name,
-        language: { code: language_code || 'pt_BR' },
+        language: { code: resolvedLanguageCode },
         components: templateComponents
       };
     } else if (interactive) {
