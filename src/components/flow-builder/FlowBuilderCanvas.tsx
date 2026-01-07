@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useCallback, useRef, useEffect, useImperativeHandle, forwardRef, useMemo } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -127,15 +127,18 @@ const FlowCanvas = forwardRef<FlowBuilderCanvasRef, FlowBuilderCanvasProps>(({
     [screenToFlowPosition, setNodes]
   );
 
-  // Inject test state into nodes
-  const nodesWithTestState = nodes.map(node => ({
-    ...node,
-    data: {
-      ...node.data,
-      isTestActive: activeTestNodeId === node.id,
-      wasTestVisited: visitedTestNodes.includes(node.id) && activeTestNodeId !== node.id,
-    }
-  }));
+  // Inject test state into nodes - memoized to prevent re-initialization issues
+  const nodesWithTestState = useMemo(() => 
+    nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        isTestActive: activeTestNodeId === node.id,
+        wasTestVisited: visitedTestNodes.includes(node.id) && activeTestNodeId !== node.id,
+      }
+    })),
+    [nodes, activeTestNodeId, visitedTestNodes]
+  );
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
