@@ -57,10 +57,20 @@ export function ActionConfig({ config, onChange }: ActionConfigProps) {
                 <SelectValue placeholder="Selecione o status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="disponivel">Disponível</SelectItem>
-                <SelectItem value="vendido">Vendido</SelectItem>
-                <SelectItem value="alugado">Alugado</SelectItem>
-                <SelectItem value="indisponivel">Indisponível</SelectItem>
+                {/* Status de Disponibilidade */}
+                <SelectItem value="Venda">Venda</SelectItem>
+                <SelectItem value="Aluguel">Aluguel</SelectItem>
+                <SelectItem value="Venda e Aluguel">Venda e Aluguel</SelectItem>
+                <SelectItem value="Aluguel Temporada">Aluguel Temporada</SelectItem>
+                {/* Status de Transação - Imobiliária */}
+                <SelectItem value="Vendido Imobiliaria">Vendido Imobiliária</SelectItem>
+                <SelectItem value="Alugado Imobiliaria">Alugado Imobiliária</SelectItem>
+                {/* Status de Transação - Terceiros */}
+                <SelectItem value="Vendido Terceiros">Vendido Terceiros</SelectItem>
+                <SelectItem value="Alugado Terceiros">Alugado Terceiros</SelectItem>
+                {/* Status de Pausa */}
+                <SelectItem value="Pendente">Pendente</SelectItem>
+                <SelectItem value="Suspenso">Suspenso</SelectItem>
               </SelectContent>
             </Select>
           </div>
