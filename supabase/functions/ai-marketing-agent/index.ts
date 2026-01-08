@@ -270,16 +270,28 @@ ${propertyInfo}
 🔴 REGRA 3 - CHAMAR TOOLS ANTES DE RESPONDER:
    Sempre chame as tools necessárias ANTES de enviar a resposta ao proprietário.
 
-🔴 REGRA 4 - SONDAGEM DE LOCAÇÃO (CENÁRIO 5) - MUITO IMPORTANTE:
-   Quando o proprietário recusar locação pela PRIMEIRA VEZ, você DEVE OBRIGATORIAMENTE:
-   1. Enviar a EXPLICAÇÃO ESTRATÉGICA completa (cenário 5.3)
-   2. Perguntar novamente: "Diante disso, o que acha? Vamos colocar o imóvel também para locação?"
-   3. SÓ FINALIZE se ele recusar DEPOIS de receber a explicação estratégica!
+🔴 REGRA 4 - EXPLICAÇÃO ESTRATÉGICA É OBRIGATÓRIA NA PRIMEIRA RECUSA DE LOCAÇÃO:
    
-   Para saber se já enviou a explicação: verifique no histórico se você já mencionou 
-   "despesas como condomínio, IPTU" ou "90 dias para desocupação".
-   Se NÃO mencionou ainda → DEVE enviar a explicação estratégica (5.3)
-   Se JÁ mencionou → pode finalizar com "sem_interesse_locacao"
+   ⛔⛔⛔ PROIBIDO CHAMAR finalizar_atendimento(resultado="sem_interesse_locacao") SE VOCÊ AINDA NÃO ENVIOU A EXPLICAÇÃO ESTRATÉGICA! ⛔⛔⛔
+   
+   QUANDO O PROPRIETÁRIO DISSER "NÃO" PARA LOCAÇÃO:
+   
+   PASSO 1 - VERIFICAR NO HISTÓRICO: Procure nas suas mensagens anteriores se você já escreveu:
+            - "despesas como condomínio, IPTU"
+            - "90 dias para desocupação"
+            - "imóvel pode ser vendido normalmente mesmo estando alugado"
+   
+   PASSO 2 - SE NÃO ENCONTROU essas frases no histórico:
+            ⚠️ VOCÊ NÃO PODE FINALIZAR! 
+            ⚠️ VOCÊ DEVE enviar a explicação estratégica completa (cenário 5.3)
+            ⚠️ NÃO CHAME finalizar_atendimento!
+   
+   PASSO 3 - SE JÁ ENCONTROU essas frases no histórico:
+            ✅ Agora sim pode chamar finalizar_atendimento(resultado="sem_interesse_locacao")
+   
+   RESUMO DA LÓGICA:
+   - Primeira recusa de locação → OBRIGATÓRIO enviar explicação estratégica (5.3)
+   - Segunda recusa (após explicação) → Pode finalizar
 
 ═══════════════════════════════════════════════════════════════════════════════
 📋 CENÁRIOS PADRÃO DE ATENDIMENTO - SIGA EXATAMENTE ESTAS MENSAGENS
@@ -403,10 +415,21 @@ ${propertyInfo}
    Vou direcionar para o nosso setor de locação, para que possam explicar como funciona o processo, as taxas, a administração e esclarecer todas as dúvidas necessárias.
    Em breve o atendimento de locação entra em contato. Obrigada!"
    
-   👉 SE RESPONDER NÃO ao interesse em locação (primeira vez que recusa):
-   📌 5.3 — Explicação estratégica OBRIGATÓRIA (argumentação para convencê-lo):
-   ⚠️ NÃO FINALIZE AINDA! Você DEVE fazer a argumentação estratégica e perguntar novamente!
-   RESPOSTA (use EXATAMENTE este texto):
+   👉 SE RESPONDER NÃO ao interesse em locação:
+   
+   ⛔⛔⛔ PARE! ANTES DE FAZER QUALQUER COISA, SIGA ESTES PASSOS: ⛔⛔⛔
+   
+   VERIFICAÇÃO OBRIGATÓRIA - Procure no histórico da conversa SE VOCÊ já enviou uma mensagem contendo:
+   - "despesas como condomínio, IPTU, conservação e manutenção"
+   - "90 dias para desocupação"
+   
+   📍 SE NÃO ENCONTROU essas frases no histórico (primeira recusa):
+   ════════════════════════════════════════════════════════════════
+   📌 5.3 — EXPLICAÇÃO ESTRATÉGICA OBRIGATÓRIA
+   ⚠️ NÃO CHAME finalizar_atendimento! É PROIBIDO NESTE MOMENTO!
+   ⚠️ VOCÊ DEVE OBRIGATORIAMENTE ENVIAR ESTA RESPOSTA COMPLETA:
+   
+   RESPOSTA EXATA (copie TUDO, palavra por palavra):
    "Entendo perfeitamente.
    Apenas para contextualizar: ao colocar o imóvel também para locação, ele deixa de gerar apenas despesas e passa a gerar uma receita mensal, por meio do aluguel.
    Além disso, despesas como condomínio, IPTU, conservação e manutenção passam a ser de responsabilidade do inquilino, reduzindo significativamente os custos do proprietário.
@@ -416,7 +439,16 @@ ${propertyInfo}
    
    Diante disso, o que acha? Vamos colocar o imóvel também para locação, além da venda?"
    
-   ⚠️ IMPORTANTE: Aguarde a resposta do proprietário após esta explicação!
+   ⚠️ AGUARDE A PRÓXIMA RESPOSTA DO PROPRIETÁRIO!
+   
+   📍 SE JÁ ENCONTROU essas frases no histórico (segunda recusa, após explicação):
+   ════════════════════════════════════════════════════════════════════════════════
+   AÇÃO: Chamar finalizar_atendimento(resultado="sem_interesse_locacao")
+   RESPOSTA:
+   "Sem problema, agradeço o retorno.
+   Vamos então manter a disponibilidade apenas para venda. Caso surja alguma possibilidade de visita, entro em contato novamente."
+   
+   ⸻
    
    👉 SE RESPONDER SIM (após receber a explicação estratégica):
    AÇÃO: Chamar escalar_para_setor(setor="locacao", motivo="Interesse em locação após explicação estratégica")
@@ -425,13 +457,6 @@ ${propertyInfo}
    "Perfeito.
    Vou direcionar para o nosso setor de locação para dar continuidade e esclarecer todos os detalhes.
    Obrigada!"
-   
-   👉 SE RESPONDER NÃO (após já ter recebido a explicação estratégica - segunda recusa):
-   ⚠️ IMPORTANTE: Só finalize se o proprietário JÁ RECEBEU a explicação estratégica (5.3) e AINDA ASSIM disse não!
-   AÇÃO: Chamar finalizar_atendimento(resultado="sem_interesse_locacao")
-   RESPOSTA:
-   "Sem problema, agradeço o retorno.
-   Vamos então manter a disponibilidade apenas para venda. Caso surja alguma possibilidade de visita, entro em contato novamente."
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -599,6 +624,54 @@ serve(async (req) => {
         }
 
         if (functionName === 'finalizar_atendimento') {
+          // 🔒 VALIDAÇÃO CRÍTICA: Não permitir "sem_interesse_locacao" sem explicação estratégica
+          if (args.resultado === 'sem_interesse_locacao') {
+            // Verificar se a explicação estratégica já foi enviada
+            const historico = conversation_history || [];
+            const explicacaoEnviada = historico.some((msg: any) => {
+              if (msg.direction !== 'outbound') return false;
+              const body = (msg.body || '').toLowerCase();
+              return body.includes('despesas como condomínio, iptu') || 
+                     body.includes('90 dias para desocupação') ||
+                     body.includes('imóvel pode ser vendido normalmente mesmo estando alugado');
+            });
+            
+            if (!explicacaoEnviada) {
+              console.warn(`[AI Marketing] 🚨 BLOQUEADO: IA tentou finalizar sem_interesse_locacao SEM ter enviado a explicação estratégica!`);
+              console.log(`[AI Marketing] Forçando envio da explicação estratégica...`);
+              
+              // Forçar a resposta com a explicação estratégica
+              responseText = `Entendo perfeitamente.
+Apenas para contextualizar: ao colocar o imóvel também para locação, ele deixa de gerar apenas despesas e passa a gerar uma receita mensal, por meio do aluguel.
+Além disso, despesas como condomínio, IPTU, conservação e manutenção passam a ser de responsabilidade do inquilino, reduzindo significativamente os custos do proprietário.
+Muitos proprietários acreditam que alugar o imóvel dificulta a venda, mas na prática acontece o contrário. Aqui na Smolka Imóveis, temos diversos clientes investidores que buscam exclusivamente imóveis já alugados, justamente pela rentabilidade e segurança do investimento.
+Inclusive, por lei, o inquilino tem preferência de compra. Caso ele não tenha interesse, existe um prazo legal de até 90 dias para desocupação, se houver a venda.
+Ou seja, o imóvel pode ser vendido normalmente mesmo estando alugado, ao mesmo tempo em que gera renda e elimina despesas enquanto isso.
+
+Diante disso, o que acha? Vamos colocar o imóvel também para locação, além da venda?`;
+              
+              // NÃO marcar como finalizado - aguardar próxima resposta
+              finalized = false;
+              
+              // Retornar imediatamente com a explicação forçada
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  response: responseText,
+                  escalated: false,
+                  escalated_to_setor: null,
+                  finalized: false,
+                  vista_updates: vistaUpdates,
+                  property_data: propertyInfo,
+                  forced_strategic_explanation: true,
+                }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            } else {
+              console.log(`[AI Marketing] ✅ Explicação estratégica já foi enviada, permitindo finalização`);
+            }
+          }
+          
           finalized = true;
           console.log(`[AI Marketing] Atendimento finalizado:`, args);
         }
