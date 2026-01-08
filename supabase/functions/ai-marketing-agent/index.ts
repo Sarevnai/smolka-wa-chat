@@ -266,6 +266,23 @@ FLUXO DE ATENDIMENTO:
 🔴 REGRA 4 - FINALIZAR APÓS ATUALIZAÇÃO:
    Após chamar atualizar_imovel com sucesso, chame também finalizar_atendimento
 
+🔴 REGRA 5 - VALORES SÃO SAGRADOS (CRÍTICO!):
+   ⛔ VOCÊ NUNCA DEVE INVENTAR, SUGERIR OU ALTERAR VALORES!
+   
+   Só use valor_venda na tool SE E SOMENTE SE o proprietário EXPLICITAMENTE
+   mencionar um número na mensagem atual.
+   
+   ✅ CORRETO: Proprietário diz "O valor agora é 400 mil" → Usar valor_venda: 400000
+   ✅ CORRETO: Proprietário diz "vendeu por 1.200.000" → Usar valor_venda: 1200000
+   ✅ CORRETO: Proprietário diz "está disponível" (sem mencionar valor) → NÃO enviar valor_venda
+   
+   ❌ ERRADO: Inventar qualquer valor
+   ❌ ERRADO: Usar o valor atual do sistema sem confirmação
+   ❌ ERRADO: Sugerir um valor diferente do mencionado
+   
+   Se precisar atualizar status (vendido, suspenso, etc.) e o proprietário 
+   NÃO mencionar nenhum valor numérico na mensagem, NÃO inclua valor_venda na tool.
+
 ═══════════════════════════════════════════════════════════════════════════════
 
 REGRAS GERAIS:
@@ -356,7 +373,7 @@ serve(async (req) => {
         tools,
         tool_choice: 'auto',
         max_tokens: 300,
-        temperature: 0.7,
+        temperature: 0.3, // Reduzido para evitar criatividade excessiva (inventar valores)
       }),
     });
 
@@ -386,14 +403,41 @@ serve(async (req) => {
         console.log(`[AI Marketing] Tool call: ${functionName}`, args);
 
         if (functionName === 'atualizar_imovel') {
+          // 🔒 VALIDAÇÃO CRÍTICA: Só aceitar valor_venda se foi explicitamente mencionado na mensagem
+          let validatedValor: number | undefined = undefined;
+          
+          if (args.valor_venda) {
+            // Regex para detectar valores numéricos na mensagem do usuário
+            // Aceita: 400000, 400.000, 400mil, 1.200.000, R$ 850.000, etc.
+            const valorRegex = /(?:R?\$?\s*)?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?|\d+\s*(?:mil|k|milhão|milhões|mi)?)/i;
+            const messageHasValue = valorRegex.test(message);
+            
+            if (messageHasValue) {
+              validatedValor = args.valor_venda;
+              console.log(`[AI Marketing] ✅ Valor confirmado explicitamente pelo proprietário: ${validatedValor}`);
+            } else {
+              // BLOQUEADO: IA tentou inventar valor
+              console.error(`[AI Marketing] 🚨 BLOQUEADO: IA tentou alterar valor de ${propertyInfo?.valor || 'N/A'} para ${args.valor_venda} SEM confirmação explícita do proprietário!`);
+              console.warn(`[AI Marketing] ⚠️ Mensagem do usuário: "${message}" - Nenhum valor numérico detectado`);
+              // Não enviar valor_venda para o Vista
+            }
+          }
+          
           const updateResult = await updatePropertyInVista({
             codigo: args.codigo || propertyInfo?.codigo,
             status: args.status,
             exibir_no_site: args.exibir_no_site,
-            valor_venda: args.valor_venda,
+            valor_venda: validatedValor, // Usa valor validado ou undefined
             motivo: args.motivo || 'Confirmado pelo proprietário via WhatsApp',
           });
-          vistaUpdates.push({ ...args, result: updateResult });
+          
+          vistaUpdates.push({ 
+            ...args, 
+            valor_venda_original: args.valor_venda,
+            valor_venda_validado: validatedValor,
+            valor_bloqueado: args.valor_venda && !validatedValor,
+            result: updateResult 
+          });
           console.log(`[AI Marketing] Vista update result:`, updateResult);
         }
 
@@ -429,7 +473,7 @@ serve(async (req) => {
           model: 'gpt-4o-mini',
           messages,
           max_tokens: 200,
-          temperature: 0.7,
+          temperature: 0.3, // Reduzido para consistência
         }),
       });
 
