@@ -32,98 +32,85 @@ serve(async (req) => {
 
     console.log(`[Vista Get Property] Buscando imóvel código: ${codigo}`);
 
-    // Usar /imoveis/listar paginando para encontrar o imóvel
-    // Vista tem limite de 50 por página
-    let found = false;
-    let prop: Record<string, any> | null = null;
-    let page = 1;
-    const maxPages = 100; // Buscar até 5000 imóveis
+    // Usar endpoint /imoveis/detalhes conforme documentação oficial
+    const pesquisa = {
+      fields: [
+        'Codigo',
+        'Categoria',
+        'Status',
+        'Finalidade',
+        'Endereco',
+        'Numero',
+        'Complemento',
+        'Bairro',
+        'Cidade',
+        'UF',
+        'CEP',
+        'ValorVenda',
+        'ValorLocacao',
+        'ValorCondominio',
+        'Dormitorios',
+        'Suites',
+        'Vagas',
+        'AreaPrivativa',
+        'AreaTotal',
+        'ExibirNoSite',
+        'DataCadastro',
+        'DataAtualizacao',
+        'FotoDestaque',
+        'Descricao'
+      ]
+    };
 
-    while (!found && page <= maxPages) {
-      const pesquisa = {
-        fields: [
-          'Codigo',
-          'Categoria',
-          'Bairro',
-          'Cidade',
-          'Endereco',
-          'ValorVenda',
-          'ValorLocacao',
-          'Dormitorios',
-          'Suites',
-          'Vagas',
-          'AreaPrivativa',
-          'AreaTotal',
-          'Descricao',
-          'FotoDestaque',
-          'Status',
-          'Finalidade'
-        ],
-        filter: {},
-        paginacao: {
-          pagina: page,
-          quantidade: 50
-        },
-        order: { Codigo: 'asc' }
-      };
+    const pesquisaEncoded = encodeURIComponent(JSON.stringify(pesquisa));
+    const url = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&pesquisa=${pesquisaEncoded}&imovel=${codigo}`;
+    
+    console.log(`[Vista Get Property] URL: ${url}`);
 
-      const pesquisaEncoded = encodeURIComponent(JSON.stringify(pesquisa));
-      const listarUrl = `${VISTA_API_URL}/imoveis/listar?key=${VISTA_API_KEY}&pesquisa=${pesquisaEncoded}`;
-      
-      if (page === 1) {
-        console.log(`[Vista Get Property] Buscando na lista de imóveis...`);
-      }
-      
-      const response = await fetch(listarUrl, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
 
-      if (!response.ok) {
-        console.error(`[Vista Get Property] Erro HTTP: ${response.status}`);
-        return new Response(
-          JSON.stringify({ success: false, error: `Erro ao buscar imóvel: HTTP ${response.status}` }),
-          { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const responseText = await response.text();
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error(`[Vista Get Property] JSON inválido`);
-        return new Response(
-          JSON.stringify({ success: false, error: 'Resposta inválida da API Vista' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Verificar se o código existe como chave
-      if (data[codigo]) {
-        prop = data[codigo];
-        found = true;
-        console.log(`[Vista Get Property] Imóvel ${codigo} encontrado na página ${page}`);
-        break;
-      }
-
-      // Verificar se ainda há mais páginas
-      const entries = Object.entries(data).filter(([key]) => 
-        !['paginas', 'pagina', 'total', 'qtd', 'status', 'message'].includes(key)
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Vista Get Property] Erro HTTP: ${response.status}`, errorText);
+      return new Response(
+        JSON.stringify({ success: false, error: `Erro ao buscar imóvel: HTTP ${response.status}`, details: errorText }),
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-      
-      if (entries.length < 50) {
-        // Última página, não encontrado
-        console.log(`[Vista Get Property] Última página (${page}), imóvel não encontrado`);
-        break;
-      }
-
-      page++;
     }
 
-    if (!prop) {
+    const responseText = await response.text();
+    console.log(`[Vista Get Property] Resposta bruta:`, responseText.substring(0, 500));
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error(`[Vista Get Property] JSON inválido:`, responseText);
       return new Response(
-        JSON.stringify({ success: false, error: `Imóvel ${codigo} não encontrado` }),
+        JSON.stringify({ success: false, error: 'Resposta inválida da API Vista', raw: responseText }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[Vista Get Property] Dados recebidos:`, JSON.stringify(data).substring(0, 500));
+
+    // Verificar se há erro na resposta
+    if (data.status === 'error' || data.message) {
+      return new Response(
+        JSON.stringify({ success: false, error: data.message || 'Erro da API Vista', raw_response: data }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // A resposta pode vir diretamente como objeto ou dentro de uma chave
+    const prop = data[codigo] || data;
+
+    if (!prop || Object.keys(prop).length === 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Imóvel ${codigo} não encontrado`, raw_response: data }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -132,18 +119,21 @@ serve(async (req) => {
 
     // Transformar resposta em formato padronizado
     const property = {
-      codigo,
+      codigo: prop.Codigo || codigo,
       categoria: prop.Categoria || '',
       status: prop.Status || '',
       finalidade: prop.Finalidade || '',
       endereco: prop.Endereco || '',
+      numero: prop.Numero || '',
+      complemento: prop.Complemento || '',
       bairro: prop.Bairro || '',
       cidade: prop.Cidade || '',
+      uf: prop.UF || '',
+      cep: prop.CEP || '',
       // Valores
       valor_venda: parseFloat(prop.ValorVenda || '0'),
       valor_locacao: parseFloat(prop.ValorLocacao || '0'),
       valor_condominio: parseFloat(prop.ValorCondominio || '0'),
-      valor_iptu: parseFloat(prop.ValorIPTU || '0'),
       // Características
       dormitorios: parseInt(prop.Dormitorios || '0'),
       suites: parseInt(prop.Suites || '0'),
@@ -152,7 +142,8 @@ serve(async (req) => {
       area_total: parseFloat(prop.AreaTotal || '0'),
       // Controle
       exibir_no_site: prop.ExibirNoSite === 'Sim',
-      destaque: prop.Destaque === 'Sim',
+      data_cadastro: prop.DataCadastro || '',
+      data_atualizacao: prop.DataAtualizacao || '',
       // Mídia
       foto_destaque: prop.FotoDestaque || '',
       // Descrição
