@@ -672,6 +672,20 @@ Diante disso, o que acha? Vamos colocar o imóvel também para locação, além 
             }
           }
           
+          // 🔒 CORREÇÃO: Garantir escalação para locação quando o resultado indicar interesse
+          if (args.resultado === 'interesse_locacao') {
+            escalated = true;
+            escalatedToSetor = 'locacao';
+            console.log(`[AI Marketing] ✅ Forçando escalação para locação baseado no resultado: interesse_locacao`);
+          }
+          
+          // 🔒 CORREÇÃO: Garantir escalação para vendas quando o resultado indicar interesse em investimento
+          if (args.resultado === 'interesse_investimento') {
+            escalated = true;
+            escalatedToSetor = 'vendas';
+            console.log(`[AI Marketing] ✅ Forçando escalação para vendas baseado no resultado: interesse_investimento`);
+          }
+          
           finalized = true;
           console.log(`[AI Marketing] Atendimento finalizado:`, args);
         }
