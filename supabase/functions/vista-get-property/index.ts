@@ -32,7 +32,8 @@ serve(async (req) => {
 
     console.log(`[Vista Get Property] Buscando imóvel código: ${codigo}`);
 
-    // Usar endpoint /imoveis/detalhes conforme documentação oficial
+    // Usar /imoveis/listar com filtro por Codigo para buscar TODOS os imóveis
+    // incluindo os que não estão marcados para exibir no site
     const pesquisa = {
       fields: [
         'Codigo',
@@ -59,13 +60,20 @@ serve(async (req) => {
         'DataAtualizacao',
         'FotoDestaque',
         'Descricao'
-      ]
+      ],
+      filter: {
+        Codigo: codigo.toString()
+      },
+      paginacao: {
+        pagina: 1,
+        quantidade: 1
+      }
     };
 
     const pesquisaEncoded = encodeURIComponent(JSON.stringify(pesquisa));
-    const url = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&pesquisa=${pesquisaEncoded}&imovel=${codigo}`;
+    const url = `${VISTA_API_URL}/imoveis/listar?key=${VISTA_API_KEY}&pesquisa=${pesquisaEncoded}`;
     
-    console.log(`[Vista Get Property] URL: ${url}`);
+    console.log(`[Vista Get Property] Tentando /imoveis/listar com filtro Codigo`);
 
     const response = await fetch(url, {
       method: 'GET',
@@ -98,17 +106,28 @@ serve(async (req) => {
     console.log(`[Vista Get Property] Dados recebidos:`, JSON.stringify(data).substring(0, 500));
 
     // Verificar se há erro na resposta
-    if (data.status === 'error' || data.message) {
+    if (data.status === 'error' || (data.status && typeof data.status === 'number' && data.status >= 400)) {
       return new Response(
         JSON.stringify({ success: false, error: data.message || 'Erro da API Vista', raw_response: data }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // A resposta pode vir diretamente como objeto ou dentro de uma chave
-    const prop = data[codigo] || data;
+    // A resposta pode vir com o código como chave ou diretamente
+    let prop = data[codigo] || data[codigo.toString()];
+    
+    // Se não encontrou, tentar buscar no objeto (pode ter outras chaves de metadata)
+    if (!prop) {
+      for (const [key, value] of Object.entries(data)) {
+        if (['paginas', 'pagina', 'total', 'qtd', 'status', 'message'].includes(key)) continue;
+        if (value && typeof value === 'object' && (value as any).Codigo === codigo.toString()) {
+          prop = value;
+          break;
+        }
+      }
+    }
 
-    if (!prop || Object.keys(prop).length === 0) {
+    if (!prop || (Array.isArray(prop) && prop.length === 0) || Object.keys(prop).length === 0) {
       return new Response(
         JSON.stringify({ success: false, error: `Imóvel ${codigo} não encontrado`, raw_response: data }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
