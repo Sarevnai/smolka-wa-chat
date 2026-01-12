@@ -1,6 +1,6 @@
 import Layout from '@/components/Layout';
 import { AdminGuard } from '@/components/guards/AdminGuard';
-import { useUserManagement, UserWithStatus } from '@/hooks/admin/useUserManagement';
+import { useUserManagement, UserWithStatus, DepartmentCode } from '@/hooks/admin/useUserManagement';
 import { UserCard } from '@/components/admin/UserCard';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
 import { ResetPasswordModal } from '@/components/admin/ResetPasswordModal';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { FUNCTION_LABELS } from '@/types/functions';
+import { DEPARTMENT_OPTIONS } from '@/components/admin/DepartmentBadge';
 
 export default function UserManagement() {
   const {
@@ -27,6 +28,7 @@ export default function UserManagement() {
     createUser,
     updateUserFunction,
     removeUserFunction,
+    updateUserDepartment,
     toggleUserStatus,
     blockUser,
     unblockUser,
@@ -36,6 +38,7 @@ export default function UserManagement() {
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'blocked'>('all');
   const [functionFilter, setFunctionFilter] = useState<'all' | 'admin' | 'manager' | 'attendant' | 'marketing' | 'none'>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<'all' | 'locacao' | 'administrativo' | 'vendas' | 'marketing' | 'none'>('all');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [resetPasswordUser, setResetPasswordUser] = useState<UserWithStatus | null>(null);
 
@@ -48,6 +51,10 @@ export default function UserManagement() {
     // Function filter
     if (functionFilter === 'none' && user.function !== null) return false;
     if (functionFilter !== 'all' && functionFilter !== 'none' && user.function !== functionFilter) return false;
+
+    // Department filter
+    if (departmentFilter === 'none' && user.department_code !== null) return false;
+    if (departmentFilter !== 'all' && departmentFilter !== 'none' && user.department_code !== departmentFilter) return false;
 
     return true;
   });
@@ -115,8 +122,8 @@ export default function UserManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4">
-                <div className="flex-1">
+              <div className="flex gap-4 flex-wrap">
+                <div className="flex-1 min-w-[150px]">
                   <label className="text-sm font-medium mb-2 block">Status</label>
                   <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
                     <SelectTrigger>
@@ -130,7 +137,7 @@ export default function UserManagement() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-[150px]">
                   <label className="text-sm font-medium mb-2 block">Função</label>
                   <Select value={functionFilter} onValueChange={(v: any) => setFunctionFilter(v)}>
                     <SelectTrigger>
@@ -143,6 +150,23 @@ export default function UserManagement() {
                       <SelectItem value="attendant">{FUNCTION_LABELS.attendant}</SelectItem>
                       <SelectItem value="marketing">{FUNCTION_LABELS.marketing}</SelectItem>
                       <SelectItem value="none">Sem Função</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                  <label className="text-sm font-medium mb-2 block">Setor</label>
+                  <Select value={departmentFilter} onValueChange={(v: any) => setDepartmentFilter(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {DEPARTMENT_OPTIONS.map((dept) => (
+                        <SelectItem key={dept.value} value={dept.value}>
+                          {dept.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="none">Sem Setor</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -170,19 +194,20 @@ export default function UserManagement() {
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
-              {filteredUsers.map(user => (
-                <UserCard
-                  key={user.id}
-                  user={user}
-                  onUpdateFunction={updateUserFunction}
-                  onRemoveFunction={removeUserFunction}
-                  onToggleStatus={toggleUserStatus}
-                  onBlock={blockUser}
-                  onUnblock={unblockUser}
-                  onDelete={deleteUser}
-                  onResetPassword={handleResetPassword}
-                />
-              ))}
+                {filteredUsers.map(user => (
+                  <UserCard
+                    key={user.id}
+                    user={user}
+                    onUpdateFunction={updateUserFunction}
+                    onRemoveFunction={removeUserFunction}
+                    onUpdateDepartment={updateUserDepartment}
+                    onToggleStatus={toggleUserStatus}
+                    onBlock={blockUser}
+                    onUnblock={unblockUser}
+                    onDelete={deleteUser}
+                    onResetPassword={handleResetPassword}
+                  />
+                ))}
             </div>
           )}
 
