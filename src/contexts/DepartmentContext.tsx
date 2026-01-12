@@ -42,6 +42,11 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const fetchUserData = async () => {
+      // Reset state on user change to prevent stale data between logins
+      setLoading(true);
+      setUserDepartment(null);
+      setActiveDepartmentState(null);
+      
       if (!user?.id) {
         setLoading(false);
         return;
@@ -57,24 +62,41 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
         const hasAdmin = functions?.some(f => f.function === 'admin') || false;
         setIsAdmin(hasAdmin);
 
-        // Get user's department from profiles table
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('department_code')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        const deptCode = profile?.department_code || null;
+        // Get user's department via secure RPC (bypasses RLS issues)
+        let deptCode: DepartmentType | null = null;
+        
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('get_my_department');
+        
+        if (!rpcError && rpcResult) {
+          deptCode = rpcResult as DepartmentType;
+        } else {
+          // Fallback: direct query if RPC fails
+          console.warn('RPC get_my_department failed, falling back to direct query:', rpcError);
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('department_code')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (!profileError && profile) {
+            deptCode = profile.department_code;
+          }
+        }
+        
+        console.log('[DepartmentContext] User department loaded:', { userId: user.id, deptCode, hasAdmin });
+        
         setUserDepartment(deptCode);
 
         // Load saved preference for admins or use user's department
         if (hasAdmin) {
           const savedDept = localStorage.getItem('activeDepartment');
-          // Default to 'locacao' if no valid department saved
+          // For admins: use saved preference, or user's own department, or fallback to locacao
           if (savedDept && ['locacao', 'administrativo', 'vendas', 'marketing'].includes(savedDept)) {
             setActiveDepartmentState(savedDept as DepartmentType);
+          } else if (deptCode) {
+            setActiveDepartmentState(deptCode);
           } else {
-            setActiveDepartmentState('locacao'); // Default to locacao instead of null
+            setActiveDepartmentState('locacao');
           }
           
           // Load saved view mode preference for admins
@@ -85,6 +107,7 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
             setViewModeState('leads');
           }
         } else {
+          // Non-admin: use their department directly
           setActiveDepartmentState(deptCode);
           // Set view mode based on department
           setViewModeState(getDefaultViewMode(deptCode));
