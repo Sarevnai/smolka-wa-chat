@@ -1,8 +1,9 @@
 import Layout from '@/components/Layout';
 import { AdminGuard } from '@/components/guards/AdminGuard';
-import { useUserManagement } from '@/hooks/admin/useUserManagement';
+import { useUserManagement, UserWithStatus } from '@/hooks/admin/useUserManagement';
 import { UserCard } from '@/components/admin/UserCard';
 import { CreateUserModal } from '@/components/admin/CreateUserModal';
+import { ResetPasswordModal } from '@/components/admin/ResetPasswordModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, RefreshCw, Filter, UserPlus } from 'lucide-react';
@@ -30,11 +31,13 @@ export default function UserManagement() {
     blockUser,
     unblockUser,
     deleteUser,
+    resetPassword,
   } = useUserManagement();
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'blocked'>('all');
   const [functionFilter, setFunctionFilter] = useState<'all' | 'admin' | 'manager' | 'attendant' | 'marketing' | 'none'>('all');
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserWithStatus | null>(null);
 
   const filteredUsers = users.filter(user => {
     // Status filter
@@ -58,6 +61,19 @@ export default function UserManagement() {
   }) => {
     await createUser(data);
     setCreateModalOpen(false);
+  };
+
+  const handleResetPassword = (userId: string) => {
+    const user = users.find(u => u.user_id === userId);
+    if (user) {
+      setResetPasswordUser(user);
+    }
+  };
+
+  const handleConfirmResetPassword = async (newPassword: string) => {
+    if (resetPasswordUser) {
+      await resetPassword(resetPasswordUser.user_id, newPassword);
+    }
   };
 
   return (
@@ -164,6 +180,7 @@ export default function UserManagement() {
                   onBlock={blockUser}
                   onUnblock={unblockUser}
                   onDelete={deleteUser}
+                  onResetPassword={handleResetPassword}
                 />
               ))}
             </div>
@@ -208,6 +225,13 @@ export default function UserManagement() {
           onOpenChange={setCreateModalOpen}
           onCreateUser={handleCreateUser}
           isLoading={creating}
+        />
+
+        <ResetPasswordModal
+          open={!!resetPasswordUser}
+          onOpenChange={(open) => !open && setResetPasswordUser(null)}
+          userName={resetPasswordUser?.full_name || resetPasswordUser?.username || ''}
+          onConfirm={handleConfirmResetPassword}
         />
       </Layout>
     </AdminGuard>

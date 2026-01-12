@@ -15,9 +15,10 @@ interface UserCardProps {
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
   onDelete: (userId: string) => void;
+  onResetPassword: (userId: string) => void;
 }
 
-export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleStatus, onBlock, onUnblock, onDelete }: UserCardProps) {
+export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleStatus, onBlock, onUnblock, onDelete, onResetPassword }: UserCardProps) {
   const getInitials = (name: string | null, username: string) => {
     if (name) {
       const parts = name.split(' ');
@@ -119,6 +120,7 @@ export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleSta
             onBlock={onBlock}
             onUnblock={onUnblock}
             onDelete={onDelete}
+            onResetPassword={onResetPassword}
           />
         </div>
       </CardContent>
