@@ -41,11 +41,12 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
   const [viewMode, setViewModeState] = useState<ViewMode>('leads');
 
   useEffect(() => {
-    const fetchUserData = async () => {
+  const fetchUserData = async () => {
       // Reset state on user change to prevent stale data between logins
       setLoading(true);
       setUserDepartment(null);
       setActiveDepartmentState(null);
+      setIsAdmin(false);
       
       if (!user?.id) {
         setLoading(false);
