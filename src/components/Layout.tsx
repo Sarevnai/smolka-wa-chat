@@ -13,6 +13,8 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { cn } from "@/lib/utils";
+import { useDepartment } from "@/contexts/DepartmentContext";
+import { Skeleton } from "@/components/ui/skeleton";
 export default function Layout({
   children
 }: {
@@ -24,6 +26,7 @@ export default function Layout({
     profile,
     signOut
   } = useAuth();
+  const { loading: departmentLoading } = useDepartment();
 
   // Initialize keyboard shortcuts
   useKeyboardShortcuts();
@@ -34,6 +37,21 @@ export default function Layout({
     if (!user?.email) return 'U';
     return user.email.charAt(0).toUpperCase();
   };
+
+  // Show skeleton while department is loading to prevent race condition
+  if (departmentLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="space-y-4 w-full max-w-md p-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-8 w-1/2" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
   return <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
