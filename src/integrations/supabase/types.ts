@@ -1178,6 +1178,74 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_leads_log: {
+        Row: {
+          client_listing_id: string | null
+          contact_email: string | null
+          contact_id: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message: string | null
+          origin_lead_id: string | null
+          origin_listing_id: string | null
+          portal_origin: string
+          processed_at: string | null
+          raw_payload: Json | null
+          status: string | null
+          temperature: string | null
+          transaction_type: string | null
+        }
+        Insert: {
+          client_listing_id?: string | null
+          contact_email?: string | null
+          contact_id?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          origin_lead_id?: string | null
+          origin_listing_id?: string | null
+          portal_origin: string
+          processed_at?: string | null
+          raw_payload?: Json | null
+          status?: string | null
+          temperature?: string | null
+          transaction_type?: string | null
+        }
+        Update: {
+          client_listing_id?: string | null
+          contact_email?: string | null
+          contact_id?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message?: string | null
+          origin_lead_id?: string | null
+          origin_listing_id?: string | null
+          portal_origin?: string
+          processed_at?: string | null
+          raw_payload?: Json | null
+          status?: string | null
+          temperature?: string | null
+          transaction_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_leads_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

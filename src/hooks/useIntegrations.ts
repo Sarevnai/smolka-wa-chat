@@ -17,6 +17,20 @@ export interface Integration {
 
 const defaultIntegrations: Integration[] = [
   {
+    id: 'portais-imobiliarios',
+    name: 'Portais Imobiliários',
+    description: 'Receba leads automaticamente do ZAP, Viva Real e OLX',
+    status: 'disconnected',
+    configPath: '/admin/portal-integration',
+    icon: '🏢',
+    features: [
+      'Webhook para receber leads',
+      'Criação automática de contatos',
+      'Atribuição a listas de marketing',
+      'Histórico completo de leads'
+    ]
+  },
+  {
     id: 'c2s',
     name: 'C2S - Contact2Sale',
     description: 'Envie leads qualificados de venda diretamente para o sistema C2S dos corretores',
@@ -172,14 +186,31 @@ export function useIntegrations() {
     }
   };
 
+  const checkPortaisStatus = async (): Promise<'connected' | 'disconnected'> => {
+    try {
+      const { data } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('setting_category', 'portais')
+        .eq('setting_key', 'webhook_token')
+        .maybeSingle();
+
+      return data?.setting_value ? 'connected' : 'disconnected';
+    } catch (error) {
+      console.error('Error checking Portais status:', error);
+      return 'disconnected';
+    }
+  };
+
   const loadIntegrationsStatus = async () => {
     setLoading(true);
     
     try {
-      const [n8nStatus, clickupStatus, c2sStatus] = await Promise.all([
+      const [n8nStatus, clickupStatus, c2sStatus, portaisStatus] = await Promise.all([
         checkN8NStatus(),
         checkClickUpStatus(),
-        checkC2SStatus()
+        checkC2SStatus(),
+        checkPortaisStatus()
       ]);
       const whatsappStatus = checkWhatsAppStatus();
 
@@ -193,6 +224,8 @@ export function useIntegrations() {
             return { ...integration, status: whatsappStatus as 'connected' | 'disconnected' };
           case 'c2s':
             return { ...integration, status: c2sStatus };
+          case 'portais-imobiliarios':
+            return { ...integration, status: portaisStatus };
           default:
             return integration;
         }
