@@ -490,9 +490,14 @@ export default function MarketingCampaigns() {
             </Card>
           </TabsContent>
 
+          {/* Lists Tab */}
+          <TabsContent value="lists" className="space-y-6">
+            <ContactListManager />
+          </TabsContent>
+
           {/* Create Campaign Tab */}
           <TabsContent value="create" className="space-y-6">
-            <CampaignCreator onCampaignCreated={handleCampaignCreated} />
+            <CampaignWizard onCampaignCreated={handleCampaignCreated} />
           </TabsContent>
         </Tabs>
 
