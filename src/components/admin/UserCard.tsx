@@ -1,4 +1,4 @@
-import { UserWithStatus } from '@/hooks/admin/useUserManagement';
+import { UserWithStatus, DepartmentCode } from '@/hooks/admin/useUserManagement';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,11 +6,13 @@ import { FUNCTION_LABELS } from '@/types/functions';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { UserActionsMenu } from './UserActionsMenu';
+import { DepartmentBadge } from './DepartmentBadge';
 
 interface UserCardProps {
   user: UserWithStatus;
   onUpdateFunction: (userId: string, newFunction: any) => void;
   onRemoveFunction: (userId: string) => void;
+  onUpdateDepartment: (userId: string, departmentCode: DepartmentCode) => void;
   onToggleStatus: (userId: string, isActive: boolean) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
@@ -18,7 +20,7 @@ interface UserCardProps {
   onResetPassword: (userId: string) => void;
 }
 
-export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleStatus, onBlock, onUnblock, onDelete, onResetPassword }: UserCardProps) {
+export function UserCard({ user, onUpdateFunction, onRemoveFunction, onUpdateDepartment, onToggleStatus, onBlock, onUnblock, onDelete, onResetPassword }: UserCardProps) {
   const getInitials = (name: string | null, username: string) => {
     if (name) {
       const parts = name.split(' ');
@@ -86,13 +88,14 @@ export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleSta
                 <p className="text-xs text-muted-foreground">Código: #{user.user_code}</p>
               </div>
 
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 <Badge 
                   variant={getRoleBadgeVariant(user.function)} 
                   className={getRoleBadgeClass(user.function)}
                 >
                   {user.function ? FUNCTION_LABELS[user.function] : 'Sem função'}
                 </Badge>
+                <DepartmentBadge departmentCode={user.department_code} />
                 {user.last_login && (
                   <span className="text-xs text-muted-foreground">
                     Último acesso:{' '}
@@ -116,6 +119,7 @@ export function UserCard({ user, onUpdateFunction, onRemoveFunction, onToggleSta
             user={user}
             onUpdateFunction={onUpdateFunction}
             onRemoveFunction={onRemoveFunction}
+            onUpdateDepartment={onUpdateDepartment}
             onToggleStatus={onToggleStatus}
             onBlock={onBlock}
             onUnblock={onUnblock}

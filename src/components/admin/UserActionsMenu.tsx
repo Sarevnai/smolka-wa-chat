@@ -1,4 +1,4 @@
-import { UserWithStatus } from '@/hooks/admin/useUserManagement';
+import { UserWithStatus, DepartmentCode } from '@/hooks/admin/useUserManagement';
 import { AppFunction, FUNCTION_LABELS } from '@/types/functions';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +12,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Shield, UserCheck, UserX, Ban, Unlock, UserMinus, Trash2, Key } from 'lucide-react';
+import { MoreVertical, Shield, UserCheck, UserX, Ban, Unlock, UserMinus, Trash2, Key, Building2, Home, FileText, TrendingUp, Target, X } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,11 +27,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useState } from 'react';
+import { DEPARTMENT_OPTIONS } from './DepartmentBadge';
 
 interface UserActionsMenuProps {
   user: UserWithStatus;
   onUpdateFunction: (userId: string, newFunction: AppFunction) => void;
   onRemoveFunction: (userId: string) => void;
+  onUpdateDepartment: (userId: string, departmentCode: DepartmentCode) => void;
   onToggleStatus: (userId: string, isActive: boolean) => void;
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
@@ -43,6 +45,7 @@ export function UserActionsMenu({
   user,
   onUpdateFunction,
   onRemoveFunction,
+  onUpdateDepartment,
   onToggleStatus,
   onBlock,
   onUnblock,
@@ -50,6 +53,16 @@ export function UserActionsMenu({
   onResetPassword,
 }: UserActionsMenuProps) {
   const [blockReason, setBlockReason] = useState('');
+
+  const getDepartmentIcon = (dept: string) => {
+    switch (dept) {
+      case 'locacao': return Home;
+      case 'administrativo': return FileText;
+      case 'vendas': return TrendingUp;
+      case 'marketing': return Target;
+      default: return Building2;
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -87,6 +100,40 @@ export function UserActionsMenu({
                 >
                   <UserMinus className="mr-2 h-4 w-4" />
                   Remover Função
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+
+        {/* Alterar Setor */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Building2 className="mr-2 h-4 w-4" />
+            Alterar Setor
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {DEPARTMENT_OPTIONS.map((dept) => {
+              const Icon = getDepartmentIcon(dept.value);
+              return (
+                <DropdownMenuItem 
+                  key={dept.value}
+                  onClick={() => onUpdateDepartment(user.user_id, dept.value as DepartmentCode)}
+                >
+                  <Icon className="mr-2 h-4 w-4" />
+                  {dept.label}
+                </DropdownMenuItem>
+              );
+            })}
+            {user.department_code && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => onUpdateDepartment(user.user_id, null)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Remover Setor
                 </DropdownMenuItem>
               </>
             )}

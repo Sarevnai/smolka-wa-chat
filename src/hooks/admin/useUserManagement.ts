@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { AppFunction } from '@/types/functions';
 import { useToast } from '@/hooks/use-toast';
 
+export type DepartmentCode = 'locacao' | 'administrativo' | 'vendas' | 'marketing' | null;
+
 export interface UserWithStatus {
   id: string;
   user_id: string;
@@ -12,6 +14,7 @@ export interface UserWithStatus {
   user_code: number;
   avatar_url: string | null;
   function: AppFunction | null;
+  department_code: DepartmentCode;
   is_active: boolean;
   is_blocked: boolean;
   blocked_reason: string | null;
@@ -32,7 +35,7 @@ export function useUserManagement() {
       // Buscar perfis
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, user_id, full_name, username, user_code, avatar_url, created_at')
+        .select('id, user_id, full_name, username, user_code, avatar_url, created_at, department_code')
         .order('full_name');
 
       if (profilesError) throw profilesError;
@@ -65,6 +68,7 @@ export function useUserManagement() {
           user_code: profile.user_code,
           avatar_url: profile.avatar_url,
           function: userFunction?.function as AppFunction || null,
+          department_code: profile.department_code as DepartmentCode,
           is_active: userStatus?.is_active ?? true,
           is_blocked: userStatus?.is_blocked ?? false,
           blocked_reason: userStatus?.blocked_reason || null,
@@ -315,6 +319,33 @@ export function useUserManagement() {
     }
   };
 
+  const updateUserDepartment = async (userId: string, departmentCode: DepartmentCode) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ department_code: departmentCode })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Setor atualizado',
+        description: departmentCode 
+          ? 'O setor do usuário foi atualizado com sucesso.'
+          : 'O setor do usuário foi removido.',
+      });
+
+      fetchUsers();
+    } catch (error) {
+      console.error('Error updating department:', error);
+      toast({
+        title: 'Erro ao atualizar setor',
+        description: 'Não foi possível atualizar o setor do usuário.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -327,6 +358,7 @@ export function useUserManagement() {
     createUser,
     updateUserFunction,
     removeUserFunction,
+    updateUserDepartment,
     toggleUserStatus,
     blockUser,
     unblockUser,
