@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSyncDepartment } from "@/hooks/useSyncDepartment";
 import {
   Users, Plus, Search, Filter, Tag, Download, Upload,
-  ArrowLeft, MoreHorizontal, Phone, Mail, Building
+  ArrowLeft, MoreHorizontal, Phone, Mail, Building, FolderOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ import Layout from "@/components/Layout";
 import { TagManager } from "@/components/marketing/TagManager";
 import { TagSelector } from "@/components/marketing/TagSelector";
 import { ImportMarketingContactsModal } from "@/components/marketing/ImportMarketingContactsModal";
+import ContactListManager from "@/components/marketing/ContactListManager";
 import { NewMarketingContactModal } from "@/components/marketing/NewMarketingContactModal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -144,6 +145,10 @@ export default function MarketingContacts() {
             <TabsTrigger value="contacts">
               <Users className="h-4 w-4 mr-2" />
               Contatos
+            </TabsTrigger>
+            <TabsTrigger value="lists">
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Listas
             </TabsTrigger>
             <TabsTrigger value="tags">
               <Tag className="h-4 w-4 mr-2" />
@@ -305,6 +310,20 @@ export default function MarketingContacts() {
                   )}
                 </div>
               </ScrollArea>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="lists" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Listas de Contatos</CardTitle>
+                <CardDescription>
+                  Organize seus contatos em listas para campanhas segmentadas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ContactListManager />
+              </CardContent>
             </Card>
           </TabsContent>
 
