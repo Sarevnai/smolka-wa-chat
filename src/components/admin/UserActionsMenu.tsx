@@ -12,7 +12,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Shield, UserCheck, UserX, Ban, Unlock, UserMinus, Trash2 } from 'lucide-react';
+import { MoreVertical, Shield, UserCheck, UserX, Ban, Unlock, UserMinus, Trash2, Key } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,7 @@ interface UserActionsMenuProps {
   onBlock: (userId: string, reason: string) => void;
   onUnblock: (userId: string) => void;
   onDelete: (userId: string) => void;
+  onResetPassword: (userId: string) => void;
 }
 
 export function UserActionsMenu({
@@ -46,6 +47,7 @@ export function UserActionsMenu({
   onBlock,
   onUnblock,
   onDelete,
+  onResetPassword,
 }: UserActionsMenuProps) {
   const [blockReason, setBlockReason] = useState('');
 
@@ -90,6 +92,12 @@ export function UserActionsMenu({
             )}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+
+        {/* Redefinir Senha */}
+        <DropdownMenuItem onClick={() => onResetPassword(user.user_id)}>
+          <Key className="mr-2 h-4 w-4" />
+          Redefinir Senha
+        </DropdownMenuItem>
 
         <DropdownMenuSeparator />
 

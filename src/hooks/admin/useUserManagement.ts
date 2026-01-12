@@ -288,6 +288,33 @@ export function useUserManagement() {
     }
   };
 
+  const resetPassword = async (userId: string, newPassword: string) => {
+    try {
+      const { data: result, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: { user_id: userId, new_password: newPassword },
+      });
+
+      if (error) throw error;
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      toast({
+        title: 'Senha redefinida',
+        description: 'A senha do usuário foi atualizada com sucesso.',
+      });
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      toast({
+        title: 'Erro ao redefinir senha',
+        description: error.message || 'Não foi possível redefinir a senha.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -304,5 +331,6 @@ export function useUserManagement() {
     blockUser,
     unblockUser,
     deleteUser,
+    resetPassword,
   };
 }
