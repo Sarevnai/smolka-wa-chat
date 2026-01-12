@@ -48,19 +48,21 @@ export function AppSidebar() {
   const { unreadCount } = useNewMessages();
   const permissions = usePermissions();
   const { count: triageCount } = useTriageConversations();
-  const { isAdmin, userDepartment, activeDepartment } = useDepartment();
+  const { isAdmin, userDepartment, activeDepartment, loading } = useDepartment();
   const [adminOpen, setAdminOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
 
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
   
-  // Determine which department to show
-  const effectiveDepartment = isAdmin 
-    ? (activeDepartment || 'locacao') 
-    : (userDepartment || 'locacao');
+  // Determine which department to show - only apply fallback after loading completes
+  const effectiveDepartment = loading 
+    ? null 
+    : (isAdmin 
+      ? (activeDepartment || 'locacao') 
+      : (userDepartment || 'locacao'));
   
-  const config = getDepartmentConfig(effectiveDepartment);
+  const config = effectiveDepartment ? getDepartmentConfig(effectiveDepartment) : null;
 
   const isActive = (path: string) => {
     if (path === "/") return currentPath === "/";
@@ -72,7 +74,7 @@ export function AppSidebar() {
     const active = isActive(path);
     return cn(
       "w-full justify-start transition-all duration-200",
-      active
+      active && config
         ? cn("border-l-3 font-semibold", config.bgLight, config.textColor, config.borderColor)
         : "hover:bg-neutral-100 text-neutral-700 hover:text-neutral-900"
     );
@@ -91,10 +93,23 @@ export function AppSidebar() {
     )}>
       <SidebarContent>
         {/* Department Selector for Admins */}
-        {!collapsed && isAdmin && <DepartmentSelector />}
+        {!collapsed && isAdmin && !loading && <DepartmentSelector />}
         
-        {/* Department Header for non-admins */}
-        {!collapsed && !isAdmin && (
+        {/* Loading skeleton while department loads */}
+        {!collapsed && loading && (
+          <div className="mx-3 my-3 rounded-lg overflow-hidden p-4 bg-neutral-100 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 bg-neutral-200 rounded-md w-8 h-8" />
+              <div className="flex flex-col gap-1">
+                <div className="h-2 w-8 bg-neutral-200 rounded" />
+                <div className="h-4 w-20 bg-neutral-200 rounded" />
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Department Header for non-admins - only show when loaded */}
+        {!collapsed && !isAdmin && !loading && config && (
           <div className={cn(
             "mx-3 my-3 rounded-lg overflow-hidden p-4",
             "bg-gradient-to-r",
@@ -113,43 +128,45 @@ export function AppSidebar() {
         )}
 
         {/* Main Department Items */}
-      <SidebarGroup className="mt-2">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {config.items.map((item) => {
-                const badgeCount = getBadgeCount(item.badge);
-                const showBadge = badgeCount > 0;
-                
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className={getNavClassName(item.url)}>
-                      <Link to={item.url}>
-                        <item.icon className={cn(
-                          "h-5 w-5", 
-                          collapsed ? "mx-auto" : "mr-3",
-                          item.badge === 'triage' && badgeCount > 0 ? "text-amber-500" : ""
-                        )} />
-                        {!collapsed && (
-                          <div className="flex items-center justify-between flex-1">
-                            <span>{item.title}</span>
-                            {showBadge && (
-                              <Badge 
-                                variant={item.badge === 'triage' ? "destructive" : "destructive"} 
-                                className="text-xs"
-                              >
-                                {badgeCount}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {config && (
+          <SidebarGroup className="mt-2">
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {config.items.map((item) => {
+                  const badgeCount = getBadgeCount(item.badge);
+                  const showBadge = badgeCount > 0;
+                  
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild className={getNavClassName(item.url)}>
+                        <Link to={item.url}>
+                          <item.icon className={cn(
+                            "h-5 w-5", 
+                            collapsed ? "mx-auto" : "mr-3",
+                            item.badge === 'triage' && badgeCount > 0 ? "text-amber-500" : ""
+                          )} />
+                          {!collapsed && (
+                            <div className="flex items-center justify-between flex-1">
+                              <span>{item.title}</span>
+                              {showBadge && (
+                                <Badge 
+                                  variant={item.badge === 'triage' ? "destructive" : "destructive"} 
+                                  className="text-xs"
+                                >
+                                  {badgeCount}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Integrations Section - Admin Only */}
         {permissions.isAdmin && (
