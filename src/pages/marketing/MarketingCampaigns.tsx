@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSyncDepartment } from "@/hooks/useSyncDepartment";
 import {
   Megaphone, Plus, Search, BarChart3, Send, CheckCircle, 
-  MessageCircle, TrendingUp, Filter, LayoutDashboard, List
+  MessageCircle, TrendingUp, Filter, LayoutDashboard, List, FolderOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,8 @@ import CampaignStatusBadge from "@/components/marketing/CampaignStatusBadge";
 import CampaignProgressBar from "@/components/marketing/CampaignProgressBar";
 import CampaignDetailModal from "@/components/marketing/CampaignDetailModal";
 import CampaignTimelineChart from "@/components/marketing/CampaignTimelineChart";
-import CampaignCreator from "@/components/marketing/CampaignCreator";
+import CampaignWizard from "@/components/marketing/CampaignWizard";
+import ContactListManager from "@/components/marketing/ContactListManager";
 import SyncTemplatesButton from "@/components/campaigns/SyncTemplatesButton";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -136,7 +137,7 @@ export default function MarketingCampaigns() {
 
         {/* Main Tabs */}
         <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <LayoutDashboard className="h-4 w-4" />
               Dashboard
@@ -144,6 +145,10 @@ export default function MarketingCampaigns() {
             <TabsTrigger value="campaigns" className="flex items-center gap-2">
               <List className="h-4 w-4" />
               Campanhas
+            </TabsTrigger>
+            <TabsTrigger value="lists" className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              Listas
             </TabsTrigger>
             <TabsTrigger value="create" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
