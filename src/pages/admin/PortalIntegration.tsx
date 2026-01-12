@@ -79,7 +79,8 @@ export default function PortalIntegration() {
   const portals = [
     { name: 'ZAP Imóveis', logo: '🏠', color: 'bg-orange-500' },
     { name: 'Viva Real', logo: '🏡', color: 'bg-green-500' },
-    { name: 'OLX Imóveis', logo: '📦', color: 'bg-purple-500' }
+    { name: 'OLX Imóveis', logo: '📦', color: 'bg-purple-500' },
+    { name: 'Chaves na Mão', logo: '🔑', color: 'bg-yellow-500' }
   ];
 
   const getStatusBadge = (status: string) => {
