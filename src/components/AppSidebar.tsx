@@ -7,7 +7,8 @@ import {
   TrendingUp,
   Puzzle,
   Settings,
-  ChevronRight
+  ChevronRight,
+  Briefcase
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -231,6 +232,14 @@ export function AppSidebar() {
               <CollapsibleContent>
                 <SidebarGroupContent>
                   <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild className={getNavClassName('/admin/gestao')}>
+                        <Link to="/admin/gestao">
+                          <Briefcase className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                          {!collapsed && <span>Gestão</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild className={getNavClassName('/admin')}>
                         <Link to="/admin">

@@ -30,6 +30,7 @@ import SystemSettings from "./pages/admin/SystemSettings";
 import AIAgentConfig from "./pages/admin/AIAgentConfig";
 import C2SDashboard from "./pages/admin/C2SDashboard";
 import PortalIntegration from "./pages/admin/PortalIntegration";
+import ManagementDashboard from "./pages/admin/ManagementDashboard";
 import { AdminGuard } from "./components/guards/AdminGuard";
 import { MarketingGuard } from "./components/guards/MarketingGuard";
 // Marketing Module
@@ -253,6 +254,13 @@ const App = () => (
                     <ProtectedRoute>
                       <AdminGuard>
                         <PortalIntegration />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/gestao" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <ManagementDashboard />
                       </AdminGuard>
                     </ProtectedRoute>
                   } />
