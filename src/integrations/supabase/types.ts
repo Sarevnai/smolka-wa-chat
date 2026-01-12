@@ -1579,6 +1579,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_my_department: {
+        Args: never
+        Returns: Database["public"]["Enums"]["department_type"]
+      }
       get_user_department: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["department_type"]
