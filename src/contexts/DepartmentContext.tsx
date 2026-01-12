@@ -51,14 +51,20 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
         // Check if user is admin
         const { data: functions } = await supabase
           .from('user_functions')
-          .select('function, department_code')
+          .select('function')
           .eq('user_id', user.id);
 
         const hasAdmin = functions?.some(f => f.function === 'admin') || false;
         setIsAdmin(hasAdmin);
 
-        // Get user's department
-        const deptCode = functions?.find(f => f.department_code)?.department_code || null;
+        // Get user's department from profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('department_code')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        const deptCode = profile?.department_code || null;
         setUserDepartment(deptCode);
 
         // Load saved preference for admins or use user's department
