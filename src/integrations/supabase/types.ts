@@ -86,6 +86,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_behavior_config: {
+        Row: {
+          created_at: string | null
+          essential_questions: Json | null
+          functions: Json | null
+          id: string
+          reengagement_hours: number | null
+          require_cpf_for_visit: boolean | null
+          send_cold_leads: boolean | null
+          updated_at: string | null
+          visit_schedule: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          essential_questions?: Json | null
+          functions?: Json | null
+          id?: string
+          reengagement_hours?: number | null
+          require_cpf_for_visit?: boolean | null
+          send_cold_leads?: boolean | null
+          updated_at?: string | null
+          visit_schedule?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          essential_questions?: Json | null
+          functions?: Json | null
+          id?: string
+          reengagement_hours?: number | null
+          require_cpf_for_visit?: boolean | null
+          send_cold_leads?: boolean | null
+          updated_at?: string | null
+          visit_schedule?: Json | null
+        }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           context_data: Json | null
@@ -1180,14 +1216,21 @@ export type Database = {
       }
       portal_leads_log: {
         Row: {
+          ai_attended: boolean | null
+          ai_attended_at: string | null
           client_listing_id: string | null
           contact_email: string | null
           contact_id: string | null
           contact_name: string | null
           contact_phone: string | null
           created_at: string | null
+          crm_sent_at: string | null
+          crm_status: string | null
+          day_of_week: number | null
           error_message: string | null
+          hour_of_day: number | null
           id: string
+          lead_temperature: string | null
           message: string | null
           origin_lead_id: string | null
           origin_listing_id: string | null
@@ -1199,14 +1242,21 @@ export type Database = {
           transaction_type: string | null
         }
         Insert: {
+          ai_attended?: boolean | null
+          ai_attended_at?: string | null
           client_listing_id?: string | null
           contact_email?: string | null
           contact_id?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          crm_sent_at?: string | null
+          crm_status?: string | null
+          day_of_week?: number | null
           error_message?: string | null
+          hour_of_day?: number | null
           id?: string
+          lead_temperature?: string | null
           message?: string | null
           origin_lead_id?: string | null
           origin_listing_id?: string | null
@@ -1218,14 +1268,21 @@ export type Database = {
           transaction_type?: string | null
         }
         Update: {
+          ai_attended?: boolean | null
+          ai_attended_at?: string | null
           client_listing_id?: string | null
           contact_email?: string | null
           contact_id?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          crm_sent_at?: string | null
+          crm_status?: string | null
+          day_of_week?: number | null
           error_message?: string | null
+          hour_of_day?: number | null
           id?: string
+          lead_temperature?: string | null
           message?: string | null
           origin_lead_id?: string | null
           origin_listing_id?: string | null
