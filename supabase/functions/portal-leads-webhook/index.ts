@@ -79,7 +79,15 @@ serve(async (req) => {
       .eq('setting_key', 'webhook_token')
       .maybeSingle();
 
-    const savedToken = tokenSetting?.setting_value;
+    // Parse token value - it's stored as JSON in setting_value
+    let savedToken = tokenSetting?.setting_value;
+    if (typeof savedToken === 'string') {
+      try {
+        savedToken = JSON.parse(savedToken);
+      } catch {
+        // Keep as is if not valid JSON
+      }
+    }
 
     // Validar token
     if (!token || !savedToken || token !== savedToken) {
