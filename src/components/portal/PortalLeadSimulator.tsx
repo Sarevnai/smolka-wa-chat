@@ -413,12 +413,13 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
         
         if (error) throw error;
         
-        if (data?.success && data?.messages) {
+          if (data?.success && data?.messages) {
           // Add AI responses
           for (const msg of data.messages) {
             await delay(500);
             if (msg.type === 'image' && msg.imageUrl) {
-              addMessage('bot', msg.content, msg.imageUrl, 'real');
+              // Use 'image' type for proper rendering
+              addMessage('image', msg.content, msg.imageUrl, 'real');
             } else {
               addMessage('bot', msg.content, undefined, 'real');
             }
