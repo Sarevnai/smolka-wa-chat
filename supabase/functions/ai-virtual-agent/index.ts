@@ -1197,6 +1197,521 @@ async function generateAudio(text: string, config: AIAgentConfig): Promise<{ aud
   }
 }
 
+// ========== PORTAL LEAD QUALIFICATION FUNCTIONS ==========
+
+interface EssentialQuestion {
+  id: string;
+  question: string;
+  category: string;
+  isQualifying: boolean;
+  isLocked: boolean;
+  order: number;
+  enabled: boolean;
+}
+
+interface AIBehaviorConfig {
+  id: string;
+  essential_questions: EssentialQuestion[];
+  functions: any[];
+  reengagement_hours: number;
+  send_cold_leads: boolean;
+  require_cpf_for_visit: boolean;
+  visit_schedule: any;
+}
+
+/**
+ * Get AI behavior config from database
+ */
+async function getAIBehaviorConfig(): Promise<AIBehaviorConfig | null> {
+  const { data } = await supabase
+    .from('ai_behavior_config')
+    .select('*')
+    .limit(1)
+    .single();
+  return data as AIBehaviorConfig | null;
+}
+
+/**
+ * Check if phone number has a recent portal lead (within 48h)
+ */
+async function isPortalLead(phoneNumber: string): Promise<{
+  isPortal: boolean;
+  portalData?: any;
+  qualificationId?: string;
+  qualificationData?: any;
+}> {
+  // Clean phone number for comparison
+  const cleanPhone = phoneNumber.replace(/\D/g, '');
+  
+  // Search for recent portal leads
+  const { data } = await supabase
+    .from('portal_leads_log')
+    .select('*')
+    .or(`contact_phone.eq.${phoneNumber},contact_phone.eq.${cleanPhone},contact_phone.ilike.%${cleanPhone.slice(-8)}%`)
+    .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  
+  if (!data) {
+    return { isPortal: false };
+  }
+  
+  // Get associated qualification if exists
+  let qualificationData = null;
+  if (data.qualification_id) {
+    const { data: qual } = await supabase
+      .from('lead_qualification')
+      .select('*')
+      .eq('id', data.qualification_id)
+      .single();
+    qualificationData = qual;
+  } else {
+    // Try to find by phone number
+    const { data: qual } = await supabase
+      .from('lead_qualification')
+      .select('*')
+      .or(`phone_number.eq.${phoneNumber},phone_number.eq.${cleanPhone}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    qualificationData = qual;
+  }
+  
+  return {
+    isPortal: true,
+    portalData: data,
+    qualificationId: qualificationData?.id || data.qualification_id,
+    qualificationData
+  };
+}
+
+/**
+ * Update lead qualification in database
+ */
+async function updateLeadQualification(
+  qualificationId: string, 
+  updates: Record<string, any>
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('lead_qualification')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', qualificationId);
+    
+  if (error) {
+    console.error('❌ Error updating lead qualification:', error);
+    return false;
+  }
+  
+  console.log('✅ Lead qualification updated:', updates);
+  return true;
+}
+
+/**
+ * Detect if lead is a broker or curious (disqualify)
+ */
+function detectDisqualificationReason(message: string, history: string[]): {
+  isDisqualified: boolean;
+  reason?: 'corretor' | 'curioso' | 'sem_interesse' | 'fora_perfil';
+} {
+  const lower = message.toLowerCase();
+  const fullContext = [message, ...history].join(' ').toLowerCase();
+  
+  // Corretor/Imobiliária patterns
+  const corretorPatterns = /corretor|imobili[aá]ria|parceria|tenho.*cliente|represento?|capta[çc][aã]o|creci|sou.*corretor|trabalho.*imobili/i;
+  if (corretorPatterns.test(fullContext)) {
+    return { isDisqualified: true, reason: 'corretor' };
+  }
+  
+  // Curioso patterns (very vague responses, no real interest)
+  const curiosoCount = (fullContext.match(/s[oó].*olhando|s[oó].*curiosidade|depois.*vejo|talvez|quem sabe|n[aã]o sei/gi) || []).length;
+  if (curiosoCount >= 2) {
+    return { isDisqualified: true, reason: 'curioso' };
+  }
+  
+  // Sem interesse patterns
+  const semInteressePatterns = /n[aã]o.*interesse|desist|n[aã]o.*mais|n[aã]o.*quero|cancel/i;
+  if (semInteressePatterns.test(lower)) {
+    return { isDisqualified: true, reason: 'sem_interesse' };
+  }
+  
+  return { isDisqualified: false };
+}
+
+/**
+ * Calculate qualification score based on answers
+ */
+function calculateQualificationScore(answers: Record<string, string>, questions: EssentialQuestion[]): number {
+  if (!questions || questions.length === 0) return 0;
+  
+  const qualifyingQuestions = questions.filter(q => q.isQualifying && q.enabled);
+  if (qualifyingQuestions.length === 0) return 50; // Default if no qualifying questions
+  
+  let answeredQualifying = 0;
+  for (const q of qualifyingQuestions) {
+    if (answers[q.id] && answers[q.id].trim().length > 0) {
+      answeredQualifying++;
+    }
+  }
+  
+  // Base score from answered qualifying questions (0-70 points)
+  const baseScore = Math.round((answeredQualifying / qualifyingQuestions.length) * 70);
+  
+  // Bonus for total answers (0-30 points)
+  const totalAnswered = Object.keys(answers).filter(k => answers[k] && answers[k].trim().length > 0).length;
+  const totalQuestions = questions.filter(q => q.enabled).length;
+  const bonusScore = Math.round((Math.min(totalAnswered, totalQuestions) / totalQuestions) * 30);
+  
+  return Math.min(100, baseScore + bonusScore);
+}
+
+/**
+ * Extract answer from message for a specific question
+ */
+function extractAnswerFromMessage(message: string, question: EssentialQuestion): string | null {
+  const lower = message.toLowerCase();
+  
+  // Category-specific extraction
+  switch (question.category) {
+    case 'operation':
+      // Tipo de operação: compra ou locação
+      if (/compra|compr[aá]r|adquir|aquisi[çc]/i.test(lower)) return 'compra';
+      if (/alug|loca[çc]|locar/i.test(lower)) return 'locacao';
+      break;
+      
+    case 'property':
+      // Tipo de imóvel
+      if (/apartamento|apto/i.test(lower)) return 'apartamento';
+      if (/casa/i.test(lower)) return 'casa';
+      if (/terreno/i.test(lower)) return 'terreno';
+      if (/cobertura/i.test(lower)) return 'cobertura';
+      if (/comercial|loja|sala/i.test(lower)) return 'comercial';
+      if (/kitnet|kitnete|kit/i.test(lower)) return 'kitnet';
+      break;
+      
+    case 'location':
+      // Extract neighborhood/region
+      const neighborhoods = getAllNeighborhoods();
+      for (const n of neighborhoods) {
+        if (lower.includes(n.toLowerCase())) return n;
+      }
+      break;
+      
+    case 'lead_info':
+      // Name, contact info - return the message as-is if it looks like an answer
+      if (message.trim().length > 2 && message.trim().length < 100) {
+        return message.trim();
+      }
+      break;
+  }
+  
+  return null;
+}
+
+/**
+ * Build system prompt for portal lead qualification
+ */
+function buildPortalLeadPrompt(
+  config: AIAgentConfig,
+  behaviorConfig: AIBehaviorConfig,
+  portalData: any,
+  qualificationData: any,
+  contactName?: string
+): string {
+  const basePrompt = buildSystemPrompt(config, contactName);
+  
+  // Get enabled essential questions sorted by order
+  const questions = (behaviorConfig.essential_questions || [])
+    .filter((q: EssentialQuestion) => q.enabled)
+    .sort((a: EssentialQuestion, b: EssentialQuestion) => a.order - b.order);
+  
+  const answeredQuestions = qualificationData?.answers || {};
+  const questionsAsked = qualificationData?.questions_asked || 0;
+  
+  // Find next unanswered question
+  const unansweredQuestions = questions.filter((q: EssentialQuestion) => !answeredQuestions[q.id]);
+  const nextQuestion = unansweredQuestions[0];
+  
+  const portalContext = `
+📍 CONTEXTO DO LEAD (PORTAL - PRIORIDADE MÁXIMA):
+- Portal de origem: ${portalData?.portal_origin || 'Não informado'}
+- Imóvel de interesse: ${portalData?.origin_listing_id ? `Código ${portalData.origin_listing_id}` : 'Não especificado'}
+- Tipo de transação: ${portalData?.transaction_type === 'SELL' ? 'COMPRA' : portalData?.transaction_type === 'RENT' ? 'LOCAÇÃO' : 'Não especificado'}
+- Mensagem original: ${portalData?.message || 'Sem mensagem'}
+- Perguntas já feitas: ${questionsAsked}
+- Respostas coletadas: ${JSON.stringify(answeredQuestions)}
+
+📋 PRÓXIMA PERGUNTA A FAZER (faça UMA pergunta por vez, de forma natural):
+${nextQuestion ? `→ ${nextQuestion.question}` : '✅ Todas as perguntas essenciais já foram respondidas!'}
+
+📋 PERGUNTAS ESSENCIAIS RESTANTES:
+${unansweredQuestions.map((q: EssentialQuestion) => `- [${q.category}] ${q.question}`).join('\n') || '(todas respondidas)'}
+
+⚠️ REGRAS PARA LEADS DE PORTAL (CRÍTICO):
+1. O lead JÁ demonstrou interesse em um imóvel específico - USE ISSO como gancho inicial!
+2. Faça as perguntas essenciais de forma NATURAL, NÃO como interrogatório
+3. Pergunte UMA coisa por vez
+4. Se detectar que é CORRETOR (fala de parceria, clientes, CRECI), seja educado e encerre: "Obrigada pelo interesse! No momento estamos focados em atendimento direto a compradores. 😊"
+5. Se detectar CURIOSO (respostas muito vagas repetidas), tente reconverter UMA vez antes de encerrar
+6. Quando tiver respostas suficientes (score >= 70), use enviar_lead_c2s para vendas ou continue atendimento para locação
+
+🎯 OBJETIVO PRINCIPAL: Qualificar rapidamente com as perguntas essenciais e enviar para corretor (venda) ou atender diretamente (locação)
+
+💡 DICA DE ABERTURA (primeira mensagem para lead de portal):
+"Oi! Vi que você demonstrou interesse num imóvel pelo ${portalData?.portal_origin || 'portal'} 🏠 ${portalData?.origin_listing_id ? `(código ${portalData.origin_listing_id})` : ''}"
+`;
+
+  return basePrompt + portalContext;
+}
+
+/**
+ * Handle portal lead qualification flow
+ */
+async function handlePortalLeadQualification(
+  phoneNumber: string,
+  messageBody: string,
+  messageType: string,
+  contactName: string | undefined,
+  portalCheck: { isPortal: boolean; portalData?: any; qualificationId?: string; qualificationData?: any },
+  behaviorConfig: AIBehaviorConfig,
+  config: AIAgentConfig
+): Promise<Response> {
+  console.log('🎯 Handling portal lead qualification flow');
+  
+  const qualificationId = portalCheck.qualificationId;
+  const qualificationData = portalCheck.qualificationData || {};
+  const portalData = portalCheck.portalData;
+  
+  // Get enabled essential questions
+  const questions = (behaviorConfig.essential_questions || [])
+    .filter((q: EssentialQuestion) => q.enabled)
+    .sort((a: EssentialQuestion, b: EssentialQuestion) => a.order - b.order);
+  
+  // Get current answers
+  const currentAnswers = qualificationData.answers || {};
+  const questionsAsked = qualificationData.questions_asked || 0;
+  
+  // Mark as AI attended on first interaction
+  if (!portalData?.ai_attended) {
+    await supabase
+      .from('portal_leads_log')
+      .update({ 
+        ai_attended: true,
+        ai_attended_at: new Date().toISOString()
+      })
+      .eq('id', portalData.id);
+    console.log('✅ Marked portal lead as AI attended');
+  }
+  
+  // Check for disqualification
+  const historyMessages = await getRecentMessages(phoneNumber, 10);
+  const historyText = historyMessages.map((m: any) => m.body || '').filter(Boolean);
+  const disqualCheck = detectDisqualificationReason(messageBody, historyText);
+  
+  if (disqualCheck.isDisqualified && qualificationId) {
+    console.log(`❌ Lead disqualified: ${disqualCheck.reason}`);
+    
+    await updateLeadQualification(qualificationId, {
+      qualification_status: 'disqualified',
+      disqualification_reason: disqualCheck.reason,
+      completed_at: new Date().toISOString()
+    });
+    
+    // Send polite closing message
+    let closingMessage = '';
+    switch (disqualCheck.reason) {
+      case 'corretor':
+        closingMessage = 'Obrigada pelo interesse! No momento estamos focados em atendimento direto a compradores e locatários. Boas vendas! 😊';
+        break;
+      case 'curioso':
+        closingMessage = 'Entendi! Quando tiver um interesse mais definido, pode nos procurar. Até breve! 😊';
+        break;
+      case 'sem_interesse':
+        closingMessage = 'Tudo bem! Se mudar de ideia no futuro, estaremos aqui. Obrigada! 😊';
+        break;
+      default:
+        closingMessage = 'Obrigada pelo contato! 😊';
+    }
+    
+    await sendWhatsAppMessage(phoneNumber, closingMessage);
+    
+    return new Response(
+      JSON.stringify({ success: true, action: 'lead_disqualified', reason: disqualCheck.reason }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  // Try to extract answers from current message
+  let newAnswers = { ...currentAnswers };
+  let extractedAny = false;
+  
+  for (const q of questions) {
+    if (!newAnswers[q.id]) {
+      const answer = extractAnswerFromMessage(messageBody, q);
+      if (answer) {
+        newAnswers[q.id] = answer;
+        extractedAny = true;
+        console.log(`✅ Extracted answer for ${q.category}: ${answer}`);
+      }
+    }
+  }
+  
+  // Calculate new score
+  const newScore = calculateQualificationScore(newAnswers, questions);
+  console.log(`📊 Qualification score: ${newScore}%`);
+  
+  // Update qualification if we extracted new answers
+  if (extractedAny && qualificationId) {
+    await updateLeadQualification(qualificationId, {
+      answers: newAnswers,
+      questions_answered: Object.keys(newAnswers).length,
+      qualification_score: newScore,
+      last_interaction_at: new Date().toISOString()
+    });
+  }
+  
+  // Check if qualified (score >= 70) and is for sale (venda)
+  const isForSale = portalData?.transaction_type === 'SELL' || newAnswers['operation'] === 'compra';
+  
+  if (newScore >= 70 && isForSale && qualificationId) {
+    console.log('🎉 Lead qualified! Sending to C2S...');
+    
+    // Build lead data for C2S
+    const leadData = {
+      nome: contactName || portalData?.contact_name || 'Lead Portal',
+      interesse: `Lead qualificado do portal ${portalData?.portal_origin}`,
+      tipo_imovel: newAnswers['property'] || '',
+      bairro: newAnswers['location'] || '',
+      faixa_preco: newAnswers['budget'] || '',
+      quartos: 0
+    };
+    
+    // Build conversation history
+    const historyForC2S = historyMessages
+      .slice(-10)
+      .map((m: any) => `[${m.direction === 'incoming' ? 'Cliente' : 'Agente'}]: ${m.body}`)
+      .join('\n');
+    
+    const c2sResult = await sendLeadToC2S(leadData, phoneNumber, historyForC2S, contactName);
+    
+    if (c2sResult.success) {
+      // Update qualification as sent to CRM
+      await updateLeadQualification(qualificationId, {
+        qualification_status: 'sent_to_crm',
+        sent_to_crm_at: new Date().toISOString()
+      });
+      
+      // Update portal lead log
+      await supabase
+        .from('portal_leads_log')
+        .update({ 
+          crm_status: 'sent',
+          crm_sent_at: new Date().toISOString()
+        })
+        .eq('id', portalData.id);
+      
+      // Send handoff message
+      const handoffMessage = `Perfeito${contactName ? `, ${contactName}` : ''}! 🎉\n\nVou te passar para um de nossos corretores especializados em vendas. Ele vai entrar em contato pelo WhatsApp em breve! 😊`;
+      await sendWhatsAppMessage(phoneNumber, handoffMessage);
+      
+      return new Response(
+        JSON.stringify({ success: true, action: 'lead_qualified_sent_crm', c2sLeadId: c2sResult.c2s_lead_id }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+  
+  // Continue with AI conversation to collect more info
+  // Update questions asked counter
+  if (qualificationId) {
+    await updateLeadQualification(qualificationId, {
+      questions_asked: questionsAsked + 1,
+      total_messages: (qualificationData.total_messages || 0) + 1,
+      ai_messages: (qualificationData.ai_messages || 0) + 1,
+      last_interaction_at: new Date().toISOString()
+    });
+  }
+  
+  // Build specialized prompt for portal leads
+  const systemPrompt = buildPortalLeadPrompt(config, behaviorConfig, portalData, { ...qualificationData, answers: newAnswers }, contactName);
+  
+  // Get conversation history
+  const conversationHistory = historyMessages
+    .reverse()
+    .map((m: any) => ({
+      role: m.direction === 'incoming' ? 'user' : 'assistant',
+      content: m.body || ''
+    }))
+    .filter((m: any) => m.content);
+  
+  conversationHistory.push({ role: 'user', content: messageBody });
+  
+  // Call AI
+  try {
+    const aiResult = await callAIWithTools(config, [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory
+    ], config.vista_integration_enabled !== false);
+    
+    let aiMessage = sanitizeAIMessage(aiResult.content);
+    
+    // Validate response
+    const validation = validateAIResponse(aiMessage);
+    if (!validation.valid) {
+      aiMessage = FALLBACK_RESPONSE;
+    }
+    
+    // Send response (respecting audio preference)
+    const useAudio = messageType === 'audio' && config.audio_enabled;
+    
+    if (useAudio) {
+      const audioResult = await generateAudio(aiMessage, config);
+      if (audioResult) {
+        await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, aiMessage, audioResult.isVoiceMessage);
+      } else {
+        await sendWhatsAppMessage(phoneNumber, aiMessage);
+      }
+    } else {
+      const fragments = fragmentMessage(aiMessage, 100);
+      for (let i = 0; i < Math.min(fragments.length, 3); i++) {
+        await sendWhatsAppMessage(phoneNumber, fragments[i]);
+        if (i < fragments.length - 1) await sleep(1500);
+      }
+    }
+    
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        action: 'qualification_continued',
+        score: newScore,
+        answersCollected: Object.keys(newAnswers).length 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+    
+  } catch (error) {
+    console.error('❌ Error in portal lead qualification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get recent messages for a phone number
+ */
+async function getRecentMessages(phoneNumber: string, limit: number = 10): Promise<any[]> {
+  const { data } = await supabase
+    .from('messages')
+    .select('body, direction, created_at')
+    .or(`wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber}`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  
+  return data || [];
+}
+
 // ========== TRIAGE FLOW FUNCTIONS ==========
 
 /**
@@ -1758,6 +2273,36 @@ serve(async (req) => {
       }
     }
     // ========== END TRIAGE FLOW ==========
+
+    // ========== PORTAL LEAD QUALIFICATION CHECK ==========
+    // Check if this is a portal lead and handle with qualification flow
+    const behaviorConfig = await getAIBehaviorConfig();
+    const portalCheck = await isPortalLead(phoneNumber);
+    
+    if (portalCheck.isPortal && behaviorConfig) {
+      console.log('📍 Portal lead detected!', {
+        portal: portalCheck.portalData?.portal_origin,
+        qualificationId: portalCheck.qualificationId,
+        currentScore: portalCheck.qualificationData?.qualification_score
+      });
+      
+      // Only use qualification flow if not already sent to CRM or disqualified
+      const qualStatus = portalCheck.qualificationData?.qualification_status;
+      if (!qualStatus || ['pending', 'qualifying'].includes(qualStatus)) {
+        return handlePortalLeadQualification(
+          phoneNumber,
+          messageBody,
+          messageType,
+          contactName,
+          portalCheck,
+          behaviorConfig,
+          config
+        );
+      } else {
+        console.log(`📋 Portal lead already processed (status: ${qualStatus}), continuing normal flow`);
+      }
+    }
+    // ========== END PORTAL LEAD QUALIFICATION CHECK ==========
 
     // ========== PENDING PROPERTIES & NEGOTIATION LOGIC ==========
     // Check if user wants to see another property option
