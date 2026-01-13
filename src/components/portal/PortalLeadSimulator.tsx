@@ -88,6 +88,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
   const [waitingForInput, setWaitingForInput] = useState(false);
   const [simulationPhase, setSimulationPhase] = useState<'idle' | 'initial' | 'conversation'>('idle');
   const [currentProperty, setCurrentProperty] = useState<VistaProperty | null>(null);
+  const [shownPropertyCodes, setShownPropertyCodes] = useState<string[]>([]); // Track shown properties
   const chatEndRef = useRef<HTMLDivElement>(null);
   
   // Lead configuration
@@ -175,6 +176,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
     setSimulationPhase('initial');
     setWaitingForInput(false);
     setCurrentProperty(null);
+    setShownPropertyCodes([]); // Reset shown properties
 
     try {
       // Step 1: Call real simulation endpoint
@@ -263,6 +265,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
     setSimulationPhase('initial');
     setWaitingForInput(false);
     setCurrentProperty(null);
+    setShownPropertyCodes([]); // Reset shown properties
 
     try {
       // Step 1: Receive webhook
@@ -406,12 +409,19 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
             transactionType: leadConfig.transactionType,
             simulateResponse: {
               userMessage,
-              conversationHistory
+              conversationHistory,
+              excludeProperties: shownPropertyCodes // Pass already shown properties
             }
           }
         });
         
         if (error) throw error;
+        
+        // Track newly shown properties
+        if (data?.shownProperties && data.shownProperties.length > 0) {
+          setShownPropertyCodes(prev => [...prev, ...data.shownProperties]);
+          console.log('📦 Updated shown properties:', [...shownPropertyCodes, ...data.shownProperties]);
+        }
         
           if (data?.success && data?.messages) {
           // Add AI responses
@@ -497,6 +507,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
     setIsRunning(false);
     setInputValue('');
     setCurrentProperty(null);
+    setShownPropertyCodes([]); // Reset shown properties
   };
 
   // Quick responses based on test mode
