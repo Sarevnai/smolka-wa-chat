@@ -165,17 +165,21 @@ IMPORTANTE:
           if (alternatives.length > 0) {
             const altProperty = alternatives[0];
             
+            // Normalize field names for Vista CRM response
+            const altBairro = altProperty.bairro || altProperty.Bairro || 'Localização';
+            const altFoto = altProperty.foto_destaque || altProperty.FotoDestaque || altProperty.Foto;
+            
             simulatedMessages.push({
               type: 'text',
               content: `Olha essa outra opção que separei pra você! 🏠`,
               timestamp: new Date(Date.now() + 1000).toISOString()
             });
             
-            if (altProperty.foto_destaque) {
+            if (altFoto) {
               simulatedMessages.push({
                 type: 'image',
-                content: `Foto alternativa - ${altProperty.bairro}`,
-                imageUrl: altProperty.foto_destaque,
+                content: `Foto alternativa - ${altBairro}`,
+                imageUrl: altFoto,
                 timestamp: new Date(Date.now() + 2000).toISOString()
               });
             }
@@ -346,7 +350,18 @@ IMPORTANTE:
 });
 
 function formatPropertyDetails(property: any, transactionType: string): string {
-  const valor = transactionType === 'SELL' ? property.valor_venda : property.valor_locacao;
+  // Normalize fields - Vista CRM can return snake_case or PascalCase
+  const categoria = property.categoria || property.Categoria || 'Imóvel';
+  const bairro = property.bairro || property.Bairro || 'Localização não informada';
+  const dormitorios = property.dormitorios || property.Dormitorios;
+  const suites = property.suites || property.Suites;
+  const areaUtil = property.area_util || property.AreaPrivativa || property.AreaUtil;
+  const vagas = property.vagas || property.Vagas;
+  const valorVenda = property.valor_venda || property.ValorVenda;
+  const valorLocacao = property.valor_locacao || property.ValorLocacao;
+  const codigo = property.codigo || property.Codigo;
+  
+  const valor = transactionType === 'SELL' ? valorVenda : valorLocacao;
   const tipoTransacao = transactionType === 'SELL' ? 'Venda' : 'Locação';
   
   const priceFormatted = new Intl.NumberFormat('pt-BR', { 
@@ -356,15 +371,15 @@ function formatPropertyDetails(property: any, transactionType: string): string {
   }).format(valor || 0);
 
   const lines = [
-    `📍 ${property.bairro || 'Localização não informada'}`,
+    `📍 ${bairro}`,
     '',
-    `• ${property.categoria || 'Imóvel'}`,
-    property.dormitorios ? `• ${property.dormitorios} dormitório(s)${property.suites ? ` (${property.suites} suíte)` : ''}` : null,
-    property.area_util ? `• ${property.area_util}m²` : null,
-    property.vagas ? `• ${property.vagas} vaga(s)` : null,
+    `• ${categoria}`,
+    dormitorios ? `• ${dormitorios} dormitório(s)${suites ? ` (${suites} suíte)` : ''}` : null,
+    areaUtil ? `• ${areaUtil}m²` : null,
+    vagas ? `• ${vagas} vaga(s)` : null,
     `• ${tipoTransacao}: ${priceFormatted}`,
     '',
-    `🔗 smolkaimoveis.com.br/imovel/${property.codigo}`
+    `🔗 smolkaimoveis.com.br/imovel/${codigo}`
   ].filter(Boolean);
 
   return lines.join('\n');
