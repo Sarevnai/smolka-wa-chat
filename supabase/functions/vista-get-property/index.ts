@@ -84,12 +84,24 @@ serve(async (req) => {
       );
     }
 
-    const detalhesSemResultado =
+    // Check if response is empty or contains error message
+    const isEmptyOrError =
+      !data ||
       (Array.isArray(data) && data.length === 0) ||
       (data?.message && typeof data.message === "string" && data.message.toLowerCase().includes("não retornou"));
 
+    // ========== Check if /detalhes returned the property directly ==========
+    // Vista /imoveis/detalhes returns: { "Codigo": "17346", "Categoria": "...", ... }
+    let prop: any = null;
+    
+    if (!isEmptyOrError && data && typeof data === "object" && data.Codigo) {
+      // Direct property object from /detalhes
+      console.log(`[Vista Get Property] Imóvel encontrado via /detalhes (formato direto)`);
+      prop = data;
+    }
+
     // ========== Attempt 2: /imoveis/listar (fallback) ==========
-    if (detalhesSemResultado || (!data || Object.keys(data).length === 0)) {
+    if (!prop && isEmptyOrError) {
       console.log(`[Vista Get Property] /detalhes sem resultado, tentando /imoveis/listar (fallback)...`);
 
       // Vista API hard limit per docs/logs: quantidade <= 50
@@ -123,23 +135,23 @@ serve(async (req) => {
       }
     }
 
-    // ========== Find property in response ==========
-    let prop: any = null;
+    // ========== Find property in response (only if not already found) ==========
+    if (!prop) {
+      if (data?.[codigo] && typeof data[codigo] === "object") {
+        prop = data[codigo];
+      } else if (data?.[codigo.toString()] && typeof data[codigo.toString()] === "object") {
+        prop = data[codigo.toString()];
+      } else if (data && typeof data === "object") {
+        for (const [key, value] of Object.entries(data)) {
+          if (["paginas", "pagina", "total", "qtd", "status", "message"].includes(key)) continue;
+          if (!value || typeof value !== "object") continue;
 
-    if (data?.[codigo] && typeof data[codigo] === "object") {
-      prop = data[codigo];
-    } else if (data?.[codigo.toString()] && typeof data[codigo.toString()] === "object") {
-      prop = data[codigo.toString()];
-    } else if (data && typeof data === "object") {
-      for (const [key, value] of Object.entries(data)) {
-        if (["paginas", "pagina", "total", "qtd", "status", "message"].includes(key)) continue;
-        if (!value || typeof value !== "object") continue;
-
-        const entry = value as Record<string, any>;
-        const entryCodigo = (entry.Codigo ?? key)?.toString();
-        if (entryCodigo === codigo.toString()) {
-          prop = entry;
-          break;
+          const entry = value as Record<string, any>;
+          const entryCodigo = (entry.Codigo ?? key)?.toString();
+          if (entryCodigo === codigo.toString()) {
+            prop = entry;
+            break;
+          }
         }
       }
     }
