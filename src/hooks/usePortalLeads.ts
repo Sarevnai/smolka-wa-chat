@@ -114,7 +114,15 @@ export function usePortalConfig() {
       const config: Partial<PortalConfig> = {};
       data?.forEach(setting => {
         const key = setting.setting_key as keyof PortalConfig;
-        const value = setting.setting_value;
+        // Parse JSONB value - it could be a string, boolean, or already parsed
+        let value = setting.setting_value;
+        if (typeof value === 'string') {
+          try {
+            value = JSON.parse(value);
+          } catch {
+            // Keep as string if not valid JSON
+          }
+        }
         
         if (key === 'auto_create_conversation' || key === 'send_welcome_message') {
           config[key] = value === 'true' || value === true;
@@ -136,7 +144,7 @@ export function useSavePortalConfig() {
       const settings = Object.entries(config).map(([key, value]) => ({
         setting_category: 'portais',
         setting_key: key,
-        setting_value: typeof value === 'boolean' ? String(value) : value,
+        setting_value: JSON.stringify(value),
         description: getSettingDescription(key)
       }));
 
@@ -173,7 +181,7 @@ export function useGenerateToken() {
         .upsert({
           setting_category: 'portais',
           setting_key: 'webhook_token',
-          setting_value: token,
+          setting_value: JSON.stringify(token),
           description: 'Token de autenticação para webhook dos portais imobiliários'
         }, {
           onConflict: 'setting_category,setting_key'
