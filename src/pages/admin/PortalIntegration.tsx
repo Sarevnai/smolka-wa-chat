@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   ArrowLeft, Copy, RefreshCw, Eye, EyeOff, Building2, 
-  CheckCircle2, XCircle, Clock, TrendingUp, Users
+  CheckCircle2, XCircle, Clock, TrendingUp, Users, Check, Star, ExternalLink
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -28,6 +28,14 @@ import {
 import { useContactLists } from "@/hooks/useContactLists";
 
 const SUPABASE_PROJECT_ID = "wpjxsgxxhogzkkuznyke";
+
+// Canal Pro configuration steps
+const canalProSteps = [
+  { step: 1, title: "Acesse o Canal Pro", description: "Entre em canalpro.com.br com suas credenciais" },
+  { step: 2, title: "Vá em Configurações", description: "Menu → Configurações → Recebimento de Leads" },
+  { step: 3, title: "Configure o Webhook", description: "Cole a URL e token na seção de integração webhook" },
+  { step: 4, title: "Teste a integração", description: "Use o botão 'Enviar Lead de Teste' do Canal Pro" }
+];
 
 export default function PortalIntegration() {
   const navigate = useNavigate();
@@ -76,7 +84,7 @@ export default function PortalIntegration() {
     generateToken.mutate();
   };
 
-  const portals = [
+  const individualPortals = [
     { name: 'ZAP Imóveis', logo: '🏠', color: 'bg-orange-500' },
     { name: 'Viva Real', logo: '🏡', color: 'bg-green-500' },
     { name: 'OLX Imóveis', logo: '📦', color: 'bg-purple-500' },
@@ -306,27 +314,118 @@ export default function PortalIntegration() {
           </CardContent>
         </Card>
 
-        {/* Portais Suportados */}
+        {/* Canal Pro - Recomendado */}
+        <Card className="border-2 border-primary bg-gradient-to-r from-primary/5 to-primary/10 relative overflow-hidden">
+          <div className="absolute top-3 right-3">
+            <Badge className="bg-primary text-primary-foreground">
+              <Star className="h-3 w-3 mr-1 fill-current" />
+              Recomendado
+            </Badge>
+          </div>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                <Building2 className="h-10 w-10 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Canal Pro</CardTitle>
+                <CardDescription className="text-base">
+                  Centralize todos os leads de ZAP, Viva Real e OLX em uma única integração
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Benefícios */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg">
+                <Check className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">Configuração Única</p>
+                  <p className="text-xs text-muted-foreground">Uma integração para todos os portais</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg">
+                <Check className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">Tempo Real</p>
+                  <p className="text-xs text-muted-foreground">Leads via webhook instantâneo</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg">
+                <Check className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-sm">Origem Identificada</p>
+                  <p className="text-xs text-muted-foreground">Saiba de qual portal veio o lead</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Portais incluídos */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-muted-foreground">Portais incluídos:</span>
+              <Badge variant="secondary" className="gap-1">🏠 ZAP Imóveis</Badge>
+              <Badge variant="secondary" className="gap-1">🏡 Viva Real</Badge>
+              <Badge variant="secondary" className="gap-1">📦 OLX Imóveis</Badge>
+            </div>
+
+            {/* Passo a Passo */}
+            <div className="border-t pt-4">
+              <p className="font-medium mb-3 flex items-center gap-2">
+                <span>📋</span> Como configurar no Canal Pro
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {canalProSteps.map((item) => (
+                  <div key={item.step} className="p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+                        {item.step}
+                      </span>
+                      <span className="font-medium text-sm">{item.title}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Link para Canal Pro */}
+            <Button variant="outline" className="w-full" asChild>
+              <a href="https://www.canalpro.com.br" target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Acessar Canal Pro
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Portais Individuais */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Portais Suportados</CardTitle>
+            <CardTitle className="text-lg">Portais Individuais</CardTitle>
+            <CardDescription>
+              Configure individualmente caso não utilize o Canal Pro
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              {portals.map((portal) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {individualPortals.map((portal) => (
                 <div 
                   key={portal.name}
-                  className="p-4 border rounded-lg text-center space-y-2"
+                  className="p-4 border rounded-lg text-center space-y-2 hover:border-primary/50 transition-colors"
                 >
                   <span className="text-3xl">{portal.logo}</span>
-                  <p className="font-medium">{portal.name}</p>
-                  <Badge variant="outline" className="text-green-600">
+                  <p className="font-medium text-sm">{portal.name}</p>
+                  <Badge variant="outline" className="text-green-600 text-xs">
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     Suportado
                   </Badge>
                 </div>
               ))}
             </div>
+            <p className="text-sm text-muted-foreground mt-4 text-center">
+              💡 Use a mesma URL e token do webhook acima para configurar cada portal individualmente
+            </p>
           </CardContent>
         </Card>
 
