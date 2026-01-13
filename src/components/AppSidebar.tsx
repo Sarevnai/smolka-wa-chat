@@ -8,7 +8,11 @@ import {
   Puzzle,
   Settings,
   ChevronRight,
-  Briefcase
+  Briefcase,
+  Users,
+  BarChart3,
+  Bell,
+  Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -43,6 +47,14 @@ const integrationItems = [
   { title: "ClickUp", url: "/clickup", icon: Settings },
 ];
 
+const aiItems = [
+  { title: "Dashboard IA", url: "/admin/ia-dashboard", icon: LayoutDashboard },
+  { title: "Leads", url: "/admin/leads", icon: Users },
+  { title: "Comportamento", url: "/admin/ia-comportamento", icon: Settings },
+  { title: "Relatórios", url: "/admin/leads-relatorios", icon: BarChart3 },
+  { title: "Notificações", url: "/admin/ia-notificacoes", icon: Bell },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
@@ -52,6 +64,7 @@ export function AppSidebar() {
   const { isAdmin, userDepartment, activeDepartment, loading } = useDepartment();
   const [adminOpen, setAdminOpen] = useState(false);
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
@@ -207,6 +220,41 @@ export function AppSidebar() {
                         </SidebarMenuSubItem>
                       ))}
                     </SidebarMenuSub>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
+
+        {/* Minha IA Section - Admin Only */}
+        {permissions.isAdmin && (
+          <Collapsible open={aiOpen} onOpenChange={setAiOpen}>
+            <SidebarGroup>
+              <CollapsibleTrigger asChild>
+                <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between text-violet-600">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    {!collapsed && <span>Minha IA</span>}
+                  </div>
+                  {!collapsed && (
+                    <ChevronRight className={cn("h-4 w-4 transition-transform", aiOpen && "rotate-90")} />
+                  )}
+                </SidebarGroupLabel>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {aiItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton asChild className={getNavClassName(item.url)}>
+                          <Link to={item.url}>
+                            <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
+                            {!collapsed && <span>{item.title}</span>}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>
