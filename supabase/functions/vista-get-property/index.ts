@@ -62,9 +62,10 @@ serve(async (req) => {
     // ========== Attempt 1: /imoveis/detalhes (direct by code) ==========
     const pesquisaDetalhes = { fields: detalhesFields };
     const pesquisaDetalhesEncoded = encodeURIComponent(JSON.stringify(pesquisaDetalhes));
-    const urlDetalhes = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&imovel=${codigo}&pesquisa=${pesquisaDetalhesEncoded}`;
+    // Add showSuspended and showInternal to see all properties (like Make.com blueprint)
+    const urlDetalhes = `${VISTA_API_URL}/imoveis/detalhes?key=${VISTA_API_KEY}&imovel=${codigo}&pesquisa=${pesquisaDetalhesEncoded}&showSuspended=1&showInternal=1`;
 
-    console.log(`[Vista Get Property] Tentando /imoveis/detalhes com imovel=${codigo}`);
+    console.log(`[Vista Get Property] Tentando /imoveis/detalhes com imovel=${codigo} (showSuspended=1, showInternal=1)`);
 
     let response = await fetch(urlDetalhes, {
       method: "GET",
