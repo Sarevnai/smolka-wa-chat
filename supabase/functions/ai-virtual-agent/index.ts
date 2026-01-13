@@ -2640,6 +2640,105 @@ serve(async (req) => {
       
       console.log(`📦 Pending properties: ${pendingProperties.length}, Negotiation pending: ${negotiationPending}`);
       
+      // CASE 0: Portal lead with no pending properties - search for similar properties
+      if (pendingProperties.length === 0 && !lastSearchParams) {
+        // Check if this is a portal lead
+        const portalCheckForNext = await isPortalLead(phoneNumber);
+        
+        if (portalCheckForNext.isPortal && portalCheckForNext.portalData) {
+          console.log('🔍 Portal lead wants alternative, searching for similar properties...');
+          
+          const portalData = portalCheckForNext.portalData;
+          const originalListingId = portalData.origin_listing_id || portalData.client_listing_id;
+          
+          // Get original property info to search for similar ones
+          const { data: originalProperty } = await supabase.functions.invoke('vista-get-property', {
+            body: { codigo: originalListingId }
+          });
+          
+          if (originalProperty?.success && originalProperty?.property) {
+            const prop = originalProperty.property;
+            const isRental = portalData.transaction_type === 'RENT';
+            const originalPrice = isRental ? prop.valor_locacao : prop.valor_venda;
+            
+            // Build search params for similar properties
+            const similarSearchParams = {
+              tipo: prop.categoria?.toLowerCase()?.includes('apartamento') ? 'apartamento' :
+                    prop.categoria?.toLowerCase()?.includes('casa') ? 'casa' :
+                    prop.categoria?.toLowerCase()?.includes('terreno') ? 'terreno' : undefined,
+              bairro: prop.bairro,
+              finalidade: isRental ? 'locacao' : 'venda',
+              preco_min: originalPrice ? Math.floor(originalPrice * 0.7) : undefined,
+              preco_max: originalPrice ? Math.ceil(originalPrice * 1.3) : undefined,
+              exclude_codigo: originalListingId // Exclude the original property
+            };
+            
+            console.log('🔍 Searching similar properties with params:', similarSearchParams);
+            
+            const searchResult = await searchProperties(similarSearchParams);
+            
+            if (searchResult.success && searchResult.properties.length > 0) {
+              // Filter out the original property just in case
+              const alternatives = searchResult.properties.filter(
+                (p: any) => p.codigo !== originalListingId
+              );
+              
+              if (alternatives.length > 0) {
+                const nextProperty = alternatives[0];
+                const remainingProperties = alternatives.slice(1);
+                
+                // Send intro message
+                await sendWhatsAppMessage(phoneNumber, "Olha essa outra opção que separei pra você! 🏠");
+                await sleep(1500);
+                
+                // Send photo if available
+                if (nextProperty.foto_destaque) {
+                  await sendWhatsAppImage(phoneNumber, nextProperty.foto_destaque);
+                  await sleep(1000);
+                }
+                
+                // Send property details
+                const propertyText = formatPropertyMessage(nextProperty);
+                await sendWhatsAppMessage(phoneNumber, propertyText);
+                await sleep(1500);
+                await sendWhatsAppMessage(phoneNumber, "Faz mais sentido pra você? 😊");
+                
+                // Save remaining properties and search params
+                await supabase
+                  .from('conversation_states')
+                  .upsert({
+                    phone_number: phoneNumber,
+                    pending_properties: remainingProperties,
+                    last_search_params: similarSearchParams,
+                    updated_at: new Date().toISOString()
+                  }, { onConflict: 'phone_number' });
+                
+                return new Response(
+                  JSON.stringify({ 
+                    success: true, 
+                    action: 'portal_alternative_shown', 
+                    remaining: remainingProperties.length 
+                  }),
+                  { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+              }
+            }
+            
+            // No alternatives found - ask what they didn't like
+            console.log('❌ No similar properties found for portal lead');
+            await sendWhatsAppMessage(phoneNumber, 
+              "Entendi que você quer algo diferente! 😊\n\n" +
+              "Me conta: o que não te agradou nesse? Assim posso buscar algo mais alinhado com o que você procura!"
+            );
+            
+            return new Response(
+              JSON.stringify({ success: true, action: 'asked_for_preferences' }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      }
+      
       // CASE 1: User accepting price negotiation
       if (negotiationPending && /sim|pode|ok|beleza|vamos|t[aá]|fechado|aceito|bora|vamo/i.test(messageBody)) {
         console.log('💰 User accepted higher price, searching with new limit...');
