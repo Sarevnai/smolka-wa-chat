@@ -1056,6 +1056,117 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_qualification: {
+        Row: {
+          ai_messages: number | null
+          answers: Json | null
+          completed_at: string | null
+          conversation_id: string | null
+          created_at: string | null
+          detected_bedrooms: number | null
+          detected_budget_max: number | null
+          detected_budget_min: number | null
+          detected_interest: string | null
+          detected_neighborhood: string | null
+          detected_property_type: string | null
+          disqualification_reason: string | null
+          id: string
+          is_broker: boolean | null
+          is_curious: boolean | null
+          last_interaction_at: string | null
+          last_reengagement_at: string | null
+          needs_reengagement: boolean | null
+          phone_number: string
+          portal_lead_id: string | null
+          qualification_score: number | null
+          qualification_status: string | null
+          questions_answered: number | null
+          questions_asked: number | null
+          reengagement_attempts: number | null
+          sent_to_crm_at: string | null
+          started_at: string | null
+          total_messages: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_messages?: number | null
+          answers?: Json | null
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          detected_bedrooms?: number | null
+          detected_budget_max?: number | null
+          detected_budget_min?: number | null
+          detected_interest?: string | null
+          detected_neighborhood?: string | null
+          detected_property_type?: string | null
+          disqualification_reason?: string | null
+          id?: string
+          is_broker?: boolean | null
+          is_curious?: boolean | null
+          last_interaction_at?: string | null
+          last_reengagement_at?: string | null
+          needs_reengagement?: boolean | null
+          phone_number: string
+          portal_lead_id?: string | null
+          qualification_score?: number | null
+          qualification_status?: string | null
+          questions_answered?: number | null
+          questions_asked?: number | null
+          reengagement_attempts?: number | null
+          sent_to_crm_at?: string | null
+          started_at?: string | null
+          total_messages?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_messages?: number | null
+          answers?: Json | null
+          completed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string | null
+          detected_bedrooms?: number | null
+          detected_budget_max?: number | null
+          detected_budget_min?: number | null
+          detected_interest?: string | null
+          detected_neighborhood?: string | null
+          detected_property_type?: string | null
+          disqualification_reason?: string | null
+          id?: string
+          is_broker?: boolean | null
+          is_curious?: boolean | null
+          last_interaction_at?: string | null
+          last_reengagement_at?: string | null
+          needs_reengagement?: boolean | null
+          phone_number?: string
+          portal_lead_id?: string | null
+          qualification_score?: number | null
+          qualification_status?: string | null
+          questions_answered?: number | null
+          questions_asked?: number | null
+          reengagement_attempts?: number | null
+          sent_to_crm_at?: string | null
+          started_at?: string | null
+          total_messages?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_qualification_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_qualification_portal_lead_id_fkey"
+            columns: ["portal_lead_id"]
+            isOneToOne: false
+            referencedRelation: "portal_leads_log"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_flags: {
         Row: {
           created_at: string
@@ -1230,13 +1341,16 @@ export type Database = {
           error_message: string | null
           hour_of_day: number | null
           id: string
+          last_reengagement_at: string | null
           lead_temperature: string | null
           message: string | null
           origin_lead_id: string | null
           origin_listing_id: string | null
           portal_origin: string
           processed_at: string | null
+          qualification_id: string | null
           raw_payload: Json | null
+          reengagement_count: number | null
           status: string | null
           temperature: string | null
           transaction_type: string | null
@@ -1256,13 +1370,16 @@ export type Database = {
           error_message?: string | null
           hour_of_day?: number | null
           id?: string
+          last_reengagement_at?: string | null
           lead_temperature?: string | null
           message?: string | null
           origin_lead_id?: string | null
           origin_listing_id?: string | null
           portal_origin: string
           processed_at?: string | null
+          qualification_id?: string | null
           raw_payload?: Json | null
+          reengagement_count?: number | null
           status?: string | null
           temperature?: string | null
           transaction_type?: string | null
@@ -1282,13 +1399,16 @@ export type Database = {
           error_message?: string | null
           hour_of_day?: number | null
           id?: string
+          last_reengagement_at?: string | null
           lead_temperature?: string | null
           message?: string | null
           origin_lead_id?: string | null
           origin_listing_id?: string | null
           portal_origin?: string
           processed_at?: string | null
+          qualification_id?: string | null
           raw_payload?: Json | null
+          reengagement_count?: number | null
           status?: string | null
           temperature?: string | null
           transaction_type?: string | null
@@ -1299,6 +1419,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_log_qualification_id_fkey"
+            columns: ["qualification_id"]
+            isOneToOne: false
+            referencedRelation: "lead_qualification"
             referencedColumns: ["id"]
           },
         ]

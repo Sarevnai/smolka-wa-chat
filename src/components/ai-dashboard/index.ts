@@ -4,3 +4,5 @@ export { StatusByChannelChart } from './StatusByChannelChart';
 export { LeadsByHourChart } from './LeadsByHourChart';
 export { LeadsWeeklyChart } from './LeadsWeeklyChart';
 export { LeadsMonthlyChart } from './LeadsMonthlyChart';
+export { QualificationStatsCard } from './QualificationStatsCard';
+export { QualificationComparisonCard } from './QualificationComparisonCard';
