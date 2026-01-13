@@ -1040,6 +1040,85 @@ function formatPropertyMessage(property: any): string {
   return lines.join('\n');
 }
 
+// Format property details like Laís style (for portal leads)
+function formatPropertyDetailsLikeLais(property: any, portalOrigin?: string): string {
+  const lines: string[] = [];
+  
+  // Location header
+  const endereco = property.endereco || '';
+  const bairro = property.bairro || '';
+  const cidade = property.cidade || 'Florianópolis';
+  
+  if (endereco || bairro) {
+    lines.push(`📍 ${endereco}${endereco && bairro ? ', ' : ''}${bairro} - ${cidade}`);
+  }
+  
+  // Property characteristics
+  const characteristics: string[] = [];
+  
+  if (property.dormitorios || property.quartos) {
+    const quartos = property.dormitorios || property.quartos;
+    const suites = property.suites || 0;
+    const suiteText = suites > 0 ? `, sendo ${suites} suíte${suites > 1 ? 's' : ''}` : '';
+    characteristics.push(`${quartos} dormitório${quartos > 1 ? 's' : ''}${suiteText}`);
+  }
+  
+  if (property.area_util || property.area_privativa) {
+    const area = property.area_util || property.area_privativa;
+    characteristics.push(`área privativa de ${area}m²`);
+  }
+  
+  if (property.vagas) {
+    characteristics.push(`${property.vagas} vaga${property.vagas > 1 ? 's' : ''} de garagem`);
+  }
+  
+  // Add characteristics as bullet point
+  if (characteristics.length > 0) {
+    lines.push(`• ${characteristics.join(', ')}`);
+  }
+  
+  // Price
+  const preco = property.preco_formatado || 
+    (property.valor_venda ? `R$ ${property.valor_venda.toLocaleString('pt-BR')}` : 
+     property.valor_locacao ? `R$ ${property.valor_locacao.toLocaleString('pt-BR')}/mês` : null);
+  
+  if (preco) {
+    lines.push(`• Valor: ${preco}`);
+  }
+  
+  // Link
+  const codigo = property.codigo || property.Codigo;
+  if (codigo) {
+    lines.push(`\n🔗 smolkaimoveis.com.br/imovel/${codigo}`);
+  }
+  
+  return lines.join('\n');
+}
+
+/**
+ * Fetch property by listing ID from Vista CRM
+ */
+async function getPropertyByListingId(listingId: string): Promise<any | null> {
+  try {
+    console.log(`🏠 Fetching property by listing ID: ${listingId}`);
+    
+    const { data, error } = await supabase.functions.invoke('vista-get-property', {
+      body: { codigo: listingId }
+    });
+    
+    if (error || !data?.success) {
+      console.log(`⚠️ Property not found for listing ID: ${listingId}`, error || data?.error);
+      return null;
+    }
+    
+    console.log(`✅ Found property:`, data.property);
+    return data.property;
+  } catch (e) {
+    console.error(`❌ Error fetching property ${listingId}:`, e);
+    return null;
+  }
+}
+
 // Send lead to C2S system
 async function sendLeadToC2S(params: Record<string, any>, phoneNumber: string, conversationHistory: string, contactName?: string): Promise<{ success: boolean; c2s_lead_id?: string; error?: string }> {
   try {
@@ -1412,7 +1491,7 @@ function extractAnswerFromMessage(message: string, question: EssentialQuestion):
 }
 
 /**
- * Build system prompt for portal lead qualification
+ * Build system prompt for portal lead qualification (Laís style)
  */
 function buildPortalLeadPrompt(
   config: AIAgentConfig,
@@ -1436,32 +1515,52 @@ function buildPortalLeadPrompt(
   const nextQuestion = unansweredQuestions[0];
   
   const portalContext = `
-📍 CONTEXTO DO LEAD (PORTAL - PRIORIDADE MÁXIMA):
+📍 CONTEXTO DO LEAD (PORTAL - ESTILO LAÍS):
 - Portal de origem: ${portalData?.portal_origin || 'Não informado'}
 - Imóvel de interesse: ${portalData?.origin_listing_id ? `Código ${portalData.origin_listing_id}` : 'Não especificado'}
 - Tipo de transação: ${portalData?.transaction_type === 'SELL' ? 'COMPRA' : portalData?.transaction_type === 'RENT' ? 'LOCAÇÃO' : 'Não especificado'}
-- Mensagem original: ${portalData?.message || 'Sem mensagem'}
+- Nome do lead: ${contactName || portalData?.contact_name || 'Não informado'}
 - Perguntas já feitas: ${questionsAsked}
 - Respostas coletadas: ${JSON.stringify(answeredQuestions)}
 
-📋 PRÓXIMA PERGUNTA A FAZER (faça UMA pergunta por vez, de forma natural):
-${nextQuestion ? `→ ${nextQuestion.question}` : '✅ Todas as perguntas essenciais já foram respondidas!'}
+⚠️ IMPORTANTE: O lead JÁ recebeu a foto e detalhes do imóvel de interesse na primeira mensagem.
+Agora você está respondendo às mensagens seguintes do cliente.
 
-📋 PERGUNTAS ESSENCIAIS RESTANTES:
-${unansweredQuestions.map((q: EssentialQuestion) => `- [${q.category}] ${q.question}`).join('\n') || '(todas respondidas)'}
+📋 FLUXO DE RESPOSTAS (ESTILO LAÍS - NATURAL E COMERCIAL):
 
-⚠️ REGRAS PARA LEADS DE PORTAL (CRÍTICO):
-1. O lead JÁ demonstrou interesse em um imóvel específico - USE ISSO como gancho inicial!
-2. Faça as perguntas essenciais de forma NATURAL, NÃO como interrogatório
-3. Pergunte UMA coisa por vez
-4. Se detectar que é CORRETOR (fala de parceria, clientes, CRECI), seja educado e encerre: "Obrigada pelo interesse! No momento estamos focados em atendimento direto a compradores. 😊"
-5. Se detectar CURIOSO (respostas muito vagas repetidas), tente reconverter UMA vez antes de encerrar
-6. Quando tiver respostas suficientes (score >= 70), use enviar_lead_c2s para vendas ou continue atendimento para locação
+SE O CLIENTE GOSTOU DO IMÓVEL:
+→ "Ótimo${contactName ? `, ${contactName}` : ''}! 🎉 Posso agendar uma visita pra você conhecer pessoalmente?"
+→ Se sim: "Qual dia e horário seria melhor pra você?"
+→ Colete disponibilidade e confirme
 
-🎯 OBJETIVO PRINCIPAL: Qualificar rapidamente com as perguntas essenciais e enviar para corretor (venda) ou atender diretamente (locação)
+SE O CLIENTE QUER ALGO DIFERENTE:
+→ "Entendi! Me conta mais: o que você gostaria de diferente?"
+→ Colete: tipo de imóvel, quantidade de quartos, bairro de interesse, faixa de preço
+→ Use buscar_imoveis para encontrar alternativas
+→ Apresente novas opções com foto + detalhes
 
-💡 DICA DE ABERTURA (primeira mensagem para lead de portal):
-"Oi! Vi que você demonstrou interesse num imóvel pelo ${portalData?.portal_origin || 'portal'} 🏠 ${portalData?.origin_listing_id ? `(código ${portalData.origin_listing_id})` : ''}"
+SE O CLIENTE É CORRETOR:
+→ "Obrigada pelo interesse! No momento estamos focados em atendimento direto a compradores. Boas vendas! 😊"
+→ Encerre a conversa
+
+SE O CLIENTE ESTÁ CURIOSO/VAGO:
+→ Tente uma vez: "Entendo! Quando tiver um interesse mais definido, pode contar com a gente. 😊"
+→ Se continuar vago: "Fico à disposição quando precisar! Até breve!"
+
+📋 PERGUNTAS ESSENCIAIS RESTANTES (faça de forma NATURAL, uma por vez):
+${unansweredQuestions.map((q: EssentialQuestion) => `- ${q.question}`).join('\n') || '(todas respondidas - pode prosseguir para agendamento ou buscar novas opções)'}
+
+🎯 OBJETIVO: 
+- Se GOSTOU do imóvel → Agendar visita
+- Se QUER DIFERENTE → Qualificar e buscar alternativas  
+- Se é VENDA e qualificado (score >= 70) → Enviar para C2S com enviar_lead_c2s
+
+💡 DICAS DE ATENDIMENTO ESTILO LAÍS:
+- Mensagens curtas e diretas (máx 2 frases por mensagem)
+- Use o nome do cliente quando souber
+- Seja proativa: "Posso agendar?" ao invés de "Quer agendar?"
+- Use emojis com moderação (1-2 por mensagem)
+- Quando buscar imóvel novo, envie foto + detalhes formatados
 `;
 
   return basePrompt + portalContext;
@@ -1494,8 +1593,13 @@ async function handlePortalLeadQualification(
   const currentAnswers = qualificationData.answers || {};
   const questionsAsked = qualificationData.questions_asked || 0;
   
-  // Mark as AI attended on first interaction
-  if (!portalData?.ai_attended) {
+  // ========== FIRST INTERACTION: PROACTIVE PROPERTY SEND (LAÍS STYLE) ==========
+  const isFirstInteraction = !portalData?.ai_attended;
+  
+  if (isFirstInteraction) {
+    console.log('👋 First interaction with portal lead - sending proactive property info');
+    
+    // Mark as AI attended
     await supabase
       .from('portal_leads_log')
       .update({ 
@@ -1504,7 +1608,102 @@ async function handlePortalLeadQualification(
       })
       .eq('id', portalData.id);
     console.log('✅ Marked portal lead as AI attended');
+    
+    // Get contact name from portal data if not provided
+    const leadName = contactName || portalData?.contact_name || '';
+    const portalOrigin = portalData?.portal_origin || 'portal';
+    const listingId = portalData?.origin_listing_id || portalData?.client_listing_id;
+    
+    // Build greeting message
+    const greeting = leadName 
+      ? `Olá, ${leadName}! 👋 Aqui é a ${config.agent_name || 'Helena'} da ${config.company_name || 'Smolka Imóveis'}!`
+      : `Olá! 👋 Aqui é a ${config.agent_name || 'Helena'} da ${config.company_name || 'Smolka Imóveis'}!`;
+    
+    await sendWhatsAppMessage(phoneNumber, greeting);
+    await sleep(1500);
+    
+    // Try to fetch the property
+    let property = null;
+    if (listingId) {
+      property = await getPropertyByListingId(listingId);
+    }
+    
+    if (property) {
+      // Send intro about the property
+      const introMessage = `Vi que você se interessou por esse imóvel no ${portalOrigin}:`;
+      await sendWhatsAppMessage(phoneNumber, introMessage);
+      await sleep(1500);
+      
+      // Send property photo if available
+      const photoUrl = property.foto_destaque || property.FotoDestaque;
+      if (photoUrl) {
+        await sendWhatsAppImage(phoneNumber, photoUrl, '🏠');
+        await sleep(1500);
+      }
+      
+      // Send property details in Laís format
+      const propertyDetails = formatPropertyDetailsLikeLais(property, portalOrigin);
+      await sendWhatsAppMessage(phoneNumber, propertyDetails);
+      await sleep(2000);
+      
+      // Ask follow-up question
+      const followUpQuestion = 'Gostou da opção? Está buscando algo diferente? 😊';
+      await sendWhatsAppMessage(phoneNumber, followUpQuestion);
+      
+      // Pre-fill operation type from portal data
+      let updatedAnswers = { ...currentAnswers };
+      if (portalData?.transaction_type === 'SELL') {
+        updatedAnswers['operation'] = 'compra';
+      } else if (portalData?.transaction_type === 'RENT') {
+        updatedAnswers['operation'] = 'locacao';
+      }
+      
+      // Update qualification with initial data
+      if (qualificationId) {
+        await updateLeadQualification(qualificationId, {
+          answers: updatedAnswers,
+          qualification_status: 'qualifying',
+          questions_asked: 1,
+          ai_messages: 1,
+          total_messages: 1,
+          last_interaction_at: new Date().toISOString()
+        });
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          action: 'proactive_property_sent',
+          propertyCode: property.codigo || listingId
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // No property found - send generic greeting and ask what they're looking for
+      const genericMessage = `Vi que você entrou em contato pelo ${portalOrigin}! Como posso te ajudar? 😊`;
+      await sendWhatsAppMessage(phoneNumber, genericMessage);
+      
+      if (qualificationId) {
+        await updateLeadQualification(qualificationId, {
+          qualification_status: 'qualifying',
+          questions_asked: 1,
+          ai_messages: 1,
+          total_messages: 1,
+          last_interaction_at: new Date().toISOString()
+        });
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          action: 'generic_greeting_sent',
+          reason: 'property_not_found'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   }
+  // ========== END FIRST INTERACTION ==========
   
   // Check for disqualification
   const historyMessages = await getRecentMessages(phoneNumber, 10);
