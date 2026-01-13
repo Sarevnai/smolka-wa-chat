@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ export default function PortalIntegration() {
   });
 
   // Sync local config with fetched config
-  useState(() => {
+  useEffect(() => {
     if (config) {
       setLocalConfig({
         default_list_id: config.default_list_id || '',
@@ -67,7 +67,7 @@ export default function PortalIntegration() {
         rent_department: config.rent_department || 'locacao'
       });
     }
-  });
+  }, [config]);
 
   const webhookUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/portal-leads-webhook?token=${config?.webhook_token || 'GERAR_TOKEN'}`;
 
