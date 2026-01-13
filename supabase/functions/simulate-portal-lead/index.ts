@@ -17,6 +17,11 @@ interface SimulationRequest {
   listingId: string;
   transactionType?: 'SELL' | 'RENT';
   message?: string;
+  // For simulating user responses
+  simulateResponse?: {
+    userMessage: string;
+    conversationHistory: Array<{ role: string; content: string; imageUrl?: string }>;
+  };
 }
 
 interface SimulatedMessage {
@@ -34,10 +39,183 @@ serve(async (req) => {
 
   try {
     const body: SimulationRequest = await req.json();
-    const { leadName, leadPhone, portal, listingId, transactionType = 'SELL', message } = body;
+    const { leadName, leadPhone, portal, listingId, transactionType = 'SELL', message, simulateResponse } = body;
 
-    console.log('🧪 Starting simulation for:', { leadName, leadPhone, portal, listingId });
+    console.log('🧪 Simulation request:', { leadName, leadPhone, portal, listingId, hasSimulateResponse: !!simulateResponse });
 
+    // ========== MODE 2: Simulate user response (call real AI) ==========
+    if (simulateResponse) {
+      console.log('💬 Processing user response:', simulateResponse.userMessage);
+      
+      // Build context from conversation history
+      const conversationContext = simulateResponse.conversationHistory || [];
+      const userMessage = simulateResponse.userMessage;
+      
+      // Call the real AI virtual agent in simulation mode
+      // We'll simulate by calling the AI directly without sending WhatsApp messages
+      
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        throw new Error("LOVABLE_API_KEY not configured");
+      }
+      
+      // Load AI config
+      const { data: configData } = await supabase
+        .from('system_settings')
+        .select('setting_value')
+        .eq('setting_key', 'ai_agent_config')
+        .single();
+      
+      const config = configData?.setting_value || {};
+      const agentName = config.agent_name || 'Helena';
+      const companyName = config.company_name || 'Smolka Imóveis';
+      
+      // Get property info for context
+      const { data: propertyData } = await supabase.functions.invoke('vista-get-property', {
+        body: { codigo: listingId }
+      });
+      
+      const property = propertyData?.property;
+      const propertyContext = property ? `
+O cliente veio do portal ${portal} interessado no imóvel:
+- Código: ${property.codigo}
+- Tipo: ${property.categoria}
+- Bairro: ${property.bairro}
+- Preço: R$ ${(transactionType === 'SELL' ? property.valor_venda : property.valor_locacao)?.toLocaleString('pt-BR')}
+` : '';
+      
+      // Build messages for AI
+      const aiMessages = [
+        {
+          role: 'system',
+          content: `Você é ${agentName}, assistente virtual da ${companyName}. 
+${propertyContext}
+
+REGRAS:
+- Responda de forma curta e humanizada (máximo 2-3 frases)
+- Se o cliente perguntar "tem outra opção", busque imóveis similares
+- Se o cliente quiser agendar visita, peça confirmação de data e horário
+- Use emojis moderadamente
+- Estilo consultivo: "Faz sentido pra você?" 
+
+IMPORTANTE: 
+- Se o cliente pedir OUTRA OPÇÃO, responda dizendo que vai buscar alternativas similares
+- Se o cliente demonstrar INTERESSE (quero visitar, tenho interesse, quero conhecer), pergunte qual dia/horário seria melhor`
+        },
+        ...conversationContext.map((msg: any) => ({
+          role: msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        })),
+        { role: 'user', content: userMessage }
+      ];
+      
+      // Call Lovable AI
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: aiMessages,
+          max_tokens: 200
+        }),
+      });
+      
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error('AI error:', errorText);
+        throw new Error(`AI error: ${aiResponse.status}`);
+      }
+      
+      const aiResult = await aiResponse.json();
+      const aiContent = aiResult.choices?.[0]?.message?.content || 'Desculpe, não entendi. Pode repetir?';
+      
+      // Check if AI suggests looking for alternatives
+      const wantsAlternative = /outra|outro|diferente|não gostei|não curti/i.test(userMessage);
+      const wantsScheduling = /agendar|visitar|conhecer|interesse|quero ver|quero ir/i.test(userMessage);
+      
+      const simulatedMessages: SimulatedMessage[] = [{
+        type: 'text',
+        content: aiContent,
+        timestamp: new Date().toISOString()
+      }];
+      
+      // If user wants alternative and we have property context, search for similar
+      if (wantsAlternative && property) {
+        const isRental = transactionType === 'RENT';
+        const originalPrice = isRental ? property.valor_locacao : property.valor_venda;
+        
+        // Search for similar properties
+        const { data: searchResult } = await supabase.functions.invoke('vista-search-properties', {
+          body: {
+            categoria: property.categoria,
+            bairro: property.bairro,
+            finalidade: isRental ? 'locacao' : 'venda',
+            preco_min: originalPrice ? Math.floor(originalPrice * 0.7) : undefined,
+            preco_max: originalPrice ? Math.ceil(originalPrice * 1.3) : undefined
+          }
+        });
+        
+        if (searchResult?.success && searchResult?.properties?.length > 0) {
+          // Find a different property
+          const alternatives = searchResult.properties.filter((p: any) => p.codigo !== property.codigo);
+          
+          if (alternatives.length > 0) {
+            const altProperty = alternatives[0];
+            
+            simulatedMessages.push({
+              type: 'text',
+              content: `Olha essa outra opção que separei pra você! 🏠`,
+              timestamp: new Date(Date.now() + 1000).toISOString()
+            });
+            
+            if (altProperty.foto_destaque) {
+              simulatedMessages.push({
+                type: 'image',
+                content: `Foto alternativa - ${altProperty.bairro}`,
+                imageUrl: altProperty.foto_destaque,
+                timestamp: new Date(Date.now() + 2000).toISOString()
+              });
+            }
+            
+            simulatedMessages.push({
+              type: 'text',
+              content: formatPropertyDetails(altProperty, transactionType),
+              timestamp: new Date(Date.now() + 3000).toISOString()
+            });
+            
+            simulatedMessages.push({
+              type: 'text',
+              content: 'Faz mais sentido pra você? 😊',
+              timestamp: new Date(Date.now() + 4000).toISOString()
+            });
+          }
+        }
+      }
+      
+      // Add scheduling detection context
+      const detectedIntent = wantsScheduling ? 'scheduling' : wantsAlternative ? 'alternative' : 'general';
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          mode: 'response_simulation',
+          messages: simulatedMessages,
+          detectedIntent,
+          debug: {
+            userMessage,
+            wantsAlternative,
+            wantsScheduling
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ========== MODE 1: Initial simulation (first contact) ==========
+    
     // Validate required fields
     if (!leadName || !leadPhone || !portal || !listingId) {
       return new Response(

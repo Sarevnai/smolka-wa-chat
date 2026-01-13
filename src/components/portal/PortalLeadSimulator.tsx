@@ -384,40 +384,105 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
     // Add user message
     addMessage('user', userMessage, undefined, testMode === 'real' ? 'real' : 'simulated');
     
-    // Simulate AI processing
+    // If in real mode, call the edge function
+    if (testMode === 'real') {
+      try {
+        // Build conversation history from current messages
+        const conversationHistory = messages
+          .filter(m => m.source === 'real' || m.source === 'simulated')
+          .filter(m => m.type !== 'system')
+          .map(m => ({
+            role: m.type === 'user' ? 'user' : 'assistant',
+            content: m.content,
+            imageUrl: m.imageUrl
+          }));
+        
+        const { data, error } = await supabase.functions.invoke('simulate-portal-lead', {
+          body: {
+            leadName: leadConfig.name,
+            leadPhone: leadConfig.phone,
+            portal: leadConfig.portal,
+            listingId: leadConfig.listingId,
+            transactionType: leadConfig.transactionType,
+            simulateResponse: {
+              userMessage,
+              conversationHistory
+            }
+          }
+        });
+        
+        if (error) throw error;
+        
+        if (data?.success && data?.messages) {
+          // Add AI responses
+          for (const msg of data.messages) {
+            await delay(500);
+            if (msg.type === 'image' && msg.imageUrl) {
+              addMessage('bot', msg.content, msg.imageUrl, 'real');
+            } else {
+              addMessage('bot', msg.content, undefined, 'real');
+            }
+          }
+          
+          // Add system message about detected intent
+          if (data.detectedIntent) {
+            const intentLabels: Record<string, string> = {
+              scheduling: '📅 DETECTADO: Intenção de agendamento',
+              alternative: '🔄 DETECTADO: Cliente quer outra opção',
+              general: '💬 Conversa geral'
+            };
+            addMessage('system', intentLabels[data.detectedIntent] || data.detectedIntent, undefined, 'real');
+          }
+        }
+      } catch (err) {
+        console.error('Error calling AI:', err);
+        addMessage('system', `❌ Erro ao chamar IA: ${err instanceof Error ? err.message : 'Erro desconhecido'}`, undefined, 'real');
+      }
+      
+      setWaitingForInput(true);
+      return;
+    }
+    
+    // Simulate AI processing (mock mode)
     await delay(800);
     
     // Generate response based on user input
     const lowerMessage = userMessage.toLowerCase();
     
-    if (lowerMessage.includes('gostei') || lowerMessage.includes('interesse') || lowerMessage.includes('visita') || 
+    if (lowerMessage.includes('outra') || lowerMessage.includes('outro') || lowerMessage.includes('mais opção') || lowerMessage.includes('tem mais')) {
+      // User wants another option - THIS IS THE FIX FOR THE REPORTED BUG
+      addMessage('bot', `Claro, ${leadConfig.name}! Vou buscar outra opção pra você 🔍`, undefined, 'simulated');
+      await delay(1000);
+      addMessage('bot', `Olha essa outra opção que separei pra você! 🏠`, undefined, 'simulated');
+      addMessage('system', '🔄 Helena busca imóveis similares no Vista CRM', undefined, 'simulated');
+    } else if (lowerMessage.includes('gostei') || lowerMessage.includes('interesse') || lowerMessage.includes('visita') || 
         lowerMessage.includes('conhecer') || lowerMessage.includes('agendar')) {
       // User wants to schedule visit - DETECTED SCHEDULING INTENT
-      addMessage('bot', `Ótimo, ${leadConfig.name}! 🎉\n\nPosso agendar uma visita para você conhecer o imóvel pessoalmente.\n\nQual dia e horário seria melhor pra você?`, undefined, testMode === 'real' ? 'real' : 'simulated');
-      addMessage('system', '✅ DETECTADO: Intenção de agendamento → Pipeline: Qualificação', undefined, testMode === 'real' ? 'real' : 'simulated');
+      addMessage('bot', `Ótimo, ${leadConfig.name}! 🎉\n\nPosso agendar uma visita para você conhecer o imóvel pessoalmente.\n\nQual dia e horário seria melhor pra você?`, undefined, 'simulated');
+      addMessage('system', '✅ DETECTADO: Intenção de agendamento → Pipeline: Qualificação', undefined, 'simulated');
     } else if (lowerMessage.includes('sábado') || lowerMessage.includes('domingo') || lowerMessage.includes('manhã') || lowerMessage.includes('tarde')) {
       // User provided scheduling preference
-      addMessage('bot', `Perfeito! Sábado de manhã está ótimo! 📅\n\nSó preciso confirmar alguns dados:\n• Nome completo\n• Telefone para contato\n\nPode me passar?`, undefined, testMode === 'real' ? 'real' : 'simulated');
-      addMessage('system', '✅ Horário detectado → Coletando dados para confirmação', undefined, testMode === 'real' ? 'real' : 'simulated');
+      addMessage('bot', `Perfeito! Sábado de manhã está ótimo! 📅\n\nSó preciso confirmar alguns dados:\n• Nome completo\n• Telefone para contato\n\nPode me passar?`, undefined, 'simulated');
+      addMessage('system', '✅ Horário detectado → Coletando dados para confirmação', undefined, 'simulated');
     } else if (lowerMessage.includes('48 ') || lowerMessage.match(/\d{2}\s*9\d{8}/)) {
       // User provided contact data - HANDOFF
-      addMessage('bot', `Perfeito, ${leadConfig.name}! 🎉\n\nVou te passar para um de nossos corretores especializados em ${leadConfig.transactionType === 'SELL' ? 'vendas' : 'locação'}. Ele vai entrar em contato pelo WhatsApp em breve! 😊`, undefined, testMode === 'real' ? 'real' : 'simulated');
-      addMessage('system', '🚀 HANDOFF: Lead enviado para C2S → Pipeline: Enviado C2S', undefined, testMode === 'real' ? 'real' : 'simulated');
-    } else if (lowerMessage.includes('diferente') || lowerMessage.includes('outro') || lowerMessage.includes('3 quartos') || lowerMessage.includes('maior')) {
+      addMessage('bot', `Perfeito, ${leadConfig.name}! 🎉\n\nVou te passar para um de nossos corretores especializados em ${leadConfig.transactionType === 'SELL' ? 'vendas' : 'locação'}. Ele vai entrar em contato pelo WhatsApp em breve! 😊`, undefined, 'simulated');
+      addMessage('system', '🚀 HANDOFF: Lead enviado para C2S → Pipeline: Enviado C2S', undefined, 'simulated');
+    } else if (lowerMessage.includes('diferente') || lowerMessage.includes('3 quartos') || lowerMessage.includes('maior')) {
       // User wants something different
-      addMessage('bot', `Entendi, ${leadConfig.name}! Me conta mais:\n\n📍 Qual região você prefere?\n🏠 Quantos quartos precisa?\n💰 Qual sua faixa de orçamento?\n\nAssim posso buscar opções mais alinhadas com o que você procura! 😊`, undefined, testMode === 'real' ? 'real' : 'simulated');
-      addMessage('system', '🔄 Lead quer algo diferente - Iniciando qualificação', undefined, testMode === 'real' ? 'real' : 'simulated');
+      addMessage('bot', `Entendi, ${leadConfig.name}! Me conta mais:\n\n📍 Qual região você prefere?\n🏠 Quantos quartos precisa?\n💰 Qual sua faixa de orçamento?\n\nAssim posso buscar opções mais alinhadas com o que você procura! 😊`, undefined, 'simulated');
+      addMessage('system', '🔄 Lead quer algo diferente - Iniciando qualificação', undefined, 'simulated');
     } else if (lowerMessage.includes('corretor') || lowerMessage.includes('cliente') || lowerMessage.includes('parceria')) {
       // Broker detection
-      addMessage('bot', `Obrigada pelo interesse! No momento nosso atendimento é direto ao comprador.\n\nSe você tem um cliente interessado, peça para ele entrar em contato diretamente conosco.\n\nBoas vendas! 😊`, undefined, testMode === 'real' ? 'real' : 'simulated');
-      addMessage('system', '🚫 Lead desqualificado - Identificado como corretor', undefined, testMode === 'real' ? 'real' : 'simulated');
+      addMessage('bot', `Obrigada pelo interesse! No momento nosso atendimento é direto ao comprador.\n\nSe você tem um cliente interessado, peça para ele entrar em contato diretamente conosco.\n\nBoas vendas! 😊`, undefined, 'simulated');
+      addMessage('system', '🚫 Lead desqualificado - Identificado como corretor', undefined, 'simulated');
     } else if (lowerMessage.includes('preço') || lowerMessage.includes('valor') || lowerMessage.includes('quanto')) {
       // Price question
       const priceFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentProperty.valor_venda || currentProperty.valor_locacao);
-      addMessage('bot', `O valor deste imóvel é ${priceFormatted}! 💰\n\nÉ um ${currentProperty.categoria?.toLowerCase() || 'imóvel'} de ${currentProperty.dormitorios} dormitório(s) em ${currentProperty.bairro}.\n\nTem interesse em agendar uma visita?`, undefined, testMode === 'real' ? 'real' : 'simulated');
+      addMessage('bot', `O valor deste imóvel é ${priceFormatted}! 💰\n\nÉ um ${currentProperty.categoria?.toLowerCase() || 'imóvel'} de ${currentProperty.dormitorios} dormitório(s) em ${currentProperty.bairro}.\n\nTem interesse em agendar uma visita?`, undefined, 'simulated');
     } else {
       // Default response
-      addMessage('bot', `Entendi! 😊\n\nSobre o imóvel em ${currentProperty.bairro}, posso te ajudar com mais informações ou agendar uma visita.\n\nO que você gostaria de saber?`, undefined, testMode === 'real' ? 'real' : 'simulated');
+      addMessage('bot', `Entendi! 😊\n\nSobre o imóvel em ${currentProperty.bairro}, posso te ajudar com mais informações ou agendar uma visita.\n\nO que você gostaria de saber?`, undefined, 'simulated');
     }
     
     setWaitingForInput(true);
