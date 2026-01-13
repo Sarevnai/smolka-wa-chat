@@ -10,11 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   ArrowLeft, Copy, RefreshCw, Eye, EyeOff, Building2, 
   CheckCircle2, XCircle, Clock, TrendingUp, Users, Check, Star, ExternalLink,
-  PlayCircle
+  PlayCircle, ChevronDown, Bot
 } from "lucide-react";
+import { PortalLeadSimulator } from "@/components/portal/PortalLeadSimulator";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -337,6 +339,33 @@ export default function PortalIntegration() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Simulador de Fluxo */}
+        <Collapsible>
+          <Card>
+            <CardHeader className="cursor-pointer">
+              <CollapsibleTrigger className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Bot className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <CardTitle className="text-lg">Simulador do Fluxo de Atendimento</CardTitle>
+                    <CardDescription>
+                      Teste o fluxo de atendimento da IA sem enviar mensagens reais
+                    </CardDescription>
+                  </div>
+                </div>
+                <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                <PortalLeadSimulator />
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Canal Pro - Recomendado */}
         <Card className="border-2 border-primary bg-gradient-to-r from-primary/5 to-primary/10 relative overflow-hidden">
