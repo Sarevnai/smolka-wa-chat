@@ -21,7 +21,7 @@ serve(async (req) => {
     }
 
     const VISTA_API_KEY = Deno.env.get("VISTA_CRM_API_KEY");
-    const VISTA_API_URL = Deno.env.get("VISTA_CRM_URL") || "http://lkaimobi-rest.vistahost.com.br";
+    const VISTA_API_URL = Deno.env.get("VISTA_CRM_URL") || "https://lkaimobi-rest.vistahost.com.br";
 
     if (!VISTA_API_KEY) {
       return new Response(
