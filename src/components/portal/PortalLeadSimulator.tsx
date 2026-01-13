@@ -8,10 +8,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  Play, RefreshCw, Send, Bot, User, Image, Loader2, 
-  CheckCircle2, AlertCircle, MessageCircle, Phone, Building2
+  Play, RefreshCw, Send, Bot, User, Loader2, 
+  CheckCircle2, AlertCircle, MessageCircle, Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface SimulatedMessage {
   id: string;
@@ -32,22 +34,24 @@ interface PortalLeadSimulatorProps {
   onClose?: () => void;
 }
 
-// Simulated property data (mock Vista response)
-const MOCK_PROPERTY = {
-  Codigo: "12345",
-  Endereco: "Rua das Flores, 123",
-  Bairro: "Ingleses",
-  Cidade: "Florianópolis",
-  UF: "SC",
-  Dormitorios: 3,
-  Suites: 1,
-  AreaPrivativa: 120,
-  Vagas: 2,
-  ValorVenda: 850000,
-  FotoDestaque: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&h=300&fit=crop",
-  Link: "https://smolkaimoveis.com.br/imovel/12345",
-  Categoria: "Apartamento"
-};
+interface VistaProperty {
+  codigo: string;
+  categoria: string;
+  endereco: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  dormitorios: number;
+  suites: number;
+  area_util: number;
+  vagas: number;
+  valor_venda: number;
+  valor_locacao: number;
+  foto_destaque: string;
+  descricao: string;
+  finalidade: string;
+}
 
 export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
   const [isRunning, setIsRunning] = useState(false);
@@ -56,6 +60,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
   const [inputValue, setInputValue] = useState('');
   const [waitingForInput, setWaitingForInput] = useState(false);
   const [simulationPhase, setSimulationPhase] = useState<'idle' | 'initial' | 'conversation'>('idle');
+  const [currentProperty, setCurrentProperty] = useState<VistaProperty | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   
   // Lead configuration
@@ -63,7 +68,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
     name: 'João Silva',
     phone: '5548999887766',
     portal: 'ZAP Imóveis',
-    listingId: '12345',
+    listingId: '29908',
     message: 'Olá, tenho interesse neste imóvel'
   });
 
@@ -94,12 +99,36 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  const fetchPropertyFromVista = async (codigo: string): Promise<VistaProperty | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('vista-get-property', {
+        body: { codigo }
+      });
+
+      if (error) {
+        console.error('Error fetching property:', error);
+        return null;
+      }
+
+      if (!data?.success || !data?.property) {
+        console.error('Property not found:', data?.error);
+        return null;
+      }
+
+      return data.property as VistaProperty;
+    } catch (error) {
+      console.error('Exception fetching property:', error);
+      return null;
+    }
+  };
+
   const startSimulation = async () => {
     setIsRunning(true);
     setMessages([]);
     setSteps([]);
     setSimulationPhase('initial');
     setWaitingForInput(false);
+    setCurrentProperty(null);
 
     try {
       // Step 1: Receive webhook
@@ -131,12 +160,22 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       await delay(300);
       updateStep(step4, { status: 'completed', details: `origin_listing_id: ${leadConfig.listingId}` });
 
-      // Step 5: Fetch property from Vista
+      // Step 5: Fetch property from Vista CRM (REAL API CALL)
       const step5 = addStep('Buscando imóvel no Vista CRM...');
-      await delay(800);
       updateStep(step5, { status: 'running' });
-      await delay(600);
-      updateStep(step5, { status: 'completed', details: `Imóvel encontrado: ${MOCK_PROPERTY.Bairro} - ${MOCK_PROPERTY.Categoria}` });
+      
+      const property = await fetchPropertyFromVista(leadConfig.listingId);
+      
+      if (!property) {
+        updateStep(step5, { status: 'error', details: 'Imóvel não encontrado no Vista' });
+        addMessage('system', `❌ Imóvel código ${leadConfig.listingId} não encontrado no Vista CRM`);
+        toast.error(`Imóvel ${leadConfig.listingId} não encontrado. Verifique o código.`);
+        setIsRunning(false);
+        return;
+      }
+      
+      setCurrentProperty(property);
+      updateStep(step5, { status: 'completed', details: `✅ Encontrado: ${property.bairro} - ${property.categoria}` });
 
       // Step 6: Send greeting message
       const step6 = addStep('Enviando mensagem de boas-vindas...');
@@ -153,7 +192,12 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       await delay(600);
       updateStep(step7, { status: 'running' });
       await delay(500);
-      addMessage('image', '🏠 Foto do imóvel', MOCK_PROPERTY.FotoDestaque);
+      
+      if (property.foto_destaque) {
+        addMessage('image', '🏠 Foto do imóvel', property.foto_destaque);
+      } else {
+        addMessage('system', '⚠️ Imóvel sem foto de destaque');
+      }
       updateStep(step7, { status: 'completed' });
 
       // Step 8: Send formatted property details
@@ -162,7 +206,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       updateStep(step8, { status: 'running' });
       await delay(400);
       
-      const propertyDetails = formatPropertyDetails(MOCK_PROPERTY);
+      const propertyDetails = formatPropertyDetails(property, leadConfig.portal);
       addMessage('bot', propertyDetails);
       updateStep(step8, { status: 'completed' });
 
@@ -182,13 +226,14 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
     } catch (error) {
       console.error('Simulation error:', error);
       addMessage('system', '❌ Erro na simulação');
+      toast.error('Erro ao executar simulação');
     } finally {
       setIsRunning(false);
     }
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !waitingForInput) return;
+    if (!inputValue.trim() || !waitingForInput || !currentProperty) return;
     
     const userMessage = inputValue.trim();
     setInputValue('');
@@ -217,11 +262,11 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       addMessage('system', '🚫 Lead desqualificado - Identificado como corretor');
     } else if (lowerMessage.includes('preço') || lowerMessage.includes('valor') || lowerMessage.includes('quanto')) {
       // Price question
-      const priceFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(MOCK_PROPERTY.ValorVenda);
-      addMessage('bot', `O valor deste imóvel é ${priceFormatted}! 💰\n\nÉ um ${MOCK_PROPERTY.Categoria.toLowerCase()} de ${MOCK_PROPERTY.Dormitorios} dormitórios em ${MOCK_PROPERTY.Bairro}.\n\nTem interesse em agendar uma visita?`);
+      const priceFormatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentProperty.valor_venda || currentProperty.valor_locacao);
+      addMessage('bot', `O valor deste imóvel é ${priceFormatted}! 💰\n\nÉ um ${currentProperty.categoria?.toLowerCase() || 'imóvel'} de ${currentProperty.dormitorios} dormitório(s) em ${currentProperty.bairro}.\n\nTem interesse em agendar uma visita?`);
     } else {
       // Default response
-      addMessage('bot', `Entendi! 😊\n\nSobre o imóvel em ${MOCK_PROPERTY.Bairro}, posso te ajudar com mais informações ou agendar uma visita.\n\nO que você gostaria de saber?`);
+      addMessage('bot', `Entendi! 😊\n\nSobre o imóvel em ${currentProperty.bairro}, posso te ajudar com mais informações ou agendar uma visita.\n\nO que você gostaria de saber?`);
     }
     
     setWaitingForInput(true);
@@ -234,6 +279,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
     setWaitingForInput(false);
     setIsRunning(false);
     setInputValue('');
+    setCurrentProperty(null);
   };
 
   const quickResponses = [
@@ -482,23 +528,30 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
   );
 }
 
-function formatPropertyDetails(property: typeof MOCK_PROPERTY): string {
+function formatPropertyDetails(property: VistaProperty, portalOrigin?: string): string {
+  const valor = property.valor_venda > 0 ? property.valor_venda : property.valor_locacao;
+  const tipoTransacao = property.valor_venda > 0 ? 'Venda' : 'Locação';
+  
   const priceFormatted = new Intl.NumberFormat('pt-BR', { 
     style: 'currency', 
     currency: 'BRL',
     maximumFractionDigits: 0 
-  }).format(property.ValorVenda);
+  }).format(valor);
+
+  const endereco = [property.endereco, property.numero].filter(Boolean).join(', ');
+  const localizacao = [property.bairro, property.cidade, property.uf].filter(Boolean).join(' - ');
 
   const lines = [
-    `📍 ${property.Endereco}, ${property.Bairro} - ${property.Cidade}/${property.UF}`,
+    `📍 ${endereco}`,
+    `${localizacao}`,
     '',
-    `• ${property.Dormitorios} dormitório(s)${property.Suites ? `, sendo ${property.Suites} suíte(s)` : ''}`,
-    `• Área privativa: ${property.AreaPrivativa}m²`,
-    `• ${property.Vagas} vaga(s) de garagem`,
-    `• Valor: ${priceFormatted}`,
+    `• ${property.dormitorios} dormitório(s)${property.suites ? `, sendo ${property.suites} suíte(s)` : ''}`,
+    property.area_util ? `• Área: ${property.area_util}m²` : null,
+    property.vagas ? `• ${property.vagas} vaga(s) de garagem` : null,
+    `• ${tipoTransacao}: ${priceFormatted}`,
     '',
-    `🔗 ${property.Link}`
-  ];
+    `🔗 smolkaimoveis.com.br/imovel/${property.codigo}`
+  ].filter(Boolean);
 
   return lines.join('\n');
 }
