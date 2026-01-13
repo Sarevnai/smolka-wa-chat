@@ -234,7 +234,7 @@ serve(async (req) => {
     }
 
     // Registrar log de sucesso
-    await supabase.from('portal_leads_log').insert({
+    const { data: portalLog } = await supabase.from('portal_leads_log').insert({
       portal_origin: lead.leadOrigin || 'unknown',
       origin_lead_id: lead.originLeadId,
       origin_listing_id: lead.originListingId,
@@ -248,8 +248,43 @@ serve(async (req) => {
       transaction_type: lead.transactionType,
       raw_payload: lead,
       processed_at: new Date().toISOString(),
-      status: 'processed'
-    });
+      status: 'processed',
+      hour_of_day: new Date().getHours(),
+      day_of_week: new Date().getDay()
+    }).select('id').single();
+
+    // Criar registro de qualificação para pré-atendimento da IA
+    if (portalLog?.id) {
+      const { data: existingConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('phone_number', phone)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      await supabase.from('lead_qualification').insert({
+        phone_number: phone,
+        conversation_id: existingConv?.id || null,
+        portal_lead_id: portalLog.id,
+        qualification_status: 'pending',
+        needs_reengagement: true,
+        detected_interest: lead.transactionType === 'SELL' ? 'compra' : lead.transactionType === 'RENT' ? 'locacao' : null,
+      });
+
+      // Atualizar portal_leads_log com o ID da qualificação
+      const { data: qualData } = await supabase
+        .from('lead_qualification')
+        .select('id')
+        .eq('portal_lead_id', portalLog.id)
+        .maybeSingle();
+
+      if (qualData?.id) {
+        await supabase
+          .from('portal_leads_log')
+          .update({ qualification_id: qualData.id })
+          .eq('id', portalLog.id);
+      }
+    }
 
     console.log('Lead processed successfully:', { contactId, phone, portal: lead.leadOrigin });
 
