@@ -31,6 +31,11 @@ import AIAgentConfig from "./pages/admin/AIAgentConfig";
 import C2SDashboard from "./pages/admin/C2SDashboard";
 import PortalIntegration from "./pages/admin/PortalIntegration";
 import ManagementDashboard from "./pages/admin/ManagementDashboard";
+import AIMainDashboard from "./pages/admin/AIMainDashboard";
+import LeadsManagement from "./pages/admin/LeadsManagement";
+import AIBehaviorConfig from "./pages/admin/AIBehaviorConfig";
+import LeadsReports from "./pages/admin/LeadsReports";
+import AINotifications from "./pages/admin/AINotifications";
 import { AdminGuard } from "./components/guards/AdminGuard";
 import { MarketingGuard } from "./components/guards/MarketingGuard";
 // Marketing Module
@@ -261,6 +266,42 @@ const App = () => (
                     <ProtectedRoute>
                       <AdminGuard>
                         <ManagementDashboard />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  {/* Minha IA Routes */}
+                  <Route path="/admin/ia-dashboard" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <AIMainDashboard />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/leads" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <LeadsManagement />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/ia-comportamento" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <AIBehaviorConfig />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/leads-relatorios" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <LeadsReports />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/ia-notificacoes" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <AINotifications />
                       </AdminGuard>
                     </ProtectedRoute>
                   } />
