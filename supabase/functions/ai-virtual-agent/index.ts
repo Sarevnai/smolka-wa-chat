@@ -1831,16 +1831,69 @@ async function handlePortalLeadQualification(
     });
   }
   
-  // Check if qualified (score >= 70) and is for sale (venda)
+  // Detectar intenção de agendamento na mensagem
+  const schedulingKeywords = [
+    'agendar', 'visitar', 'ver o imóvel', 'conhecer pessoalmente',
+    'marcar visita', 'quero ir', 'qual horário', 'posso visitar',
+    'sábado', 'domingo', 'amanhã', 'semana que vem', 'manhã', 'tarde',
+    'quero conhecer', 'quero ver', 'visita', 'agendamento'
+  ];
+
+  const wantsScheduling = schedulingKeywords.some(keyword => 
+    messageBody.toLowerCase().includes(keyword)
+  );
+
+  // Helper function to update conversation stage in pipeline
+  const updateConversationStage = async (targetOrderIndex: number) => {
+    // Get stage by order_index for vendas department (portal leads go to vendas)
+    const { data: stage } = await supabase
+      .from('conversation_stages')
+      .select('id, name')
+      .eq('department_code', 'vendas')
+      .eq('order_index', targetOrderIndex)
+      .maybeSingle();
+
+    if (!stage) {
+      console.log(`⚠️ Stage com order_index ${targetOrderIndex} não encontrado para vendas`);
+      return;
+    }
+
+    // Update conversation stage
+    const { error } = await supabase
+      .from('conversations')
+      .update({ 
+        stage_id: stage.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('phone_number', phoneNumber);
+
+    if (error) {
+      console.error('❌ Error updating conversation stage:', error);
+    } else {
+      console.log(`✅ Pipeline atualizado para: ${stage.name} (order ${targetOrderIndex})`);
+    }
+  };
+
+  // Update to "Qualificação" stage when first answer is extracted
+  if (extractedAny && questionsAsked === 0) {
+    console.log('📊 Primeira resposta extraída - movendo para Qualificação');
+    await updateConversationStage(2);
+  }
+
+  // Determine transaction type for dynamic handoff message
   const isForSale = portalData?.transaction_type === 'SELL' || newAnswers['operation'] === 'compra';
+  const transactionType = isForSale ? 'vendas' : 'locação';
+
+  // Check if should send to C2S: score >= 70 OR wants scheduling (for BOTH sale and rental)
+  const shouldSendToC2S = (newScore >= 70 || wantsScheduling) && qualificationId;
   
-  if (newScore >= 70 && isForSale && qualificationId) {
-    console.log('🎉 Lead qualified! Sending to C2S...');
+  if (shouldSendToC2S) {
+    console.log(`🎉 Lead qualified! Reason: ${wantsScheduling ? 'Agendamento detectado' : 'Score >= 70'}. Sending to C2S...`);
     
     // Build lead data for C2S
     const leadData = {
       nome: contactName || portalData?.contact_name || 'Lead Portal',
-      interesse: `Lead qualificado do portal ${portalData?.portal_origin}`,
+      interesse: `Lead qualificado do portal ${portalData?.portal_origin} - ${transactionType.toUpperCase()}`,
       tipo_imovel: newAnswers['property'] || '',
       bairro: newAnswers['location'] || '',
       faixa_preco: newAnswers['budget'] || '',
@@ -1870,9 +1923,13 @@ async function handlePortalLeadQualification(
           crm_sent_at: new Date().toISOString()
         })
         .eq('id', portalData.id);
+
+      // Update pipeline to "Enviado C2S" stage (order_index: 3)
+      console.log('📤 Enviando para estágio C2S no pipeline');
+      await updateConversationStage(3);
       
-      // Send handoff message
-      const handoffMessage = `Perfeito${contactName ? `, ${contactName}` : ''}! 🎉\n\nVou te passar para um de nossos corretores especializados em vendas. Ele vai entrar em contato pelo WhatsApp em breve! 😊`;
+      // Send handoff message (dynamic based on transaction type)
+      const handoffMessage = `Perfeito${contactName ? `, ${contactName}` : ''}! 🎉\n\nVou te passar para um de nossos corretores especializados em ${transactionType}. Ele vai entrar em contato pelo WhatsApp em breve! 😊`;
       await sendWhatsAppMessage(phoneNumber, handoffMessage);
       
       return new Response(
