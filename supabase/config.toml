@@ -104,3 +104,6 @@ verify_jwt = true
 
 [functions.vista-get-property]
 verify_jwt = false
+
+[functions.simulate-portal-lead]
+verify_jwt = false
