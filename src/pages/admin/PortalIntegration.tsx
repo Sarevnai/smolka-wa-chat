@@ -12,7 +12,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   ArrowLeft, Copy, RefreshCw, Eye, EyeOff, Building2, 
-  CheckCircle2, XCircle, Clock, TrendingUp, Users, Check, Star, ExternalLink
+  CheckCircle2, XCircle, Clock, TrendingUp, Users, Check, Star, ExternalLink,
+  PlayCircle
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -23,7 +24,8 @@ import {
   usePortalLeadsStats, 
   usePortalConfig, 
   useSavePortalConfig,
-  useGenerateToken 
+  useGenerateToken,
+  useTestWebhook
 } from "@/hooks/usePortalLeads";
 import { useContactLists } from "@/hooks/useContactLists";
 
@@ -47,6 +49,7 @@ export default function PortalIntegration() {
   const { data: contactLists } = useContactLists();
   const saveConfig = useSavePortalConfig();
   const generateToken = useGenerateToken();
+  const testWebhook = useTestWebhook();
 
   const [localConfig, setLocalConfig] = useState({
     default_list_id: '',
@@ -82,6 +85,14 @@ export default function PortalIntegration() {
 
   const handleGenerateToken = () => {
     generateToken.mutate();
+  };
+
+  const handleTestWebhook = () => {
+    if (!config?.webhook_token) {
+      toast.error('Gere um token antes de testar a integração');
+      return;
+    }
+    testWebhook.mutate(config.webhook_token);
   };
 
   const individualPortals = [
@@ -202,11 +213,24 @@ export default function PortalIntegration() {
                 {config?.webhook_token ? 'Regenerar' : 'Gerar Token'}
               </Button>
             </div>
-            {config?.webhook_token && (
-              <p className="text-sm text-muted-foreground">
-                ⚠️ Ao regenerar o token, você precisará atualizar a configuração em todos os portais.
-              </p>
-            )}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div>
+                {config?.webhook_token && (
+                  <p className="text-sm text-muted-foreground">
+                    ⚠️ Ao regenerar o token, você precisará atualizar a configuração em todos os portais.
+                  </p>
+                )}
+              </div>
+              <Button 
+                variant="outline"
+                onClick={handleTestWebhook}
+                disabled={!config?.webhook_token || testWebhook.isPending}
+                className="gap-2"
+              >
+                <PlayCircle className={`h-4 w-4 ${testWebhook.isPending ? 'animate-pulse' : ''}`} />
+                {testWebhook.isPending ? 'Testando...' : 'Testar Integração'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

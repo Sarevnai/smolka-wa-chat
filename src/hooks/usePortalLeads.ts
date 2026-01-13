@@ -212,3 +212,53 @@ function getSettingDescription(key: string): string {
   };
   return descriptions[key] || '';
 }
+
+export function useTestWebhook() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (token: string) => {
+      const testLead = {
+        leadOrigin: 'teste_sistema',
+        timestamp: new Date().toISOString(),
+        originLeadId: `test_${Date.now()}`,
+        originListingId: 'TEST-001',
+        clientListingId: 'IMOVEL-TESTE-001',
+        name: 'Lead de Teste',
+        email: 'teste@exemplo.com',
+        ddd: '11',
+        phone: '999999999',
+        message: 'Esta é uma mensagem de teste da integração com portais imobiliários.',
+        temperature: 'HOT',
+        transactionType: 'SELL'
+      };
+
+      const response = await fetch(
+        `https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/portal-leads-webhook?token=${token}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(testLead)
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Falha no teste');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['portal-leads-log'] });
+      queryClient.invalidateQueries({ queryKey: ['portal-leads-stats'] });
+      toast.success('Teste realizado com sucesso! Lead de teste criado.');
+    },
+    onError: (error) => {
+      console.error('Test failed:', error);
+      toast.error(`Erro no teste: ${error.message}`);
+    }
+  });
+}
