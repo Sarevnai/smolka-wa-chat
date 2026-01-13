@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
           type_negotiation: leadData.type_negotiation || "Compra",
           description: description || "Lead qualificado via WhatsApp",
           body: leadData.conversation_history || "",
-          source: "Smolka AI - Helena",
+          source: "Smolka AI - Nina",
         },
       },
     };

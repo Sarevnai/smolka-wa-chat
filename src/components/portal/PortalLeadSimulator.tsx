@@ -178,10 +178,10 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
 
     try {
       // Step 1: Call real simulation endpoint
-      const step1 = addStep('Chamando IA Helena (modo simulação)...');
+      const step1 = addStep('Chamando IA Nina (modo simulação)...');
       updateStep(step1, { status: 'running' });
       
-      addMessage('system', `🧪 Testando Helena com lead REAL`, undefined, 'real');
+      addMessage('system', `🧪 Testando Nina com lead REAL`, undefined, 'real');
 
       const { data, error } = await supabase.functions.invoke('simulate-portal-lead', {
         body: {
@@ -208,8 +208,8 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       const step2 = addStep('Imóvel encontrado no Vista CRM');
       updateStep(step2, { status: 'completed', details: `${data.property.bairro} - ${data.property.categoria}` });
 
-      // Step 3: Display Helena's generated messages
-      const step3 = addStep('Exibindo respostas da Helena...');
+      // Step 3: Display Nina's generated messages
+      const step3 = addStep('Exibindo respostas da Nina...');
       updateStep(step3, { status: 'running' });
 
       // Display each message with delay (like real WhatsApp)
@@ -244,7 +244,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       // Enable conversation mode for testing user responses
       setSimulationPhase('conversation');
       setWaitingForInput(true);
-      addMessage('system', '💬 Digite uma resposta para testar o próximo passo da Helena', undefined, 'real');
+      addMessage('system', '💬 Digite uma resposta para testar o próximo passo da Nina', undefined, 'real');
 
     } catch (error) {
       console.error('Real AI test error:', error);
@@ -317,7 +317,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       updateStep(step6, { status: 'running' });
       await delay(400);
       
-      const greeting = `Olá, ${leadConfig.name}! 👋\n\nSou a Helena da Smolka Imóveis!\n\nVi que você se interessou por esse imóvel no ${leadConfig.portal}:`;
+      const greeting = `Olá, ${leadConfig.name}! 👋\n\nSou a Nina da Smolka Imóveis!\n\nVi que você se interessou por esse imóvel no ${leadConfig.portal}:`;
       addMessage('bot', greeting);
       updateStep(step6, { status: 'completed' });
 
@@ -694,7 +694,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-primary" />
-              {testMode === 'real' ? 'Respostas da Helena (IA Real)' : 'Simulação do WhatsApp'}
+              {testMode === 'real' ? 'Respostas da Nina (IA Real)' : 'Simulação do WhatsApp'}
             </CardTitle>
             <CardDescription>
               {testMode === 'real' 
@@ -708,7 +708,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
                 {messages.length === 0 ? (
                   <div className="text-center text-muted-foreground py-12">
                     <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>Clique em "{testMode === 'real' ? 'Testar IA Helena' : 'Iniciar Simulação'}" para ver o fluxo</p>
+                    <p>Clique em "{testMode === 'real' ? 'Testar IA Nina' : 'Iniciar Simulação'}" para ver o fluxo</p>
                   </div>
                 ) : (
                   messages.map((msg) => (
@@ -751,7 +751,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
                                 <User className="h-3 w-3" />
                               )}
                               <span className="text-xs opacity-70">
-                                {msg.type === 'bot' ? 'Helena' : leadConfig.name}
+                                {msg.type === 'bot' ? 'Nina' : leadConfig.name}
                               </span>
                             </div>
                             <p className="whitespace-pre-wrap">{msg.content}</p>

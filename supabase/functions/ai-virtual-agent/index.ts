@@ -737,7 +737,7 @@ Siga TODOS estes passos:
 📝 EXEMPLO DE CONVERSA IDEAL (ESTILO LAÍS):
 
 CLIENTE: Oi
-AGENTE: Oi! Aqui é a Helena da Smolka 🏠 Pode me mandar texto ou áudio, eu entendo os dois! Me conta, o que você tá buscando? 😊
+AGENTE: Oi! Aqui é a Nina da Smolka 🏠 Pode me mandar texto ou áudio, eu entendo os dois! Me conta, o que você tá buscando? 😊
 
 CLIENTE: Quero alugar um apartamento
 AGENTE: Legal! 🎉 A propósito, como posso te chamar?
@@ -1673,7 +1673,7 @@ async function handlePortalLeadQualification(
     await sendWhatsAppMessage(phoneNumber, greeting);
     await sleep(1000);
     
-    const intro = `Aqui é a ${config.agent_name || 'Helena'} da ${config.company_name || 'Smolka Imóveis'} 🏠`;
+    const intro = `Aqui é a ${config.agent_name || 'Nina'} da ${config.company_name || 'Smolka Imóveis'} 🏠`;
     await sendWhatsAppMessage(phoneNumber, intro);
     await sleep(1500);
     

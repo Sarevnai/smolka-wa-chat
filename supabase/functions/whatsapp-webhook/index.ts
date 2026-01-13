@@ -291,7 +291,7 @@ async function checkMarketingCampaignSource(phoneNumber: string): Promise<{
 
 /**
  * Find an existing active conversation for this phone number, or create a new one.
- * New conversations start with department_code = NULL (pending triage by Helena).
+ * New conversations start with department_code = NULL (pending triage by Nina).
  * If the phone comes from a recent campaign, inherit the campaign's department.
  */
 async function findOrCreateConversation(phoneNumber: string): Promise<ConversationRecord | null> {
@@ -388,7 +388,7 @@ async function updateConversationTimestamp(conversationId: string) {
 }
 
 /**
- * Assign department to conversation after Helena's triage
+ * Assign department to conversation after Nina's triage
  * Also syncs the department_code to the contact for proper RLS filtering
  */
 async function assignDepartmentToConversation(
