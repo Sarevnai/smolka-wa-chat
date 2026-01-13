@@ -170,6 +170,31 @@ serve(async (req) => {
       );
     }
 
+    // Lista de status indisponíveis que não devem ser mostrados
+    const statusIndisponiveis = [
+      "Suspenso",
+      "Alugado terceiros",
+      "Pendente",
+      "Alugado imobiliária",
+      "Vendido terceiros",
+      "Vendido imobiliária",
+    ];
+
+    // Verificar se o status do imóvel está na lista de indisponíveis
+    const statusImovel = (prop.Status || "").trim();
+    if (statusIndisponiveis.some(s => s.toLowerCase() === statusImovel.toLowerCase())) {
+      console.log(`[Vista Get Property] Imóvel ${codigo} está indisponível (Status: ${statusImovel})`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Imóvel ${codigo} não está disponível`,
+          status: statusImovel,
+          hint: "Este imóvel está com status que indica indisponibilidade para comercialização.",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Normalize photo URL
     let fotoDestaque = "";
     if (prop.FotoDestaque) {
