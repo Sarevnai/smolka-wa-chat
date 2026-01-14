@@ -46,6 +46,7 @@ import MarketingReports from "./pages/marketing/MarketingReports";
 import MarketingAIConfig from "./pages/marketing/MarketingAIConfig";
 import MarketingChat from "./pages/marketing/MarketingChat";
 import FlowBuilder from "./pages/admin/FlowBuilder";
+import DesignPreview from "./pages/admin/DesignPreview";
 
 // Create QueryClient outside component to avoid recreating on hot reload
 const queryClient = new QueryClient({
@@ -302,6 +303,13 @@ const App = () => (
                     <ProtectedRoute>
                       <AdminGuard>
                         <AINotifications />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/design-preview" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <DesignPreview />
                       </AdminGuard>
                     </ProtectedRoute>
                   } />
