@@ -11,7 +11,6 @@ import {
   Building2,
   Kanban,
   Megaphone,
-  Workflow,
   LucideIcon
 } from "lucide-react";
 import { Database } from '@/integrations/supabase/types';
@@ -101,7 +100,6 @@ export const DEPARTMENT_SIDEBAR_CONFIG: Record<DepartmentType, DepartmentSidebar
       { title: 'Campanhas', url: '/marketing/campaigns', icon: Megaphone },
       { title: 'Contatos', url: '/marketing/contacts', icon: Users },
       { title: 'Relatórios', url: '/marketing/reports', icon: BarChart3 },
-      { title: 'Flow Builder', url: '/marketing/flow-builder', icon: Workflow },
     ]
   }
 };
