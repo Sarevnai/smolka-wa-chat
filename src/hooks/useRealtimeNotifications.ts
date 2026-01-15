@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { useDepartment } from '@/contexts/DepartmentContext';
+import { useUserDepartment } from '@/hooks/useUserDepartment';
+import { getConversationDepartmentCached } from '@/hooks/useConversationDepartment';
 
 interface NotificationData {
   id: string;
@@ -16,6 +19,11 @@ export function useRealtimeNotifications() {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isEnabled, setIsEnabled] = useState(true);
   const { toast } = useToast();
+  
+  // Department filtering
+  const { activeDepartment, isAdmin } = useDepartment();
+  const { department: userDepartment } = useUserDepartment();
+  const effectiveDepartment = isAdmin ? activeDepartment : userDepartment;
 
   useEffect(() => {
     let channel: RealtimeChannel;
@@ -32,8 +40,24 @@ export function useRealtimeNotifications() {
             table: 'messages',
             filter: 'direction=eq.inbound'
           },
-          (payload) => {
+          async (payload) => {
             const message = payload.new as any;
+            
+            // Filter by department - only notify for same department or unassigned
+            if (effectiveDepartment && message.conversation_id) {
+              try {
+                const msgDepartment = await getConversationDepartmentCached(message.conversation_id);
+                
+                // Skip notification if message is from a different department
+                if (msgDepartment !== null && msgDepartment !== effectiveDepartment) {
+                  console.log('🔇 Notificação visual ignorada - departamento diferente:', msgDepartment, '!=', effectiveDepartment);
+                  return;
+                }
+              } catch (error) {
+                console.error('Error checking message department:', error);
+                // Continue with notification on error
+              }
+            }
             
             const notification: NotificationData = {
               id: message.id.toString(),
@@ -125,7 +149,7 @@ export function useRealtimeNotifications() {
         supabase.removeChannel(channel);
       }
     };
-  }, [isEnabled, toast]);
+  }, [isEnabled, toast, effectiveDepartment]);
 
   // Request notification permission on first load
   useEffect(() => {
