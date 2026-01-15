@@ -1,6 +1,5 @@
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
-import { QuickActions } from "@/components/dashboard/QuickActions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
@@ -165,13 +164,8 @@ export function DepartmentDashboardContent({ department, stats, onRefresh }: Dep
         </Card>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="animate-slide-in-from-left [animation-delay:0.5s]">
-            <RecentActivity activities={stats.recentActivity} />
-          </div>
-          <div className="animate-scale-in [animation-delay:0.6s]">
-            <QuickActions />
-          </div>
+        <div className="animate-slide-in-from-left [animation-delay:0.5s]">
+          <RecentActivity activities={stats.recentActivity} />
         </div>
       </div>
     );
@@ -274,13 +268,8 @@ export function DepartmentDashboardContent({ department, stats, onRefresh }: Dep
       </div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="animate-slide-in-from-left [animation-delay:0.7s]">
-          <RecentActivity activities={stats.recentActivity} />
-        </div>
-        <div className="animate-scale-in [animation-delay:0.8s]">
-          <QuickActions />
-        </div>
+      <div className="animate-slide-in-from-left [animation-delay:0.7s]">
+        <RecentActivity activities={stats.recentActivity} />
       </div>
     </div>
   );
