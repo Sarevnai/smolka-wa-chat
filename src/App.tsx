@@ -36,6 +36,7 @@ import AIBehaviorConfig from "./pages/admin/AIBehaviorConfig";
 import LeadsReports from "./pages/admin/LeadsReports";
 import AINotifications from "./pages/admin/AINotifications";
 import AIUnifiedConfig from "./pages/admin/AIUnifiedConfig";
+import WhatsAppProfileSettings from "./pages/admin/WhatsAppProfileSettings";
 import { AdminGuard } from "./components/guards/AdminGuard";
 import { MarketingGuard } from "./components/guards/MarketingGuard";
 // Marketing Module
@@ -304,6 +305,13 @@ const App = () => (
                     <ProtectedRoute>
                       <AdminGuard>
                         <DesignPreview />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/whatsapp-profile" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <WhatsAppProfileSettings />
                       </AdminGuard>
                     </ProtectedRoute>
                   } />
