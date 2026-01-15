@@ -6,12 +6,12 @@ import { useSyncDepartment } from "@/hooks/useSyncDepartment";
 export default function MarketingChat() {
   useSyncDepartment('marketing');
   
-  const { phoneNumber } = useParams<{ phoneNumber?: string }>();
+  const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
 
-  const handleContactSelect = (selectedPhoneNumber: string) => {
-    if (selectedPhoneNumber) {
-      navigate(`/marketing/chat/${selectedPhoneNumber}`);
+  const handleConversationSelect = (selectedConversationId: string) => {
+    if (selectedConversationId) {
+      navigate(`/marketing/chat/${selectedConversationId}`);
     } else {
       navigate("/marketing/chat");
     }
@@ -20,8 +20,8 @@ export default function MarketingChat() {
   return (
     <Layout>
       <ChatLayout
-        selectedContact={phoneNumber}
-        onContactSelect={handleContactSelect}
+        selectedConversationId={conversationId}
+        onConversationSelect={handleConversationSelect}
         departmentFilter="marketing"
       />
     </Layout>

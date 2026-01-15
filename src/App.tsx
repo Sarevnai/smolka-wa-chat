@@ -81,7 +81,7 @@ const App = () => (
                       <Chat />
                     </ProtectedRoute>
                   } />
-                  <Route path="/chat/:phoneNumber" element={
+                  <Route path="/chat/:conversationId" element={
                     <ProtectedRoute>
                       <Chat />
                     </ProtectedRoute>
@@ -145,7 +145,7 @@ const App = () => (
                       </MarketingGuard>
                     </ProtectedRoute>
                   } />
-                  <Route path="/marketing/chat/:phoneNumber" element={
+                  <Route path="/marketing/chat/:conversationId" element={
                     <ProtectedRoute>
                       <MarketingGuard>
                         <MarketingChat />

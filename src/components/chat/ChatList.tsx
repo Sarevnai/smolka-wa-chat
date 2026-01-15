@@ -37,20 +37,20 @@ interface Conversation {
   unreadCount: number;
   contactName?: string;
   contactType?: string;
-  conversationId?: string;
+  conversationId: string;
   departmentCode?: DepartmentType | null;
   stageName?: string;
   stageColor?: string;
 }
 
 interface ChatListProps {
-  onContactSelect: (phoneNumber: string) => void;
-  selectedContact?: string;
+  onConversationSelect: (conversationId: string) => void;
+  selectedConversationId?: string;
   onBack?: () => void;
   departmentFilter?: DepartmentType;
 }
 
-export function ChatList({ onContactSelect, selectedContact, onBack, departmentFilter }: ChatListProps) {
+export function ChatList({ onConversationSelect, selectedConversationId, onBack, departmentFilter }: ChatListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -120,36 +120,36 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
 
       if (convError) throw convError;
 
-      // Get the last message for each conversation
-      const phoneNumbers = (conversationsData || []).map(c => c.phone_number);
+      // Get the conversation IDs
+      const conversationIds = (conversationsData || []).map(c => c.id).filter(Boolean);
       
-      if (phoneNumbers.length === 0) {
+      if (conversationIds.length === 0) {
         setConversations([]);
         setLoading(false);
         return;
       }
 
-      // Get last message for each phone number
+      // Get last message for each conversation by conversation_id (isolated!)
       const { data: messages, error: messagesError } = await supabase
         .from("messages")
         .select("*")
-        .or(phoneNumbers.map(p => `wa_from.eq.${p},wa_to.eq.${p}`).join(','))
+        .in('conversation_id', conversationIds)
         .order("wa_timestamp", { ascending: false });
 
       if (messagesError) throw messagesError;
 
-      // Group messages by phone number and get last one
+      // Group messages by conversation_id and get last one
       const lastMessageMap = new Map<string, MessageRow>();
       messages?.forEach((message) => {
-        const phoneNumber = message.direction === "inbound" ? message.wa_from : message.wa_to;
-        if (phoneNumber && !lastMessageMap.has(phoneNumber)) {
-          lastMessageMap.set(phoneNumber, message as MessageRow);
+        const convId = message.conversation_id;
+        if (convId && !lastMessageMap.has(convId)) {
+          lastMessageMap.set(convId, message as MessageRow);
         }
       });
 
       // Build conversation list
       const conversationList: Conversation[] = (conversationsData || []).map((conv: any) => {
-        const lastMessage = lastMessageMap.get(conv.phone_number);
+        const lastMessage = lastMessageMap.get(conv.id);
         const contact = conv.contacts;
         const stage = conv.conversation_stages;
         
@@ -174,8 +174,8 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
 
       // Sort conversations: pinned first, then by last message timestamp
       conversationList.sort((a, b) => {
-        const aIsPinned = pinnedConversations.includes(a.phoneNumber);
-        const bIsPinned = pinnedConversations.includes(b.phoneNumber);
+        const aIsPinned = pinnedConversations.includes(a.conversationId);
+        const bIsPinned = pinnedConversations.includes(b.conversationId);
         
         if (aIsPinned && !bIsPinned) return -1;
         if (!aIsPinned && bIsPinned) return 1;
@@ -211,15 +211,17 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
 
     console.log('📨 [ChatList] Processando mensagem do contexto:', lastMessage.id);
     
-    // Get phone number from message
-    const phoneNumber = lastMessage.direction === 'inbound' 
-      ? lastMessage.wa_from 
-      : lastMessage.wa_to;
+    // Find conversation by conversation_id (isolated by department)
+    const messageConvId = (lastMessage as any).conversation_id;
     
-    if (!phoneNumber) return;
+    if (!messageConvId) {
+      console.log('⚠️ [ChatList] Mensagem sem conversation_id, recarregando...');
+      loadConversations();
+      return;
+    }
     
-    // Check if conversation already exists
-    const existingIndex = conversations.findIndex(c => c.phoneNumber === phoneNumber);
+    // Check if conversation already exists in our list
+    const existingIndex = conversations.findIndex(c => c.conversationId === messageConvId);
     
     if (existingIndex >= 0) {
       // Update existing conversation
@@ -232,20 +234,20 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
           ...conversation,
           lastMessage,
           messageCount: conversation.messageCount + 1,
-          unreadCount: selectedContact === phoneNumber 
+          unreadCount: selectedConversationId === conversation.conversationId 
             ? conversation.unreadCount 
             : conversation.unreadCount + 1
         };
         
         // Move to top (respecting pinned conversations)
         const movedConversation = updated.splice(existingIndex, 1)[0];
-        const isPinned = pinnedConversations.includes(phoneNumber);
+        const isPinned = pinnedConversations.includes(movedConversation.conversationId);
         
         if (isPinned) {
           updated.unshift(movedConversation);
         } else {
           const firstUnpinnedIndex = updated.findIndex(c => 
-            !pinnedConversations.includes(c.phoneNumber)
+            !pinnedConversations.includes(c.conversationId)
           );
           if (firstUnpinnedIndex >= 0) {
             updated.splice(firstUnpinnedIndex, 0, movedConversation);
@@ -261,7 +263,7 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
       console.log('🆕 [ChatList] Nova conversa detectada, recarregando...');
       loadConversations();
     }
-  }, [lastMessage, selectedContact, pinnedConversations]);
+  }, [lastMessage, selectedConversationId, pinnedConversations]);
 
   // Load contacts for the "New Conversation" modal
   const loadContacts = async () => {
@@ -487,8 +489,8 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
   };
 
   // Callback para remover conversa do estado local após exclusão
-  const removeConversationFromList = (phoneNumber: string) => {
-    setConversations(prev => prev.filter(c => c.phoneNumber !== phoneNumber));
+  const removeConversationFromList = (conversationId: string) => {
+    setConversations(prev => prev.filter(c => c.conversationId !== conversationId));
   };
 
   return (
@@ -643,14 +645,14 @@ export function ChatList({ onContactSelect, selectedContact, onBack, departmentF
               <div>
                 {filteredConversations.map((conversation) => (
                   <ConversationItem
-                    key={conversation.phoneNumber}
+                    key={conversation.conversationId}
                     phoneNumber={conversation.phoneNumber}
                     conversationId={conversation.conversationId}
                     lastMessage={conversation.lastMessage}
                     messageCount={conversation.messageCount}
                     unreadCount={conversation.unreadCount}
-                    isSelected={selectedContact === conversation.phoneNumber}
-                    onClick={() => onContactSelect(conversation.phoneNumber)}
+                    isSelected={selectedConversationId === conversation.conversationId}
+                    onClick={() => onConversationSelect(conversation.conversationId)}
                     stageName={conversation.stageName}
                     stageColor={conversation.stageColor}
                     departmentCode={conversation.departmentCode}

@@ -7,21 +7,21 @@ import { Database } from "@/integrations/supabase/types";
 type DepartmentType = Database['public']['Enums']['department_type'];
 
 interface ChatLayoutProps {
-  selectedContact?: string;
-  onContactSelect: (phoneNumber: string) => void;
+  selectedConversationId?: string;
+  onConversationSelect: (conversationId: string) => void;
   departmentFilter?: DepartmentType;
 }
 
-export function ChatLayout({ selectedContact, onContactSelect, departmentFilter }: ChatLayoutProps) {
+export function ChatLayout({ selectedConversationId, onConversationSelect, departmentFilter }: ChatLayoutProps) {
   const isMobile = useIsMobile();
 
   if (isMobile) {
     return (
       <div className="h-screen w-full">
-        {selectedContact ? (
-          <ChatWindow phoneNumber={selectedContact} onBack={() => onContactSelect("")} />
+        {selectedConversationId ? (
+          <ChatWindow conversationId={selectedConversationId} onBack={() => onConversationSelect("")} />
         ) : (
-          <ChatList selectedContact={selectedContact} onContactSelect={onContactSelect} departmentFilter={departmentFilter} />
+          <ChatList selectedConversationId={selectedConversationId} onConversationSelect={onConversationSelect} departmentFilter={departmentFilter} />
         )}
       </div>
     );
@@ -32,14 +32,14 @@ export function ChatLayout({ selectedContact, onContactSelect, departmentFilter 
       {/* Responsive sidebar */}
       <div className="w-full sm:w-80 md:w-[22rem] lg:w-96 xl:w-[26rem] 2xl:w-[28rem] border-r border-sidebar-border bg-sidebar flex-shrink-0">
         <ChatList 
-          selectedContact={selectedContact} 
-          onContactSelect={onContactSelect}
+          selectedConversationId={selectedConversationId} 
+          onConversationSelect={onConversationSelect}
           departmentFilter={departmentFilter}
         />
       </div>
       <div className="flex-1 flex flex-col items-center justify-center min-w-0 w-full">
-        {selectedContact ? (
-          <ChatWindow phoneNumber={selectedContact} />
+        {selectedConversationId ? (
+          <ChatWindow conversationId={selectedConversationId} />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 bg-chat-background">
             <div className="flex flex-col items-center max-w-2xl w-full animate-fade-in">

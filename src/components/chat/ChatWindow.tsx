@@ -48,11 +48,18 @@ import { isSameDay, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface ChatWindowProps {
-  phoneNumber: string;
+  conversationId: string;
   onBack?: () => void;
 }
 
-export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
+interface ConversationData {
+  id: string;
+  phone_number: string;
+  department_code?: string | null;
+  contact_id?: string | null;
+}
+
+export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -72,6 +79,10 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
   const [showQuickTemplate, setShowQuickTemplate] = useState(false);
   const [showC2SModal, setShowC2SModal] = useState(false);
   const [selectedFlags, setSelectedFlags] = useState<FlagType[]>([]);
+  
+  // Conversation data fetched from conversationId
+  const [conversationData, setConversationData] = useState<ConversationData | null>(null);
+  const phoneNumber = conversationData?.phone_number || '';
   
   const { toast } = useToast();
   const { data: contact } = useContactByPhone(phoneNumber);
@@ -100,14 +111,42 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
+  // Fetch conversation data first
+  useEffect(() => {
+    const fetchConversation = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('conversations')
+          .select('id, phone_number, department_code, contact_id')
+          .eq('id', conversationId)
+          .single();
+        
+        if (error) throw error;
+        setConversationData(data);
+      } catch (error) {
+        console.error('Error fetching conversation:', error);
+        toast({
+          title: "Erro ao carregar conversa",
+          description: "Não foi possível carregar os dados da conversa.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    fetchConversation();
+  }, [conversationId, toast]);
+
   const loadMessages = useCallback(async () => {
+    if (!conversationId) return;
+    
     try {
       setLoading(true);
       
+      // Fetch messages by conversation_id (ISOLATED by department!)
       const { data, error } = await supabase
         .from("messages")
         .select("*")
-        .or(`wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber}`)
+        .eq('conversation_id', conversationId)
         .order("wa_timestamp", { ascending: true })
         .limit(500);
 
@@ -125,20 +164,23 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     } finally {
       setLoading(false);
     }
-  }, [phoneNumber, scrollToBottom, toast]);
+  }, [conversationId, scrollToBottom, toast]);
 
   useEffect(() => {
-    loadMessages();
-  }, [loadMessages]);
+    if (conversationData) {
+      loadMessages();
+    }
+  }, [loadMessages, conversationData]);
 
-  // Use centralized realtime context
-  const { subscribeToPhone } = useRealtimeMessages();
+  // Use centralized realtime context - subscribe by conversationId
+  const { subscribeToConversation } = useRealtimeMessages();
 
   useEffect(() => {
-    const normalizedPhone = phoneNumber.replace(/\D/g, '');
-    console.log('🔍 [ChatWindow] Inscrevendo-se para mensagens de:', phoneNumber);
+    if (!conversationId) return;
+    
+    console.log('🔍 [ChatWindow] Inscrevendo-se para mensagens da conversa:', conversationId);
 
-    const unsubscribe = subscribeToPhone(phoneNumber, (newMessage) => {
+    const unsubscribe = subscribeToConversation(conversationId, (newMessage) => {
       console.log('📨 [ChatWindow] Mensagem recebida:', newMessage.id);
       
       setMessages(prev => {
@@ -170,10 +212,10 @@ export function ChatWindow({ phoneNumber, onBack }: ChatWindowProps) {
     });
 
     return () => {
-      console.log('🔌 [ChatWindow] Desinscrevendo de:', phoneNumber);
+      console.log('🔌 [ChatWindow] Desinscrevendo de conversa:', conversationId);
       unsubscribe();
     };
-  }, [phoneNumber, subscribeToPhone, scrollToBottom]);
+  }, [conversationId, subscribeToConversation, scrollToBottom]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || sending) return;
