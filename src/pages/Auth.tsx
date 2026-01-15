@@ -94,12 +94,8 @@ export default function Auth() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex flex-col items-center justify-center gap-4 mb-4">
-            <img 
-              src="/lovable-uploads/d8138758-50be-45b7-9d69-ea5f3c1af483.png" 
-              alt="Logo Atendimento ADM" 
-              className="w-16 h-16"
-            />
-            <h1 className="text-2xl font-bold">Atendimento ADM</h1>
+            <img src="/lovable-uploads/d8138758-50be-45b7-9d69-ea5f3c1af483.png" alt="Logo Atendimento ADM" className="w-16 h-16" />
+            <h1 className="text-2xl font-bold">Central de atendimento</h1>
           </div>
           <p className="text-muted-foreground">Entre em sua conta ou crie uma nova</p>
         </div>
