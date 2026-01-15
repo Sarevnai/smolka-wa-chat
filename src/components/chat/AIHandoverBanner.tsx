@@ -4,17 +4,18 @@ import { Bot, User, Clock } from 'lucide-react';
 import { useConversationState } from '@/hooks/useConversationState';
 
 interface AIHandoverBannerProps {
-  phoneNumber: string;
+  conversationId?: string;
+  phoneNumber?: string;
 }
 
-export function AIHandoverBanner({ phoneNumber }: AIHandoverBannerProps) {
+export function AIHandoverBanner({ conversationId, phoneNumber }: AIHandoverBannerProps) {
   const { 
     isAIActive, 
     isLoading, 
     isWithinBusinessHours,
     takeoverConversation, 
     releaseToAI 
-  } = useConversationState(phoneNumber);
+  } = useConversationState(conversationId || null, phoneNumber);
 
   const withinHours = isWithinBusinessHours();
 

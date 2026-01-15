@@ -3116,14 +3116,16 @@ serve(async (req) => {
                 await sendWhatsAppMessage(phoneNumber, "Faz mais sentido pra você? 😊");
                 
                 // Save remaining properties and search params
+                const stateData: any = {
+                  phone_number: phoneNumber,
+                  pending_properties: remainingProperties,
+                  last_search_params: similarSearchParams,
+                  updated_at: new Date().toISOString()
+                };
+                
                 await supabase
                   .from('conversation_states')
-                  .upsert({
-                    phone_number: phoneNumber,
-                    pending_properties: remainingProperties,
-                    last_search_params: similarSearchParams,
-                    updated_at: new Date().toISOString()
-                  }, { onConflict: 'phone_number' });
+                  .upsert(stateData, { onConflict: 'phone_number' });
                 
                 return new Response(
                   JSON.stringify({ 
@@ -3299,14 +3301,31 @@ serve(async (req) => {
       vistaEnabled: config.vista_integration_enabled !== false
     });
 
-    // Get conversation history for context
+    // Get conversation history for context - PHASE 2: Use conversationId for isolation
     const historyLimit = config.max_history_messages || 5;
-    const { data: recentMessages } = await supabase
-      .from('messages')
-      .select('body, direction, created_at')
-      .or(`wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber}`)
-      .order('created_at', { ascending: false })
-      .limit(historyLimit);
+    let recentMessages: any[] | null = null;
+    
+    // Prefer conversation_id if available (isolates history between departments)
+    if (conversationId) {
+      console.log(`📜 Loading history by conversationId: ${conversationId}`);
+      const { data } = await supabase
+        .from('messages')
+        .select('body, direction, created_at')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: false })
+        .limit(historyLimit);
+      recentMessages = data;
+    } else {
+      // Fallback to phone-based history (legacy)
+      console.log(`📜 Loading history by phone (legacy): ${phoneNumber}`);
+      const { data } = await supabase
+        .from('messages')
+        .select('body, direction, created_at')
+        .or(`wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber}`)
+        .order('created_at', { ascending: false })
+        .limit(historyLimit);
+      recentMessages = data;
+    }
 
     // Patterns to exclude from history (contaminated generic responses)
     const CONTAMINATED_PATTERNS = [
@@ -3665,13 +3684,15 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
         const remainingProperties = propertiesToSend.slice(1);
         console.log(`💾 Storing ${remainingProperties.length} remaining properties for later`);
         
+        const pendingState: any = {
+          phone_number: phoneNumber,
+          pending_properties: remainingProperties,
+          updated_at: new Date().toISOString()
+        };
+        
         await supabase
           .from('conversation_states')
-          .upsert({
-            phone_number: phoneNumber,
-            pending_properties: remainingProperties,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'phone_number' });
+          .upsert(pendingState, { onConflict: 'phone_number' });
       }
       
       // Ask confirmation question
@@ -3691,15 +3712,17 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
 
     console.log(`📱 ${messagesSent} WhatsApp message(s) sent`);
 
-    // Update conversation state
+    // Update conversation state - PHASE 2: Include conversation_id for future isolation
+    const stateUpdate: any = {
+      phone_number: phoneNumber,
+      is_ai_active: true,
+      last_ai_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
     await supabase
       .from('conversation_states')
-      .upsert({
-        phone_number: phoneNumber,
-        is_ai_active: true,
-        last_ai_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'phone_number' });
+      .upsert(stateUpdate, { onConflict: 'phone_number' });
 
     return new Response(
       JSON.stringify({ 

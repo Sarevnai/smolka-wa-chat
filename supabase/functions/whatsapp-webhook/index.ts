@@ -399,12 +399,13 @@ async function assignDepartmentToConversation(
   try {
     if (!department) return;
 
-    // Get the first stage for this department
+    // PHASE 3: Get the first stage for this department using order() instead of exact match
     const { data: firstStage } = await supabase
       .from('conversation_stages')
       .select('id')
       .eq('department_code', department)
-      .eq('order_index', 1)
+      .order('order_index', { ascending: true })
+      .limit(1)
       .maybeSingle();
 
     const updateData: any = {
