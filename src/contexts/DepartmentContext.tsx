@@ -42,11 +42,16 @@ export function DepartmentProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
   const fetchUserData = async () => {
-      // Reset state on user change to prevent stale data between logins
+      // Reset ALL state on user change to prevent stale data between logins
       setLoading(true);
       setUserDepartment(null);
       setActiveDepartmentState(null);
       setIsAdmin(false);
+      setViewModeState('leads');
+      
+      // Clear localStorage on user change to prevent stale preferences
+      localStorage.removeItem('activeDepartment');
+      localStorage.removeItem('viewMode');
       
       if (!user?.id) {
         setLoading(false);
