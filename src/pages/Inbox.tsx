@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Layout from "@/components/Layout";
-import { ClickUpIntegration } from "@/components/ClickUpIntegration";
 import { cn } from "@/lib/utils";
 import { PRIORITY_CONFIG } from "@/types/crm";
 import { useTickets, useTicketStages, useUpdateTicket, Ticket, TicketStage } from "@/hooks/useTickets";
@@ -146,10 +145,6 @@ export default function Inbox() {
                 <Badge variant="secondary">{ticket.assigned_to}</Badge>
               </div>
             )}
-          </div>
-
-          <div className="pt-2 border-t">
-            <ClickUpIntegration ticket={ticket} />
           </div>
         </CardContent>
       </Card>

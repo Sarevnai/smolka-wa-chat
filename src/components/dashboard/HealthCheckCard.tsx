@@ -14,7 +14,6 @@ import {
   MessageCircle,
   Volume2,
   Building2,
-  CheckSquare,
   Send
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -24,7 +23,6 @@ const integrationIcons: Record<string, React.ElementType> = {
   'WhatsApp API': MessageCircle,
   'ElevenLabs': Volume2,
   'Vista CRM': Building2,
-  'ClickUp': CheckSquare,
   'C2S CRM': Send
 };
 

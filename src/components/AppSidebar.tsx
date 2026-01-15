@@ -43,9 +43,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useState } from "react";
 
-const integrationItems = [
-  { title: "ClickUp", url: "/clickup", icon: Settings },
-];
+const integrationItems: { title: string; url: string; icon: typeof Settings }[] = [];
 
 const aiItems = [
   { title: "Dashboard IA", url: "/admin/ia-dashboard", icon: LayoutDashboard },

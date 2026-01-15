@@ -112,32 +112,7 @@ export function useHealthCheck() {
       });
     }
 
-    // 5. ClickUp
-    try {
-      const { data: clickupConfig } = await supabase
-        .from('clickup_config')
-        .select('api_token')
-        .limit(1)
-        .single();
-
-      const hasClickUp = clickupConfig?.api_token && clickupConfig.api_token.length > 5;
-
-      integrations.push({
-        name: 'ClickUp',
-        status: hasClickUp ? 'online' : 'warning',
-        message: hasClickUp ? 'Integrado' : 'Opcional - não configurado',
-        lastChecked: new Date()
-      });
-    } catch {
-      integrations.push({
-        name: 'ClickUp',
-        status: 'warning',
-        message: 'Opcional - não configurado',
-        lastChecked: new Date()
-      });
-    }
-
-    // 6. C2S Integration
+    // 5. C2S Integration
     try {
       const { data: c2sSettings } = await supabase
         .from('system_settings')
