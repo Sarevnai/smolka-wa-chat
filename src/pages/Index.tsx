@@ -9,6 +9,8 @@ import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { QuickActions } from "@/components/dashboard/QuickActions";
+import { HealthCheckCard } from "@/components/dashboard/HealthCheckCard";
+import { SetupProgressBanner } from "@/components/dashboard/SetupProgressBanner";
 import { 
   MessageCircle, 
   Users, 
@@ -62,6 +64,9 @@ const Index = () => {
       <div className="max-w-7xl mx-auto">
         {user ? (
           <div className="space-y-6">
+            {/* Setup Progress Banner */}
+            <SetupProgressBanner />
+
             {/* Dashboard Header */}
             <div className="flex items-center justify-between animate-fade-in">
               <div className="flex items-center space-x-4 animate-slide-in-from-left">
@@ -163,6 +168,9 @@ const Index = () => {
               </div>
               <div className="animate-scale-in [animation-delay:0.8s]">
                 <QuickActions />
+              </div>
+              <div className="animate-fade-in [animation-delay:0.9s]">
+                <HealthCheckCard />
               </div>
             </div>
           </div>
