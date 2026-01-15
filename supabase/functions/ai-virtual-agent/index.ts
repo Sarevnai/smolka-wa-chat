@@ -252,28 +252,46 @@ function generateRegionKnowledge(): string {
 /**
  * Extract property code from URLs sent by customers
  * Supports smolkaimoveis.com.br links and various Vista patterns
+ * 
+ * URL pattern examples:
+ * - smolkaimoveis.com.br/imovel/casas-jurere-internacional-florianopolis-sc-3-quartos-412.8m2-7558
+ *   → Code is 7558 (at the END, after the last dash)
+ * - smolkaimoveis.com.br/imovel/apartamento-ingleses-1234
+ *   → Code is 1234
  */
 function extractPropertyCodeFromUrl(message: string): string | null {
   if (!message) return null;
   
-  // Common URL patterns for property codes
-  const patterns = [
-    // smolkaimoveis.com.br/imovel/casa-sambaqui-5659 or apartamento-ingleses-1234
-    /smolkaimoveis\.com\.br\/imovel\/[^\s\/]*?[\-\/]?(\d{3,6})\b/i,
-    // smolkaimoveis.com.br/imovel/5659
-    /smolkaimoveis\.com\.br\/imovel\/(\d{3,6})\b/i,
+  // First, try to find Smolka URLs and extract the LAST number (the property code)
+  const smolkaUrlMatch = message.match(/smolkaimoveis\.com\.br\/imovel\/([^\s]+)/i);
+  if (smolkaUrlMatch && smolkaUrlMatch[1]) {
+    const urlPath = smolkaUrlMatch[1];
+    // The property code is always the LAST sequence of 3-6 digits in the URL path
+    // We need to find all digit sequences and get the last one
+    const allNumbers = urlPath.match(/\d+/g);
+    if (allNumbers && allNumbers.length > 0) {
+      // Get the last number in the URL - this is typically the property code
+      const lastNumber = allNumbers[allNumbers.length - 1];
+      // Property codes are usually 3-6 digits
+      if (lastNumber.length >= 3 && lastNumber.length <= 6) {
+        console.log(`🔗 Property code extracted from Smolka URL: ${lastNumber} (last number in path)`);
+        return lastNumber;
+      }
+    }
+  }
+  
+  // Fallback patterns for other URL formats
+  const fallbackPatterns = [
     // vistasoft URLs with codigo parameter
     /codigo[=\/](\d{3,6})\b/i,
-    // Generic property links ending in numeric code
-    /imovel[^\s]*?[\-\/](\d{3,6})\b/i,
-    // Direct code after dash at end of URL
-    /[\-](\d{4,6})(?:\s|$|\.|\?)/i
+    // Direct property code in URL
+    /\/imovel\/(\d{3,6})(?:\s|$|\/|\?)/i
   ];
   
-  for (const pattern of patterns) {
+  for (const pattern of fallbackPatterns) {
     const match = message.match(pattern);
     if (match && match[1]) {
-      console.log(`🔗 Property code extracted: ${match[1]} from pattern: ${pattern}`);
+      console.log(`🔗 Property code extracted: ${match[1]} from fallback pattern: ${pattern}`);
       return match[1];
     }
   }
