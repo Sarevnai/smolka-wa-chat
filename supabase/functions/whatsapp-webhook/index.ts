@@ -734,7 +734,7 @@ async function processIncomingMessage(message: any, value: any) {
       console.warn('⚠️ Could not find/create conversation - message will be saved without conversation_id');
     }
 
-    // Extract message data
+    // Extract message data - now including department_code for isolation
     const messageData = {
       wa_message_id: message.id,
       wa_from: message.from,
@@ -750,7 +750,8 @@ async function processIncomingMessage(message: any, value: any) {
       media_filename: mediaInfo?.filename || null,
       media_mime_type: mediaInfo?.mimeType || null,
       is_template: false,
-      conversation_id: conversationId, // 🆕 Link to conversation
+      conversation_id: conversationId,
+      department_code: conversation?.department_code || null, // 🆕 Department isolation
     };
 
     console.log('📝 Dados da mensagem a serem inseridos:', {
