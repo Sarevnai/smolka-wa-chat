@@ -75,6 +75,7 @@ export default function Pipeline() {
         <KanbanBoard 
           stages={stages} 
           loading={loading}
+          departmentCode={validDepartment}
           onMoveConversation={moveConversation}
         />
       </div>
