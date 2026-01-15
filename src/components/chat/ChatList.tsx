@@ -419,8 +419,25 @@ export function ChatList({ onConversationSelect, selectedConversationId, onBack,
       // Aguardar um pouco para garantir que mensagem foi salva no banco
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Navegar para conversa
-      navigate(`/chat/${phone}`);
+      // Buscar a conversa criada pelo conversation_id (isolada por departamento)
+      const { data: newConv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('phone_number', phone)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (newConv?.id) {
+        navigate(`/chat/${newConv.id}`);
+      } else {
+        // Fallback: recarregar lista e deixar usuário selecionar
+        loadConversations();
+        toast({
+          title: "Conversa iniciada",
+          description: "Mensagem enviada. Selecione a conversa na lista.",
+        });
+      }
       
     } catch (error) {
       console.error('❌ Erro ao enviar template:', error);
