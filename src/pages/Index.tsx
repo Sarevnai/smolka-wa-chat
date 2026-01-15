@@ -8,6 +8,7 @@ import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useDepartment } from "@/contexts/DepartmentContext";
 import { AdminDashboardContent } from "@/components/dashboard/AdminDashboardContent";
 import { DepartmentDashboardContent } from "@/components/dashboard/DepartmentDashboardContent";
+import { NoDepartmentContent } from "@/components/dashboard/NoDepartmentContent";
 import { 
   MessageCircle, 
   Send, 
@@ -57,6 +58,14 @@ const Index = () => {
     );
   }
 
+  // Debug log para identificar problemas de renderização do dashboard
+  console.log('[Index] Dashboard rendering:', {
+    isAdmin,
+    userDepartment,
+    effectiveDepartment,
+    userId: user?.id
+  });
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto">
@@ -71,8 +80,8 @@ const Index = () => {
               onRefresh={refreshStats} 
             />
           ) : (
-            // Fallback: se não tem departamento definido
-            <AdminDashboardContent stats={stats} onRefresh={refreshStats} />
+            // Fallback: usuário sem departamento definido
+            <NoDepartmentContent />
           )
         ) : (
           <div className="max-w-4xl mx-auto">
