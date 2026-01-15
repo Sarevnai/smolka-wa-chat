@@ -39,7 +39,7 @@ export function StepAIAgent({ data, updateData }: StepAIAgentProps) {
               </Label>
               <Input
                 id="agentName"
-                placeholder="Ex: Nina, Assistente Virtual"
+                placeholder="Ex: Arya, Assistente Virtual"
                 value={data.agentName}
                 onChange={(e) => updateData({ agentName: e.target.value })}
               />
@@ -86,7 +86,7 @@ export function StepAIAgent({ data, updateData }: StepAIAgentProps) {
             <Label htmlFor="greetingMessage">Mensagem de Saudação</Label>
             <Textarea
               id="greetingMessage"
-              placeholder="Ex: Olá! Sou a Nina, assistente virtual da Imobiliária XYZ. Como posso ajudá-lo hoje?"
+              placeholder="Ex: Olá! Sou a Arya, assistente virtual da Imobiliária XYZ. Como posso ajudá-lo hoje?"
               value={data.greetingMessage}
               onChange={(e) => updateData({ greetingMessage: e.target.value })}
               rows={3}

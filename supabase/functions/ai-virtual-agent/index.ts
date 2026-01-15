@@ -745,7 +745,7 @@ Siga TODOS estes passos:
 📝 EXEMPLO DE CONVERSA IDEAL (ESTILO LAÍS):
 
 CLIENTE: Oi
-AGENTE: Oi! Aqui é a Nina da Smolka 🏠 Me conta, o que você tá buscando? Se preferir, pode me mandar áudio 😊
+AGENTE: Oi! Aqui é a Arya da Smolka 🏠 Me conta, o que você tá buscando? Se preferir, pode me mandar áudio 😊
 
 CLIENTE: Quero alugar um apartamento
 AGENTE: Legal! 🎉 A propósito, como posso te chamar?
@@ -1711,7 +1711,7 @@ async function handlePortalLeadQualification(
     await sendWhatsAppMessage(phoneNumber, greeting);
     await sleep(1000);
     
-    const intro = `Aqui é a ${config.agent_name || 'Nina'} da ${config.company_name || 'Smolka Imóveis'} 🏠`;
+    const intro = `Aqui é a ${config.agent_name || 'Arya'} da ${config.company_name || 'Smolka Imóveis'} 🏠`;
     await sendWhatsAppMessage(phoneNumber, intro);
     await sleep(1500);
     
@@ -2094,7 +2094,7 @@ async function updateTriageStage(phoneNumber: string, stage: string): Promise<vo
  * Mirrors the communication channel from the start
  */
 async function sendGreeting(phoneNumber: string, config: AIAgentConfig, useAudio: boolean = false): Promise<void> {
-  const greetingText = `Olá! Aqui é a ${config.agent_name || 'Nina'} da ${config.company_name || 'Smolka Imóveis'} 🏠`;
+  const greetingText = `Olá! Aqui é a ${config.agent_name || 'Arya'} da ${config.company_name || 'Smolka Imóveis'} 🏠`;
   
   if (useAudio && config.audio_enabled) {
     const audioResult = await generateAudio(greetingText, config);

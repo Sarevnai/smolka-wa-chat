@@ -465,7 +465,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       addMessage('bot', `Claro, ${leadConfig.name}! Vou buscar outra opção pra você 🔍`, undefined, 'simulated');
       await delay(1000);
       addMessage('bot', `Olha essa outra opção que separei pra você! 🏠`, undefined, 'simulated');
-      addMessage('system', '🔄 Helena busca imóveis similares no Vista CRM', undefined, 'simulated');
+      addMessage('system', '🔄 Arya busca imóveis similares no Vista CRM', undefined, 'simulated');
     } else if (lowerMessage.includes('gostei') || lowerMessage.includes('interesse') || lowerMessage.includes('visita') || 
         lowerMessage.includes('conhecer') || lowerMessage.includes('agendar')) {
       // User wants to schedule visit - DETECTED SCHEDULING INTENT
@@ -553,7 +553,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
             </TabsContent>
             <TabsContent value="real" className="mt-2">
               <p className="text-sm text-muted-foreground">
-                Chama a edge function real (simulate-portal-lead) para ver como a Helena responde. 
+                Chama a edge function real (simulate-portal-lead) para ver como a Arya responde. 
                 <strong className="text-primary"> Não envia mensagens no WhatsApp.</strong>
               </p>
             </TabsContent>
@@ -685,7 +685,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
                 ) : (
                   <>
                     {testMode === 'real' ? <Sparkles className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-                    {testMode === 'real' ? 'Testar IA Helena' : 'Iniciar Simulação'}
+                    {testMode === 'real' ? 'Testar IA Arya' : 'Iniciar Simulação'}
                   </>
                 )}
               </Button>

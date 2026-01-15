@@ -50,8 +50,8 @@ interface MarketingAIConfig {
 
 const defaultConfig: MarketingAIConfig = {
   enabled: false,
-  agent_name: "Nina Marketing",
-  greeting_message: "Olá! 👋 Sou a Nina, assistente de marketing. Como posso ajudá-lo hoje?",
+  agent_name: "Arya Marketing",
+  greeting_message: "Olá! 👋 Sou a Arya, assistente de marketing. Como posso ajudá-lo hoje?",
   tone: "friendly",
   qualification_enabled: true,
   qualification_questions: [
