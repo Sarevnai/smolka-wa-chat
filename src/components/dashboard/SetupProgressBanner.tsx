@@ -82,7 +82,7 @@ export function SetupProgressBanner() {
 
           {/* Action Button */}
           <Button asChild size="sm" className="shrink-0">
-            <Link to="/admin/system-settings">
+            <Link to="/admin/settings">
               <Settings className="h-4 w-4 mr-2" />
               Configurar
               <ArrowRight className="h-4 w-4 ml-2" />
