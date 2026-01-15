@@ -36,6 +36,7 @@ import LeadsManagement from "./pages/admin/LeadsManagement";
 import AIBehaviorConfig from "./pages/admin/AIBehaviorConfig";
 import LeadsReports from "./pages/admin/LeadsReports";
 import AINotifications from "./pages/admin/AINotifications";
+import AIUnifiedConfig from "./pages/admin/AIUnifiedConfig";
 import { AdminGuard } from "./components/guards/AdminGuard";
 import { MarketingGuard } from "./components/guards/MarketingGuard";
 // Marketing Module
@@ -288,7 +289,14 @@ const App = () => (
                   <Route path="/admin/ia-comportamento" element={
                     <ProtectedRoute>
                       <AdminGuard>
-                        <AIBehaviorConfig />
+                        <AIUnifiedConfig />
+                      </AdminGuard>
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/ia-configuracao" element={
+                    <ProtectedRoute>
+                      <AdminGuard>
+                        <AIUnifiedConfig />
                       </AdminGuard>
                     </ProtectedRoute>
                   } />
