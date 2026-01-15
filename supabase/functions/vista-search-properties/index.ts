@@ -33,6 +33,7 @@ interface PropertyResult {
   fotos: string[];
   link: string;
   caracteristicas: string[];
+  valor_condominio: number;
 }
 
 serve(async (req) => {
@@ -92,6 +93,7 @@ serve(async (req) => {
         'Endereco',
         'ValorVenda',
         'ValorLocacao',
+        'ValorCondominio',
         'Dormitorios',
         'Suites',
         'Vagas',
@@ -260,6 +262,7 @@ serve(async (req) => {
           fotos: fotoDestaque ? [fotoDestaque] : [],
           link,
           caracteristicas,
+          valor_condominio: parseFloat(prop.ValorCondominio || '0'),
         });
         // Respect the user's limit
         if (properties.length >= (params.limit || 3)) break;

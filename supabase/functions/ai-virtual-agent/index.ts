@@ -907,7 +907,13 @@ ${config.faqs.map(faq => `P: ${faq.question}\nR: ${faq.answer}`).join('\n\n')}`;
 - NUNCA mostre mais de 1 imóvel por vez
 - Após mostrar, SEMPRE pergunte "Faz sentido pra você? 😊"
 - AGUARDE a resposta antes de mostrar outra opção
-- Use linguagem EMPOLGANTE: "Achei uma opção ótima!" ao invés de "Achei uma opção"`;
+- Use linguagem EMPOLGANTE: "Achei uma opção ótima!" ao invés de "Achei uma opção"
+
+💰 PERGUNTAS SOBRE VALORES E CUSTOS:
+- Se o cliente perguntar sobre CONDOMÍNIO: O valor já foi informado na ficha do imóvel (se disponível). Se não foi mostrado, diga que vai confirmar o valor exato com a equipe.
+- Se o cliente perguntar sobre IPTU: Informe que o valor exato será confirmado na visita ou pelo corretor.
+- Se o cliente perguntar sobre CUSTO TOTAL (aluguel + condomínio): Faça a soma e informe de forma clara. Ex: "O aluguel é R$ 3.500 + condomínio de R$ 650, totalizando R$ 4.150/mês."
+- Sempre seja transparente sobre os custos para gerar confiança!`;
 
   return prompt;
 }
@@ -1080,6 +1086,18 @@ function formatPropertyMessage(property: any): string {
     lines.push(`• ${property.area_util}m² de área útil`);
   }
   lines.push(`• ${property.preco_formatado}`);
+  
+  // Add condominium value if available (for rentals)
+  if (property.valor_condominio && property.valor_condominio > 0) {
+    const condFormatado = property.valor_condominio.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+    lines.push(`• Condomínio: ${condFormatado}`);
+  }
+  
   lines.push(`🔗 ${property.link}`);
   
   return lines.join('\n');
@@ -1129,6 +1147,18 @@ function formatPropertyDetailsLikeLais(property: any, portalOrigin?: string): st
   
   if (preco) {
     lines.push(`• Valor: ${preco}`);
+  }
+  
+  // Add condominium value if available
+  const valorCondominio = property.valor_condominio || property.ValorCondominio;
+  if (valorCondominio && parseFloat(valorCondominio) > 0) {
+    const condFormatado = parseFloat(valorCondominio).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+    lines.push(`• Condomínio: ${condFormatado}`);
   }
   
   // Link
