@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { User, ArrowLeft, Phone, Building2, Key, FileText, MoreVertical, Search, Image, Clock, MessageCircle, Bot, ClipboardList, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-// ScrollArea imported but not currently used - keeping for future use
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MessageBubble } from "./MessageBubble";
 import { MessageComposer } from "./MessageComposer";
@@ -13,7 +12,6 @@ import { MessageSearch } from "./MessageSearch";
 import { ReplyPreview } from "./MessageReply";
 import { MediaGallery } from "./MediaGallery";
 import { MessageForward } from "./MessageForward";
-// ChatBackground imported but not currently used - keeping for future use
 import { MessageScheduler } from "./MessageScheduler";
 import { ChatSettings } from "./ChatSettings";
 import { VoiceRecorder } from "./VoiceRecorder";
@@ -43,9 +41,7 @@ import { MessageRow } from "@/lib/messages";
 import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
 import { MessageFlagsFilter } from "./MessageFlagsFilter";
 import { type FlagType } from "@/hooks/useMessageFlags";
-import { formatPhoneNumber } from "@/lib/utils";
-// date-fns imports available if needed
-import { cn } from "@/lib/utils";
+import { formatPhoneNumber, cn } from "@/lib/utils";
 
 interface ChatWindowProps {
   conversationId: string;

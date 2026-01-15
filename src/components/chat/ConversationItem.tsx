@@ -42,7 +42,7 @@ interface ConversationItemProps {
   stageColor?: string;
   departmentCode?: string | null;
   viewMode?: ViewMode;
-  onDeleted?: (phoneNumber: string) => void;
+  onDeleted?: (conversationId: string) => void;
 }
 
 export function ConversationItem({
@@ -65,7 +65,7 @@ export function ConversationItem({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [openTicketsCount, setOpenTicketsCount] = useState(0);
   const navigate = useNavigate();
-  const { phoneNumber: currentPhone } = useParams<{ phoneNumber?: string }>();
+  const { conversationId: currentConversationId } = useParams<{ conversationId?: string }>();
 
   // Fetch open tickets count for tasks mode
   useEffect(() => {
@@ -88,10 +88,12 @@ export function ConversationItem({
     const result = await deleteConversation(phoneNumber, conversationId);
     if (result.success) {
       setShowDeleteDialog(false);
-      onDeleted?.(phoneNumber);
+      if (conversationId) {
+        onDeleted?.(conversationId);
+      }
       
       // Se estava visualizando esta conversa, voltar para lista
-      if (currentPhone === phoneNumber) {
+      if (currentConversationId === conversationId) {
         navigate('/chat');
       }
     }
@@ -152,7 +154,7 @@ export function ConversationItem({
   const displayName = truncateName(contact?.name || formatPhoneNumber(phoneNumber));
   const displayInitials = getInitials(contact?.name, phoneNumber);
   const isAutoDetectedName = contact?.name && contact.name !== phoneNumber && !contact.name.includes('@');
-  const conversationIsPinned = isPinned(phoneNumber);
+  const conversationIsPinned = conversationId ? isPinned(conversationId) : false;
 
   const getContactTypeInfo = (type?: string) => {
     switch (type) {
@@ -353,7 +355,7 @@ export function ConversationItem({
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
-              togglePin(phoneNumber);
+              if (conversationId) togglePin(conversationId);
             }}
           >
             {conversationIsPinned ? (

@@ -17,6 +17,7 @@ export function usePinnedConversations() {
     }
 
     try {
+      // Fetch by conversation_id for proper isolation
       const { data, error } = await supabase
         .from('pinned_conversations')
         .select('phone_number')
@@ -24,6 +25,7 @@ export function usePinnedConversations() {
 
       if (error) throw error;
 
+      // phone_number column stores conversationId now (for backward compatibility, column name unchanged)
       setPinnedConversations(data?.map(p => p.phone_number) || []);
     } catch (error) {
       console.error('Error loading pinned conversations:', error);
@@ -32,22 +34,22 @@ export function usePinnedConversations() {
     }
   };
 
-  const togglePin = async (phoneNumber: string) => {
+  const togglePin = async (conversationId: string) => {
     if (!user) return;
 
-    const isPinned = pinnedConversations.includes(phoneNumber);
+    const isPinnedNow = pinnedConversations.includes(conversationId);
 
     try {
-      if (isPinned) {
+      if (isPinnedNow) {
         const { error } = await supabase
           .from('pinned_conversations')
           .delete()
           .eq('user_id', user.id)
-          .eq('phone_number', phoneNumber);
+          .eq('phone_number', conversationId);
 
         if (error) throw error;
 
-        setPinnedConversations(prev => prev.filter(p => p !== phoneNumber));
+        setPinnedConversations(prev => prev.filter(p => p !== conversationId));
         toast({
           title: "Conversa desafixada",
           description: "A conversa foi removida dos favoritos."
@@ -57,12 +59,12 @@ export function usePinnedConversations() {
           .from('pinned_conversations')
           .insert({
             user_id: user.id,
-            phone_number: phoneNumber
+            phone_number: conversationId
           });
 
         if (error) throw error;
 
-        setPinnedConversations(prev => [...prev, phoneNumber]);
+        setPinnedConversations(prev => [...prev, conversationId]);
         toast({
           title: "Conversa fixada",
           description: "A conversa foi adicionada aos favoritos."
@@ -86,6 +88,6 @@ export function usePinnedConversations() {
     pinnedConversations,
     loading,
     togglePin,
-    isPinned: (phoneNumber: string) => pinnedConversations.includes(phoneNumber)
+    isPinned: (conversationId: string) => pinnedConversations.includes(conversationId)
   };
 }
