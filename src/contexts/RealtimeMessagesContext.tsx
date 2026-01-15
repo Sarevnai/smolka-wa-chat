@@ -12,6 +12,7 @@ type DepartmentType = Database['public']['Enums']['department_type'];
 interface RealtimeMessagesContextType {
   lastMessage: MessageRow | null;
   subscribeToPhone: (phoneNumber: string, callback: (message: MessageRow) => void) => () => void;
+  subscribeToConversation: (conversationId: string, callback: (message: MessageRow) => void) => () => void;
   isConnected: boolean;
 }
 
@@ -34,29 +35,53 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
   
   // Use refs for stable callbacks and deduplication
   const seenMessageIds = useRef(new Set<number>());
-  const subscriptions = useRef(new Map<string, Set<(message: MessageRow) => void>>());
+  const phoneSubscriptions = useRef(new Map<string, Set<(message: MessageRow) => void>>());
+  const conversationSubscriptions = useRef(new Map<string, Set<(message: MessageRow) => void>>());
   const MESSAGE_CACHE_SIZE = 1000;
 
-  // Subscribe to a specific phone number
+  // Subscribe to a specific phone number (legacy - for ChatList compatibility)
   const subscribeToPhone = useCallback((phoneNumber: string, callback: (message: MessageRow) => void) => {
-    console.log('📞 Registrando callback para:', phoneNumber);
+    console.log('📞 Registrando callback por telefone:', phoneNumber);
     
     const normalizedPhone = phoneNumber.replace(/\D/g, '');
     
-    if (!subscriptions.current.has(normalizedPhone)) {
-      subscriptions.current.set(normalizedPhone, new Set());
+    if (!phoneSubscriptions.current.has(normalizedPhone)) {
+      phoneSubscriptions.current.set(normalizedPhone, new Set());
     }
     
-    subscriptions.current.get(normalizedPhone)!.add(callback);
+    phoneSubscriptions.current.get(normalizedPhone)!.add(callback);
     
     // Return unsubscribe function
     return () => {
-      console.log('📞 Removendo callback para:', phoneNumber);
-      const callbacks = subscriptions.current.get(normalizedPhone);
+      console.log('📞 Removendo callback por telefone:', phoneNumber);
+      const callbacks = phoneSubscriptions.current.get(normalizedPhone);
       if (callbacks) {
         callbacks.delete(callback);
         if (callbacks.size === 0) {
-          subscriptions.current.delete(normalizedPhone);
+          phoneSubscriptions.current.delete(normalizedPhone);
+        }
+      }
+    };
+  }, []);
+
+  // Subscribe to a specific conversation (PREFERRED - isolated by department)
+  const subscribeToConversation = useCallback((conversationId: string, callback: (message: MessageRow) => void) => {
+    console.log('💬 Registrando callback por conversation:', conversationId);
+    
+    if (!conversationSubscriptions.current.has(conversationId)) {
+      conversationSubscriptions.current.set(conversationId, new Set());
+    }
+    
+    conversationSubscriptions.current.get(conversationId)!.add(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      console.log('💬 Removendo callback por conversation:', conversationId);
+      const callbacks = conversationSubscriptions.current.get(conversationId);
+      if (callbacks) {
+        callbacks.delete(callback);
+        if (callbacks.size === 0) {
+          conversationSubscriptions.current.delete(conversationId);
         }
       }
     };
@@ -103,13 +128,27 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
           // Update last message for global consumers
           setLastMessage(newMessage);
           
-          // Identify relevant phone numbers
+          // First, notify conversation-based subscribers (PREFERRED - isolated)
+          const messageConvId = (newMessage as any).conversation_id;
+          if (messageConvId) {
+            const convCallbacks = conversationSubscriptions.current.get(messageConvId);
+            if (convCallbacks && convCallbacks.size > 0) {
+              console.log(`✅ [RealtimeContext] Notificando ${convCallbacks.size} callback(s) para conversa ${messageConvId}`);
+              convCallbacks.forEach(callback => {
+                try {
+                  callback(newMessage);
+                } catch (error) {
+                  console.error('❌ [RealtimeContext] Erro ao executar callback de conversa:', error);
+                }
+              });
+            }
+          }
+          
+          // Then, also notify phone-based subscribers (legacy compatibility)
           const messageFrom = (newMessage.wa_from || '').replace(/\D/g, '');
           const messageTo = (newMessage.wa_to || '').replace(/\D/g, '');
           
-          // Determine which phone number this message is relevant for
           const relevantPhones: string[] = [];
-          
           if (newMessage.direction === 'inbound' && messageFrom) {
             relevantPhones.push(messageFrom);
           } else if (newMessage.direction === 'outbound' && messageTo) {
@@ -121,7 +160,7 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
           // Notify all subscribed callbacks for relevant phones
           let notifiedCount = 0;
           relevantPhones.forEach(phone => {
-            const callbacks = subscriptions.current.get(phone);
+            const callbacks = phoneSubscriptions.current.get(phone);
             if (callbacks && callbacks.size > 0) {
               console.log(`✅ [RealtimeContext] Notificando ${callbacks.size} callback(s) para ${phone}`);
               callbacks.forEach(callback => {
@@ -179,7 +218,22 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
           // Update last message if needed
           setLastMessage(updatedMessage);
           
-          // Notify relevant subscribers about the update
+          // Notify conversation-based subscribers first
+          const messageConvId = (updatedMessage as any).conversation_id;
+          if (messageConvId) {
+            const convCallbacks = conversationSubscriptions.current.get(messageConvId);
+            if (convCallbacks && convCallbacks.size > 0) {
+              convCallbacks.forEach(callback => {
+                try {
+                  callback(updatedMessage);
+                } catch (error) {
+                  console.error('❌ [RealtimeContext] Erro ao executar callback de update (conversa):', error);
+                }
+              });
+            }
+          }
+          
+          // Notify relevant phone subscribers
           const messageFrom = (updatedMessage.wa_from || '').replace(/\D/g, '');
           const messageTo = (updatedMessage.wa_to || '').replace(/\D/g, '');
           
@@ -191,7 +245,7 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
           }
           
           relevantPhones.forEach(phone => {
-            const callbacks = subscriptions.current.get(phone);
+            const callbacks = phoneSubscriptions.current.get(phone);
             if (callbacks && callbacks.size > 0) {
               callbacks.forEach(callback => {
                 try {
@@ -216,7 +270,7 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
   }, [currentConversation, playNotificationSound, effectiveDepartment]);
 
   return (
-    <RealtimeMessagesContext.Provider value={{ lastMessage, subscribeToPhone, isConnected }}>
+    <RealtimeMessagesContext.Provider value={{ lastMessage, subscribeToPhone, subscribeToConversation, isConnected }}>
       {children}
     </RealtimeMessagesContext.Provider>
   );
