@@ -300,6 +300,48 @@ function extractPropertyCodeFromUrl(message: string): string | null {
 }
 
 /**
+ * Extract property info from URL text (bairro, tipo) when we can't get the code
+ */
+function extractInfoFromUrlText(message: string): { tipo?: string; bairro?: string } {
+  const result: { tipo?: string; bairro?: string } = {};
+  
+  const urlMatch = message.match(/smolkaimoveis\.com\.br\/imovel\/([^\s]+)/i);
+  if (urlMatch && urlMatch[1]) {
+    const urlPath = urlMatch[1].toLowerCase();
+    
+    // Extract property type
+    if (urlPath.includes('apartamento')) result.tipo = 'apartamento';
+    else if (urlPath.includes('casa')) result.tipo = 'casa';
+    else if (urlPath.includes('cobertura')) result.tipo = 'cobertura';
+    else if (urlPath.includes('terreno')) result.tipo = 'terreno';
+    else if (urlPath.includes('kitnet')) result.tipo = 'kitnet';
+    else if (urlPath.includes('comercial') || urlPath.includes('sala')) result.tipo = 'comercial';
+    
+    // Try to extract neighborhood from URL
+    const neighborhoods = getAllNeighborhoods();
+    for (const n of neighborhoods) {
+      const normalizedNeighborhood = n.toLowerCase()
+        .replace(/\s+/g, '-')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      if (urlPath.includes(normalizedNeighborhood) || urlPath.includes(n.toLowerCase().replace(/\s+/g, '-'))) {
+        result.bairro = n;
+        break;
+      }
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Check if message references a previously sent property
+ */
+function referencesEarlierProperty(message: string): boolean {
+  return /primeiro|aquele|esse|anterior|que\s+(te\s+)?mandei|que\s+enviei|imóvel\s+do\s+link|imóvel\s+que\s+(te\s+)?mostrei/i.test(message);
+}
+
+/**
  * Check if message contains a property URL
  */
 function containsPropertyUrl(message: string): boolean {
@@ -673,6 +715,14 @@ NÃO atue em outra cidade. Se perguntarem sobre outra cidade, diga que atua apen
 Se no histórico você vir mensagens com menus numerados (1→, 2→), opções genéricas,
 "ajuda para estudar/trabalho/dinheiro", "mensagem para copiar", IGNORE COMPLETAMENTE.
 Foram respostas de um assistente genérico. Você é vendedora da Smolka.
+
+🔗 LINKS DE IMÓVEIS DO SITE (IMPORTANTE):
+- Quando o cliente enviar um link de imóvel (smolkaimoveis.com.br/imovel/...), o SISTEMA processa automaticamente e envia as informações.
+- Se você receber o contexto com dados do imóvel, USE essas informações para ajudar o cliente.
+- Se você NÃO receber dados do imóvel no contexto (por algum erro), peça EDUCADAMENTE o código do imóvel:
+  "Me passa o código do imóvel? São os números no final do link! 😊"
+- Se o cliente mencionar "o imóvel que mandei", "aquele imóvel", "o primeiro imóvel", verifique o contexto - o sistema busca automaticamente.
+- NUNCA diga que não consegue acessar links! O sistema processa os links automaticamente.
 
 Você é ${config.agent_name} da ${config.company_name}.
 
@@ -2761,6 +2811,67 @@ serve(async (req) => {
     }
     // ========== END PORTAL LEAD QUALIFICATION CHECK ==========
 
+    // ========== REFERENCE TO EARLIER PROPERTY ==========
+    // Check if user is referencing a property they sent earlier
+    if (referencesEarlierProperty(messageBody)) {
+      console.log('🔍 User references earlier property, searching message history...');
+      
+      // Find the first property link in the conversation history
+      const { data: previousMessages } = await supabase
+        .from('messages')
+        .select('body, created_at')
+        .or(`wa_from.eq.${phoneNumber},wa_to.eq.${phoneNumber}`)
+        .ilike('body', '%smolkaimoveis.com.br/imovel%')
+        .order('created_at', { ascending: true })
+        .limit(1);
+      
+      if (previousMessages?.[0]?.body) {
+        const earlierCode = extractPropertyCodeFromUrl(previousMessages[0].body);
+        
+        if (earlierCode) {
+          console.log(`🔗 Found earlier property code in history: ${earlierCode}`);
+          const property = await getPropertyByListingId(earlierCode);
+          
+          if (property) {
+            const { data: contactData } = await supabase
+              .from('contacts')
+              .select('name')
+              .eq('phone', phoneNumber)
+              .maybeSingle();
+            
+            const customerName = contactData?.name || contactName;
+            
+            await sendWhatsAppMessage(phoneNumber, `Achei o imóvel que você tinha me mandado! 😊`);
+            await sleep(1200);
+            
+            const photoUrl = property.foto_destaque || property.FotoDestaque;
+            if (photoUrl) {
+              await sendWhatsAppImage(phoneNumber, photoUrl);
+              await sleep(1200);
+            }
+            
+            const propertyDetails = formatPropertyDetailsLikeLais(property, 'site');
+            await sendWhatsAppMessage(phoneNumber, propertyDetails);
+            await sleep(1500);
+            
+            await sendWhatsAppMessage(phoneNumber, `Quer agendar uma visita${customerName ? `, ${customerName}` : ''}? 😊`);
+            
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                action: 'earlier_property_found',
+                propertyCode: earlierCode
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      }
+      
+      console.log('⚠️ Could not find earlier property, continuing normal flow');
+    }
+    // ========== END REFERENCE TO EARLIER PROPERTY ==========
+
     // ========== PROPERTY LINK PROCESSING ==========
     // Check if the message contains a property link and extract the code
     if (containsPropertyUrl(messageBody)) {
@@ -2783,6 +2894,13 @@ serve(async (req) => {
             .maybeSingle();
           
           const customerName = contactData?.name || contactName;
+          
+          // Determine finalidade from property
+          const isRental = property.status === 'ALUGUEL' || 
+                           property.Situacao === 'ALUGUEL' ||
+                           (property.valor_locacao && !property.valor_venda) ||
+                           (property.ValorLocacao && !property.ValorVenda);
+          const finalidade = isRental ? 'locacao' : 'venda';
           
           // Send greeting
           const greetingMsg = customerName 
@@ -2810,13 +2928,28 @@ serve(async (req) => {
           // Consultive follow-up
           await sendWhatsAppMessage(phoneNumber, `Esse imóvel combina com o que você busca? Posso agendar uma visita pra você conhecer! 😊`);
           
-          // Update conversation state
+          // Save property context to conversation_states for future reference
+          const propertyContext = {
+            tipo: property.categoria?.toLowerCase() || property.Categoria?.toLowerCase() || 'imovel',
+            finalidade: finalidade,
+            bairro: property.bairro || property.Bairro,
+            quartos: property.dormitorios || property.Dormitorios,
+            preco_referencia: isRental 
+              ? (property.valor_locacao || property.ValorLocacao)
+              : (property.valor_venda || property.ValorVenda),
+            codigo_referencia: extractedPropertyCode
+          };
+          
+          console.log(`💾 Saving property context:`, propertyContext);
+          
+          // Update conversation state with property context
           await supabase
             .from('conversation_states')
             .upsert({
               phone_number: phoneNumber,
               is_ai_active: true,
               last_ai_message_at: new Date().toISOString(),
+              last_search_params: propertyContext,
               updated_at: new Date().toISOString()
             }, { onConflict: 'phone_number' });
           
@@ -2825,15 +2958,75 @@ serve(async (req) => {
               success: true, 
               action: 'property_link_processed',
               propertyCode: extractedPropertyCode,
-              propertyFound: true
+              propertyFound: true,
+              context: propertyContext
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         } else {
-          console.log(`⚠️ Property not found for code ${extractedPropertyCode}, continuing normal flow`);
+          console.log(`⚠️ Property not found for code ${extractedPropertyCode}`);
+          
+          // Fallback: property not found, ask for confirmation
+          const { data: contactData } = await supabase
+            .from('contacts')
+            .select('name')
+            .eq('phone', phoneNumber)
+            .maybeSingle();
+          
+          const customerName = contactData?.name || contactName;
+          
+          await sendWhatsAppMessage(phoneNumber, 
+            `Hmm, não encontrei esse imóvel no sistema 🤔\n\n` +
+            `Pode me confirmar o código ${extractedPropertyCode}${customerName ? `, ${customerName}` : ''}? ` +
+            `Ou se preferir, me conta mais sobre o que você busca que eu procuro opções similares! 😊`
+          );
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              action: 'property_not_found_asked_code',
+              extractedCode: extractedPropertyCode
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
       } else {
-        console.log(`⚠️ Could not extract property code from URL, continuing normal flow`);
+        console.log(`⚠️ Could not extract property code from URL`);
+        
+        // Fallback: couldn't extract code, ask for it
+        const urlInfo = extractInfoFromUrlText(messageBody);
+        console.log(`📋 Extracted URL info:`, urlInfo);
+        
+        const { data: contactData } = await supabase
+          .from('contacts')
+          .select('name')
+          .eq('phone', phoneNumber)
+          .maybeSingle();
+        
+        const customerName = contactData?.name || contactName;
+        
+        let contextHint = '';
+        if (urlInfo.tipo && urlInfo.bairro) {
+          contextHint = `Vi que você se interessou por um ${urlInfo.tipo} em ${urlInfo.bairro}! `;
+        } else if (urlInfo.tipo) {
+          contextHint = `Vi que você se interessou por um ${urlInfo.tipo}! `;
+        } else if (urlInfo.bairro) {
+          contextHint = `Vi que você se interessou por um imóvel em ${urlInfo.bairro}! `;
+        }
+        
+        await sendWhatsAppMessage(phoneNumber, 
+          `${contextHint}Me passa o código do imóvel${customerName ? `, ${customerName}` : ''}? ` +
+          `São os números no final do link! 😊`
+        );
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            action: 'asked_property_code',
+            extractedInfo: urlInfo
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
     // ========== END PROPERTY LINK PROCESSING ==========
