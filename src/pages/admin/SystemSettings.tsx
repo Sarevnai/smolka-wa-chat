@@ -5,11 +5,10 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Save, Settings, Bell, Shield, Database, Bot } from 'lucide-react';
+import { Save, Settings, Bell, Shield, Database } from 'lucide-react';
 import { useSystemSettings } from '@/hooks/admin/useSystemSettings';
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { N8NSettings } from '@/components/admin/N8NSettings';
 
 export default function SystemSettings() {
   const { settings, loading, updateSetting, getSetting } = useSystemSettings();
@@ -65,15 +64,11 @@ export default function SystemSettings() {
       </div>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="general">Geral</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="security">Segurança</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
-          <TabsTrigger value="n8n" className="flex items-center gap-1">
-            <Bot className="h-4 w-4" />
-            N8N/IA
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="mt-6">
@@ -263,10 +258,6 @@ export default function SystemSettings() {
           </Button>
         </CardContent>
       </Card>
-        </TabsContent>
-
-        <TabsContent value="n8n" className="mt-6">
-          <N8NSettings />
         </TabsContent>
       </Tabs>
       </div>

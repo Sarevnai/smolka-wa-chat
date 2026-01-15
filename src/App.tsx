@@ -16,7 +16,6 @@ import Send from "./pages/Send";
 import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
-import ClickUpConfig from "./pages/ClickUpConfig";
 import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
 import Triage from "./pages/Triage";
@@ -108,11 +107,6 @@ const App = () => (
                   <Route path="/profile" element={
                     <ProtectedRoute>
                       <Profile />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/clickup" element={
-                    <ProtectedRoute>
-                      <ClickUpConfig />
                     </ProtectedRoute>
                   } />
                   <Route path="/integrations" element={

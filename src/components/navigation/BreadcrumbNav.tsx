@@ -50,10 +50,6 @@ const routeConfig = {
     label: 'Perfil', 
     icon: User 
   },
-  '/clickup': { 
-    label: 'ClickUp', 
-    icon: Settings 
-  },
   '/integrations': { 
     label: 'Integrações', 
     icon: Puzzle 

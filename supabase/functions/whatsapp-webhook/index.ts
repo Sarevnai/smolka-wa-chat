@@ -1078,11 +1078,7 @@ async function handleN8NTrigger(
       }
     }
 
-    // Check which agent mode to use (native or n8n)
-    const agentModeRaw = settingsMap['ai_agent_mode'];
-    const agentMode = agentModeRaw?.value ?? agentModeRaw ?? 'native'; // Default to native
-
-    console.log(`🤖 Triggering AI agent (mode: ${agentMode}) - Outside business hours, AI active, or force mode enabled`);
+    console.log('🤖 Triggering AI virtual agent - Outside business hours, AI active, or force mode enabled');
 
     // Get contact info for context
     const { data: contact } = await supabase
@@ -1091,7 +1087,7 @@ async function handleN8NTrigger(
       .eq('phone', phoneNumber)
       .maybeSingle();
 
-    // 🆕 Enhanced payload with conversation info for Helena's triage
+    // Enhanced payload with conversation info for Helena's triage
     const agentPayload = {
       phoneNumber,
       messageBody,
@@ -1100,25 +1096,23 @@ async function handleN8NTrigger(
       contactType: contact?.contact_type,
       mediaUrl: message.media_url || null,
       mediaType: message.media_type || null,
-      // 🆕 Conversation context for triage
+      // Conversation context for triage
       conversationId: conversation?.id || null,
       currentDepartment: conversation?.department_code || null,
       isPendingTriage: !conversation?.department_code,
     };
 
-    // Use native agent or N8N based on configuration
-    const functionName = agentMode === 'n8n' ? 'n8n-trigger' : 'ai-virtual-agent';
-    
-    const { data: triggerResult, error: triggerError } = await supabase.functions.invoke(functionName, {
+    // Always use native AI virtual agent
+    const { data: triggerResult, error: triggerError } = await supabase.functions.invoke('ai-virtual-agent', {
       body: agentPayload
     });
 
     if (triggerError) {
-      console.error(`❌ Error triggering ${functionName}:`, triggerError);
+      console.error('❌ Error triggering ai-virtual-agent:', triggerError);
     } else {
-      console.log(`✅ ${functionName} triggered successfully:`, triggerResult);
+      console.log('✅ ai-virtual-agent triggered successfully:', triggerResult);
       
-      // 🆕 If AI agent returns a department assignment, apply it
+      // If AI agent returns a department assignment, apply it
       if (triggerResult?.assignedDepartment && conversation?.id) {
         await assignDepartmentToConversation(
           conversation.id,
