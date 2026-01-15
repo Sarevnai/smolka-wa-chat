@@ -21,32 +21,58 @@ interface BusinessHours {
   timezone: string;
 }
 
-export function useConversationState(phoneNumber: string | null) {
+// PHASE 2: Accept conversationId as primary identifier, with phoneNumber as fallback
+export function useConversationState(conversationId: string | null, phoneNumber?: string | null) {
   const [state, setState] = useState<ConversationState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [businessHours, setBusinessHours] = useState<BusinessHours | null>(null);
+  const [resolvedPhone, setResolvedPhone] = useState<string | null>(phoneNumber || null);
   const { user } = useAuth();
 
+  // Resolve phone number from conversationId if needed
   useEffect(() => {
-    if (phoneNumber) {
+    async function resolvePhone() {
+      if (phoneNumber) {
+        setResolvedPhone(phoneNumber);
+        return;
+      }
+      
+      if (conversationId) {
+        const { data } = await supabase
+          .from('conversations')
+          .select('phone_number')
+          .eq('id', conversationId)
+          .single();
+        
+        if (data?.phone_number) {
+          setResolvedPhone(data.phone_number);
+        }
+      }
+    }
+    
+    resolvePhone();
+  }, [conversationId, phoneNumber]);
+
+  useEffect(() => {
+    if (resolvedPhone) {
       fetchState();
       fetchBusinessHours();
     }
-  }, [phoneNumber]);
+  }, [resolvedPhone]);
 
   // Subscribe to realtime updates
   useEffect(() => {
-    if (!phoneNumber) return;
+    if (!resolvedPhone) return;
 
     const channel = supabase
-      .channel(`conversation-state-${phoneNumber}`)
+      .channel(`conversation-state-${resolvedPhone}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'conversation_states',
-          filter: `phone_number=eq.${phoneNumber}`
+          filter: `phone_number=eq.${resolvedPhone}`
         },
         (payload) => {
           console.log('Conversation state updated:', payload);
@@ -60,15 +86,15 @@ export function useConversationState(phoneNumber: string | null) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [phoneNumber]);
+  }, [resolvedPhone]);
 
   const fetchState = async () => {
-    if (!phoneNumber) return;
+    if (!resolvedPhone) return;
 
     const { data, error } = await supabase
       .from('conversation_states')
       .select('*')
-      .eq('phone_number', phoneNumber)
+      .eq('phone_number', resolvedPhone)
       .maybeSingle();
 
     if (error) {
@@ -117,7 +143,7 @@ export function useConversationState(phoneNumber: string | null) {
   };
 
   const takeoverConversation = async () => {
-    if (!phoneNumber || !user) return;
+    if (!resolvedPhone || !user) return;
 
     setIsLoading(true);
     
@@ -125,7 +151,7 @@ export function useConversationState(phoneNumber: string | null) {
       const { error } = await supabase
         .from('conversation_states')
         .upsert({
-          phone_number: phoneNumber,
+          phone_number: resolvedPhone,
           is_ai_active: false,
           operator_id: user.id,
           operator_takeover_at: new Date().toISOString(),
@@ -147,7 +173,7 @@ export function useConversationState(phoneNumber: string | null) {
   };
 
   const releaseToAI = async () => {
-    if (!phoneNumber) return;
+    if (!resolvedPhone) return;
 
     setIsLoading(true);
     
@@ -155,7 +181,7 @@ export function useConversationState(phoneNumber: string | null) {
       const { error } = await supabase
         .from('conversation_states')
         .upsert({
-          phone_number: phoneNumber,
+          phone_number: resolvedPhone,
           is_ai_active: true,
           operator_id: null,
           operator_takeover_at: null,
@@ -178,13 +204,13 @@ export function useConversationState(phoneNumber: string | null) {
   };
 
   const markHumanMessage = async () => {
-    if (!phoneNumber || !user) return;
+    if (!resolvedPhone || !user) return;
 
     // Auto-takeover when human sends a message
     const { error } = await supabase
       .from('conversation_states')
       .upsert({
-        phone_number: phoneNumber,
+        phone_number: resolvedPhone,
         is_ai_active: false,
         operator_id: user.id,
         operator_takeover_at: new Date().toISOString(),

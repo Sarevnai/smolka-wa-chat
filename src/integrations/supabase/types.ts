@@ -575,6 +575,47 @@ export type Database = {
           },
         ]
       }
+      contact_departments: {
+        Row: {
+          contact_id: string
+          contact_type: Database["public"]["Enums"]["contact_type"] | null
+          created_at: string
+          department_code: Database["public"]["Enums"]["department_type"]
+          id: string
+          notes: string | null
+          rating: number | null
+          updated_at: string
+        }
+        Insert: {
+          contact_id: string
+          contact_type?: Database["public"]["Enums"]["contact_type"] | null
+          created_at?: string
+          department_code: Database["public"]["Enums"]["department_type"]
+          id?: string
+          notes?: string | null
+          rating?: number | null
+          updated_at?: string
+        }
+        Update: {
+          contact_id?: string
+          contact_type?: Database["public"]["Enums"]["contact_type"] | null
+          created_at?: string
+          department_code?: Database["public"]["Enums"]["department_type"]
+          id?: string
+          notes?: string | null
+          rating?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_departments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_groups: {
         Row: {
           contact_ids: string[]

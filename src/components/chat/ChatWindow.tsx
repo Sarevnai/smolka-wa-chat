@@ -97,7 +97,7 @@ export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
     takeoverConversation, 
     releaseToAI, 
     markHumanMessage 
-  } = useConversationState(phoneNumber);
+  } = useConversationState(conversationId, phoneNumber);
   const { viewMode, activeDepartment } = useDepartment();
   
   // Message deletion states
@@ -619,7 +619,7 @@ export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
       )}
 
       {/* AI Handover Banner */}
-      <AIHandoverBanner phoneNumber={phoneNumber} />
+      <AIHandoverBanner conversationId={conversationId} phoneNumber={phoneNumber} />
 
       {/* Messages */}
       <div 
