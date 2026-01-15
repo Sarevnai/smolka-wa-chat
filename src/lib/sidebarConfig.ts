@@ -49,7 +49,6 @@ export const DEPARTMENT_SIDEBAR_CONFIG: Record<DepartmentType, DepartmentSidebar
       { title: 'Conversas', url: '/chat', icon: MessageCircle, badge: 'unread' },
       { title: 'Pipeline', url: '/pipeline/locacao', icon: Kanban },
       { title: 'Contatos', url: '/contacts', icon: Users },
-      { title: 'Campanhas', url: '/send', icon: Send },
       { title: 'Relatórios', url: '/reports', icon: BarChart3 },
     ]
   },
@@ -66,7 +65,6 @@ export const DEPARTMENT_SIDEBAR_CONFIG: Record<DepartmentType, DepartmentSidebar
       { title: 'Conversas', url: '/chat', icon: MessageCircle, badge: 'unread' },
       { title: 'Pipeline', url: '/pipeline/vendas', icon: Kanban },
       { title: 'Contatos', url: '/contacts', icon: Users },
-      { title: 'Campanhas', url: '/send', icon: Send },
       { title: 'Relatórios', url: '/reports', icon: BarChart3 },
     ]
   },
@@ -81,6 +79,7 @@ export const DEPARTMENT_SIDEBAR_CONFIG: Record<DepartmentType, DepartmentSidebar
     items: [
       { title: 'Dashboard', url: '/', icon: LayoutDashboard },
       { title: 'Triagem', url: '/triage', icon: AlertTriangle, badge: 'triage' },
+      { title: 'Pipeline', url: '/pipeline/administrativo', icon: Kanban },
       { title: 'Conversas', url: '/chat', icon: MessageCircle, badge: 'unread' },
       { title: 'Contatos', url: '/contacts', icon: Users },
       { title: 'Relatórios', url: '/reports', icon: BarChart3 },

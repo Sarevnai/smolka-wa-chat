@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useReports } from "@/hooks/useReports";
+import { useDepartment } from "@/contexts/DepartmentContext";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -16,12 +17,17 @@ import {
   Filter,
   Ticket,
   CheckCircle,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle,
+  Target,
+  Kanban
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Reports() {
-  const { stats, recentActivity, messagesByPeriod, loading, refreshData } = useReports();
+  const { isAdmin, userDepartment } = useDepartment();
+  const effectiveDepartment = isAdmin ? null : userDepartment;
+  const { stats, recentActivity, messagesByPeriod, loading, refreshData } = useReports(effectiveDepartment);
 
   if (loading) {
     return (
@@ -51,64 +57,136 @@ export default function Reports() {
     );
   }
 
-  const statsCards = stats ? [
-    {
-      title: "Mensagens Hoje",
-      value: stats.todayMessages.toString(),
-      change: "+12%",
-      trend: "up",
-      icon: MessageCircle,
-      color: "text-primary"
-    },
-    {
-      title: "Conversas Ativas",
-      value: stats.activeConversations.toString(),
-      change: "+5%",
-      trend: "up", 
-      icon: Users,
-      color: "text-primary"
-    },
-    {
-      title: "Tempo Médio Resposta",
-      value: stats.avgResponseTime,
-      change: "-8%",
-      trend: "down",
-      icon: Clock,
-      color: "text-green-600"
-    },
-    {
-      title: "Taxa de Resposta",
-      value: stats.responseRate,
-      change: "+2%",
-      trend: "up",
-      icon: TrendingUp,
-      color: "text-primary"
-    },
-    {
-      title: "Total Contatos",
-      value: stats.totalContacts.toString(),
-      change: "+15%",
-      trend: "up",
-      icon: Users,
-      color: "text-primary"
-    },
-    {
-      title: "Tickets Ativos",
-      value: stats.activeTickets.toString(),
-      change: "-3%",
-      trend: "down",
-      icon: Ticket,
-      color: "text-orange-600"
-    },
-    {
-      title: "Tickets Concluídos",
-      value: stats.completedTickets.toString(),
-      change: "+8%",
-      trend: "up",
-      icon: CheckCircle,
-      color: "text-green-600"
+  // Define cards based on department
+  const getStatsCards = () => {
+    const baseCards = [
+      {
+        title: "Mensagens Hoje",
+        value: stats?.todayMessages.toString() || "0",
+        change: "+12%",
+        trend: "up",
+        icon: MessageCircle,
+        color: "text-primary"
+      },
+      {
+        title: "Conversas Ativas",
+        value: stats?.activeConversations.toString() || "0",
+        change: "+5%",
+        trend: "up", 
+        icon: Users,
+        color: "text-primary"
+      },
+      {
+        title: "Tempo Médio Resposta",
+        value: stats?.avgResponseTime || "0min",
+        change: "-8%",
+        trend: "down",
+        icon: Clock,
+        color: "text-green-600"
+      },
+      {
+        title: "Taxa de Resposta",
+        value: stats?.responseRate || "0%",
+        change: "+2%",
+        trend: "up",
+        icon: TrendingUp,
+        color: "text-primary"
+      }
+    ];
+
+    // Cards específicos por departamento
+    if (effectiveDepartment === 'administrativo') {
+      return [
+        ...baseCards,
+        {
+          title: "Triagens Pendentes",
+          value: stats?.triagePending?.toString() || "0",
+          change: "-5%",
+          trend: "down",
+          icon: AlertTriangle,
+          color: "text-orange-600"
+        },
+        {
+          title: "Triagens Realizadas",
+          value: stats?.triageCompleted?.toString() || "0",
+          change: "+15%",
+          trend: "up",
+          icon: CheckCircle,
+          color: "text-green-600"
+        },
+        {
+          title: "Tickets Ativos",
+          value: stats?.activeTickets?.toString() || "0",
+          change: "-3%",
+          trend: "down",
+          icon: Ticket,
+          color: "text-orange-600"
+        }
+      ];
+    } else if (effectiveDepartment === 'locacao' || effectiveDepartment === 'vendas') {
+      return [
+        ...baseCards,
+        {
+          title: "Leads Qualificados",
+          value: stats?.qualifiedLeads?.toString() || "0",
+          change: "+10%",
+          trend: "up",
+          icon: Target,
+          color: "text-green-600"
+        },
+        {
+          title: "No Pipeline",
+          value: stats?.pipelineCount?.toString() || "0",
+          change: "+8%",
+          trend: "up",
+          icon: Kanban,
+          color: "text-primary"
+        },
+        {
+          title: "Total Contatos",
+          value: stats?.totalContacts?.toString() || "0",
+          change: "+15%",
+          trend: "up",
+          icon: Users,
+          color: "text-primary"
+        }
+      ];
     }
-  ] : [];
+
+    // Dashboard geral (admin)
+    return [
+      ...baseCards,
+      {
+        title: "Total Contatos",
+        value: stats?.totalContacts?.toString() || "0",
+        change: "+15%",
+        trend: "up",
+        icon: Users,
+        color: "text-primary"
+      },
+      {
+        title: "Tickets Ativos",
+        value: stats?.activeTickets?.toString() || "0",
+        change: "-3%",
+        trend: "down",
+        icon: Ticket,
+        color: "text-orange-600"
+      },
+      {
+        title: "Tickets Concluídos",
+        value: stats?.completedTickets?.toString() || "0",
+        change: "+8%",
+        trend: "up",
+        icon: CheckCircle,
+        color: "text-green-600"
+      }
+    ];
+  };
+
+  const statsCards = getStatsCards();
+  const departmentLabel = effectiveDepartment 
+    ? effectiveDepartment.charAt(0).toUpperCase() + effectiveDepartment.slice(1)
+    : 'Geral';
 
   return (
     <Layout>
@@ -119,8 +197,14 @@ export default function Reports() {
             <div className="flex items-center space-x-3">
               <BarChart3 className="h-8 w-8 text-primary" />
               <div>
-                <h1 className="text-3xl font-bold text-foreground">Relatórios</h1>
-                <p className="text-muted-foreground">Dados em tempo real da plataforma</p>
+                <h1 className="text-3xl font-bold text-foreground">
+                  Relatórios {!isAdmin && `- ${departmentLabel}`}
+                </h1>
+                <p className="text-muted-foreground">
+                  {isAdmin 
+                    ? 'Dados consolidados de todos os setores' 
+                    : `Dados do setor de ${departmentLabel.toLowerCase()}`}
+                </p>
               </div>
             </div>
           </div>
@@ -171,6 +255,38 @@ export default function Reports() {
             );
           })}
         </div>
+
+        {/* Seção específica para Administrativo */}
+        {effectiveDepartment === 'administrativo' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5" />
+                <span>Resumo de Triagem</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-950/30 text-center">
+                  <p className="text-2xl font-bold text-orange-600">{stats?.triagePending || 0}</p>
+                  <p className="text-sm text-muted-foreground">Aguardando Triagem</p>
+                </div>
+                <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/30 text-center">
+                  <p className="text-2xl font-bold text-green-600">{stats?.triageCompleted || 0}</p>
+                  <p className="text-sm text-muted-foreground">Triagens Realizadas</p>
+                </div>
+                <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-center">
+                  <p className="text-2xl font-bold text-blue-600">{stats?.activeTickets || 0}</p>
+                  <p className="text-sm text-muted-foreground">Tickets Ativos</p>
+                </div>
+                <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-950/30 text-center">
+                  <p className="text-2xl font-bold text-slate-600">{stats?.completedTickets || 0}</p>
+                  <p className="text-sm text-muted-foreground">Tickets Concluídos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
