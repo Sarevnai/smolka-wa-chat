@@ -107,3 +107,9 @@ verify_jwt = false
 
 [functions.simulate-portal-lead]
 verify_jwt = false
+
+[functions.update-whatsapp-profile]
+verify_jwt = true
+
+[functions.upload-whatsapp-profile-photo]
+verify_jwt = false
