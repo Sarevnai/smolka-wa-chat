@@ -670,6 +670,19 @@ async function processIncomingMessage(message: any, value: any) {
     console.log('🆔 Message ID:', message.id);
     console.log('⏰ Timestamp:', message.timestamp);
     console.log('📝 Type:', message.type);
+
+    // 🛡️ DEDUPLICATION: Check if this message was already processed
+    const { data: existingMessage } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('wa_message_id', message.id)
+      .maybeSingle();
+
+    if (existingMessage) {
+      console.log(`⏭️ Duplicate message ${message.id} already exists (DB id: ${existingMessage.id}) - skipping processing`);
+      return;
+    }
+
     console.log('🔍 Full message object:', JSON.stringify(message, null, 2));
     console.log('🔍 Full value object:', JSON.stringify(value, null, 2));
 
