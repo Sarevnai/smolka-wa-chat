@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,9 @@ import {
   Settings
 } from "lucide-react";
 import { useUpdateAIFunction } from "@/hooks/useAIBehavior";
-import type { AIBehaviorConfig, QuestionCategory } from "@/types/ai-behavior";
+import { EditEssentialQuestionsModal } from "./EditEssentialQuestionsModal";
+import { EditAIFunctionModal } from "./EditAIFunctionModal";
+import type { AIBehaviorConfig, QuestionCategory, AIFunction } from "@/types/ai-behavior";
 
 interface AIBehaviorTabProps {
   behaviorConfig: AIBehaviorConfig | null | undefined;
@@ -49,6 +52,10 @@ const functionIcons: Record<string, React.ReactNode> = {
 };
 
 export function AIBehaviorTab({ behaviorConfig }: AIBehaviorTabProps) {
+  const [questionsModalOpen, setQuestionsModalOpen] = useState(false);
+  const [functionModalOpen, setFunctionModalOpen] = useState(false);
+  const [selectedFunction, setSelectedFunction] = useState<AIFunction | null>(null);
+  
   const updateFunction = useUpdateAIFunction();
 
   const handleToggleFunction = (functionId: string, enabled: boolean) => {
@@ -58,6 +65,11 @@ export function AIBehaviorTab({ behaviorConfig }: AIBehaviorTabProps) {
       functionId,
       enabled,
     });
+  };
+
+  const handleEditFunction = (func: AIFunction) => {
+    setSelectedFunction(func);
+    setFunctionModalOpen(true);
   };
 
   if (!behaviorConfig) {
@@ -81,7 +93,9 @@ export function AIBehaviorTab({ behaviorConfig }: AIBehaviorTabProps) {
               Perguntas que a IA fará durante a qualificação do lead
             </CardDescription>
           </div>
-          <Button variant="outline">Editar</Button>
+          <Button variant="outline" onClick={() => setQuestionsModalOpen(true)}>
+            Editar
+          </Button>
         </CardHeader>
         <CardContent className="space-y-2">
           {behaviorConfig.essential_questions.map((question) => (
@@ -171,13 +185,33 @@ export function AIBehaviorTab({ behaviorConfig }: AIBehaviorTabProps) {
                     onCheckedChange={(checked) => handleToggleFunction(func.id, checked)}
                     disabled={updateFunction.isPending}
                   />
-                  <Button variant="ghost" size="sm">Editar</Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleEditFunction(func)}>
+                    Editar
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Modals */}
+      <EditEssentialQuestionsModal
+        open={questionsModalOpen}
+        onOpenChange={setQuestionsModalOpen}
+        configId={behaviorConfig.id}
+        questions={behaviorConfig.essential_questions}
+      />
+
+      {selectedFunction && (
+        <EditAIFunctionModal
+          open={functionModalOpen}
+          onOpenChange={setFunctionModalOpen}
+          configId={behaviorConfig.id}
+          func={selectedFunction}
+          behaviorConfig={behaviorConfig}
+        />
+      )}
     </div>
   );
 }

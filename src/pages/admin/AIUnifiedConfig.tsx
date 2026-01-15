@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -9,7 +8,9 @@ import {
   Cpu, 
   Volume2, 
   Users,
-  Loader2
+  Loader2,
+  TrendingUp,
+  HelpCircle
 } from "lucide-react";
 
 // Tab Components
@@ -18,6 +19,8 @@ import { AIBehaviorTab } from "@/components/ai-config/AIBehaviorTab";
 import { AIProviderTab } from "@/components/ai-config/AIProviderTab";
 import { AIAudioTab } from "@/components/ai-config/AIAudioTab";
 import { AIProfilesTab } from "@/components/ai-config/AIProfilesTab";
+import { AISalesTab } from "@/components/ai-config/AISalesTab";
+import { AIQualificationTab } from "@/components/ai-config/AIQualificationTab";
 import { useAIUnifiedConfig } from "@/hooks/useAIUnifiedConfig";
 
 export default function AIUnifiedConfig() {
@@ -58,7 +61,7 @@ export default function AIUnifiedConfig() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
             <TabsTrigger value="identity" className="gap-2">
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Identidade</span>
@@ -66,6 +69,14 @@ export default function AIUnifiedConfig() {
             <TabsTrigger value="behavior" className="gap-2">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Comportamento</span>
+            </TabsTrigger>
+            <TabsTrigger value="sales" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Vendas</span>
+            </TabsTrigger>
+            <TabsTrigger value="qualification" className="gap-2">
+              <HelpCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">SPIN</span>
             </TabsTrigger>
             <TabsTrigger value="provider" className="gap-2">
               <Cpu className="h-4 w-4" />
@@ -94,6 +105,26 @@ export default function AIUnifiedConfig() {
           {/* Behavior Tab */}
           <TabsContent value="behavior">
             <AIBehaviorTab behaviorConfig={behaviorConfig} />
+          </TabsContent>
+
+          {/* Sales Tab */}
+          <TabsContent value="sales">
+            <AISalesTab 
+              config={config} 
+              updateConfig={updateConfig}
+              saveConfig={saveConfig}
+              isSaving={isSaving}
+            />
+          </TabsContent>
+
+          {/* Qualification Tab */}
+          <TabsContent value="qualification">
+            <AIQualificationTab 
+              config={config} 
+              updateConfig={updateConfig}
+              saveConfig={saveConfig}
+              isSaving={isSaving}
+            />
           </TabsContent>
 
           {/* Provider Tab */}
