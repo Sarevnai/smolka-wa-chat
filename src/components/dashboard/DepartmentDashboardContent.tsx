@@ -133,35 +133,6 @@ export function DepartmentDashboardContent({ department, stats, onRefresh }: Dep
           />
         </div>
 
-        {/* Triagem por Destino */}
-        <Card className="animate-fade-in [animation-delay:0.4s]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Triagens por Setor de Destino
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-center">
-                <p className="text-2xl font-bold text-blue-600">{stats.triageToLocacao || 0}</p>
-                <p className="text-sm text-muted-foreground">Locação</p>
-              </div>
-              <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-center">
-                <p className="text-2xl font-bold text-emerald-600">{stats.triageToVendas || 0}</p>
-                <p className="text-sm text-muted-foreground">Vendas</p>
-              </div>
-              <div className="p-4 rounded-lg bg-pink-50 dark:bg-pink-950/30 text-center">
-                <p className="text-2xl font-bold text-pink-600">{stats.triageToMarketing || 0}</p>
-                <p className="text-sm text-muted-foreground">Marketing</p>
-              </div>
-              <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-950/30 text-center">
-                <p className="text-2xl font-bold text-slate-600">{stats.triageToAdministrativo || 0}</p>
-                <p className="text-sm text-muted-foreground">Administrativo</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Main Content */}
         <div className="animate-slide-in-from-left [animation-delay:0.5s]">
