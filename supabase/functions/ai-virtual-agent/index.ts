@@ -247,6 +247,49 @@ function generateRegionKnowledge(): string {
   return lines.join('\n');
 }
 
+// ========== PROPERTY LINK EXTRACTION ==========
+
+/**
+ * Extract property code from URLs sent by customers
+ * Supports smolkaimoveis.com.br links and various Vista patterns
+ */
+function extractPropertyCodeFromUrl(message: string): string | null {
+  if (!message) return null;
+  
+  // Common URL patterns for property codes
+  const patterns = [
+    // smolkaimoveis.com.br/imovel/casa-sambaqui-5659 or apartamento-ingleses-1234
+    /smolkaimoveis\.com\.br\/imovel\/[^\s\/]*?[\-\/]?(\d{3,6})\b/i,
+    // smolkaimoveis.com.br/imovel/5659
+    /smolkaimoveis\.com\.br\/imovel\/(\d{3,6})\b/i,
+    // vistasoft URLs with codigo parameter
+    /codigo[=\/](\d{3,6})\b/i,
+    // Generic property links ending in numeric code
+    /imovel[^\s]*?[\-\/](\d{3,6})\b/i,
+    // Direct code after dash at end of URL
+    /[\-](\d{4,6})(?:\s|$|\.|\?)/i
+  ];
+  
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      console.log(`🔗 Property code extracted: ${match[1]} from pattern: ${pattern}`);
+      return match[1];
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Check if message contains a property URL
+ */
+function containsPropertyUrl(message: string): boolean {
+  return /smolkaimoveis\.com\.br\/imovel\//i.test(message) ||
+         /vistasoft.*imovel/i.test(message) ||
+         /imovel.*codigo[=\/]\d+/i.test(message);
+}
+
 type AIProvider = 'lovable' | 'openai';
 
 interface Objection {
@@ -2699,6 +2742,83 @@ serve(async (req) => {
       }
     }
     // ========== END PORTAL LEAD QUALIFICATION CHECK ==========
+
+    // ========== PROPERTY LINK PROCESSING ==========
+    // Check if the message contains a property link and extract the code
+    if (containsPropertyUrl(messageBody)) {
+      const extractedPropertyCode = extractPropertyCodeFromUrl(messageBody);
+      
+      if (extractedPropertyCode) {
+        console.log(`🔗 Property link detected! Code: ${extractedPropertyCode}`);
+        
+        // Fetch property details from Vista
+        const property = await getPropertyByListingId(extractedPropertyCode);
+        
+        if (property) {
+          console.log(`✅ Property found for code ${extractedPropertyCode}:`, property);
+          
+          // Get contact name if available
+          const { data: contactData } = await supabase
+            .from('contacts')
+            .select('name')
+            .eq('phone', phoneNumber)
+            .maybeSingle();
+          
+          const customerName = contactData?.name || contactName;
+          
+          // Send greeting
+          const greetingMsg = customerName 
+            ? `Oi, ${customerName}! Aqui é a ${config.agent_name || 'Arya'} da Smolka 🏠`
+            : `Olá! Aqui é a ${config.agent_name || 'Arya'} da Smolka 🏠`;
+          await sendWhatsAppMessage(phoneNumber, greetingMsg);
+          await sleep(1200);
+          
+          // Interest confirmation
+          await sendWhatsAppMessage(phoneNumber, `Vi que você se interessou por esse imóvel! 😊`);
+          await sleep(1500);
+          
+          // Send property photo if available
+          const photoUrl = property.foto_destaque || property.FotoDestaque;
+          if (photoUrl) {
+            await sendWhatsAppImage(phoneNumber, photoUrl);
+            await sleep(1200);
+          }
+          
+          // Send formatted property details
+          const propertyDetails = formatPropertyDetailsLikeLais(property, 'site');
+          await sendWhatsAppMessage(phoneNumber, propertyDetails);
+          await sleep(1500);
+          
+          // Consultive follow-up
+          await sendWhatsAppMessage(phoneNumber, `Esse imóvel combina com o que você busca? Posso agendar uma visita pra você conhecer! 😊`);
+          
+          // Update conversation state
+          await supabase
+            .from('conversation_states')
+            .upsert({
+              phone_number: phoneNumber,
+              is_ai_active: true,
+              last_ai_message_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'phone_number' });
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              action: 'property_link_processed',
+              propertyCode: extractedPropertyCode,
+              propertyFound: true
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          console.log(`⚠️ Property not found for code ${extractedPropertyCode}, continuing normal flow`);
+        }
+      } else {
+        console.log(`⚠️ Could not extract property code from URL, continuing normal flow`);
+      }
+    }
+    // ========== END PROPERTY LINK PROCESSING ==========
 
     // ========== PENDING PROPERTIES & NEGOTIATION LOGIC ==========
     // Check if user wants to see another property option
