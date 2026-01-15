@@ -12,7 +12,8 @@ import {
   Users,
   BarChart3,
   Bell,
-  Sparkles
+  Sparkles,
+  MessageCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ const aiItems = [
   { title: "Dashboard IA", url: "/admin/ia-dashboard", icon: LayoutDashboard },
   { title: "Leads", url: "/admin/leads", icon: Users },
   { title: "Configuração", url: "/admin/ia-configuracao", icon: Settings },
+  { title: "Perfil WhatsApp", url: "/admin/whatsapp-profile", icon: MessageCircle },
   { title: "Relatórios", url: "/admin/leads-relatorios", icon: BarChart3 },
   { title: "Notificações", url: "/admin/ia-notificacoes", icon: Bell },
 ];
