@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { WhatsAppProfilePhotoUpload } from '@/components/admin/WhatsAppProfilePhotoUpload';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Save, 
   Loader2, 
@@ -48,9 +49,16 @@ export default function WhatsAppProfileSettings() {
   const fetchProfile = async () => {
     setIsLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const response = await fetch(
         'https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/update-whatsapp-profile',
-        { method: 'GET' }
+        { 
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token || ''}`,
+          }
+        }
       );
       
       const data = await response.json();
@@ -133,11 +141,16 @@ export default function WhatsAppProfileSettings() {
         return;
       }
 
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const response = await fetch(
         'https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/update-whatsapp-profile',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || ''}`,
+          },
           body: JSON.stringify(payload),
         }
       );

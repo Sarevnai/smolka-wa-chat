@@ -109,7 +109,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.update-whatsapp-profile]
-verify_jwt = true
+verify_jwt = false
 
 [functions.upload-whatsapp-profile-photo]
 verify_jwt = false
