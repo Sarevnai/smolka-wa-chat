@@ -2456,6 +2456,49 @@ serve(async (req) => {
       console.log('Using default AI config');
     }
 
+    // 🆕 Load department-specific AI configuration if department is assigned
+    let departmentConfig: any = null;
+    if (currentDepartment) {
+      try {
+        const { data: deptConfigData } = await supabase
+          .from('ai_department_configs')
+          .select('*')
+          .eq('department_code', currentDepartment)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (deptConfigData) {
+          departmentConfig = deptConfigData;
+          console.log(`📋 Loaded department config for ${currentDepartment}:`, {
+            agent_name: deptConfigData.agent_name,
+            tone: deptConfigData.tone,
+            has_custom_instructions: !!deptConfigData.custom_instructions
+          });
+
+          // Merge department config into main config
+          config = {
+            ...config,
+            agent_name: deptConfigData.agent_name || config.agent_name,
+            tone: deptConfigData.tone || config.tone,
+            greeting_message: deptConfigData.greeting_message || config.greeting_message,
+            custom_instructions: (config.custom_instructions || '') + '\n\n' + 
+              `[INSTRUÇÕES DO DEPARTAMENTO ${currentDepartment.toUpperCase()}]\n` + 
+              (deptConfigData.custom_instructions || ''),
+            services: [
+              ...(config.services || []),
+              ...(Array.isArray(deptConfigData.services) ? deptConfigData.services : [])
+            ],
+            limitations: [
+              ...(config.limitations || []),
+              ...(Array.isArray(deptConfigData.limitations) ? deptConfigData.limitations : [])
+            ]
+          };
+        }
+      } catch (e) {
+        console.log(`No department config for ${currentDepartment}, using global config`);
+      }
+    }
+
     // ========== TRIAGE FLOW HANDLING ==========
     // Determine if we should use audio based on message type (rapport/mirroring)
     const useAudioForTriage = messageType === 'audio' && config.audio_enabled;

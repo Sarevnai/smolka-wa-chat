@@ -155,6 +155,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_department_configs: {
+        Row: {
+          agent_name: string
+          created_at: string | null
+          custom_instructions: string | null
+          department_code: Database["public"]["Enums"]["department_type"]
+          faqs: Json | null
+          greeting_message: string | null
+          id: string
+          is_active: boolean | null
+          limitations: Json | null
+          qualification_focus: Json | null
+          services: Json | null
+          tone: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_name?: string
+          created_at?: string | null
+          custom_instructions?: string | null
+          department_code: Database["public"]["Enums"]["department_type"]
+          faqs?: Json | null
+          greeting_message?: string | null
+          id?: string
+          is_active?: boolean | null
+          limitations?: Json | null
+          qualification_focus?: Json | null
+          services?: Json | null
+          tone?: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_name?: string
+          created_at?: string | null
+          custom_instructions?: string | null
+          department_code?: Database["public"]["Enums"]["department_type"]
+          faqs?: Json | null
+          greeting_message?: string | null
+          id?: string
+          is_active?: boolean | null
+          limitations?: Json | null
+          qualification_focus?: Json | null
+          services?: Json | null
+          tone?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ai_flows: {
         Row: {
           created_at: string
@@ -1235,6 +1283,7 @@ export type Database = {
           deleted_at: string | null
           deleted_by: string | null
           deleted_for_everyone: boolean | null
+          department_code: Database["public"]["Enums"]["department_type"] | null
           direction: string | null
           id: number
           is_template: boolean | null
@@ -1257,6 +1306,9 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           deleted_for_everyone?: boolean | null
+          department_code?:
+            | Database["public"]["Enums"]["department_type"]
+            | null
           direction?: string | null
           id?: number
           is_template?: boolean | null
@@ -1279,6 +1331,9 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           deleted_for_everyone?: boolean | null
+          department_code?:
+            | Database["public"]["Enums"]["department_type"]
+            | null
           direction?: string | null
           id?: number
           is_template?: boolean | null
