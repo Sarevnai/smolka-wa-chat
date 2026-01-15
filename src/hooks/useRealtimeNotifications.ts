@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { useDepartment } from '@/contexts/DepartmentContext';
-import { useUserDepartment } from '@/hooks/useUserDepartment';
 import { getConversationDepartmentCached } from '@/hooks/useConversationDepartment';
 
 interface NotificationData {
@@ -20,9 +19,8 @@ export function useRealtimeNotifications() {
   const [isEnabled, setIsEnabled] = useState(true);
   const { toast } = useToast();
   
-  // Department filtering
-  const { activeDepartment, isAdmin } = useDepartment();
-  const { department: userDepartment } = useUserDepartment();
+  // Use DepartmentContext which has safe fallbacks
+  const { activeDepartment, userDepartment, isAdmin } = useDepartment();
   const effectiveDepartment = isAdmin ? activeDepartment : userDepartment;
 
   useEffect(() => {
