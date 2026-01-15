@@ -50,7 +50,7 @@ const integrationItems = [
 const aiItems = [
   { title: "Dashboard IA", url: "/admin/ia-dashboard", icon: LayoutDashboard },
   { title: "Leads", url: "/admin/leads", icon: Users },
-  { title: "Comportamento", url: "/admin/ia-comportamento", icon: Settings },
+  { title: "Configuração", url: "/admin/ia-configuracao", icon: Settings },
   { title: "Relatórios", url: "/admin/leads-relatorios", icon: BarChart3 },
   { title: "Notificações", url: "/admin/ia-notificacoes", icon: Bell },
 ];
@@ -309,14 +309,6 @@ export function AppSidebar() {
                         <Link to="/admin/user-permissions">
                           <Shield className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
                           {!collapsed && <span>Permissões por Usuário</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild className={getNavClassName('/admin/ai-agent')}>
-                        <Link to="/admin/ai-agent">
-                          <Bot className={cn("h-5 w-5", collapsed ? "mx-auto" : "mr-3")} />
-                          {!collapsed && <span>Agente IA</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

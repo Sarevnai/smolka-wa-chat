@@ -101,7 +101,6 @@ export const DEPARTMENT_SIDEBAR_CONFIG: Record<DepartmentType, DepartmentSidebar
       { title: 'Campanhas', url: '/marketing/campaigns', icon: Megaphone },
       { title: 'Contatos', url: '/marketing/contacts', icon: Users },
       { title: 'Relatórios', url: '/marketing/reports', icon: BarChart3 },
-      { title: 'Agente IA', url: '/marketing/ai-config', icon: Bot },
       { title: 'Flow Builder', url: '/marketing/flow-builder', icon: Workflow },
     ]
   }
