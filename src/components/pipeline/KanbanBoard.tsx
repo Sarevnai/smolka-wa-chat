@@ -8,14 +8,16 @@ import { PipelineStage, PipelineConversation } from '@/hooks/usePipelineConversa
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { getContactTypeLabel } from '@/lib/departmentConfig';
 
 interface KanbanBoardProps {
   stages: PipelineStage[];
   loading: boolean;
+  departmentCode?: string;
   onMoveConversation?: (conversationId: string, newStageId: string) => void;
 }
 
-function ConversationCard({ conversation }: { conversation: PipelineConversation }) {
+function ConversationCard({ conversation, departmentCode }: { conversation: PipelineConversation; departmentCode?: string }) {
   const navigate = useNavigate();
 
   const handleClick = () => {
@@ -58,18 +60,21 @@ function ConversationCard({ conversation }: { conversation: PipelineConversation
             <Clock className="h-3 w-3" />
             {timeAgo}
           </span>
-          {conversation.contact?.contact_type && (
-            <Badge variant="outline" className="text-xs">
-              {conversation.contact.contact_type === 'proprietario' ? 'Proprietário' : 'Inquilino'}
-            </Badge>
-          )}
+          {conversation.contact?.contact_type && (() => {
+            const typeConfig = getContactTypeLabel(conversation.contact.contact_type, departmentCode);
+            return typeConfig ? (
+              <Badge variant="outline" className={cn("text-xs", typeConfig.color)}>
+                {typeConfig.label}
+              </Badge>
+            ) : null;
+          })()}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function StageColumn({ stage }: { stage: PipelineStage }) {
+function StageColumn({ stage, departmentCode }: { stage: PipelineStage; departmentCode?: string }) {
   return (
     <div className="flex-shrink-0 w-72">
       <Card className="h-full bg-surface-muted/30 border-border">
@@ -93,7 +98,8 @@ function StageColumn({ stage }: { stage: PipelineStage }) {
               {stage.conversations.map((conversation) => (
                 <ConversationCard 
                   key={conversation.id} 
-                  conversation={conversation} 
+                  conversation={conversation}
+                  departmentCode={departmentCode}
                 />
               ))}
               {stage.conversations.length === 0 && (
@@ -110,7 +116,7 @@ function StageColumn({ stage }: { stage: PipelineStage }) {
   );
 }
 
-export function KanbanBoard({ stages, loading }: KanbanBoardProps) {
+export function KanbanBoard({ stages, loading, departmentCode }: KanbanBoardProps) {
   if (loading) {
     return (
       <div className="flex gap-4 overflow-x-auto pb-4">
@@ -137,7 +143,7 @@ export function KanbanBoard({ stages, loading }: KanbanBoardProps) {
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
       {stages.map((stage) => (
-        <StageColumn key={stage.id} stage={stage} />
+        <StageColumn key={stage.id} stage={stage} departmentCode={departmentCode} />
       ))}
     </div>
   );
