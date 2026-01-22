@@ -2571,9 +2571,7 @@ serve(async (req) => {
       // Triage context from webhook
       conversationId,
       currentDepartment,
-      isPendingTriage,
-      // Proxy mode - when true, collect messages instead of sending directly
-      proxy_mode = false
+      isPendingTriage
     } = await req.json();
 
     console.log('🤖 AI Virtual Agent triggered:', { 
@@ -2581,8 +2579,7 @@ serve(async (req) => {
       messageBody, 
       messageType,
       isPendingTriage,
-      currentDepartment,
-      proxy_mode
+      currentDepartment 
     });
 
     if (!phoneNumber || !messageBody) {
@@ -2591,40 +2588,6 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Outbound messages collector for proxy mode
-    const outboundMessages: Array<{
-      to: string;
-      type: 'text' | 'image' | 'audio';
-      text?: string;
-      media_url?: string;
-      caption?: string;
-    }> = [];
-
-    // Helper functions for proxy mode - wrap existing send functions
-    const proxyOrSendMessage = async (to: string, text: string) => {
-      if (proxy_mode) {
-        outboundMessages.push({ to, type: 'text', text });
-        return true;
-      }
-      return sendWhatsAppMessage(to, text);
-    };
-
-    const proxyOrSendImage = async (to: string, imageUrl: string, caption?: string) => {
-      if (proxy_mode) {
-        outboundMessages.push({ to, type: 'image', media_url: imageUrl, caption });
-        return true;
-      }
-      return sendWhatsAppImage(to, imageUrl, caption);
-    };
-
-    const proxyOrSendAudio = async (to: string, audioUrl: string, audioText?: string, isVoiceMessage?: boolean) => {
-      if (proxy_mode) {
-        outboundMessages.push({ to, type: 'audio', media_url: audioUrl, text: audioText });
-        return true;
-      }
-      return sendWhatsAppAudio(to, audioUrl, audioText, isVoiceMessage);
-    };
 
     // Load AI agent configuration from database
     let config = { ...defaultConfig };
@@ -3659,7 +3622,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
         
         for (let i = 0; i < fragments.length; i++) {
           const fragment = fragments[i];
-          await proxyOrSendMessage(phoneNumber, fragment);
+          await sendWhatsAppMessage(phoneNumber, fragment);
           messagesSent++;
           
           if (i < fragments.length - 1 || propertiesToSend.length > 0) {
@@ -3669,7 +3632,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
           }
         }
       } else if (aiMessage) {
-        await proxyOrSendMessage(phoneNumber, aiMessage);
+        await sendWhatsAppMessage(phoneNumber, aiMessage);
         messagesSent++;
       }
     } else if (aiMessage && responseMode === 'audio') {
@@ -3688,10 +3651,10 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       console.log(`🎙️ Audio mode: sending complete audio (${audioText.length} chars)`);
       const audioResult = await generateAudio(audioText, config);
       if (audioResult) {
-        await proxyOrSendAudio(phoneNumber, audioResult.audioUrl, audioText, audioResult.isVoiceMessage);
+        await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, audioText, audioResult.isVoiceMessage);
         messagesSent++;
       } else {
-        await proxyOrSendMessage(phoneNumber, aiMessage);
+        await sendWhatsAppMessage(phoneNumber, aiMessage);
         messagesSent++;
       }
     }
@@ -3706,14 +3669,14 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       // Send photo if available
       if (property.foto_destaque) {
         await sleep(1500);
-        await proxyOrSendImage(phoneNumber, property.foto_destaque);
+        await sendWhatsAppImage(phoneNumber, property.foto_destaque);
         messagesSent++;
       }
       
       // Send property details
       await sleep(1000);
       const propertyText = formatPropertyMessage(property);
-      await proxyOrSendMessage(phoneNumber, propertyText);
+      await sendWhatsAppMessage(phoneNumber, propertyText);
       messagesSent++;
       
       // Store remaining properties for future interactions
@@ -3734,7 +3697,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       
       // Ask confirmation question
       await sleep(1500);
-      await proxyOrSendMessage(phoneNumber, "Faz sentido pra você? 😊");
+      await sendWhatsAppMessage(phoneNumber, "Faz sentido pra você? 😊");
       messagesSent++;
     }
 
@@ -3742,7 +3705,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
     if (!config.audio_channel_mirroring && config.audio_enabled && config.audio_mode === 'text_and_audio' && aiMessage) {
       const audioResult = await generateAudio(aiMessage, config);
       if (audioResult) {
-        await proxyOrSendAudio(phoneNumber, audioResult.audioUrl, aiMessage, audioResult.isVoiceMessage);
+        await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, aiMessage, audioResult.isVoiceMessage);
         messagesSent++;
       }
     }
@@ -3765,13 +3728,10 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       JSON.stringify({ 
         success: true, 
         response: aiMessage,
-        messagesSent: proxy_mode ? 0 : messagesSent, // In proxy mode, Make sends the messages
+        messagesSent,
         propertiesFound: propertiesToSend.length,
         provider: config.ai_provider,
-        model: config.ai_model,
-        // Proxy mode fields
-        proxy_mode,
-        outbound_messages: proxy_mode ? outboundMessages : undefined
+        model: config.ai_model
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
