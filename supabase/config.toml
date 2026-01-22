@@ -128,3 +128,6 @@ verify_jwt = false
 
 [functions.make-ai-handler]
 verify_jwt = false
+
+[functions.make-whatsapp-inbound]
+verify_jwt = false
