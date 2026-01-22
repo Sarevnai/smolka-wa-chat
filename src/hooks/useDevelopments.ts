@@ -34,6 +34,7 @@ export interface Development {
   talking_points: string[];
   is_active: boolean;
   c2s_project_id: string | null;
+  hero_image: string | null; // Presentation image for first contact
 }
 
 export function useDevelopments() {
