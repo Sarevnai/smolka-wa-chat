@@ -50,8 +50,8 @@ interface MarketingAIConfig {
 
 const defaultConfig: MarketingAIConfig = {
   enabled: false,
-  agent_name: "Arya Marketing",
-  greeting_message: "Olá! 👋 Sou a Arya, assistente de marketing. Como posso ajudá-lo hoje?",
+  agent_name: "Helena Marketing",
+  greeting_message: "Olá! 👋 Sou a Helena, assistente de marketing da Smolka. Como posso ajudá-lo hoje?",
   tone: "friendly",
   qualification_enabled: true,
   qualification_questions: [
@@ -70,7 +70,7 @@ const defaultConfig: MarketingAIConfig = {
   fallback_message: "No momento estou fora do horário de atendimento. Retornarei em breve!",
   // Defaults para confirmação de imóveis
   property_confirmation_enabled: true,
-  property_confirmation_message: "Olá! 🏠 Aqui é a Nina da Smolka Imóveis. Estou entrando em contato sobre o seu imóvel no endereço [ENDEREÇO]. O imóvel ainda está disponível para venda?",
+  property_confirmation_message: "Olá! 🏠 Aqui é a Helena da Smolka Imóveis. Estou entrando em contato sobre o seu imóvel no endereço [ENDEREÇO]. O imóvel ainda está disponível para venda?",
   auto_update_vista: true,
   remove_from_site_when_sold: true,
 };
@@ -251,10 +251,10 @@ export default function MarketingAIConfig() {
             <AccordionContent className="space-y-4 pb-4">
               <div>
                 <Label>Nome do Agente</Label>
-                <Input
-                  value={config.agent_name}
-                  onChange={(e) => setConfig((prev) => ({ ...prev, agent_name: e.target.value }))}
-                  placeholder="Ex: Nina Marketing"
+                  <Input
+                    value={config.agent_name}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, agent_name: e.target.value }))}
+                    placeholder="Ex: Helena Marketing"
                   className="mt-1"
                 />
               </div>

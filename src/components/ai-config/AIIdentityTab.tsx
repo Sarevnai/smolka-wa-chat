@@ -81,7 +81,7 @@ export function AIIdentityTab({ config, updateConfig, saveConfig, isSaving }: AI
                 id="agent-name"
                 value={config.agent_name}
                 onChange={(e) => updateConfig({ agent_name: e.target.value })}
-                placeholder="Ex: Nina, Assistente Virtual"
+                placeholder="Ex: Helena, Assistente Virtual"
               />
             </div>
             <div className="space-y-2">

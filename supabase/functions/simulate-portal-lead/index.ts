@@ -69,7 +69,7 @@ serve(async (req) => {
         .single();
       
       const config = configData?.setting_value || {};
-      const agentName = config.agent_name || 'Nina';
+      const agentName = config.agent_name || 'Helena';
       const companyName = config.company_name || 'Smolka Imóveis';
       
       // Get property info for context
@@ -333,7 +333,7 @@ Se o cliente demonstrar INTERESSE (quero visitar, tenho interesse, quero conhece
       .single();
 
     const config = configData?.setting_value || {};
-    const agentName = config.agent_name || 'Nina';
+    const agentName = config.agent_name || 'Helena';
     const companyName = config.company_name || 'Smolka Imóveis';
 
     // Step 3: Generate simulated messages (what Nina would send)

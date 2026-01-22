@@ -236,7 +236,7 @@ DADOS DO IMÓVEL DO PROPRIETÁRIO:
   const contactInfo = contactName ? `Nome do proprietário: ${contactName}` : '';
   const codigoImovel = property?.codigo || 'CODIGO';
 
-  return `Você é Arya, assistente virtual da Smolka Imóveis 🏠
+  return `Você é Helena, assistente virtual da Smolka Imóveis 🏠
 
 OBJETIVO: Confirmar com proprietários a disponibilidade e valor de seus imóveis, seguindo os cenários padrão de atendimento.
 
