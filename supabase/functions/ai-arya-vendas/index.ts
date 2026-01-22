@@ -301,15 +301,15 @@ const toolsQuickTransfer = [
   }
 ];
 
-// Send WhatsApp message
-async function sendWhatsAppMessage(phoneNumber: string, message: string): Promise<boolean> {
+// Send WhatsApp message - Returns message ID for tracking
+async function sendWhatsAppMessage(phoneNumber: string, message: string): Promise<{ success: boolean; messageId?: string }> {
   try {
     const waToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
     const waPhoneId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
     
     if (!waToken || !waPhoneId) {
       console.error('WhatsApp credentials not configured');
-      return false;
+      return { success: false };
     }
 
     const response = await fetch(
@@ -333,13 +333,16 @@ async function sendWhatsAppMessage(phoneNumber: string, message: string): Promis
     if (!response.ok) {
       const error = await response.text();
       console.error('WhatsApp API error:', error);
-      return false;
+      return { success: false };
     }
 
-    return true;
+    const data = await response.json();
+    const messageId = data.messages?.[0]?.id;
+    
+    return { success: true, messageId };
   } catch (error) {
     console.error('Error sending WhatsApp message:', error);
-    return false;
+    return { success: false };
   }
 }
 
@@ -504,6 +507,23 @@ serve(async (req) => {
 
     console.log(`📋 Development loaded: ${development.name}`);
 
+    // Fetch conversation for this phone number to link messages
+    let conversationId: string | null = null;
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('phone_number', phone_number)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (conv) {
+      conversationId = conv.id;
+      console.log(`📞 Found conversation: ${conversationId}`);
+    } else {
+      console.log(`⚠️ No conversation found for phone: ${phone_number}`);
+    }
+
     // Fetch available materials for this development (only in full mode)
     let materials: DevelopmentMaterial[] = [];
     if (!isQuickTransferMode) {
@@ -609,9 +629,44 @@ serve(async (req) => {
       }
     }
 
-    // Send the AI response via WhatsApp
+    // Send the AI response via WhatsApp and save to database
     if (finalResponse) {
-      await sendWhatsAppMessage(phone_number, finalResponse);
+      // First, save the AI response to the database
+      let savedMessageId: number | null = null;
+      
+      if (conversationId) {
+        const { data: savedMessage, error: saveError } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: conversationId,
+            wa_from: null,
+            wa_to: phone_number,
+            direction: 'outbound',
+            body: finalResponse,
+            department_code: 'vendas'
+          })
+          .select('id')
+          .single();
+        
+        if (saveError) {
+          console.error('❌ Error saving AI message to database:', saveError);
+        } else {
+          savedMessageId = savedMessage?.id;
+          console.log('💾 AI message saved to database:', savedMessageId);
+        }
+      }
+      
+      // Then send via WhatsApp
+      const waResult = await sendWhatsAppMessage(phone_number, finalResponse);
+      
+      // Update message with wa_message_id from WhatsApp response
+      if (waResult.success && waResult.messageId && savedMessageId) {
+        await supabase
+          .from('messages')
+          .update({ wa_message_id: waResult.messageId })
+          .eq('id', savedMessageId);
+        console.log('✅ Message updated with WhatsApp ID:', waResult.messageId);
+      }
     }
 
     // Log the interaction
