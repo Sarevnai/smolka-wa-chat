@@ -3659,7 +3659,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
         
         for (let i = 0; i < fragments.length; i++) {
           const fragment = fragments[i];
-          await sendWhatsAppMessage(phoneNumber, fragment);
+          await proxyOrSendMessage(phoneNumber, fragment);
           messagesSent++;
           
           if (i < fragments.length - 1 || propertiesToSend.length > 0) {
@@ -3669,7 +3669,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
           }
         }
       } else if (aiMessage) {
-        await sendWhatsAppMessage(phoneNumber, aiMessage);
+        await proxyOrSendMessage(phoneNumber, aiMessage);
         messagesSent++;
       }
     } else if (aiMessage && responseMode === 'audio') {
@@ -3688,10 +3688,10 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       console.log(`🎙️ Audio mode: sending complete audio (${audioText.length} chars)`);
       const audioResult = await generateAudio(audioText, config);
       if (audioResult) {
-        await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, audioText, audioResult.isVoiceMessage);
+        await proxyOrSendAudio(phoneNumber, audioResult.audioUrl, audioText, audioResult.isVoiceMessage);
         messagesSent++;
       } else {
-        await sendWhatsAppMessage(phoneNumber, aiMessage);
+        await proxyOrSendMessage(phoneNumber, aiMessage);
         messagesSent++;
       }
     }
@@ -3706,14 +3706,14 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       // Send photo if available
       if (property.foto_destaque) {
         await sleep(1500);
-        await sendWhatsAppImage(phoneNumber, property.foto_destaque);
+        await proxyOrSendImage(phoneNumber, property.foto_destaque);
         messagesSent++;
       }
       
       // Send property details
       await sleep(1000);
       const propertyText = formatPropertyMessage(property);
-      await sendWhatsAppMessage(phoneNumber, propertyText);
+      await proxyOrSendMessage(phoneNumber, propertyText);
       messagesSent++;
       
       // Store remaining properties for future interactions
@@ -3734,7 +3734,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       
       // Ask confirmation question
       await sleep(1500);
-      await sendWhatsAppMessage(phoneNumber, "Faz sentido pra você? 😊");
+      await proxyOrSendMessage(phoneNumber, "Faz sentido pra você? 😊");
       messagesSent++;
     }
 
@@ -3742,7 +3742,7 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
     if (!config.audio_channel_mirroring && config.audio_enabled && config.audio_mode === 'text_and_audio' && aiMessage) {
       const audioResult = await generateAudio(aiMessage, config);
       if (audioResult) {
-        await sendWhatsAppAudio(phoneNumber, audioResult.audioUrl, aiMessage, audioResult.isVoiceMessage);
+        await proxyOrSendAudio(phoneNumber, audioResult.audioUrl, aiMessage, audioResult.isVoiceMessage);
         messagesSent++;
       }
     }
