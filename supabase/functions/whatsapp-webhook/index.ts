@@ -1083,6 +1083,7 @@ async function handleN8NTrigger(
       console.log(`🏗️ Development lead detected: ${developmentLead.development_name}`);
       
       // Get recent messages for conversation history
+      // IMPORTANT: Exclude the current message (just inserted) to properly detect first message
       let conversationHistory: Array<{ role: string; content: string }> = [];
       if (conversation?.id) {
         const { data: recentMessages } = await supabase
@@ -1090,10 +1091,12 @@ async function handleN8NTrigger(
           .select('body, direction, created_at')
           .eq('conversation_id', conversation.id)
           .order('created_at', { ascending: false })
-          .limit(10);
+          .limit(11); // Fetch 11 to skip the current one
 
-        if (recentMessages) {
+        if (recentMessages && recentMessages.length > 1) {
+          // Skip the first (most recent = current message) and take up to 10 previous
           conversationHistory = recentMessages
+            .slice(1) // Skip the message we just inserted
             .reverse()
             .filter(msg => msg.body)
             .map(msg => ({
@@ -1101,6 +1104,7 @@ async function handleN8NTrigger(
               content: msg.body || ''
             }));
         }
+        // If only 1 message exists (the current one), keep history empty = isFirstMessage = true
       }
 
       // Route to ai-arya-vendas
