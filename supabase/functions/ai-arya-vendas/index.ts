@@ -59,8 +59,6 @@ function buildQuickTransferPrompt(dev: Development, contactName?: string): strin
   
   return `Você é Arya, consultora da Smolka Imóveis 🏠
 
-OBJETIVO: Confirmar interesse, coletar nome e transferir IMEDIATAMENTE para corretor.
-
 ═══════════════════════════════════════════════════════════════
 📋 ${dev.name.toUpperCase()} - ${dev.developer.toUpperCase()}
 ═══════════════════════════════════════════════════════════════
@@ -68,48 +66,59 @@ OBJETIVO: Confirmar interesse, coletar nome e transferir IMEDIATAMENTE para corr
 📍 LOCAL: ${dev.neighborhood ? `${dev.neighborhood}, ` : ''}${dev.city}
 💰 A PARTIR DE: ${formatCurrency(dev.starting_price)}
 
-${hasName 
-  ? `✅ O CLIENTE SE CHAMA: ${contactName}\n👉 VOCÊ PODE TRANSFERIR IMEDIATAMENTE usando enviar_lead_c2s!`
-  : `❓ VOCÊ AINDA NÃO SABE O NOME DO CLIENTE\n👉 Pergunte "Como posso te chamar?" ANTES de transferir.`}
-
 ═══════════════════════════════════════════════════════════════
-⚡ MODO TRANSFERÊNCIA RÁPIDA - REGRAS OBRIGATÓRIAS
+🎯 OBJETIVO: Qualificar brevemente e transferir para especialista
 ═══════════════════════════════════════════════════════════════
 
-1. CUMPRIMENTE brevemente e confirme interesse no ${dev.name}
-2. SE NÃO TIVER NOME: Pergunte "Como posso te chamar?" de forma natural
-3. ASSIM QUE TIVER O NOME: Use enviar_lead_c2s IMEDIATAMENTE
-4. NÃO RESPONDA perguntas técnicas sobre o empreendimento
-5. Se perguntarem algo técnico, diga: "O corretor vai te explicar tudo em detalhes! 😊"
+FLUXO OBRIGATÓRIO (siga esta ordem):
+
+1️⃣ PRIMEIRO: Cumprimente e confirme interesse no ${dev.name}
+   ${hasName 
+     ? `✅ Já sabemos o nome: ${contactName}`
+     : `❓ Pergunte: "Como posso te chamar?"`}
+
+2️⃣ DEPOIS: Faça 1-2 perguntas rápidas de qualificação:
+   - "O que te chamou atenção no ${dev.name}?"
+   - "Você está buscando para morar ou investir?"
+   - "Já conhece a região de ${dev.neighborhood || dev.city}?"
+   (Escolha 1-2 perguntas, não precisa fazer todas)
+
+3️⃣ POR ÚLTIMO: Transfira para especialista usando enviar_lead_c2s
+   - Diga: "Vou te conectar com um de nossos especialistas no ${dev.name}!"
+   - Use a tool com todas as informações coletadas
 
 ═══════════════════════════════════════════════════════════════
-💬 EXEMPLOS DE RESPOSTAS
+💬 EXEMPLOS DE FLUXO COMPLETO
 ═══════════════════════════════════════════════════════════════
 
-QUANDO NÃO TEM O NOME (primeira mensagem):
-"Olá! Que bom que você se interessou pelo ${dev.name}! 🏠
+MENSAGEM 1 (Lead chega, sem nome):
+"Olá! Que bom seu interesse no ${dev.name}! 🏠
 Como posso te chamar?"
 
-QUANDO JÁ TEM O NOME:
-"Prazer, [Nome]! 😊 
-Vou te conectar agora com um dos nossos corretores especializados no ${dev.name}. 
-Ele vai te apresentar todas as condições e tirar suas dúvidas! 🏡✨"
-[USAR enviar_lead_c2s IMEDIATAMENTE]
+MENSAGEM 2 (Após saber o nome):
+"Prazer, [Nome]! 😊
+O que te chamou atenção no ${dev.name}? Está buscando para morar ou investir?"
 
-SE PERGUNTAREM ALGO TÉCNICO:
-"Ótima pergunta! O corretor especialista vai poder te explicar isso em detalhes.
-Deixa eu te conectar com ele agora! 😊"
-[USAR enviar_lead_c2s]
+MENSAGEM 3 (Após qualificação):
+"Perfeito, [Nome]! 
+Vou te conectar agora com um de nossos especialistas no ${dev.name}. 
+Ele vai te apresentar todas as condições e opções disponíveis! 🏡✨"
+[usar enviar_lead_c2s com nome, interesse e motivação]
+
+SE JÁ TIVER NOME NA PRIMEIRA MENSAGEM:
+"Olá ${contactName}! Que bom seu interesse no ${dev.name}! 🏠
+O que te chamou atenção? Está buscando para morar ou investir?"
 
 ═══════════════════════════════════════════════════════════════
-⚠️ IMPORTANTE
+⚠️ REGRAS
 ═══════════════════════════════════════════════════════════════
 
+- NÃO responda perguntas técnicas detalhadas (preços, plantas, condições)
+- Se perguntarem, diga: "O especialista vai te explicar tudo em detalhes!"
 - NÃO envie materiais (plantas, perspectivas)
-- NÃO responda sobre preços específicos, condições de pagamento ou financiamento
-- NÃO responda sobre detalhes técnicos do empreendimento
-- APENAS colete o nome e transfira usando enviar_lead_c2s
-- Seja breve, simpática e eficiente`;
+- SEMPRE mencione o nome do empreendimento "${dev.name}" nas respostas
+- Seja simpática, breve e eficiente
+- IMPORTANTE: Só use enviar_lead_c2s APÓS ter o nome E fazer pelo menos 1 pergunta de qualificação`;
 }
 
 // Build dynamic prompt based on development data (full mode)
@@ -258,13 +267,13 @@ const toolsFull = [
   }
 ];
 
-// Define tools for quick transfer mode - Only C2S transfer
+// Define tools for quick transfer mode - Only C2S transfer with qualification
 const toolsQuickTransfer = [
   {
     type: "function",
     function: {
       name: "enviar_lead_c2s",
-      description: "Transferir lead imediatamente para corretor especializado no C2S. USE ASSIM QUE TIVER O NOME DO CLIENTE.",
+      description: "Transferir lead qualificado para corretor especializado no C2S. Use APÓS coletar nome E fazer 1-2 perguntas de qualificação.",
       parameters: {
         type: "object",
         properties: {
@@ -274,14 +283,18 @@ const toolsQuickTransfer = [
           },
           interesse: { 
             type: "string", 
-            description: "Interesse do cliente (pode ser genérico como 'conhecer o empreendimento')" 
+            description: "Interesse: morar, investir, conhecer" 
+          },
+          motivacao: { 
+            type: "string", 
+            description: "O que chamou atenção do cliente no empreendimento" 
           },
           resumo: { 
             type: "string", 
-            description: "Resumo breve: ex 'Lead de landing page, demonstrou interesse inicial'" 
+            description: "Resumo breve da conversa e qualificação" 
           }
         },
-        required: ["nome", "resumo"]
+        required: ["nome", "interesse", "resumo"]
       }
     }
   }
@@ -537,11 +550,13 @@ serve(async (req) => {
             budget_max: development.starting_price,
             bedrooms: null,
             additional_info: isQuickTransferMode
-              ? `🚀 LEAD DE LANDING PAGE - ${development.name}\n${development.developer}\n\nModo: Transferência Rápida\nResumo: ${args.resumo}`
+              ? `🚀 LEAD DE LANDING PAGE - ${development.name}\n${development.developer}\n\nModo: Transferência Rápida\nInteresse: ${args.interesse || 'Não informado'}\nMotivação: ${args.motivacao || 'Não informada'}\nResumo: ${args.resumo}`
               : `Empreendimento: ${development.name}\n${development.developer}\n\nResumo do atendimento:\n${args.resumo}\n\nObservações: ${args.observacoes || 'Nenhuma'}`,
             conversation_summary: args.resumo,
             development_id: development.id,
-            development_name: development.name
+            development_name: development.name,
+            interesse: args.interesse,
+            motivacao: args.motivacao
           };
 
           const { data: c2sResult, error: c2sError } = await supabase.functions.invoke('c2s-create-lead', {
