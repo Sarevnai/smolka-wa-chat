@@ -237,6 +237,55 @@ async function findContactWithData(phoneNumber: string): Promise<{
 }
 
 /**
+ * 🏗️ Check if a phone number has a recent lead from a landing page with development_id
+ * Used to route to ai-arya-vendas (Arya Vendas for empreendimentos)
+ */
+async function checkDevelopmentLead(phoneNumber: string): Promise<{
+  development_id: string;
+  development_name: string;
+  contact_name: string | null;
+  contact_phone: string;
+} | null> {
+  try {
+    const phoneVariations = getPhoneVariations(phoneNumber);
+    const cutoffTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(); // 72 hours
+    
+    // Check portal_leads_log for recent lead with development_id
+    const { data: portalLead } = await supabase
+      .from('portal_leads_log')
+      .select(`
+        id,
+        development_id,
+        contact_name,
+        contact_phone,
+        developments!inner(name, slug)
+      `)
+      .in('contact_phone', phoneVariations)
+      .not('development_id', 'is', null)
+      .gte('created_at', cutoffTime)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!portalLead?.development_id) {
+      return null;
+    }
+
+    console.log(`🏗️ Development lead found for ${phoneNumber}: ${(portalLead.developments as any)?.name}`);
+
+    return {
+      development_id: portalLead.development_id,
+      development_name: (portalLead.developments as any)?.name || 'Unknown',
+      contact_name: portalLead.contact_name,
+      contact_phone: portalLead.contact_phone || phoneNumber
+    };
+  } catch (error) {
+    console.error('❌ Error checking development lead:', error);
+    return null;
+  }
+}
+
+/**
  * Check if a phone number is responding to a MARKETING campaign (for property confirmation)
  * Returns contact info with notes (property data) if from marketing campaign
  * 🆕 Now uses findContactWithData to search by phone variations
@@ -926,6 +975,77 @@ async function handleN8NTrigger(
     // If operator has taken over this conversation, skip AI
     if (convState?.operator_id && !convState?.is_ai_active) {
       console.log(`⏭️ Skipping AI - operator ${convState.operator_id} handling conversation`);
+      return;
+    }
+    // 🏗️ CHECK FOR DEVELOPMENT/EMPREENDIMENTO LEAD FIRST (Arya Vendas)
+    // Priority 0: Recent lead from landing page with development_id
+    const developmentLead = await checkDevelopmentLead(phoneNumber);
+    
+    if (developmentLead?.development_id) {
+      console.log(`🏗️ Development lead detected: ${developmentLead.development_name}`);
+      
+      // Get recent messages for conversation history
+      let conversationHistory: Array<{ role: string; content: string }> = [];
+      if (conversation?.id) {
+        const { data: recentMessages } = await supabase
+          .from('messages')
+          .select('body, direction, created_at')
+          .eq('conversation_id', conversation.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (recentMessages) {
+          conversationHistory = recentMessages
+            .reverse()
+            .filter(msg => msg.body)
+            .map(msg => ({
+              role: msg.direction === 'inbound' ? 'user' : 'assistant',
+              content: msg.body || ''
+            }));
+        }
+      }
+
+      // Route to ai-arya-vendas
+      console.log(`📤 Sending to ai-arya-vendas:`, {
+        phone: phoneNumber,
+        development: developmentLead.development_name,
+        historyCount: conversationHistory.length
+      });
+
+      const { data: aryaResult, error: aryaError } = await supabase.functions.invoke('ai-arya-vendas', {
+        body: {
+          phone_number: phoneNumber,
+          message: messageBody,
+          development_id: developmentLead.development_id,
+          conversation_history: conversationHistory,
+          contact_name: developmentLead.contact_name
+        }
+      });
+
+      if (aryaError) {
+        console.error('❌ Error calling ai-arya-vendas:', aryaError);
+      } else {
+        console.log('✅ ai-arya-vendas response:', aryaResult);
+        
+        // Handle C2S transfer notification
+        if (aryaResult?.c2s_transferred) {
+          console.log('🔄 Lead transferred to C2S');
+          
+          // Update portal_leads_log with CRM status
+          await supabase
+            .from('portal_leads_log')
+            .update({ 
+              crm_status: 'sent',
+              crm_sent_at: new Date().toISOString(),
+              ai_attended: true,
+              ai_attended_at: new Date().toISOString()
+            })
+            .eq('contact_phone', phoneNumber)
+            .eq('development_id', developmentLead.development_id);
+        }
+      }
+
+      // Don't continue to other agents - Arya Vendas handled it
       return;
     }
 
