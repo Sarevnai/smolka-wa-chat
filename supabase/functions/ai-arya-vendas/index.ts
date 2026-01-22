@@ -617,7 +617,21 @@ serve(async (req) => {
 
     // Detect if this is the first message from the lead (empty conversation history)
     const isFirstMessage = !conversation_history || conversation_history.length === 0;
+    
+    // 🔍 DETAILED DEBUG LOGGING
+    console.log(`📊 ========== FIRST MESSAGE DETECTION ==========`);
+    console.log(`📊 conversation_history type: ${typeof conversation_history}`);
+    console.log(`📊 conversation_history length: ${conversation_history?.length || 0}`);
+    console.log(`📊 conversation_history is null/undefined: ${!conversation_history}`);
+    console.log(`📊 conversation_history is empty array: ${Array.isArray(conversation_history) && conversation_history.length === 0}`);
     console.log(`📩 Is first message: ${isFirstMessage}`);
+    
+    console.log(`🖼️ ========== HERO IMAGE CHECK ==========`);
+    console.log(`🖼️ development.hero_image exists: ${!!development.hero_image}`);
+    console.log(`🖼️ development.hero_image URL: ${development.hero_image || 'NULL'}`);
+    console.log(`🖼️ isQuickTransferMode: ${isQuickTransferMode}`);
+    console.log(`🖼️ Will send hero image: ${isFirstMessage && isQuickTransferMode && !!development.hero_image}`);
+    console.log(`📊 ==========================================`);
 
     // Handle first message with hero image presentation
     if (isFirstMessage && isQuickTransferMode && development.hero_image) {
