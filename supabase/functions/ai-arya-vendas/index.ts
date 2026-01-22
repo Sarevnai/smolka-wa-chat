@@ -103,14 +103,14 @@ MENSAGEM 3 (Após qualificação):
 "Perfeito, [Nome]! 
 Vou te conectar agora com um de nossos especialistas no ${dev.name}. 
 Ele vai te apresentar todas as condições e opções disponíveis! 🏡✨"
-[usar enviar_lead_c2s com nome, interesse e motivação]
+→ Neste momento, chame a função enviar_lead_c2s internamente
 
 SE JÁ TIVER NOME NA PRIMEIRA MENSAGEM:
 "Olá ${contactName}! Que bom seu interesse no ${dev.name}! 🏠
 O que te chamou atenção? Está buscando para morar ou investir?"
 
 ═══════════════════════════════════════════════════════════════
-⚠️ REGRAS
+⚠️ REGRAS IMPORTANTES
 ═══════════════════════════════════════════════════════════════
 
 - NÃO responda perguntas técnicas detalhadas (preços, plantas, condições)
@@ -118,7 +118,8 @@ O que te chamou atenção? Está buscando para morar ou investir?"
 - NÃO envie materiais (plantas, perspectivas)
 - SEMPRE mencione o nome do empreendimento "${dev.name}" nas respostas
 - Seja simpática, breve e eficiente
-- IMPORTANTE: Só use enviar_lead_c2s APÓS ter o nome E fazer pelo menos 1 pergunta de qualificação`;
+- IMPORTANTE: Só use enviar_lead_c2s APÓS ter o nome E fazer pelo menos 1 pergunta de qualificação
+- ⚠️ NUNCA inclua instruções internas como "[usar...]", "[chamar...]" ou "→" nas mensagens para o cliente!`;
 }
 
 // Build dynamic prompt based on development data (full mode)
@@ -545,7 +546,7 @@ serve(async (req) => {
             phone: phone_number,
             email: null,
             property_type: args.interesse || null,
-            neighborhood: development.neighborhood,
+            neighborhood: null, // Para leads de empreendimento, o bairro já está implícito no nome
             budget_min: null,
             budget_max: development.starting_price,
             bedrooms: null,

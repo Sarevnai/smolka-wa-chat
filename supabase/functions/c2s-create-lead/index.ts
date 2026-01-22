@@ -66,7 +66,10 @@ Deno.serve(async (req) => {
     }
     
     if (leadData.property_type) criteria.push(`Tipo: ${leadData.property_type}`);
-    if (leadData.neighborhood) criteria.push(`Bairro: ${leadData.neighborhood}`);
+    // Só incluir bairro se NÃO for lead de empreendimento específico
+    if (leadData.neighborhood && !leadData.development_name) {
+      criteria.push(`Bairro: ${leadData.neighborhood}`);
+    }
     if (leadData.price_range) criteria.push(`Faixa de preço: ${leadData.price_range}`);
     if (leadData.bedrooms) criteria.push(`Quartos: ${leadData.bedrooms}`);
     if (leadData.interesse) criteria.push(`Interesse: ${leadData.interesse}`);
