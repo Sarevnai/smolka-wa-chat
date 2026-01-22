@@ -113,3 +113,15 @@ verify_jwt = false
 
 [functions.upload-whatsapp-profile-photo]
 verify_jwt = false
+
+[functions.portal-leads-webhook]
+verify_jwt = false
+
+[functions.ai-reengagement]
+verify_jwt = false
+
+[functions.ai-arya-vendas]
+verify_jwt = false
+
+[functions.landing-page-webhook]
+verify_jwt = false

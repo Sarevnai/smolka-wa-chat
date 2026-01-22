@@ -1005,6 +1005,128 @@ export type Database = {
         }
         Relationships: []
       }
+      development_materials: {
+        Row: {
+          created_at: string
+          description: string | null
+          development_id: string
+          file_type: string | null
+          file_url: string
+          id: string
+          is_featured: boolean | null
+          material_type: string
+          order_index: number | null
+          title: string
+          whatsapp_media_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          development_id: string
+          file_type?: string | null
+          file_url: string
+          id?: string
+          is_featured?: boolean | null
+          material_type: string
+          order_index?: number | null
+          title: string
+          whatsapp_media_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          development_id?: string
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          is_featured?: boolean | null
+          material_type?: string
+          order_index?: number | null
+          title?: string
+          whatsapp_media_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_materials_development_id_fkey"
+            columns: ["development_id"]
+            isOneToOne: false
+            referencedRelation: "developments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      developments: {
+        Row: {
+          address: string | null
+          ai_instructions: string | null
+          amenities: string[] | null
+          c2s_project_id: string | null
+          city: string | null
+          created_at: string
+          delivery_date: string | null
+          description: string | null
+          developer: string
+          differentials: string[] | null
+          faq: Json | null
+          id: string
+          is_active: boolean
+          name: string
+          neighborhood: string | null
+          slug: string
+          starting_price: number | null
+          status: string
+          talking_points: string[] | null
+          unit_types: Json | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          ai_instructions?: string | null
+          amenities?: string[] | null
+          c2s_project_id?: string | null
+          city?: string | null
+          created_at?: string
+          delivery_date?: string | null
+          description?: string | null
+          developer: string
+          differentials?: string[] | null
+          faq?: Json | null
+          id?: string
+          is_active?: boolean
+          name: string
+          neighborhood?: string | null
+          slug: string
+          starting_price?: number | null
+          status?: string
+          talking_points?: string[] | null
+          unit_types?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          ai_instructions?: string | null
+          amenities?: string[] | null
+          c2s_project_id?: string | null
+          city?: string | null
+          created_at?: string
+          delivery_date?: string | null
+          description?: string | null
+          developer?: string
+          differentials?: string[] | null
+          faq?: Json | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          neighborhood?: string | null
+          slug?: string
+          starting_price?: number | null
+          status?: string
+          talking_points?: string[] | null
+          unit_types?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       flow_execution_logs: {
         Row: {
           action_taken: string | null
@@ -1434,10 +1556,12 @@ export type Database = {
           crm_sent_at: string | null
           crm_status: string | null
           day_of_week: number | null
+          development_id: string | null
           error_message: string | null
           hour_of_day: number | null
           id: string
           last_reengagement_at: string | null
+          lead_source_type: string | null
           lead_temperature: string | null
           message: string | null
           origin_lead_id: string | null
@@ -1463,10 +1587,12 @@ export type Database = {
           crm_sent_at?: string | null
           crm_status?: string | null
           day_of_week?: number | null
+          development_id?: string | null
           error_message?: string | null
           hour_of_day?: number | null
           id?: string
           last_reengagement_at?: string | null
+          lead_source_type?: string | null
           lead_temperature?: string | null
           message?: string | null
           origin_lead_id?: string | null
@@ -1492,10 +1618,12 @@ export type Database = {
           crm_sent_at?: string | null
           crm_status?: string | null
           day_of_week?: number | null
+          development_id?: string | null
           error_message?: string | null
           hour_of_day?: number | null
           id?: string
           last_reengagement_at?: string | null
+          lead_source_type?: string | null
           lead_temperature?: string | null
           message?: string | null
           origin_lead_id?: string | null
@@ -1515,6 +1643,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_leads_log_development_id_fkey"
+            columns: ["development_id"]
+            isOneToOne: false
+            referencedRelation: "developments"
             referencedColumns: ["id"]
           },
           {
