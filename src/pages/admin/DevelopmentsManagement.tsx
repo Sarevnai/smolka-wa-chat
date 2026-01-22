@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useDevelopments, useUpdateDevelopment, Development } from '@/hooks/useDevelopments';
-import { Building2, MapPin, Calendar, DollarSign, Plus, Pencil, Eye } from 'lucide-react';
-import { Loader2 } from 'lucide-react';
+import { useDevelopmentMaterials } from '@/hooks/useDevelopmentMaterials';
+import DevelopmentMaterialsModal from '@/components/admin/DevelopmentMaterialsModal';
+import { Building2, MapPin, Calendar, DollarSign, Plus, Pencil, Eye, FolderOpen, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 function formatCurrency(value: number | null): string {
@@ -30,9 +31,26 @@ const statusColors: Record<string, string> = {
   pronto: 'bg-green-500'
 };
 
+function MaterialsCount({ developmentId }: { developmentId: string }) {
+  const { data: materials } = useDevelopmentMaterials(developmentId);
+  const count = materials?.length || 0;
+  return (
+    <span className="text-xs text-muted-foreground">
+      {count} {count === 1 ? 'material' : 'materiais'}
+    </span>
+  );
+}
+
 export default function DevelopmentsManagement() {
   const { data: developments, isLoading } = useDevelopments();
   const updateDevelopment = useUpdateDevelopment();
+  const [selectedDevelopment, setSelectedDevelopment] = useState<Development | null>(null);
+  const [materialsModalOpen, setMaterialsModalOpen] = useState(false);
+
+  const handleOpenMaterials = (dev: Development) => {
+    setSelectedDevelopment(dev);
+    setMaterialsModalOpen(true);
+  };
 
   const handleToggleActive = async (dev: Development) => {
     try {
@@ -139,6 +157,14 @@ export default function DevelopmentsManagement() {
                       </span>
                     </div>
                     <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleOpenMaterials(dev)}
+                        title="Materiais"
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" disabled>
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -147,11 +173,20 @@ export default function DevelopmentsManagement() {
                       </Button>
                     </div>
                   </div>
+                  <div className="pt-2">
+                    <MaterialsCount developmentId={dev.id} />
+                  </div>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
+
+        <DevelopmentMaterialsModal
+          development={selectedDevelopment}
+          open={materialsModalOpen}
+          onOpenChange={setMaterialsModalOpen}
+        />
       </div>
     </Layout>
   );
