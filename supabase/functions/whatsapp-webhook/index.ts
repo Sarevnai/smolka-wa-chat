@@ -237,6 +237,64 @@ async function findContactWithData(phoneNumber: string): Promise<{
 }
 
 /**
+ * 🆕 Detect development/empreendimento from message body
+ * Searches for development names mentioned in the message text
+ */
+async function detectDevelopmentFromMessage(messageBody: string): Promise<{
+  development_id: string;
+  development_name: string;
+} | null> {
+  try {
+    if (!messageBody || messageBody.length < 5) return null;
+
+    // Fetch all active developments
+    const { data: developments } = await supabase
+      .from('developments')
+      .select('id, name, slug')
+      .eq('is_active', true);
+
+    if (!developments?.length) return null;
+
+    // Normalize message (lowercase, remove accents)
+    const normalizedMessage = messageBody.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Search for development name match
+    for (const dev of developments) {
+      const normalizedName = dev.name.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      
+      // Check if message contains development name (at least 5 chars to avoid false positives)
+      if (normalizedName.length >= 5 && normalizedMessage.includes(normalizedName)) {
+        console.log(`🏗️ Development detected in message: "${dev.name}"`);
+        return {
+          development_id: dev.id,
+          development_name: dev.name
+        };
+      }
+      
+      // Also check slug if exists
+      if (dev.slug) {
+        const normalizedSlug = dev.slug.toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (normalizedSlug.length >= 5 && normalizedMessage.includes(normalizedSlug)) {
+          console.log(`🏗️ Development detected by slug in message: "${dev.name}"`);
+          return {
+            development_id: dev.id,
+            development_name: dev.name
+          };
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('❌ Error detecting development from message:', error);
+    return null;
+  }
+}
+
+/**
  * 🏗️ Check if a phone number has a recent lead from a landing page with development_id
  * Used to route to ai-arya-vendas (Arya Vendas for empreendimentos)
  */
@@ -979,7 +1037,47 @@ async function handleN8NTrigger(
     }
     // 🏗️ CHECK FOR DEVELOPMENT/EMPREENDIMENTO LEAD FIRST (Arya Vendas)
     // Priority 0: Recent lead from landing page with development_id
-    const developmentLead = await checkDevelopmentLead(phoneNumber);
+    let developmentLead = await checkDevelopmentLead(phoneNumber);
+    
+    // 🆕 Priority 0.5: If no lead exists, try to detect development from message body
+    if (!developmentLead?.development_id) {
+      const detectedDev = await detectDevelopmentFromMessage(messageBody);
+      
+      if (detectedDev) {
+        console.log(`🏗️ Development detected from message: "${detectedDev.development_name}"`);
+        
+        // Get contact name if exists
+        const contact = await findContactWithData(phoneNumber);
+        
+        // Create portal_leads_log entry for tracking
+        const { error: logError } = await supabase
+          .from('portal_leads_log')
+          .insert({
+            portal_origin: 'whatsapp_direct',
+            lead_source_type: 'whatsapp_mention',
+            development_id: detectedDev.development_id,
+            contact_phone: phoneNumber,
+            contact_name: contact?.name || null,
+            message: messageBody,
+            status: 'processed',
+            processed_at: new Date().toISOString()
+          });
+        
+        if (logError) {
+          console.error('❌ Error logging detected development lead:', logError);
+        } else {
+          console.log(`✅ Created portal_leads_log for detected development: ${detectedDev.development_name}`);
+        }
+        
+        // Set developmentLead for routing
+        developmentLead = {
+          development_id: detectedDev.development_id,
+          development_name: detectedDev.development_name,
+          contact_name: contact?.name || null,
+          contact_phone: phoneNumber
+        };
+      }
+    }
     
     if (developmentLead?.development_id) {
       console.log(`🏗️ Development lead detected: ${developmentLead.development_name}`);
