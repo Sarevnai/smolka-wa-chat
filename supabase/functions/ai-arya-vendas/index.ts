@@ -199,7 +199,7 @@ const tools = [
   }
 ];
 
-// Send WhatsApp message
+// Send WhatsApp message (only used in non-proxy mode)
 async function sendWhatsAppMessage(phoneNumber: string, message: string): Promise<boolean> {
   try {
     const waToken = Deno.env.get('WHATSAPP_TOKEN');
@@ -241,7 +241,7 @@ async function sendWhatsAppMessage(phoneNumber: string, message: string): Promis
   }
 }
 
-// Send WhatsApp media
+// Send WhatsApp media (only used in non-proxy mode)
 async function sendWhatsAppMedia(phoneNumber: string, mediaUrl: string, caption?: string): Promise<boolean> {
   try {
     const waToken = Deno.env.get('WHATSAPP_TOKEN');
@@ -352,10 +352,11 @@ serve(async (req) => {
       development_id, 
       development_slug,
       conversation_history = [],
-      contact_name 
+      contact_name,
+      proxy_mode = false // NEW: Proxy mode flag
     } = await req.json();
 
-    console.log(`🏗️ Arya Vendas - Phone: ${phone_number}, Development: ${development_id || development_slug}`);
+    console.log(`🏗️ Arya Vendas - Phone: ${phone_number}, Development: ${development_id || development_slug}, Proxy: ${proxy_mode}`);
 
     // Fetch development data
     let development: Development | null = null;
@@ -405,6 +406,8 @@ serve(async (req) => {
     let finalResponse = aiResponse.content;
     let c2sTransferred = false;
     let materialSent = false;
+    let materialUrl: string | null = null;
+    let materialCaption: string | null = null;
 
     // Process tool calls
     for (const toolCall of aiResponse.toolCalls) {
@@ -467,21 +470,28 @@ serve(async (req) => {
         }
 
         if (material) {
-          const caption = `${development.name} - ${material.title}`;
-          const sent = await sendWhatsAppMedia(phone_number, material.file_url, caption);
-          if (sent) {
+          materialUrl = material.file_url;
+          materialCaption = `${development.name} - ${material.title}`;
+          
+          if (!proxy_mode) {
+            // Only send directly if not in proxy mode
+            const sent = await sendWhatsAppMedia(phone_number, material.file_url, materialCaption);
+            if (sent) {
+              materialSent = true;
+              console.log(`📸 Material sent: ${material.title}`);
+            }
+          } else {
             materialSent = true;
-            console.log(`📸 Material sent: ${material.title}`);
+            console.log(`📸 Material prepared for proxy: ${material.title}`);
           }
         } else {
           console.log(`⚠️ Material not found: ${materialType}`);
-          // Will mention in response that material is not available
         }
       }
     }
 
-    // Send the AI response via WhatsApp
-    if (finalResponse) {
+    // Send the AI response via WhatsApp (only if NOT proxy mode)
+    if (!proxy_mode && finalResponse) {
       await sendWhatsAppMessage(phone_number, finalResponse);
     }
 
@@ -496,7 +506,8 @@ serve(async (req) => {
         development_name: development.name,
         c2s_transferred: c2sTransferred,
         material_sent: materialSent,
-        message_preview: message.substring(0, 100)
+        message_preview: message.substring(0, 100),
+        proxy_mode
       }
     }).then(() => {}).catch(console.error);
 
@@ -506,11 +517,14 @@ serve(async (req) => {
         response: finalResponse,
         c2s_transferred: c2sTransferred,
         material_sent: materialSent,
+        material_url: materialUrl,
+        material_caption: materialCaption,
         development: {
           id: development.id,
           name: development.name,
           slug: development.slug
-        }
+        },
+        proxy_mode
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

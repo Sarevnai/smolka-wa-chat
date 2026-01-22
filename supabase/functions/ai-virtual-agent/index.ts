@@ -2571,7 +2571,9 @@ serve(async (req) => {
       // Triage context from webhook
       conversationId,
       currentDepartment,
-      isPendingTriage
+      isPendingTriage,
+      // Proxy mode - when true, collect messages instead of sending directly
+      proxy_mode = false
     } = await req.json();
 
     console.log('🤖 AI Virtual Agent triggered:', { 
@@ -2579,7 +2581,8 @@ serve(async (req) => {
       messageBody, 
       messageType,
       isPendingTriage,
-      currentDepartment 
+      currentDepartment,
+      proxy_mode
     });
 
     if (!phoneNumber || !messageBody) {
@@ -2588,6 +2591,40 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Outbound messages collector for proxy mode
+    const outboundMessages: Array<{
+      to: string;
+      type: 'text' | 'image' | 'audio';
+      text?: string;
+      media_url?: string;
+      caption?: string;
+    }> = [];
+
+    // Helper functions for proxy mode - wrap existing send functions
+    const proxyOrSendMessage = async (to: string, text: string) => {
+      if (proxy_mode) {
+        outboundMessages.push({ to, type: 'text', text });
+        return true;
+      }
+      return sendWhatsAppMessage(to, text);
+    };
+
+    const proxyOrSendImage = async (to: string, imageUrl: string, caption?: string) => {
+      if (proxy_mode) {
+        outboundMessages.push({ to, type: 'image', media_url: imageUrl, caption });
+        return true;
+      }
+      return sendWhatsAppImage(to, imageUrl, caption);
+    };
+
+    const proxyOrSendAudio = async (to: string, audioUrl: string, audioText?: string, isVoiceMessage?: boolean) => {
+      if (proxy_mode) {
+        outboundMessages.push({ to, type: 'audio', media_url: audioUrl, text: audioText });
+        return true;
+      }
+      return sendWhatsAppAudio(to, audioUrl, audioText, isVoiceMessage);
+    };
 
     // Load AI agent configuration from database
     let config = { ...defaultConfig };
@@ -3728,10 +3765,13 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       JSON.stringify({ 
         success: true, 
         response: aiMessage,
-        messagesSent,
+        messagesSent: proxy_mode ? 0 : messagesSent, // In proxy mode, Make sends the messages
         propertiesFound: propertiesToSend.length,
         provider: config.ai_provider,
-        model: config.ai_model
+        model: config.ai_model,
+        // Proxy mode fields
+        proxy_mode,
+        outbound_messages: proxy_mode ? outboundMessages : undefined
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

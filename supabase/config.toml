@@ -131,3 +131,6 @@ verify_jwt = false
 
 [functions.make-whatsapp-inbound]
 verify_jwt = false
+
+[functions.log-outbound-message]
+verify_jwt = false
