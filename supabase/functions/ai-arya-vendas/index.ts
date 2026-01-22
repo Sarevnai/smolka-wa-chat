@@ -25,6 +25,7 @@ interface Development {
   ai_instructions: string | null;
   talking_points: string[];
   c2s_project_id: string | null;
+  hero_image: string | null; // New: presentation image for first contact
 }
 
 interface DevelopmentMaterial {
@@ -54,7 +55,7 @@ function formatCurrency(value: number | null): string {
 }
 
 // Build quick transfer prompt for landing page leads
-function buildQuickTransferPrompt(dev: Development, contactName?: string): string {
+function buildQuickTransferPrompt(dev: Development, contactName?: string, isFirstMessage?: boolean): string {
   const hasName = !!contactName && contactName.toLowerCase() !== 'lead sem nome';
   
   return `Você é Arya, consultora da Smolka Imóveis 🏠
@@ -70,56 +71,61 @@ function buildQuickTransferPrompt(dev: Development, contactName?: string): strin
 🎯 OBJETIVO: Qualificar brevemente e transferir para especialista
 ═══════════════════════════════════════════════════════════════
 
-FLUXO OBRIGATÓRIO (siga esta ordem):
+⚠️ REGRA CRÍTICA DE MENSAGENS:
+- SEMPRE responda com UMA única pergunta por mensagem
+- NUNCA combine várias perguntas na mesma mensagem
+- Mantenha as mensagens curtas e naturais
 
-1️⃣ PRIMEIRO: Cumprimente e confirme interesse no ${dev.name}
+${isFirstMessage ? `
+🆕 ESTA É A PRIMEIRA MENSAGEM DO LEAD
+- NÃO inclua saudação na sua resposta (já foi enviada pelo sistema)
+- ${hasName ? `Já sabemos o nome: ${contactName}. Responda apenas: "O que te chamou atenção no ${dev.name}?"` : `Responda APENAS: "Como posso te chamar?"`}
+` : ''}
+
+FLUXO OBRIGATÓRIO (UMA pergunta por vez):
+
+1️⃣ PRIMEIRO: Pergunte o nome (se não souber)
    ${hasName 
      ? `✅ Já sabemos o nome: ${contactName}`
-     : `❓ Pergunte: "Como posso te chamar?"`}
+     : `Responda APENAS: "Como posso te chamar?"`}
 
-2️⃣ DEPOIS: Faça 1-2 perguntas rápidas de qualificação:
-   - "O que te chamou atenção no ${dev.name}?"
-   - "Você está buscando para morar ou investir?"
-   - "Já conhece a região de ${dev.neighborhood || dev.city}?"
-   (Escolha 1-2 perguntas, não precisa fazer todas)
+2️⃣ SEGUNDO: Após saber o nome, faça UMA pergunta de qualificação:
+   Responda APENAS: "Prazer, [Nome]! 😊 O que te chamou atenção no ${dev.name}?"
 
-3️⃣ POR ÚLTIMO: Transfira para especialista usando enviar_lead_c2s
-   - Diga: "Vou te conectar com um de nossos especialistas no ${dev.name}!"
-   - Use a tool com todas as informações coletadas
+3️⃣ TERCEIRO: Após a resposta, faça OUTRA pergunta (opcional):
+   Responda APENAS: "Você está buscando para morar ou investir?"
 
-═══════════════════════════════════════════════════════════════
-💬 EXEMPLOS DE FLUXO COMPLETO
-═══════════════════════════════════════════════════════════════
-
-MENSAGEM 1 (Lead chega, sem nome):
-"Olá! Que bom seu interesse no ${dev.name}! 🏠
-Como posso te chamar?"
-
-MENSAGEM 2 (Após saber o nome):
-"Prazer, [Nome]! 😊
-O que te chamou atenção no ${dev.name}? Está buscando para morar ou investir?"
-
-MENSAGEM 3 (Após qualificação):
-"Perfeito, [Nome]! 
-Vou te conectar agora com um de nossos especialistas no ${dev.name}. 
-Ele vai te apresentar todas as condições e opções disponíveis! 🏡✨"
-→ Neste momento, chame a função enviar_lead_c2s internamente
-
-SE JÁ TIVER NOME NA PRIMEIRA MENSAGEM:
-"Olá ${contactName}! Que bom seu interesse no ${dev.name}! 🏠
-O que te chamou atenção? Está buscando para morar ou investir?"
+4️⃣ POR ÚLTIMO: Transfira para especialista
+   Responda: "Perfeito! Vou te conectar com um especialista no ${dev.name}! 🏡✨"
+   E use a função enviar_lead_c2s
 
 ═══════════════════════════════════════════════════════════════
-⚠️ REGRAS IMPORTANTES
+✅ EXEMPLOS CORRETOS (UMA pergunta por mensagem):
 ═══════════════════════════════════════════════════════════════
 
-- NÃO responda perguntas técnicas detalhadas (preços, plantas, condições)
+Mensagem 1: "Como posso te chamar?"
+Mensagem 2: "Prazer, João! 😊 O que te chamou atenção no ${dev.name}?"
+Mensagem 3: "Você está buscando para morar ou investir?"
+Mensagem 4: "Perfeito! Vou te conectar com um especialista! 🏡✨" [+ enviar_lead_c2s]
+
+═══════════════════════════════════════════════════════════════
+❌ EXEMPLOS ERRADOS (NÃO FAZER):
+═══════════════════════════════════════════════════════════════
+
+❌ "Prazer, João! O que te chamou atenção? Está buscando para morar ou investir?"
+❌ "Como posso te chamar? E o que te interessou no empreendimento?"
+❌ "Olá! Que bom seu interesse! Como posso te chamar?"
+
+═══════════════════════════════════════════════════════════════
+⚠️ OUTRAS REGRAS
+═══════════════════════════════════════════════════════════════
+
+- NÃO responda perguntas técnicas detalhadas
 - Se perguntarem, diga: "O especialista vai te explicar tudo em detalhes!"
-- NÃO envie materiais (plantas, perspectivas)
-- SEMPRE mencione o nome do empreendimento "${dev.name}" nas respostas
+- NÃO envie materiais
 - Seja simpática, breve e eficiente
-- IMPORTANTE: Só use enviar_lead_c2s APÓS ter o nome E fazer pelo menos 1 pergunta de qualificação
-- ⚠️ NUNCA inclua instruções internas como "[usar...]", "[chamar...]" ou "→" nas mensagens para o cliente!`;
+- IMPORTANTE: Só use enviar_lead_c2s APÓS ter o nome E pelo menos 1 resposta de qualificação
+- ⚠️ NUNCA inclua instruções internas nas mensagens!`;
 }
 
 // Build dynamic prompt based on development data (full mode)
@@ -346,15 +352,15 @@ async function sendWhatsAppMessage(phoneNumber: string, message: string): Promis
   }
 }
 
-// Send WhatsApp media
-async function sendWhatsAppMedia(phoneNumber: string, mediaUrl: string, caption?: string): Promise<boolean> {
+// Send WhatsApp media with image - Returns message ID for tracking
+async function sendWhatsAppMedia(phoneNumber: string, mediaUrl: string, caption?: string): Promise<{ success: boolean; messageId?: string }> {
   try {
     const waToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
     const waPhoneId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
     
     if (!waToken || !waPhoneId) {
       console.error('WhatsApp credentials not configured');
-      return false;
+      return { success: false };
     }
 
     const response = await fetch(
@@ -381,14 +387,88 @@ async function sendWhatsAppMedia(phoneNumber: string, mediaUrl: string, caption?
     if (!response.ok) {
       const error = await response.text();
       console.error('WhatsApp media API error:', error);
-      return false;
+      return { success: false };
     }
 
-    return true;
+    const data = await response.json();
+    const messageId = data.messages?.[0]?.id;
+    
+    return { success: true, messageId };
   } catch (error) {
     console.error('Error sending WhatsApp media:', error);
-    return false;
+    return { success: false };
   }
+}
+
+// Helper: Small delay between messages for natural flow
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper: Save message to database and send via WhatsApp
+async function saveAndSendMessage(
+  supabase: any,
+  conversationId: string | null,
+  phoneNumber: string,
+  body: string,
+  mediaUrl?: string,
+  mediaType?: string
+): Promise<{ success: boolean; savedMessageId?: number; waMessageId?: string }> {
+  let savedMessageId: number | null = null;
+  
+  // Save to database first
+  if (conversationId) {
+    const messageData: any = {
+      conversation_id: conversationId,
+      wa_from: null,
+      wa_to: phoneNumber,
+      direction: 'outbound',
+      body: body,
+      department_code: 'vendas'
+    };
+    
+    if (mediaUrl) {
+      messageData.media_url = mediaUrl;
+      messageData.media_type = mediaType || 'image/jpeg';
+    }
+    
+    const { data: savedMessage, error: saveError } = await supabase
+      .from('messages')
+      .insert(messageData)
+      .select('id')
+      .single();
+    
+    if (saveError) {
+      console.error('❌ Error saving message to database:', saveError);
+    } else {
+      savedMessageId = savedMessage?.id;
+      console.log('💾 Message saved to database:', savedMessageId);
+    }
+  }
+  
+  // Send via WhatsApp
+  let waResult: { success: boolean; messageId?: string };
+  
+  if (mediaUrl) {
+    waResult = await sendWhatsAppMedia(phoneNumber, mediaUrl, body);
+  } else {
+    waResult = await sendWhatsAppMessage(phoneNumber, body);
+  }
+  
+  // Update message with wa_message_id
+  if (waResult.success && waResult.messageId && savedMessageId) {
+    await supabase
+      .from('messages')
+      .update({ wa_message_id: waResult.messageId })
+      .eq('id', savedMessageId);
+    console.log('✅ Message updated with WhatsApp ID:', waResult.messageId);
+  }
+  
+  return { 
+    success: waResult.success, 
+    savedMessageId: savedMessageId || undefined,
+    waMessageId: waResult.messageId 
+  };
 }
 
 // Call OpenAI API with tools
@@ -535,9 +615,81 @@ serve(async (req) => {
       materials = data || [];
     }
 
-    // Build the prompt based on mode
+    // Detect if this is the first message from the lead (empty conversation history)
+    const isFirstMessage = !conversation_history || conversation_history.length === 0;
+    console.log(`📩 Is first message: ${isFirstMessage}`);
+
+    // Handle first message with hero image presentation
+    if (isFirstMessage && isQuickTransferMode && development.hero_image) {
+      console.log(`🖼️ Sending hero image for ${development.name}`);
+      
+      // 1. Send greeting with hero image
+      const greetingCaption = `Que bom seu interesse no ${development.name}! 🏠`;
+      await saveAndSendMessage(
+        supabase,
+        conversationId,
+        phone_number,
+        greetingCaption,
+        development.hero_image,
+        'image/jpeg'
+      );
+      
+      // Small delay for natural flow
+      await delay(1500);
+      
+      // 2. Check if we already have the name
+      const hasName = !!contact_name && contact_name.toLowerCase() !== 'lead sem nome';
+      
+      let followUpMessage: string;
+      if (hasName) {
+        followUpMessage = `Prazer, ${contact_name}! 😊 O que te chamou atenção no ${development.name}?`;
+      } else {
+        followUpMessage = 'Como posso te chamar?';
+      }
+      
+      // 3. Send follow-up question in separate message
+      await saveAndSendMessage(
+        supabase,
+        conversationId,
+        phone_number,
+        followUpMessage
+      );
+      
+      // Log the interaction
+      await supabase.from('activity_logs').insert({
+        user_id: '00000000-0000-0000-0000-000000000000',
+        action_type: 'ai_arya_vendas_welcome',
+        target_table: 'conversations',
+        target_id: phone_number,
+        metadata: {
+          development_id: development.id,
+          development_name: development.name,
+          hero_image_sent: true,
+          has_contact_name: hasName,
+          quick_transfer_mode: isQuickTransferMode,
+          message_preview: message.substring(0, 100)
+        }
+      }).then(() => {}).catch(console.error);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          response: `${greetingCaption}\n\n${followUpMessage}`,
+          hero_image_sent: true,
+          quick_transfer_mode: isQuickTransferMode,
+          development: {
+            id: development.id,
+            name: development.name,
+            slug: development.slug
+          }
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Build the prompt based on mode (flag if first message for context)
     const systemPrompt = isQuickTransferMode
-      ? buildQuickTransferPrompt(development, contact_name)
+      ? buildQuickTransferPrompt(development, contact_name, isFirstMessage)
       : buildEmpreendimentoPrompt(development);
 
     // Select tools based on mode
@@ -618,8 +770,8 @@ serve(async (req) => {
 
         if (material) {
           const caption = `${development.name} - ${material.title}`;
-          const sent = await sendWhatsAppMedia(phone_number, material.file_url, caption);
-          if (sent) {
+          const result = await sendWhatsAppMedia(phone_number, material.file_url, caption);
+          if (result.success) {
             materialSent = true;
             console.log(`📸 Material sent: ${material.title}`);
           }
@@ -631,42 +783,12 @@ serve(async (req) => {
 
     // Send the AI response via WhatsApp and save to database
     if (finalResponse) {
-      // First, save the AI response to the database
-      let savedMessageId: number | null = null;
-      
-      if (conversationId) {
-        const { data: savedMessage, error: saveError } = await supabase
-          .from('messages')
-          .insert({
-            conversation_id: conversationId,
-            wa_from: null,
-            wa_to: phone_number,
-            direction: 'outbound',
-            body: finalResponse,
-            department_code: 'vendas'
-          })
-          .select('id')
-          .single();
-        
-        if (saveError) {
-          console.error('❌ Error saving AI message to database:', saveError);
-        } else {
-          savedMessageId = savedMessage?.id;
-          console.log('💾 AI message saved to database:', savedMessageId);
-        }
-      }
-      
-      // Then send via WhatsApp
-      const waResult = await sendWhatsAppMessage(phone_number, finalResponse);
-      
-      // Update message with wa_message_id from WhatsApp response
-      if (waResult.success && waResult.messageId && savedMessageId) {
-        await supabase
-          .from('messages')
-          .update({ wa_message_id: waResult.messageId })
-          .eq('id', savedMessageId);
-        console.log('✅ Message updated with WhatsApp ID:', waResult.messageId);
-      }
+      await saveAndSendMessage(
+        supabase,
+        conversationId,
+        phone_number,
+        finalResponse
+      );
     }
 
     // Log the interaction

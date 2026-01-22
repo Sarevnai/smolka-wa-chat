@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { useDevelopments, useUpdateDevelopment, Development } from '@/hooks/useDevelopments';
 import { useDevelopmentMaterials } from '@/hooks/useDevelopmentMaterials';
 import DevelopmentMaterialsModal from '@/components/admin/DevelopmentMaterialsModal';
-import { Building2, MapPin, Calendar, DollarSign, Plus, Pencil, Eye, FolderOpen, Loader2 } from 'lucide-react';
+import { Building2, MapPin, Calendar, DollarSign, Plus, Pencil, Eye, FolderOpen, Loader2, Image } from 'lucide-react';
 import { toast } from 'sonner';
 
 function formatCurrency(value: number | null): string {
@@ -38,6 +38,28 @@ function MaterialsCount({ developmentId }: { developmentId: string }) {
     <span className="text-xs text-muted-foreground">
       {count} {count === 1 ? 'material' : 'materiais'}
     </span>
+  );
+}
+
+function HeroImagePreview({ development }: { development: Development }) {
+  if (!development.hero_image) {
+    return (
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Image className="h-3 w-3" />
+        <span>Sem foto de capa</span>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="flex items-center gap-2">
+      <img 
+        src={development.hero_image} 
+        alt={`Capa ${development.name}`}
+        className="h-8 w-12 object-cover rounded border"
+      />
+      <span className="text-xs text-green-600">✓ Foto de capa</span>
+    </div>
   );
 }
 
@@ -173,7 +195,8 @@ export default function DevelopmentsManagement() {
                       </Button>
                     </div>
                   </div>
-                  <div className="pt-2">
+                  <div className="pt-2 space-y-1">
+                    <HeroImagePreview development={dev} />
                     <MaterialsCount developmentId={dev.id} />
                   </div>
                 </CardContent>

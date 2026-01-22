@@ -1068,6 +1068,7 @@ export type Database = {
           developer: string
           differentials: string[] | null
           faq: Json | null
+          hero_image: string | null
           id: string
           is_active: boolean
           name: string
@@ -1091,6 +1092,7 @@ export type Database = {
           developer: string
           differentials?: string[] | null
           faq?: Json | null
+          hero_image?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -1114,6 +1116,7 @@ export type Database = {
           developer?: string
           differentials?: string[] | null
           faq?: Json | null
+          hero_image?: string | null
           id?: string
           is_active?: boolean
           name?: string
