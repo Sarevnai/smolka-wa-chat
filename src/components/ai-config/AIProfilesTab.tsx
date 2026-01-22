@@ -119,7 +119,7 @@ function DepartmentConfigEditor({ config, onUpdate, isSaving }: DepartmentConfig
               <Input
                 value={config.agent_name}
                 onChange={(e) => onUpdate({ agent_name: e.target.value })}
-                placeholder="Ex: Nina Locação"
+                placeholder="Ex: Helena Locação"
                 className="mt-1"
               />
             </div>
@@ -146,7 +146,7 @@ function DepartmentConfigEditor({ config, onUpdate, isSaving }: DepartmentConfig
               <Textarea
                 value={config.greeting_message || ''}
                 onChange={(e) => onUpdate({ greeting_message: e.target.value })}
-                placeholder="Olá! Sou a Nina, especialista em..."
+                placeholder="Olá! Sou a Helena, especialista em..."
                 className="mt-1"
                 rows={3}
               />

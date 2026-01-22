@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     // Determine source based on development
     const source = leadData.development_name 
       ? `Smolka AI - ${leadData.development_name}` 
-      : "Smolka AI - Nina";
+      : "Smolka AI - Helena";
 
     // Build C2S payload according to API spec
     const c2sPayload = {
