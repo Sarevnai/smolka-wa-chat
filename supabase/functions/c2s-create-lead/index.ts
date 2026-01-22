@@ -18,6 +18,10 @@ interface LeadData {
   neighborhood?: string;
   price_range?: string;
   bedrooms?: number;
+  development_id?: string;
+  development_name?: string;
+  interesse?: string;
+  motivacao?: string;
 }
 
 Deno.serve(async (req) => {
@@ -52,17 +56,31 @@ Deno.serve(async (req) => {
     // Format phone number (remove all non-digits)
     const formattedPhone = leadData.phone.replace(/\D/g, "");
 
-    // Build description with property criteria
-    let description = leadData.description || "";
-    if (leadData.property_type || leadData.neighborhood || leadData.price_range) {
-      const criteria: string[] = [];
-      if (leadData.property_type) criteria.push(`Tipo: ${leadData.property_type}`);
-      if (leadData.neighborhood) criteria.push(`Bairro: ${leadData.neighborhood}`);
-      if (leadData.price_range) criteria.push(`Faixa de preço: ${leadData.price_range}`);
-      if (leadData.bedrooms) criteria.push(`Quartos: ${leadData.bedrooms}`);
-      
-      description = criteria.join(" | ") + (description ? ` - ${description}` : "");
+    // Build description with property criteria and development info
+    let description = "";
+    const criteria: string[] = [];
+    
+    // Add development name first if available
+    if (leadData.development_name) {
+      criteria.push(`Empreendimento: ${leadData.development_name}`);
     }
+    
+    if (leadData.property_type) criteria.push(`Tipo: ${leadData.property_type}`);
+    if (leadData.neighborhood) criteria.push(`Bairro: ${leadData.neighborhood}`);
+    if (leadData.price_range) criteria.push(`Faixa de preço: ${leadData.price_range}`);
+    if (leadData.bedrooms) criteria.push(`Quartos: ${leadData.bedrooms}`);
+    if (leadData.interesse) criteria.push(`Interesse: ${leadData.interesse}`);
+    if (leadData.motivacao) criteria.push(`Motivação: ${leadData.motivacao}`);
+    
+    description = criteria.join(" | ");
+    if (leadData.description) {
+      description += description ? ` - ${leadData.description}` : leadData.description;
+    }
+
+    // Determine source based on development
+    const source = leadData.development_name 
+      ? `Smolka AI - ${leadData.development_name}` 
+      : "Smolka AI - Nina";
 
     // Build C2S payload according to API spec
     const c2sPayload = {
@@ -75,7 +93,7 @@ Deno.serve(async (req) => {
           type_negotiation: leadData.type_negotiation || "Compra",
           description: description || "Lead qualificado via WhatsApp",
           body: leadData.conversation_history || "",
-          source: "Smolka AI - Nina",
+          source: source,
         },
       },
     };
