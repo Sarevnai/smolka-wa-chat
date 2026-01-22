@@ -53,7 +53,66 @@ function formatCurrency(value: number | null): string {
   }).format(value);
 }
 
-// Build dynamic prompt based on development data
+// Build quick transfer prompt for landing page leads
+function buildQuickTransferPrompt(dev: Development, contactName?: string): string {
+  const hasName = !!contactName && contactName.toLowerCase() !== 'lead sem nome';
+  
+  return `Você é Arya, consultora da Smolka Imóveis 🏠
+
+OBJETIVO: Confirmar interesse, coletar nome e transferir IMEDIATAMENTE para corretor.
+
+═══════════════════════════════════════════════════════════════
+📋 ${dev.name.toUpperCase()} - ${dev.developer.toUpperCase()}
+═══════════════════════════════════════════════════════════════
+
+📍 LOCAL: ${dev.neighborhood ? `${dev.neighborhood}, ` : ''}${dev.city}
+💰 A PARTIR DE: ${formatCurrency(dev.starting_price)}
+
+${hasName 
+  ? `✅ O CLIENTE SE CHAMA: ${contactName}\n👉 VOCÊ PODE TRANSFERIR IMEDIATAMENTE usando enviar_lead_c2s!`
+  : `❓ VOCÊ AINDA NÃO SABE O NOME DO CLIENTE\n👉 Pergunte "Como posso te chamar?" ANTES de transferir.`}
+
+═══════════════════════════════════════════════════════════════
+⚡ MODO TRANSFERÊNCIA RÁPIDA - REGRAS OBRIGATÓRIAS
+═══════════════════════════════════════════════════════════════
+
+1. CUMPRIMENTE brevemente e confirme interesse no ${dev.name}
+2. SE NÃO TIVER NOME: Pergunte "Como posso te chamar?" de forma natural
+3. ASSIM QUE TIVER O NOME: Use enviar_lead_c2s IMEDIATAMENTE
+4. NÃO RESPONDA perguntas técnicas sobre o empreendimento
+5. Se perguntarem algo técnico, diga: "O corretor vai te explicar tudo em detalhes! 😊"
+
+═══════════════════════════════════════════════════════════════
+💬 EXEMPLOS DE RESPOSTAS
+═══════════════════════════════════════════════════════════════
+
+QUANDO NÃO TEM O NOME (primeira mensagem):
+"Olá! Que bom que você se interessou pelo ${dev.name}! 🏠
+Como posso te chamar?"
+
+QUANDO JÁ TEM O NOME:
+"Prazer, [Nome]! 😊 
+Vou te conectar agora com um dos nossos corretores especializados no ${dev.name}. 
+Ele vai te apresentar todas as condições e tirar suas dúvidas! 🏡✨"
+[USAR enviar_lead_c2s IMEDIATAMENTE]
+
+SE PERGUNTAREM ALGO TÉCNICO:
+"Ótima pergunta! O corretor especialista vai poder te explicar isso em detalhes.
+Deixa eu te conectar com ele agora! 😊"
+[USAR enviar_lead_c2s]
+
+═══════════════════════════════════════════════════════════════
+⚠️ IMPORTANTE
+═══════════════════════════════════════════════════════════════
+
+- NÃO envie materiais (plantas, perspectivas)
+- NÃO responda sobre preços específicos, condições de pagamento ou financiamento
+- NÃO responda sobre detalhes técnicos do empreendimento
+- APENAS colete o nome e transfira usando enviar_lead_c2s
+- Seja breve, simpática e eficiente`;
+}
+
+// Build dynamic prompt based on development data (full mode)
 function buildEmpreendimentoPrompt(dev: Development): string {
   const unitTypesFormatted = dev.unit_types
     .map(u => `• ${u.tipo}: ${u.area}m² - A partir de ${formatCurrency(u.preco_de)}`)
@@ -144,8 +203,8 @@ Ao transferir, avise o cliente de forma natural:
 continuidade ao seu atendimento! 🏠✨"`;
 }
 
-// Define tools for OpenAI
-const tools = [
+// Define tools for OpenAI - Full mode with materials
+const toolsFull = [
   {
     type: "function",
     function: {
@@ -199,11 +258,40 @@ const tools = [
   }
 ];
 
+// Define tools for quick transfer mode - Only C2S transfer
+const toolsQuickTransfer = [
+  {
+    type: "function",
+    function: {
+      name: "enviar_lead_c2s",
+      description: "Transferir lead imediatamente para corretor especializado no C2S. USE ASSIM QUE TIVER O NOME DO CLIENTE.",
+      parameters: {
+        type: "object",
+        properties: {
+          nome: { 
+            type: "string", 
+            description: "Nome do cliente" 
+          },
+          interesse: { 
+            type: "string", 
+            description: "Interesse do cliente (pode ser genérico como 'conhecer o empreendimento')" 
+          },
+          resumo: { 
+            type: "string", 
+            description: "Resumo breve: ex 'Lead de landing page, demonstrou interesse inicial'" 
+          }
+        },
+        required: ["nome", "resumo"]
+      }
+    }
+  }
+];
+
 // Send WhatsApp message
 async function sendWhatsAppMessage(phoneNumber: string, message: string): Promise<boolean> {
   try {
-    const waToken = Deno.env.get('WHATSAPP_TOKEN');
-    const waPhoneId = Deno.env.get('WHATSAPP_PHONE_ID');
+    const waToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+    const waPhoneId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
     
     if (!waToken || !waPhoneId) {
       console.error('WhatsApp credentials not configured');
@@ -244,8 +332,8 @@ async function sendWhatsAppMessage(phoneNumber: string, message: string): Promis
 // Send WhatsApp media
 async function sendWhatsAppMedia(phoneNumber: string, mediaUrl: string, caption?: string): Promise<boolean> {
   try {
-    const waToken = Deno.env.get('WHATSAPP_TOKEN');
-    const waPhoneId = Deno.env.get('WHATSAPP_PHONE_ID');
+    const waToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+    const waPhoneId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
     
     if (!waToken || !waPhoneId) {
       console.error('WhatsApp credentials not configured');
@@ -290,7 +378,8 @@ async function sendWhatsAppMedia(phoneNumber: string, mediaUrl: string, caption?
 async function callOpenAI(
   systemPrompt: string, 
   conversationHistory: ConversationMessage[],
-  userMessage: string
+  userMessage: string,
+  tools: any[]
 ): Promise<{ content: string; toolCalls: any[] }> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   
@@ -357,6 +446,19 @@ serve(async (req) => {
 
     console.log(`🏗️ Arya Vendas - Phone: ${phone_number}, Development: ${development_id || development_slug}`);
 
+    // Check if quick transfer mode is enabled
+    const { data: quickModeSetting } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_category', 'ai_arya')
+      .eq('setting_key', 'quick_transfer_mode')
+      .maybeSingle();
+
+    const isQuickTransferMode = quickModeSetting?.setting_value === true 
+      || quickModeSetting?.setting_value === 'true';
+
+    console.log(`⚡ Quick Transfer Mode: ${isQuickTransferMode ? 'ENABLED' : 'DISABLED'}`);
+
     // Fetch development data
     let development: Development | null = null;
     
@@ -388,18 +490,27 @@ serve(async (req) => {
 
     console.log(`📋 Development loaded: ${development.name}`);
 
-    // Fetch available materials for this development
-    const { data: materials } = await supabase
-      .from('development_materials')
-      .select('*')
-      .eq('development_id', development.id)
-      .order('order_index');
+    // Fetch available materials for this development (only in full mode)
+    let materials: DevelopmentMaterial[] = [];
+    if (!isQuickTransferMode) {
+      const { data } = await supabase
+        .from('development_materials')
+        .select('*')
+        .eq('development_id', development.id)
+        .order('order_index');
+      materials = data || [];
+    }
 
-    // Build the prompt
-    const systemPrompt = buildEmpreendimentoPrompt(development);
+    // Build the prompt based on mode
+    const systemPrompt = isQuickTransferMode
+      ? buildQuickTransferPrompt(development, contact_name)
+      : buildEmpreendimentoPrompt(development);
+
+    // Select tools based on mode
+    const tools = isQuickTransferMode ? toolsQuickTransfer : toolsFull;
 
     // Call OpenAI
-    const aiResponse = await callOpenAI(systemPrompt, conversation_history, message);
+    const aiResponse = await callOpenAI(systemPrompt, conversation_history, message, tools);
     console.log(`🤖 AI Response:`, aiResponse.content?.substring(0, 100));
 
     let finalResponse = aiResponse.content;
@@ -425,7 +536,9 @@ serve(async (req) => {
             budget_min: null,
             budget_max: development.starting_price,
             bedrooms: null,
-            additional_info: `Empreendimento: ${development.name}\n${development.developer}\n\nResumo do atendimento:\n${args.resumo}\n\nObservações: ${args.observacoes || 'Nenhuma'}`,
+            additional_info: isQuickTransferMode
+              ? `🚀 LEAD DE LANDING PAGE - ${development.name}\n${development.developer}\n\nModo: Transferência Rápida\nResumo: ${args.resumo}`
+              : `Empreendimento: ${development.name}\n${development.developer}\n\nResumo do atendimento:\n${args.resumo}\n\nObservações: ${args.observacoes || 'Nenhuma'}`,
             conversation_summary: args.resumo,
             development_id: development.id,
             development_name: development.name
@@ -446,7 +559,8 @@ serve(async (req) => {
         }
       }
 
-      if (functionName === 'enviar_material') {
+      // Only process material tool in full mode
+      if (functionName === 'enviar_material' && !isQuickTransferMode) {
         // Find and send material
         const materialType = args.tipo;
         const tipologia = args.tipologia?.toLowerCase();
@@ -475,7 +589,6 @@ serve(async (req) => {
           }
         } else {
           console.log(`⚠️ Material not found: ${materialType}`);
-          // Will mention in response that material is not available
         }
       }
     }
@@ -496,6 +609,7 @@ serve(async (req) => {
         development_name: development.name,
         c2s_transferred: c2sTransferred,
         material_sent: materialSent,
+        quick_transfer_mode: isQuickTransferMode,
         message_preview: message.substring(0, 100)
       }
     }).then(() => {}).catch(console.error);
@@ -506,6 +620,7 @@ serve(async (req) => {
         response: finalResponse,
         c2s_transferred: c2sTransferred,
         material_sent: materialSent,
+        quick_transfer_mode: isQuickTransferMode,
         development: {
           id: development.id,
           name: development.name,
