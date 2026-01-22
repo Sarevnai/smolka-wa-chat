@@ -521,6 +521,32 @@ async function getConversationHistory(conversationId: string): Promise<Array<{ r
     }));
 }
 
+// ========== OUTBOUND MESSAGE STRUCTURE ==========
+interface OutboundMessage {
+  to: string;
+  type: 'text' | 'template' | 'interactive' | 'image' | 'audio';
+  text?: string;
+  template_name?: string;
+  template_components?: any;
+  interactive?: any;
+  media_url?: string;
+  caption?: string;
+}
+
+interface AIRoutingResult {
+  agent?: string;
+  result?: any;
+  skipped?: boolean;
+  reason?: string;
+  error?: string;
+  // Proxy mode fields
+  should_send_message?: boolean;
+  outbound_messages?: OutboundMessage[];
+  escalated?: boolean;
+  escalated_to_setor?: string;
+  finalized?: boolean;
+}
+
 // ========== MAIN AI ROUTING LOGIC ==========
 
 async function handleAIRouting(
@@ -528,7 +554,7 @@ async function handleAIRouting(
   messageBody: string, 
   message: any, 
   conversation: ConversationRecord | null
-) {
+): Promise<AIRoutingResult> {
   try {
     // Check if operator has taken over
     const { data: convState } = await supabase
@@ -539,7 +565,7 @@ async function handleAIRouting(
 
     if (convState?.operator_id && !convState?.is_ai_active) {
       console.log(`⏭️ Skipping AI - operator ${convState.operator_id} handling conversation`);
-      return { skipped: true, reason: 'operator_takeover' };
+      return { skipped: true, reason: 'operator_takeover', should_send_message: false };
     }
 
     // 🏗️ CHECK FOR DEVELOPMENT LEAD FIRST (Arya Vendas)
@@ -558,30 +584,58 @@ async function handleAIRouting(
           message: messageBody,
           development_id: developmentLead.development_id,
           conversation_history: conversationHistory,
-          contact_name: developmentLead.contact_name
+          contact_name: developmentLead.contact_name,
+          proxy_mode: true // NEW: Enable proxy mode
         }
       });
 
       if (aryaError) {
         console.error('❌ Error calling ai-arya-vendas:', aryaError);
-      } else {
-        console.log('✅ ai-arya-vendas response:', aryaResult);
-        
-        if (aryaResult?.c2s_transferred) {
-          await supabase
-            .from('portal_leads_log')
-            .update({ 
-              crm_status: 'sent',
-              crm_sent_at: new Date().toISOString(),
-              ai_attended: true,
-              ai_attended_at: new Date().toISOString()
-            })
-            .eq('contact_phone', phoneNumber)
-            .eq('development_id', developmentLead.development_id);
-        }
+        return { agent: 'ai-arya-vendas', error: String(aryaError), should_send_message: false };
       }
 
-      return { agent: 'ai-arya-vendas', result: aryaResult };
+      console.log('✅ ai-arya-vendas response:', aryaResult);
+      
+      if (aryaResult?.c2s_transferred) {
+        await supabase
+          .from('portal_leads_log')
+          .update({ 
+            crm_status: 'sent',
+            crm_sent_at: new Date().toISOString(),
+            ai_attended: true,
+            ai_attended_at: new Date().toISOString()
+          })
+          .eq('contact_phone', phoneNumber)
+          .eq('development_id', developmentLead.development_id);
+      }
+
+      // Build outbound messages from response
+      const outboundMessages: OutboundMessage[] = [];
+      
+      if (aryaResult?.response) {
+        outboundMessages.push({
+          to: phoneNumber,
+          type: 'text',
+          text: aryaResult.response
+        });
+      }
+      
+      // Handle materials if sent
+      if (aryaResult?.material_sent && aryaResult?.material_url) {
+        outboundMessages.push({
+          to: phoneNumber,
+          type: 'image',
+          media_url: aryaResult.material_url,
+          caption: aryaResult.material_caption || ''
+        });
+      }
+
+      return { 
+        agent: 'ai-arya-vendas', 
+        result: aryaResult,
+        should_send_message: outboundMessages.length > 0,
+        outbound_messages: outboundMessages
+      };
     }
 
     // 📢 CHECK FOR MARKETING
@@ -625,39 +679,50 @@ async function handleAIRouting(
 
       if (aiError) {
         console.error('❌ Error calling ai-marketing-agent:', aiError);
-      } else {
-        console.log('✅ ai-marketing-agent response:', aiResult);
-        
-        if (aiResult?.response) {
-          await supabase.functions.invoke('send-wa-message', {
-            body: {
-              to: phoneNumber,
-              text: aiResult.response,
-              conversation_id: conversation?.id
-            }
-          });
-        }
-
-        if (aiResult?.escalated) {
-          await supabase
-            .from('conversation_states')
-            .upsert({
-              phone_number: phoneNumber,
-              is_ai_active: false,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'phone_number' });
-        }
-
-        if (aiResult?.finalized) {
-          await supabase
-            .from('campaign_results')
-            .update({ replied_at: new Date().toISOString() })
-            .eq('phone', phoneNumber)
-            .is('replied_at', null);
-        }
+        return { agent: 'ai-marketing-agent', error: String(aiError), should_send_message: false };
       }
 
-      return { agent: 'ai-marketing-agent', result: aiResult };
+      console.log('✅ ai-marketing-agent response:', aiResult);
+      
+      // ai-marketing-agent already returns response without sending
+      // Build outbound message for Make to send
+      const outboundMessages: OutboundMessage[] = [];
+      
+      if (aiResult?.response) {
+        outboundMessages.push({
+          to: phoneNumber,
+          type: 'text',
+          text: aiResult.response
+        });
+      }
+
+      if (aiResult?.escalated) {
+        await supabase
+          .from('conversation_states')
+          .upsert({
+            phone_number: phoneNumber,
+            is_ai_active: false,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'phone_number' });
+      }
+
+      if (aiResult?.finalized) {
+        await supabase
+          .from('campaign_results')
+          .update({ replied_at: new Date().toISOString() })
+          .eq('phone', phoneNumber)
+          .is('replied_at', null);
+      }
+
+      return { 
+        agent: 'ai-marketing-agent', 
+        result: aiResult,
+        should_send_message: outboundMessages.length > 0,
+        outbound_messages: outboundMessages,
+        escalated: aiResult?.escalated,
+        escalated_to_setor: aiResult?.escalated_to_setor,
+        finalized: aiResult?.finalized
+      };
     }
 
     // 🤖 DEFAULT: AI VIRTUAL AGENT (Vendas/Locação/Admin)
@@ -681,11 +746,11 @@ async function handleAIRouting(
       
       if (isWithinBusinessHours && !convState?.is_ai_active) {
         console.log('⏰ Within business hours - human agents available');
-        return { skipped: true, reason: 'business_hours' };
+        return { skipped: true, reason: 'business_hours', should_send_message: false };
       }
     }
 
-    console.log('🤖 Routing to ai-virtual-agent');
+    console.log('🤖 Routing to ai-virtual-agent (proxy_mode=true)');
 
     const { data: contact } = await supabase
       .from('contacts')
@@ -702,6 +767,7 @@ async function handleAIRouting(
       conversationId: conversation?.id || null,
       currentDepartment: conversation?.department_code || null,
       isPendingTriage: !conversation?.department_code,
+      proxy_mode: true // NEW: Enable proxy mode
     };
 
     const { data: triggerResult, error: triggerError } = await supabase.functions.invoke('ai-virtual-agent', {
@@ -710,23 +776,44 @@ async function handleAIRouting(
 
     if (triggerError) {
       console.error('❌ Error triggering ai-virtual-agent:', triggerError);
-    } else {
-      console.log('✅ ai-virtual-agent response:', triggerResult);
-      
-      if (triggerResult?.assignedDepartment && conversation?.id) {
-        await assignDepartmentToConversation(
-          conversation.id,
-          triggerResult.assignedDepartment as DepartmentType,
-          triggerResult.qualificationData
-        );
-      }
+      return { agent: 'ai-virtual-agent', error: String(triggerError), should_send_message: false };
     }
 
-    return { agent: 'ai-virtual-agent', result: triggerResult };
+    console.log('✅ ai-virtual-agent response:', triggerResult);
+    
+    if (triggerResult?.assignedDepartment && conversation?.id) {
+      await assignDepartmentToConversation(
+        conversation.id,
+        triggerResult.assignedDepartment as DepartmentType,
+        triggerResult.qualificationData
+      );
+    }
+
+    // Build outbound messages from virtual agent response
+    const outboundMessages: OutboundMessage[] = [];
+    
+    if (triggerResult?.outbound_messages && Array.isArray(triggerResult.outbound_messages)) {
+      // Use messages from agent directly
+      outboundMessages.push(...triggerResult.outbound_messages);
+    } else if (triggerResult?.response) {
+      // Fallback to simple text response
+      outboundMessages.push({
+        to: phoneNumber,
+        type: 'text',
+        text: triggerResult.response
+      });
+    }
+
+    return { 
+      agent: 'ai-virtual-agent', 
+      result: triggerResult,
+      should_send_message: outboundMessages.length > 0,
+      outbound_messages: outboundMessages
+    };
 
   } catch (error) {
     console.error('Error in handleAIRouting:', error);
-    return { error: String(error) };
+    return { error: String(error), should_send_message: false };
   }
 }
 
@@ -805,17 +892,36 @@ async function processIncomingMessage(phoneNumber: string, messageBody: string, 
     await updateTriageStage(phoneNumber, 'completed');
     await sendDepartmentWelcomeAndActivateAI(phoneNumber, departmentCode, conversation.id);
     
-    return { triage: true, department: departmentCode };
+    // Triage completed - send welcome message via proxy
+    const welcomeText = DEPARTMENT_WELCOMES[departmentCode] || DEPARTMENT_WELCOMES.locacao;
+    
+    return { 
+      triage: true, 
+      department: departmentCode,
+      should_send_message: true,
+      outbound_message: {
+        to: phoneNumber,
+        type: 'text',
+        text: welcomeText
+      }
+    };
   }
   
   // ========== AI ROUTING ==========
   const aiResult = await handleAIRouting(phoneNumber, messageBody, rawMessage, conversation);
   
+  // Build response with proxy mode data
   return {
     message_id: insertedData?.[0]?.id,
     conversation_id: conversationId,
     department: conversation?.department_code,
-    ai: aiResult
+    ai: aiResult,
+    // Proxy mode fields at top level for easy access in Make
+    should_send_message: aiResult.should_send_message || false,
+    outbound_messages: aiResult.outbound_messages || [],
+    escalated: aiResult.escalated,
+    escalated_to_setor: aiResult.escalated_to_setor,
+    finalized: aiResult.finalized
   };
 }
 
