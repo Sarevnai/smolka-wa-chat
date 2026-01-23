@@ -640,26 +640,22 @@ serve(async (req) => {
     console.log(`📊 conversation_history is empty array: ${Array.isArray(conversation_history) && conversation_history.length === 0}`);
     console.log(`📩 Is first message: ${isFirstMessage}`);
     
-    console.log(`🖼️ ========== HERO IMAGE CHECK ==========`);
-    console.log(`🖼️ development.hero_image exists: ${!!development.hero_image}`);
-    console.log(`🖼️ development.hero_image URL: ${development.hero_image || 'NULL'}`);
-    console.log(`🖼️ isQuickTransferMode: ${isQuickTransferMode}`);
-    console.log(`🖼️ Will send hero image: ${isFirstMessage && isQuickTransferMode && !!development.hero_image}`);
+    console.log(`👋 ========== WELCOME CHECK ==========`);
+    console.log(`👋 isQuickTransferMode: ${isQuickTransferMode}`);
+    console.log(`👋 Will send welcome: ${isFirstMessage && isQuickTransferMode}`);
     console.log(`📊 ==========================================`);
 
-    // Handle first message with hero image presentation
-    if (isFirstMessage && isQuickTransferMode && development.hero_image) {
-      console.log(`🖼️ Sending hero image for ${development.name}`);
+    // Handle first message with text-only greeting (no hero image)
+    if (isFirstMessage && isQuickTransferMode) {
+      console.log(`👋 Sending welcome greeting for ${development.name}`);
       
-      // 1. Send greeting with hero image - Helena Smolka
-      const greetingCaption = `Que bom seu interesse no ${development.name}, no bairro João Paulo, em Florianópolis! 🏠 Entre o azul do mar e o verde das montanhas, é um lugar pensado para viver com calma e bem-estar.`;
+      // 1. Send greeting text message - Helena Smolka
+      const greetingMessage = `Que bom seu interesse no ${development.name}, no bairro João Paulo, em Florianópolis! 🏠 Entre o azul do mar e o verde das montanhas, é um lugar pensado para viver com calma e bem-estar.`;
       await saveAndSendMessage(
         supabase,
         conversationId,
         phone_number,
-        greetingCaption,
-        development.hero_image,
-        'image/jpeg'
+        greetingMessage
       );
       
       // Small delay for natural flow
@@ -692,7 +688,8 @@ serve(async (req) => {
         metadata: {
           development_id: development.id,
           development_name: development.name,
-          hero_image_sent: true,
+          hero_image_sent: false,
+          greeting_type: 'text_only',
           has_contact_name: hasName,
           quick_transfer_mode: isQuickTransferMode,
           message_preview: message.substring(0, 100)
@@ -702,8 +699,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          response: `${greetingCaption}\n\n${followUpMessage}`,
-          hero_image_sent: true,
+          response: `${greetingMessage}\n\n${followUpMessage}`,
+          hero_image_sent: false,
+          greeting_type: 'text_only',
           quick_transfer_mode: isQuickTransferMode,
           development: {
             id: development.id,
