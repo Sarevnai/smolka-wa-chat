@@ -16,14 +16,16 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // URL da imagem no app publicado
-    const sourceUrl = 'https://locacaoatt.lovable.app/developments/villa-maggiore-hero.jpg';
+    // URL da imagem no app preview (usa a versão mais recente)
+    const previewUrl = Deno.env.get('SUPABASE_URL')?.includes('lovable') 
+      ? 'https://id-preview--12b59a46-c28e-4ee4-90fd-f0235513f414.lovable.app/developments/villa-maggiore-hero.jpg'
+      : 'https://locacaoatt.lovable.app/developments/villa-maggiore-hero.jpg';
     const targetPath = 'developments/villa-maggiore-hero.jpg';
 
-    console.log(`Downloading image from: ${sourceUrl}`);
+    console.log(`Downloading image from: ${previewUrl}`);
 
     // Baixar a imagem
-    const imageResponse = await fetch(sourceUrl);
+    const imageResponse = await fetch(previewUrl);
     if (!imageResponse.ok) {
       throw new Error(`Failed to download image: ${imageResponse.status}`);
     }
