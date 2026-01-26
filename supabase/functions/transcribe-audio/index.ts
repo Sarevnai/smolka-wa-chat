@@ -24,8 +24,25 @@ serve(async (req) => {
 
     console.log('🎤 Transcribing audio from:', audioUrl);
 
-    // Download audio file
-    const audioResponse = await fetch(audioUrl);
+    // Check if this is a WhatsApp/Facebook media URL that requires authentication
+    const isWhatsAppUrl = audioUrl.includes('lookaside.fbsbx.com') || 
+                          audioUrl.includes('whatsapp') ||
+                          audioUrl.includes('facebook');
+
+    // Download audio file with appropriate headers
+    const fetchHeaders: Record<string, string> = {};
+    
+    if (isWhatsAppUrl) {
+      const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+      if (accessToken) {
+        fetchHeaders['Authorization'] = `Bearer ${accessToken}`;
+        console.log('🔐 Using WhatsApp access token for authenticated download');
+      } else {
+        console.warn('⚠️ WhatsApp URL detected but no access token available');
+      }
+    }
+
+    const audioResponse = await fetch(audioUrl, { headers: fetchHeaders });
     if (!audioResponse.ok) {
       throw new Error(`Failed to download audio: ${audioResponse.status}`);
     }
