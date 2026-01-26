@@ -237,7 +237,7 @@ export function AppSidebar() {
                 <SidebarGroupLabel className="cursor-pointer hover:bg-accent/50 rounded-md p-2 flex items-center justify-between text-violet-600">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4" />
-                    {!collapsed && <span>Minha IA</span>}
+                    {!collapsed && <span>Minha Aimee</span>}
                   </div>
                   {!collapsed && (
                     <ChevronRight className={cn("h-4 w-4 transition-transform", aiOpen && "rotate-90")} />
