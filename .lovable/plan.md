@@ -1,323 +1,294 @@
 
-# Plano: Suporte a Audio e Midia no make-webhook
+# Plano: Habilitar Respostas em Áudio no make-webhook
 
-## Visao Geral
+## Visão Geral
 
-Adicionar capacidade ao `make-webhook` para processar mensagens de audio e outros tipos de midia (imagem, video, documento) recebidas via Make.com. O audio sera transcrito automaticamente via Whisper e processado como texto pela IA.
+Adicionar capacidade ao `make-webhook` para gerar e enviar respostas em áudio (TTS) usando ElevenLabs, além das respostas em texto. Isso permitirá que a IA Helena/Nina responda com mensagens de voz via integração Make.com.
 
-## Estrutura de Dados do Make para Midia
+## Infraestrutura Existente (Reutilizável)
 
-O Make.com pode enviar diferentes formatos de midia. Vamos expandir a interface `MakeWebhookRequest`:
+| Componente | Status | Descrição |
+|------------|--------|-----------|
+| `elevenlabs-tts` | ✅ Pronto | Converte texto em áudio (MP3 → OGG/Opus) |
+| `send-wa-media` | ✅ Pronto | Envia mídia via WhatsApp API |
+| `system_settings` | ✅ Configurado | `audio_enabled: true`, voz: "Roberta" |
+| `whatsapp-media` bucket | ✅ Disponível | Storage para arquivos de áudio |
+
+## Configuração Atual de Áudio
 
 ```text
-TIPOS DE MENSAGEM DO MAKE:
-┌─────────────────────────────────────────────────────────────────────┐
-│  message_type: "text"                                                │
-│  - phone, message, contact_name, message_id                         │
-└─────────────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────────────┐
-│  message_type: "audio" | "voice"                                     │
-│  - media_url: URL do arquivo no storage do WhatsApp/Make            │
-│  - media_id: ID da midia no WhatsApp                                │
-│  - media_mime: Tipo MIME (audio/ogg, audio/mp4, etc)                │
-└─────────────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────────────┐
-│  message_type: "image" | "video" | "document"                        │
-│  - media_url: URL do arquivo                                        │
-│  - media_id: ID da midia                                            │
-│  - media_caption: Legenda enviada junto com a midia                 │
-│  - media_filename: Nome do arquivo (para documentos)                │
-│  - media_mime: Tipo MIME                                            │
-└─────────────────────────────────────────────────────────────────────┘
+audio_enabled: true
+audio_voice_id: RGymW84CSmfVugnA5tvA
+audio_voice_name: Roberta - For Conversational
+audio_mode: audio_only
 ```
 
 ## Fluxo de Processamento
 
 ```text
-AUDIO:
-┌──────────────┐     ┌────────────────┐     ┌──────────────────┐
-│ Make envia   │────▶│ make-webhook   │────▶│ transcribe-audio │
-│ media_url    │     │ detecta audio  │     │ (Whisper API)    │
-└──────────────┘     └────────────────┘     └──────────────────┘
-                              │                      │
-                              │              ┌───────┴───────┐
-                              │              │ Texto         │
-                              │              │ transcrito    │
-                              │              └───────────────┘
-                              ▼
-                    ┌─────────────────────┐
-                    │ Processa como texto │
-                    │ normal pela IA      │
-                    └─────────────────────┘
-
-IMAGEM/VIDEO/DOCUMENTO:
-┌──────────────┐     ┌────────────────┐     ┌──────────────────┐
-│ Make envia   │────▶│ make-webhook   │────▶│ Salva no banco   │
-│ media_url    │     │ detecta midia  │     │ com media_url    │
-└──────────────┘     └────────────────┘     └──────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────────────────────────────┐
-                    │ IA recebe: "[Audio recebido: <texto>]"  │
-                    │ ou "[Imagem recebida: <caption>]"       │
-                    └─────────────────────────────────────────┘
+┌──────────────────┐     ┌────────────────┐     ┌──────────────────┐
+│ Make envia       │────▶│ make-webhook   │────▶│ IA gera resposta │
+│ mensagem         │     │ processa       │     │ em texto         │
+└──────────────────┘     └────────────────┘     └──────────────────┘
+                                                         │
+                                                         ▼
+                              ┌──────────────────────────────────────┐
+                              │ audio_enabled?                       │
+                              │ ┌────────────┐    ┌────────────────┐ │
+                              │ │    SIM     │    │      NÃO       │ │
+                              │ └─────┬──────┘    └───────┬────────┘ │
+                              └───────┼───────────────────┼──────────┘
+                                      │                   │
+                                      ▼                   ▼
+                              ┌──────────────┐    ┌───────────────┐
+                              │ elevenlabs-  │    │ Retorna só    │
+                              │ tts          │    │ texto         │
+                              └──────┬───────┘    └───────────────┘
+                                     │
+                                     ▼
+                              ┌──────────────┐
+                              │ Upload para  │
+                              │ Storage      │
+                              └──────┬───────┘
+                                     │
+                                     ▼
+                              ┌────────────────────────────────────┐
+                              │ Retorna JSON com:                  │
+                              │ - result (texto)                   │
+                              │ - audio_url (URL do áudio)         │
+                              │ - audio_type (audio/ogg ou mp3)    │
+                              └────────────────────────────────────┘
 ```
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
-| Arquivo | Acao | Descricao |
+| Arquivo | Ação | Descrição |
 |---------|------|-----------|
-| `supabase/functions/make-webhook/index.ts` | **Modificar** | Adicionar suporte a midia |
+| `supabase/functions/make-webhook/index.ts` | Modificar | Adicionar geração de áudio TTS |
 
-## Mudancas Tecnicas
+## Mudanças Técnicas
 
-### 1. Atualizar Interface MakeWebhookRequest
+### 1. Nova Função: getAudioConfig
+
+Buscar configurações de áudio do `system_settings`:
 
 ```typescript
-interface MakeWebhookRequest {
-  phone: string;
-  message: string;        // Texto OU vazio para audio/midia
-  contact_name?: string;
-  message_id?: string;
-  timestamp?: string;
-  message_type?: string;  // "text" | "audio" | "voice" | "image" | "video" | "document"
-  
-  // Novos campos para midia
-  media_url?: string;     // URL publica da midia
-  media_id?: string;      // ID da midia no WhatsApp
-  media_mime?: string;    // Tipo MIME (audio/ogg, image/jpeg, etc)
-  media_caption?: string; // Legenda da midia
-  media_filename?: string;// Nome do arquivo (documentos)
+interface AudioConfig {
+  audio_enabled: boolean;
+  audio_voice_id: string;
+  audio_voice_name: string;
+  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
+  audio_max_chars: number;
 }
-```
 
-### 2. Nova Funcao: transcribeAudio
-
-```typescript
-async function transcribeAudio(
-  supabase: any, 
-  audioUrl: string
-): Promise<string | null> {
+async function getAudioConfig(supabase: any): Promise<AudioConfig | null> {
   try {
-    console.log('🎤 Transcribing audio from Make:', audioUrl);
+    const { data } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'ai_agent_config')
+      .single();
     
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: { audioUrl }
-    });
+    if (!data?.setting_value) return null;
     
-    if (error || !data?.success) {
-      console.error('❌ Transcription failed:', error || data?.error);
-      return null;
-    }
-    
-    console.log('✅ Audio transcribed:', data.text?.substring(0, 100));
-    return data.text;
-    
+    const config = data.setting_value;
+    return {
+      audio_enabled: config.audio_enabled || false,
+      audio_voice_id: config.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL',
+      audio_voice_name: config.audio_voice_name || 'Sarah',
+      audio_mode: config.audio_mode || 'text_and_audio',
+      audio_max_chars: config.audio_max_chars || 1000
+    };
   } catch (error) {
-    console.error('❌ Error in transcribeAudio:', error);
+    console.error('Error getting audio config:', error);
     return null;
   }
 }
 ```
 
-### 3. Nova Funcao: saveMessageWithMedia
+### 2. Nova Função: generateAudioResponse
 
-Modificar `saveMessage` para suportar campos de midia:
+Gerar áudio via ElevenLabs TTS:
 
 ```typescript
-async function saveMessage(
+async function generateAudioResponse(
   supabase: any,
-  conversationId: string | null,
-  phoneNumber: string,
-  body: string,
-  direction: 'inbound' | 'outbound',
-  messageId?: string,
-  mediaInfo?: {
-    type?: string;
-    url?: string;
-    caption?: string;
-    filename?: string;
-    mimeType?: string;
-  }
-): Promise<number | null> {
+  text: string,
+  audioConfig: AudioConfig
+): Promise<{ audioUrl: string; isVoiceMessage: boolean } | null> {
+  if (!audioConfig.audio_enabled) return null;
+  
+  // Limit text length for audio
+  const textToConvert = text.length > audioConfig.audio_max_chars 
+    ? text.substring(0, audioConfig.audio_max_chars) + '...'
+    : text;
+  
   try {
-    const messageData: any = {
-      conversation_id: conversationId,
-      wa_message_id: messageId || `make_${direction}_${Date.now()}`,
-      wa_from: direction === 'inbound' ? phoneNumber : null,
-      wa_to: direction === 'outbound' ? phoneNumber : null,
-      direction,
-      body,
-      wa_timestamp: new Date().toISOString(),
-      department_code: 'vendas',
-      // Campos de midia
-      media_type: mediaInfo?.type || null,
-      media_url: mediaInfo?.url || null,
-      media_caption: mediaInfo?.caption || null,
-      media_filename: mediaInfo?.filename || null,
-      media_mime_type: mediaInfo?.mimeType || null
+    console.log('🎙️ Generating TTS audio for Make response...');
+    
+    const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+      body: {
+        text: textToConvert,
+        voiceId: audioConfig.audio_voice_id
+      }
+    });
+    
+    if (error || !data?.success) {
+      console.error('❌ TTS generation failed:', error || data?.error);
+      return null;
+    }
+    
+    console.log('✅ Audio generated:', data.audioUrl);
+    return {
+      audioUrl: data.audioUrl,
+      isVoiceMessage: data.isVoiceMessage || false
     };
-    // ... resto da funcao
+  } catch (error) {
+    console.error('❌ Error in generateAudioResponse:', error);
+    return null;
   }
 }
 ```
 
-### 4. Modificar Handler Principal
+### 3. Modificar Handler Principal
 
-No handler principal, adicionar logica para:
-
-1. **Detectar tipo de mensagem** (texto vs midia)
-2. **Para audio**: Transcrever antes de processar
-3. **Para outras midias**: Usar caption ou mensagem generica
-4. **Salvar com campos de midia** preenchidos
+Após gerar a resposta da IA, verificar se áudio está habilitado e gerar:
 
 ```typescript
-// Parse request body
-const body: MakeWebhookRequest = await req.json();
-const { 
-  phone, 
-  message, 
-  contact_name, 
-  message_id, 
-  message_type,
-  media_url,
-  media_id,
-  media_mime,
-  media_caption,
-  media_filename
-} = body;
+// --- Após obter aiResponse ---
 
-// Determine message content based on type
-let messageContent = message || '';
-let mediaInfo: { type?: string; url?: string; caption?: string; filename?: string; mimeType?: string } | undefined;
+// Get audio configuration
+const audioConfig = await getAudioConfig(supabase);
+let audioResult: { audioUrl: string; isVoiceMessage: boolean } | null = null;
 
-// Handle media types
-const isAudio = message_type === 'audio' || message_type === 'voice';
-const isMedia = ['image', 'video', 'document', 'sticker'].includes(message_type || '');
+if (audioConfig?.audio_enabled && aiResponse) {
+  audioResult = await generateAudioResponse(supabase, aiResponse, audioConfig);
+  
+  if (audioResult) {
+    console.log(`🎤 Audio generated for response: ${audioResult.audioUrl}`);
+  }
+}
 
-if (isAudio && media_url) {
-  // Transcribe audio
-  const transcribedText = await transcribeAudio(supabase, media_url);
-  messageContent = transcribedText || '[Audio nao pude ser transcrito]';
-  
-  mediaInfo = {
-    type: 'audio',
-    url: media_url,
-    caption: messageContent,
-    mimeType: media_mime
-  };
-  
-  console.log(`🎤 Audio transcribed: "${messageContent.substring(0, 50)}..."`);
-  
-} else if (isMedia && media_url) {
-  // For other media, use caption or generic message
-  messageContent = media_caption || `[${message_type === 'image' ? 'Imagem' : message_type === 'video' ? 'Video' : 'Documento'} recebido]`;
-  
-  mediaInfo = {
-    type: message_type,
-    url: media_url,
-    caption: media_caption,
-    filename: media_filename,
-    mimeType: media_mime
-  };
-  
-  console.log(`📎 Media received: ${message_type} - ${media_url}`);
+// Save outbound message (include audio info)
+if (aiResponse && conversationId) {
+  await saveMessage(
+    supabase, 
+    conversationId, 
+    phoneNumber, 
+    aiResponse, 
+    'outbound',
+    undefined,
+    audioResult ? {
+      type: audioResult.isVoiceMessage ? 'audio' : 'audio',
+      url: audioResult.audioUrl,
+      mimeType: audioResult.isVoiceMessage ? 'audio/ogg' : 'audio/mpeg'
+    } : undefined
+  );
 }
 ```
 
-### 5. Resposta Especial para Midias
+### 4. Modificar Resposta JSON
 
-Se a mensagem foi uma midia, podemos incluir contexto extra para a IA:
+Incluir informações de áudio na resposta para o Make:
 
 ```typescript
-// Provide context to AI about media
-let aiPromptMessage = messageContent;
-
-if (isAudio) {
-  aiPromptMessage = `[O cliente enviou um audio que foi transcrito automaticamente]\n\n"${messageContent}"`;
-} else if (isMedia) {
-  aiPromptMessage = `[O cliente enviou ${message_type === 'image' ? 'uma imagem' : message_type === 'video' ? 'um video' : 'um documento'}${media_caption ? ` com legenda: "${media_caption}"` : ''}]`;
-}
+return new Response(
+  JSON.stringify({
+    success: true,
+    result: aiResponse,  // Texto da resposta (sempre incluído)
+    phone: phoneNumber,
+    agent,
+    conversation_id: conversationId,
+    // NOVO: Informações de áudio
+    audio: audioResult ? {
+      url: audioResult.audioUrl,
+      type: audioResult.isVoiceMessage ? 'audio/ogg' : 'audio/mpeg',
+      is_voice_message: audioResult.isVoiceMessage
+    } : null,
+    metadata: {
+      development_detected: developmentDetected,
+      c2s_transferred: c2sTransferred,
+      contact_name: contact_name,
+      media_processed: mediaProcessed || null,
+      audio_enabled: audioConfig?.audio_enabled || false
+    }
+  }),
+  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+);
 ```
 
-## Mapeamento no Make.com
+## Configuração no Make.com
 
-O usuario deve configurar o HTTP Request no Make para enviar os campos de midia:
+O Make precisa ser configurado para usar a URL de áudio retornada:
 
-```json
-{
-  "phone": "{{1.messages[].from}}",
-  "message": "{{1.messages[].text.body}}",
-  "contact_name": "{{1.contacts[].profile.name}}",
-  "message_id": "{{1.messages[].id}}",
-  "message_type": "{{1.messages[].type}}",
-  "media_url": "{{1.messages[].audio.url}}",
-  "media_id": "{{1.messages[].audio.id}}",
-  "media_mime": "{{1.messages[].audio.mime_type}}",
-  "media_caption": "{{1.messages[].image.caption}}"
-}
+### Opção 1: Enviar Áudio ao Invés de Texto
+```text
+Se {{audio.url}} existir:
+  → Módulo WhatsApp: Enviar Áudio
+    - Media URL: {{audio.url}}
+    - Type: {{audio.type}}
+Senão:
+  → Módulo WhatsApp: Enviar Texto
+    - Body: {{result}}
 ```
 
-Nota: O Make pode precisar de um Router para tratar diferentes tipos de mensagem com mapeamentos diferentes.
+### Opção 2: Enviar Texto + Áudio (text_and_audio mode)
+O Make pode enviar ambos dependendo do `audio_mode` configurado.
 
-## Tratamento de Erro
-
-Se a transcricao falhar:
-- Log do erro
-- Usar fallback: `"[Audio recebido, mas nao foi possivel transcrever]"`
-- IA responde pedindo para o cliente digitar a mensagem
-
-```typescript
-if (!transcribedText) {
-  messageContent = '[O cliente enviou um audio que nao pude entender. Por favor, peca para ele digitar a mensagem.]';
-}
-```
-
-## Resposta Enriquecida
-
-A resposta do webhook incluira informacao sobre midia processada:
+## Resposta JSON Enriquecida
 
 ```json
 {
   "success": true,
-  "result": "Entendi! Voce mencionou que...",
+  "result": "Olá! Que bom seu interesse...",
   "phone": "5548991109003",
   "agent": "helena",
   "conversation_id": "uuid-xxx",
+  "audio": {
+    "url": "https://wpjxsgxxhogzkkuznyke.supabase.co/storage/v1/object/public/whatsapp-media/ai-voice-1234567890.ogg",
+    "type": "audio/ogg",
+    "is_voice_message": true
+  },
   "metadata": {
     "development_detected": "Villa Maggiore",
     "c2s_transferred": false,
-    "contact_name": "Joao",
-    "media_processed": {
-      "type": "audio",
-      "transcribed": true,
-      "transcription_preview": "Ola, gostaria de saber..."
-    }
+    "contact_name": "João",
+    "media_processed": null,
+    "audio_enabled": true
   }
 }
 ```
 
-## Integracao Existente Preservada
+## Comportamento por Modo de Áudio
 
-| Componente | Status |
-|------------|--------|
-| `whatsapp-webhook/index.ts` | Intacto |
-| `transcribe-audio/index.ts` | Reutilizado (sem alteracoes) |
-| `download-media/index.ts` | Nao necessario (Make ja fornece URL) |
-| `ai-arya-vendas/index.ts` | Intacto |
+| Modo | Texto Enviado | Áudio Enviado |
+|------|---------------|---------------|
+| `text_only` | ✅ Sim | ❌ Não |
+| `audio_only` | ❌ Não* | ✅ Sim |
+| `text_and_audio` | ✅ Sim | ✅ Sim |
 
-## Beneficios
+*O texto ainda é retornado no JSON para log/fallback, mas Make deve enviar apenas áudio.
 
-1. **Experiencia Completa**: Clientes podem enviar audios naturalmente
-2. **Transcricao Automatica**: Whisper API converte audio em texto
-3. **Persistencia**: Todas as midias ficam salvas no banco
-4. **Chat UI**: Operadores veem audios e midias normalmente
-5. **Zero Impacto**: Integracao direta da Meta nao e afetada
+## Mirroring de Canal (Opcional)
+
+Se `audio_channel_mirroring` estiver ativo:
+- Cliente envia áudio → IA responde com áudio
+- Cliente envia texto → IA responde com texto
+
+Isso pode ser implementado verificando `message_type` na entrada.
+
+## Benefícios
+
+1. **Experiência Natural**: Clientes recebem respostas em voz
+2. **Voz Personalizada**: Usa a voz "Roberta" configurada
+3. **Configurável**: Respeita configurações existentes do admin
+4. **Fallback Seguro**: Se TTS falhar, texto ainda é enviado
+5. **Zero Impacto**: whatsapp-webhook continua funcionando normalmente
 
 ## Plano de Testes
 
-1. Testar com mensagem de texto (deve funcionar como antes)
-2. Testar com audio via Make (verificar transcricao)
-3. Testar com imagem via Make (verificar salvamento)
-4. Verificar Chat UI mostra as midias corretamente
-5. Verificar que a integracao direta (whatsapp-webhook) continua funcionando
+1. Enviar mensagem de texto via Make → Verificar se áudio é gerado
+2. Verificar resposta JSON contém `audio.url`
+3. Testar fallback quando TTS falha (deve retornar só texto)
+4. Configurar Make para enviar áudio e testar no WhatsApp
+5. Verificar que a conversa mostra o áudio no Chat UI
