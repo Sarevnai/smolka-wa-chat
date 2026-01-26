@@ -23,6 +23,167 @@ interface ConversationRecord {
   stage_id: string | null;
 }
 
+// Audio TTS configuration
+interface AudioConfig {
+  audio_enabled: boolean;
+  audio_voice_id: string;
+  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
+  audio_max_chars: number;
+}
+
+/**
+ * Get audio TTS configuration from system_settings
+ */
+async function getAudioConfig(): Promise<AudioConfig | null> {
+  try {
+    const { data } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'ai_agent_config')
+      .maybeSingle();
+    
+    if (!data?.setting_value) return null;
+    
+    const config = data.setting_value as any;
+    return {
+      audio_enabled: config.audio_enabled || false,
+      audio_voice_id: config.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL',
+      audio_mode: config.audio_mode || 'text_and_audio',
+      audio_max_chars: config.audio_max_chars || 1000
+    };
+  } catch (error) {
+    console.error('❌ Error getting audio config:', error);
+    return null;
+  }
+}
+
+/**
+ * Generate audio via ElevenLabs TTS and send via WhatsApp
+ */
+async function generateAndSendAudio(
+  phoneNumber: string,
+  text: string,
+  conversationId: string | null,
+  audioConfig: AudioConfig
+): Promise<boolean> {
+  try {
+    // Limit text for TTS
+    const textToConvert = text.length > audioConfig.audio_max_chars 
+      ? text.substring(0, audioConfig.audio_max_chars) + '...'
+      : text;
+    
+    console.log('🎙️ Generating TTS audio...', { 
+      textLength: textToConvert.length, 
+      voiceId: audioConfig.audio_voice_id 
+    });
+    
+    // Generate audio via elevenlabs-tts
+    const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('elevenlabs-tts', {
+      body: {
+        text: textToConvert,
+        voiceId: audioConfig.audio_voice_id
+      }
+    });
+    
+    if (ttsError || !ttsResult?.success) {
+      console.error('❌ TTS generation failed:', ttsError || ttsResult?.error);
+      return false;
+    }
+    
+    console.log('✅ Audio generated:', ttsResult.audioUrl, 'isVoiceMessage:', ttsResult.isVoiceMessage);
+    
+    // Send audio via WhatsApp
+    const { error: sendError } = await supabase.functions.invoke('send-wa-media', {
+      body: {
+        to: phoneNumber,
+        mediaUrl: ttsResult.audioUrl,
+        mediaType: 'audio',
+        mimeType: ttsResult.contentType || 'audio/mpeg',
+        conversation_id: conversationId
+      }
+    });
+    
+    if (sendError) {
+      console.error('❌ Error sending audio to WhatsApp:', sendError);
+      return false;
+    }
+    
+    console.log('✅ Audio sent to WhatsApp');
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Error in generateAndSendAudio:', error);
+    return false;
+  }
+}
+
+/**
+ * Send AI response with optional TTS audio based on configuration
+ */
+async function sendAIResponse(
+  phoneNumber: string,
+  responseText: string,
+  conversationId: string | null,
+  agentName: string = 'AI'
+): Promise<void> {
+  // Get audio configuration
+  const audioConfig = await getAudioConfig();
+  
+  // Determine what to send based on audio_mode
+  const sendText = !audioConfig?.audio_enabled || 
+                   audioConfig.audio_mode === 'text_only' || 
+                   audioConfig.audio_mode === 'text_and_audio';
+  
+  const sendAudio = audioConfig?.audio_enabled && 
+                    (audioConfig.audio_mode === 'audio_only' || 
+                     audioConfig.audio_mode === 'text_and_audio');
+  
+  console.log(`🔊 ${agentName} response mode:`, { 
+    sendText, 
+    sendAudio, 
+    mode: audioConfig?.audio_mode || 'text_only' 
+  });
+
+  // Send text (unless audio_only mode)
+  if (sendText) {
+    const { error: sendError } = await supabase.functions.invoke('send-wa-message', {
+      body: {
+        to: phoneNumber,
+        text: responseText,
+        conversation_id: conversationId
+      }
+    });
+    
+    if (sendError) {
+      console.error(`❌ Error sending ${agentName} text response:`, sendError);
+    } else {
+      console.log(`✅ ${agentName} text response sent to WhatsApp`);
+    }
+  }
+  
+  // Send audio (if enabled)
+  if (sendAudio && audioConfig) {
+    const audioSent = await generateAndSendAudio(
+      phoneNumber,
+      responseText,
+      conversationId,
+      audioConfig
+    );
+    
+    if (!audioSent && audioConfig.audio_mode === 'audio_only') {
+      // Fallback: if audio_only mode failed, send text
+      console.log('⚠️ Audio failed in audio_only mode, falling back to text');
+      await supabase.functions.invoke('send-wa-message', {
+        body: {
+          to: phoneNumber,
+          text: responseText,
+          conversation_id: conversationId
+        }
+      });
+    }
+  }
+}
+
 // ========== TRIAGE BUTTON MAPPING ==========
 // For interactive messages (btn_* IDs)
 const TRIAGE_BUTTON_IDS: Record<string, DepartmentType> = {
@@ -122,20 +283,13 @@ async function sendDepartmentWelcomeAndActivateAI(
     welcomeMessage = welcomeMessage.replace('Certo!', `Certo, ${name}!`);
   }
   
-  // Send welcome message
-  const { error } = await supabase.functions.invoke('send-wa-message', {
-    body: {
-      to: phoneNumber,
-      text: welcomeMessage,
-      conversation_id: conversationId
-    }
-  });
-  
-  if (error) {
-    console.error('❌ Error sending department welcome:', error);
-  } else {
-    console.log(`✅ Department welcome sent for ${department}`);
-  }
+  // Send welcome message with TTS if enabled
+  await sendAIResponse(
+    phoneNumber,
+    welcomeMessage,
+    conversationId,
+    'department-welcome'
+  );
 }
 
 /**
@@ -1231,21 +1385,14 @@ async function handleN8NTrigger(
       } else {
         console.log('✅ ai-marketing-agent response:', aiResult);
         
-        // Send AI response back to WhatsApp
+        // Send AI response back to WhatsApp (with TTS if enabled)
         if (aiResult?.response) {
-          const { error: sendError } = await supabase.functions.invoke('send-wa-message', {
-            body: {
-              to: phoneNumber,
-              text: aiResult.response,
-              conversation_id: conversation?.id
-            }
-          });
-          
-          if (sendError) {
-            console.error('❌ Error sending marketing agent response:', sendError);
-          } else {
-            console.log('✅ Marketing agent response sent to WhatsApp');
-          }
+          await sendAIResponse(
+            phoneNumber,
+            aiResult.response,
+            conversation?.id || null,
+            'ai-marketing-agent'
+          );
         }
 
         // Handle escalation to human
