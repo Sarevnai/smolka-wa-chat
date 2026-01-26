@@ -43,6 +43,14 @@ interface ConversationMessage {
   content: string;
 }
 
+// Audio TTS configuration
+interface AudioConfig {
+  audio_enabled: boolean;
+  audio_voice_id: string;
+  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
+  audio_max_chars: number;
+}
+
 // Format currency in BRL
 function formatCurrency(value: number | null): string {
   if (!value) return 'Consultar';
@@ -419,7 +427,93 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Helper: Save message to database and send via WhatsApp
+// Initialize Supabase client for internal use (TTS, etc.)
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabaseInternal = createClient(supabaseUrl, supabaseServiceKey);
+
+/**
+ * Get audio TTS configuration from system_settings
+ */
+async function getAudioConfig(): Promise<AudioConfig | null> {
+  try {
+    const { data } = await supabaseInternal
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'ai_agent_config')
+      .maybeSingle();
+    
+    if (!data?.setting_value) return null;
+    
+    const config = data.setting_value as any;
+    return {
+      audio_enabled: config.audio_enabled || false,
+      audio_voice_id: config.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL',
+      audio_mode: config.audio_mode || 'text_and_audio',
+      audio_max_chars: config.audio_max_chars || 1000
+    };
+  } catch (error) {
+    console.error('❌ Error getting audio config:', error);
+    return null;
+  }
+}
+
+/**
+ * Generate and send audio via ElevenLabs TTS
+ */
+async function generateAndSendAudio(
+  phoneNumber: string,
+  text: string,
+  audioConfig: AudioConfig
+): Promise<boolean> {
+  try {
+    // Limit text for TTS
+    const textToConvert = text.length > audioConfig.audio_max_chars 
+      ? text.substring(0, audioConfig.audio_max_chars) + '...'
+      : text;
+    
+    console.log('🎙️ Helena: Generating TTS audio...', { textLength: textToConvert.length });
+    
+    // Generate audio via elevenlabs-tts
+    const { data: ttsResult, error: ttsError } = await supabaseInternal.functions.invoke('elevenlabs-tts', {
+      body: {
+        text: textToConvert,
+        voiceId: audioConfig.audio_voice_id
+      }
+    });
+    
+    if (ttsError || !ttsResult?.success) {
+      console.error('❌ TTS generation failed:', ttsError || ttsResult?.error);
+      return false;
+    }
+    
+    console.log('✅ Audio generated:', ttsResult.audioUrl);
+    
+    // Send audio via send-wa-media
+    const { error: sendError } = await supabaseInternal.functions.invoke('send-wa-media', {
+      body: {
+        to: phoneNumber,
+        mediaUrl: ttsResult.audioUrl,
+        mediaType: 'audio',
+        mimeType: ttsResult.contentType || 'audio/mpeg'
+      }
+    });
+    
+    if (sendError) {
+      console.error('❌ Error sending audio to WhatsApp:', sendError);
+      return false;
+    }
+    
+    console.log('✅ Helena audio sent to WhatsApp');
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Error in generateAndSendAudio:', error);
+    return false;
+  }
+}
+
+// Helper: Save message to database and send via WhatsApp (with TTS if enabled)
 async function saveAndSendMessage(
   supabase: any,
   conversationId: string | null,
@@ -460,13 +554,30 @@ async function saveAndSendMessage(
     }
   }
   
-  // Send via WhatsApp
-  let waResult: { success: boolean; messageId?: string };
+  // Get audio configuration
+  const audioConfig = await getAudioConfig();
   
-  if (mediaUrl) {
-    waResult = await sendWhatsAppMedia(phoneNumber, mediaUrl, body);
-  } else {
-    waResult = await sendWhatsAppMessage(phoneNumber, body);
+  // Determine what to send based on audio_mode
+  const sendText = !audioConfig?.audio_enabled || 
+                   audioConfig.audio_mode === 'text_only' || 
+                   audioConfig.audio_mode === 'text_and_audio';
+  
+  const sendAudio = audioConfig?.audio_enabled && 
+                    !mediaUrl && // Don't send audio if already sending media
+                    (audioConfig.audio_mode === 'audio_only' || 
+                     audioConfig.audio_mode === 'text_and_audio');
+  
+  console.log(`🔊 Helena response mode:`, { sendText, sendAudio, mode: audioConfig?.audio_mode || 'text_only' });
+  
+  // Send via WhatsApp
+  let waResult: { success: boolean; messageId?: string } = { success: false };
+  
+  if (sendText || mediaUrl) {
+    if (mediaUrl) {
+      waResult = await sendWhatsAppMedia(phoneNumber, mediaUrl, body);
+    } else {
+      waResult = await sendWhatsAppMessage(phoneNumber, body);
+    }
   }
   
   // Update message with wa_message_id
@@ -478,8 +589,19 @@ async function saveAndSendMessage(
     console.log('✅ Message updated with WhatsApp ID:', waResult.messageId);
   }
   
+  // Send audio (if enabled and not a media message)
+  if (sendAudio && audioConfig) {
+    const audioSent = await generateAndSendAudio(phoneNumber, body, audioConfig);
+    
+    if (!audioSent && audioConfig.audio_mode === 'audio_only') {
+      // Fallback: if audio_only mode failed and we didn't send text, send text now
+      console.log('⚠️ Audio failed in audio_only mode, falling back to text');
+      waResult = await sendWhatsAppMessage(phoneNumber, body);
+    }
+  }
+  
   return { 
-    success: waResult.success, 
+    success: waResult.success || sendAudio, 
     savedMessageId: savedMessageId || undefined,
     waMessageId: waResult.messageId 
   };
