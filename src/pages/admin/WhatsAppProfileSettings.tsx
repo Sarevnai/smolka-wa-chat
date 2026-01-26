@@ -154,8 +154,9 @@ export default function WhatsAppProfileSettings() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">Perfil WhatsApp da sua Aimee<MessageCircle className="h-6 w-6 text-green-500" />
-              Perfil WhatsApp da Arya
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <MessageCircle className="h-6 w-6 text-green-500" />
+              Perfil WhatsApp da Helena Smolka
             </h1>
             <p className="text-muted-foreground mt-1">
               Configure como sua assistente virtual aparece no WhatsApp
@@ -192,7 +193,7 @@ export default function WhatsAppProfileSettings() {
                   <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center overflow-hidden border-4 border-green-500/20">
                     {profile.profile_picture_url ? <img src={profile.profile_picture_url} alt="Profile" className="w-full h-full object-cover" /> : <MessageCircle className="h-10 w-10 text-muted-foreground" />}
                   </div>
-                  <h3 className="font-semibold mt-3">Arya</h3>
+                  <h3 className="font-semibold mt-3">Helena Smolka</h3>
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {profile.about || 'Sem descrição curta'}
                   </p>
