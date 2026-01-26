@@ -665,7 +665,7 @@ serve(async (req) => {
     }
 
     // Log the interaction
-    await supabase.from('activity_logs').insert({
+    const { error: logError } = await supabase.from('activity_logs').insert({
       user_id: '00000000-0000-0000-0000-000000000000',
       action_type: 'make_webhook_processed',
       target_table: 'messages',
@@ -677,7 +677,11 @@ serve(async (req) => {
         conversation_id: conversationId,
         message_preview: message.substring(0, 100)
       }
-    }).catch(console.error);
+    });
+
+    if (logError) {
+      console.error('❌ Error logging activity:', logError);
+    }
 
     console.log(`✅ Make webhook processed - Agent: ${agent}, Response length: ${aiResponse.length}`);
 
