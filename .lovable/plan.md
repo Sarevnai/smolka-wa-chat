@@ -1,87 +1,72 @@
 
-# Plano: Habilitar Respostas em Áudio no make-webhook
+
+# Plano: Habilitar Áudio TTS em Ambas as Frentes
 
 ## Visão Geral
 
-Adicionar capacidade ao `make-webhook` para gerar e enviar respostas em áudio (TTS) usando ElevenLabs, além das respostas em texto. Isso permitirá que a IA Helena/Nina responda com mensagens de voz via integração Make.com.
+Adicionar capacidade de resposta em áudio (Text-to-Speech via ElevenLabs) para **ambas as frentes** de comunicação WhatsApp:
 
-## Infraestrutura Existente (Reutilizável)
+| Frente | Webhook | Situação Atual | Situação Proposta |
+|--------|---------|----------------|-------------------|
+| Marketing (API META) | `whatsapp-webhook` | Só texto | Texto + Áudio TTS |
+| Atendimento (Make.com) | `make-webhook` | ✅ Já tem TTS | Mantém |
 
-| Componente | Status | Descrição |
-|------------|--------|-----------|
-| `elevenlabs-tts` | ✅ Pronto | Converte texto em áudio (MP3 → OGG/Opus) |
-| `send-wa-media` | ✅ Pronto | Envia mídia via WhatsApp API |
-| `system_settings` | ✅ Configurado | `audio_enabled: true`, voz: "Roberta" |
-| `whatsapp-media` bucket | ✅ Disponível | Storage para arquivos de áudio |
+## Fluxo Atual vs Proposto
 
-## Configuração Atual de Áudio
+### Frente Marketing - Antes
 
 ```text
-audio_enabled: true
-audio_voice_id: RGymW84CSmfVugnA5tvA
-audio_voice_name: Roberta - For Conversational
-audio_mode: audio_only
+Cliente responde → whatsapp-webhook → ai-marketing-agent 
+                                           ↓
+                                    { response: "texto..." }
+                                           ↓
+                                    send-wa-message (só texto)
 ```
 
-## Fluxo de Processamento
+### Frente Marketing - Depois
 
 ```text
-┌──────────────────┐     ┌────────────────┐     ┌──────────────────┐
-│ Make envia       │────▶│ make-webhook   │────▶│ IA gera resposta │
-│ mensagem         │     │ processa       │     │ em texto         │
-└──────────────────┘     └────────────────┘     └──────────────────┘
-                                                         │
-                                                         ▼
-                              ┌──────────────────────────────────────┐
-                              │ audio_enabled?                       │
-                              │ ┌────────────┐    ┌────────────────┐ │
-                              │ │    SIM     │    │      NÃO       │ │
-                              │ └─────┬──────┘    └───────┬────────┘ │
-                              └───────┼───────────────────┼──────────┘
-                                      │                   │
-                                      ▼                   ▼
-                              ┌──────────────┐    ┌───────────────┐
-                              │ elevenlabs-  │    │ Retorna só    │
-                              │ tts          │    │ texto         │
-                              └──────┬───────┘    └───────────────┘
-                                     │
-                                     ▼
-                              ┌──────────────┐
-                              │ Upload para  │
-                              │ Storage      │
-                              └──────┬───────┘
-                                     │
-                                     ▼
-                              ┌────────────────────────────────────┐
-                              │ Retorna JSON com:                  │
-                              │ - result (texto)                   │
-                              │ - audio_url (URL do áudio)         │
-                              │ - audio_type (audio/ogg ou mp3)    │
-                              └────────────────────────────────────┘
+Cliente responde → whatsapp-webhook → ai-marketing-agent 
+                                           ↓
+                                    { response: "texto..." }
+                                           ↓
+                                ┌──────────────────────────────┐
+                                │ audio_enabled?               │
+                                │    ↓                  ↓      │
+                                │   SIM                NÃO     │
+                                │    ↓                  ↓      │
+                                │ elevenlabs-tts    texto só   │
+                                │    ↓                         │
+                                │ send-wa-media                │
+                                └──────────────────────────────┘
 ```
 
 ## Arquivo a Modificar
 
 | Arquivo | Ação | Descrição |
 |---------|------|-----------|
-| `supabase/functions/make-webhook/index.ts` | Modificar | Adicionar geração de áudio TTS |
+| `supabase/functions/whatsapp-webhook/index.ts` | Modificar | Adicionar geração de áudio TTS após resposta do `ai-marketing-agent` |
 
-## Mudanças Técnicas
+## Mudanças Técnicas Detalhadas
 
-### 1. Nova Função: getAudioConfig
+### 1. Adicionar Interfaces no Início do Arquivo
+
+```typescript
+// Audio TTS configuration
+interface AudioConfig {
+  audio_enabled: boolean;
+  audio_voice_id: string;
+  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
+  audio_max_chars: number;
+}
+```
+
+### 2. Nova Função: getAudioConfig
 
 Buscar configurações de áudio do `system_settings`:
 
 ```typescript
-interface AudioConfig {
-  audio_enabled: boolean;
-  audio_voice_id: string;
-  audio_voice_name: string;
-  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
-  audio_max_chars: number;
-}
-
-async function getAudioConfig(supabase: any): Promise<AudioConfig | null> {
+async function getAudioConfig(): Promise<AudioConfig | null> {
   try {
     const { data } = await supabase
       .from('system_settings')
@@ -95,7 +80,6 @@ async function getAudioConfig(supabase: any): Promise<AudioConfig | null> {
     return {
       audio_enabled: config.audio_enabled || false,
       audio_voice_id: config.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL',
-      audio_voice_name: config.audio_voice_name || 'Sarah',
       audio_mode: config.audio_mode || 'text_and_audio',
       audio_max_chars: config.audio_max_chars || 1000
     };
@@ -106,189 +90,234 @@ async function getAudioConfig(supabase: any): Promise<AudioConfig | null> {
 }
 ```
 
-### 2. Nova Função: generateAudioResponse
+### 3. Nova Função: generateAndSendAudio
 
-Gerar áudio via ElevenLabs TTS:
+Gerar áudio via TTS e enviar via WhatsApp:
 
 ```typescript
-async function generateAudioResponse(
-  supabase: any,
+async function generateAndSendAudio(
+  phoneNumber: string,
   text: string,
+  conversationId: string | null,
   audioConfig: AudioConfig
-): Promise<{ audioUrl: string; isVoiceMessage: boolean } | null> {
-  if (!audioConfig.audio_enabled) return null;
-  
-  // Limit text length for audio
-  const textToConvert = text.length > audioConfig.audio_max_chars 
-    ? text.substring(0, audioConfig.audio_max_chars) + '...'
-    : text;
-  
+): Promise<boolean> {
   try {
-    console.log('🎙️ Generating TTS audio for Make response...');
+    // Limit text for TTS
+    const textToConvert = text.length > audioConfig.audio_max_chars 
+      ? text.substring(0, audioConfig.audio_max_chars) + '...'
+      : text;
     
-    const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
+    console.log('🎙️ Generating TTS audio for marketing response...');
+    
+    // Generate audio via elevenlabs-tts
+    const { data: ttsResult, error: ttsError } = await supabase.functions.invoke('elevenlabs-tts', {
       body: {
         text: textToConvert,
         voiceId: audioConfig.audio_voice_id
       }
     });
     
-    if (error || !data?.success) {
-      console.error('❌ TTS generation failed:', error || data?.error);
-      return null;
+    if (ttsError || !ttsResult?.success) {
+      console.error('❌ TTS generation failed:', ttsError || ttsResult?.error);
+      return false;
     }
     
-    console.log('✅ Audio generated:', data.audioUrl);
-    return {
-      audioUrl: data.audioUrl,
-      isVoiceMessage: data.isVoiceMessage || false
-    };
-  } catch (error) {
-    console.error('❌ Error in generateAudioResponse:', error);
-    return null;
-  }
-}
-```
-
-### 3. Modificar Handler Principal
-
-Após gerar a resposta da IA, verificar se áudio está habilitado e gerar:
-
-```typescript
-// --- Após obter aiResponse ---
-
-// Get audio configuration
-const audioConfig = await getAudioConfig(supabase);
-let audioResult: { audioUrl: string; isVoiceMessage: boolean } | null = null;
-
-if (audioConfig?.audio_enabled && aiResponse) {
-  audioResult = await generateAudioResponse(supabase, aiResponse, audioConfig);
-  
-  if (audioResult) {
-    console.log(`🎤 Audio generated for response: ${audioResult.audioUrl}`);
-  }
-}
-
-// Save outbound message (include audio info)
-if (aiResponse && conversationId) {
-  await saveMessage(
-    supabase, 
-    conversationId, 
-    phoneNumber, 
-    aiResponse, 
-    'outbound',
-    undefined,
-    audioResult ? {
-      type: audioResult.isVoiceMessage ? 'audio' : 'audio',
-      url: audioResult.audioUrl,
-      mimeType: audioResult.isVoiceMessage ? 'audio/ogg' : 'audio/mpeg'
-    } : undefined
-  );
-}
-```
-
-### 4. Modificar Resposta JSON
-
-Incluir informações de áudio na resposta para o Make:
-
-```typescript
-return new Response(
-  JSON.stringify({
-    success: true,
-    result: aiResponse,  // Texto da resposta (sempre incluído)
-    phone: phoneNumber,
-    agent,
-    conversation_id: conversationId,
-    // NOVO: Informações de áudio
-    audio: audioResult ? {
-      url: audioResult.audioUrl,
-      type: audioResult.isVoiceMessage ? 'audio/ogg' : 'audio/mpeg',
-      is_voice_message: audioResult.isVoiceMessage
-    } : null,
-    metadata: {
-      development_detected: developmentDetected,
-      c2s_transferred: c2sTransferred,
-      contact_name: contact_name,
-      media_processed: mediaProcessed || null,
-      audio_enabled: audioConfig?.audio_enabled || false
+    console.log('✅ Audio generated:', ttsResult.audioUrl);
+    
+    // Send audio via WhatsApp
+    const { error: sendError } = await supabase.functions.invoke('send-wa-media', {
+      body: {
+        to: phoneNumber,
+        mediaUrl: ttsResult.audioUrl,
+        mediaType: ttsResult.isVoiceMessage ? 'audio' : 'audio',
+        mimeType: ttsResult.contentType || 'audio/mpeg',
+        conversation_id: conversationId
+      }
+    });
+    
+    if (sendError) {
+      console.error('❌ Error sending audio:', sendError);
+      return false;
     }
-  }),
-  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-);
-```
-
-## Configuração no Make.com
-
-O Make precisa ser configurado para usar a URL de áudio retornada:
-
-### Opção 1: Enviar Áudio ao Invés de Texto
-```text
-Se {{audio.url}} existir:
-  → Módulo WhatsApp: Enviar Áudio
-    - Media URL: {{audio.url}}
-    - Type: {{audio.type}}
-Senão:
-  → Módulo WhatsApp: Enviar Texto
-    - Body: {{result}}
-```
-
-### Opção 2: Enviar Texto + Áudio (text_and_audio mode)
-O Make pode enviar ambos dependendo do `audio_mode` configurado.
-
-## Resposta JSON Enriquecida
-
-```json
-{
-  "success": true,
-  "result": "Olá! Que bom seu interesse...",
-  "phone": "5548991109003",
-  "agent": "helena",
-  "conversation_id": "uuid-xxx",
-  "audio": {
-    "url": "https://wpjxsgxxhogzkkuznyke.supabase.co/storage/v1/object/public/whatsapp-media/ai-voice-1234567890.ogg",
-    "type": "audio/ogg",
-    "is_voice_message": true
-  },
-  "metadata": {
-    "development_detected": "Villa Maggiore",
-    "c2s_transferred": false,
-    "contact_name": "João",
-    "media_processed": null,
-    "audio_enabled": true
+    
+    console.log('✅ Audio sent to WhatsApp');
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Error in generateAndSendAudio:', error);
+    return false;
   }
 }
 ```
+
+### 4. Modificar handleN8NTrigger - Seção Marketing
+
+Localização: Linhas ~1235-1273 (após enviar resposta de texto do marketing agent)
+
+**Código Atual:**
+```typescript
+// Send AI response back to WhatsApp
+if (aiResult?.response) {
+  const { error: sendError } = await supabase.functions.invoke('send-wa-message', {
+    body: {
+      to: phoneNumber,
+      text: aiResult.response,
+      conversation_id: conversation?.id
+    }
+  });
+  
+  if (sendError) {
+    console.error('❌ Error sending marketing agent response:', sendError);
+  } else {
+    console.log('✅ Marketing agent response sent to WhatsApp');
+  }
+}
+```
+
+**Código Novo:**
+```typescript
+// Send AI response back to WhatsApp
+if (aiResult?.response) {
+  // Get audio configuration
+  const audioConfig = await getAudioConfig();
+  
+  // Determine what to send based on audio_mode
+  const sendText = !audioConfig?.audio_enabled || 
+                   audioConfig.audio_mode === 'text_only' || 
+                   audioConfig.audio_mode === 'text_and_audio';
+  
+  const sendAudio = audioConfig?.audio_enabled && 
+                    (audioConfig.audio_mode === 'audio_only' || 
+                     audioConfig.audio_mode === 'text_and_audio');
+  
+  // Send text (unless audio_only mode)
+  if (sendText) {
+    const { error: sendError } = await supabase.functions.invoke('send-wa-message', {
+      body: {
+        to: phoneNumber,
+        text: aiResult.response,
+        conversation_id: conversation?.id
+      }
+    });
+    
+    if (sendError) {
+      console.error('❌ Error sending marketing agent text response:', sendError);
+    } else {
+      console.log('✅ Marketing agent text response sent to WhatsApp');
+    }
+  }
+  
+  // Send audio (if enabled)
+  if (sendAudio) {
+    const audioSent = await generateAndSendAudio(
+      phoneNumber,
+      aiResult.response,
+      conversation?.id || null,
+      audioConfig
+    );
+    
+    if (!audioSent && audioConfig.audio_mode === 'audio_only') {
+      // Fallback: if audio_only mode failed, send text
+      console.log('⚠️ Audio failed in audio_only mode, falling back to text');
+      await supabase.functions.invoke('send-wa-message', {
+        body: {
+          to: phoneNumber,
+          text: aiResult.response,
+          conversation_id: conversation?.id
+        }
+      });
+    }
+  }
+}
+```
+
+### 5. Aplicar Mesmo Padrão para ai-arya-vendas
+
+Localização: Linhas ~1117-1148 (após resposta do ai-arya-vendas)
+
+O `ai-arya-vendas` já envia suas próprias mensagens internamente via `send-wa-message`. Para adicionar TTS:
+
+1. O `ai-arya-vendas` precisa retornar a resposta no resultado para que o webhook possa gerar áudio
+2. OU modificar o `ai-arya-vendas` diretamente para gerar áudio
+
+**Recomendação:** Modificar o retorno do `ai-arya-vendas` para incluir a resposta, permitindo que o `whatsapp-webhook` controle o envio de áudio centralmente.
+
+### 6. Aplicar para ai-virtual-agent (Nina Geral)
+
+Localização: Linhas ~1343-1360
+
+Similar ao marketing, adicionar geração de áudio após resposta da Nina geral.
 
 ## Comportamento por Modo de Áudio
 
-| Modo | Texto Enviado | Áudio Enviado |
-|------|---------------|---------------|
-| `text_only` | ✅ Sim | ❌ Não |
-| `audio_only` | ❌ Não* | ✅ Sim |
-| `text_and_audio` | ✅ Sim | ✅ Sim |
+| Modo | Texto | Áudio | Descrição |
+|------|-------|-------|-----------|
+| `text_only` | ✅ | ❌ | Apenas texto (padrão atual) |
+| `audio_only` | ❌* | ✅ | Apenas áudio (fallback para texto se falhar) |
+| `text_and_audio` | ✅ | ✅ | Envia ambos |
 
-*O texto ainda é retornado no JSON para log/fallback, mas Make deve enviar apenas áudio.
+## Resumo das Edge Functions Impactadas
 
-## Mirroring de Canal (Opcional)
+| Função | Modificação |
+|--------|-------------|
+| `whatsapp-webhook` | Adicionar TTS para marketing, vendas e atendimento geral |
+| `make-webhook` | ✅ Já implementado - sem alterações |
+| `elevenlabs-tts` | ✅ Já existe - será reutilizado |
+| `send-wa-media` | ✅ Já existe - será usado para enviar áudios |
 
-Se `audio_channel_mirroring` estiver ativo:
-- Cliente envia áudio → IA responde com áudio
-- Cliente envia texto → IA responde com texto
+## Fluxo Final Completo
 
-Isso pode ser implementado verificando `message_type` na entrada.
+```text
+                    ┌─────────────────────────────────────────┐
+                    │         MENSAGEM RECEBIDA               │
+                    └─────────────────────┬───────────────────┘
+                                          │
+              ┌───────────────────────────┼───────────────────────────┐
+              │                           │                           │
+              ▼                           ▼                           ▼
+    ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+    │ API META Direct │         │ Make.com        │         │ API META Direct │
+    │ (Marketing)     │         │ (Atendimento)   │         │ (Vendas/Geral)  │
+    └────────┬────────┘         └────────┬────────┘         └────────┬────────┘
+             │                           │                           │
+             ▼                           ▼                           ▼
+    ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+    │ ai-marketing-   │         │ ai-arya-vendas  │         │ ai-virtual-     │
+    │ agent (Nina)    │         │ ou Nina         │         │ agent (Nina)    │
+    └────────┬────────┘         └────────┬────────┘         └────────┬────────┘
+             │                           │                           │
+             │                           │                           │
+             ▼                           ▼                           ▼
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                        DECISÃO DE ÁUDIO                                 │
+    │                                                                         │
+    │   audio_mode = 'text_only'     → Envia só texto                         │
+    │   audio_mode = 'audio_only'    → Gera TTS → Envia só áudio              │
+    │   audio_mode = 'text_and_audio'→ Envia texto + Gera TTS → Envia áudio   │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+             │                           │                           │
+             ▼                           ▼                           ▼
+    ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
+    │ send-wa-message │         │ JSON para Make  │         │ send-wa-message │
+    │ send-wa-media   │         │ (Make envia)    │         │ send-wa-media   │
+    └─────────────────┘         └─────────────────┘         └─────────────────┘
+```
 
 ## Benefícios
 
-1. **Experiência Natural**: Clientes recebem respostas em voz
-2. **Voz Personalizada**: Usa a voz "Roberta" configurada
-3. **Configurável**: Respeita configurações existentes do admin
-4. **Fallback Seguro**: Se TTS falhar, texto ainda é enviado
-5. **Zero Impacto**: whatsapp-webhook continua funcionando normalmente
+1. **Consistência**: Ambas as frentes têm capacidade de áudio
+2. **Configurável**: Administrador controla via painel existente
+3. **Reutilização**: Usa infraestrutura TTS já implementada
+4. **Fallback Seguro**: Se TTS falhar, texto é enviado
+5. **Centralizado**: Lógica de áudio no `whatsapp-webhook` facilita manutenção
 
-## Plano de Testes
+## Testes Recomendados
 
-1. Enviar mensagem de texto via Make → Verificar se áudio é gerado
-2. Verificar resposta JSON contém `audio.url`
-3. Testar fallback quando TTS falha (deve retornar só texto)
-4. Configurar Make para enviar áudio e testar no WhatsApp
-5. Verificar que a conversa mostra o áudio no Chat UI
+1. Enviar mensagem para número Marketing → Verificar áudio gerado
+2. Enviar mensagem mencionando empreendimento → Helena responde com áudio
+3. Enviar mensagem fora do horário comercial → Nina responde com áudio
+4. Testar modo `audio_only` → Confirmar só áudio enviado
+5. Testar modo `text_and_audio` → Confirmar ambos enviados
+6. Simular falha de TTS → Verificar fallback para texto
+
