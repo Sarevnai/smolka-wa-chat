@@ -13,7 +13,21 @@ interface MakeWebhookRequest {
   contact_name?: string;
   message_id?: string;
   timestamp?: string;
-  message_type?: string;
+  message_type?: string;  // "text" | "audio" | "voice" | "image" | "video" | "document"
+  // Media fields
+  media_url?: string;     // Public URL of the media file
+  media_id?: string;      // WhatsApp media ID
+  media_mime?: string;    // MIME type (audio/ogg, image/jpeg, etc)
+  media_caption?: string; // Media caption
+  media_filename?: string;// Filename (for documents)
+}
+
+interface MediaInfo {
+  type?: string;
+  url?: string;
+  caption?: string;
+  filename?: string;
+  mimeType?: string;
 }
 
 interface Development {
@@ -322,7 +336,8 @@ async function saveMessage(
   phoneNumber: string,
   body: string,
   direction: 'inbound' | 'outbound',
-  messageId?: string
+  messageId?: string,
+  mediaInfo?: MediaInfo
 ): Promise<number | null> {
   try {
     const messageData: any = {
@@ -333,7 +348,13 @@ async function saveMessage(
       direction,
       body,
       wa_timestamp: new Date().toISOString(),
-      department_code: 'vendas'
+      department_code: 'vendas',
+      // Media fields
+      media_type: mediaInfo?.type || null,
+      media_url: mediaInfo?.url || null,
+      media_caption: mediaInfo?.caption || null,
+      media_filename: mediaInfo?.filename || null,
+      media_mime_type: mediaInfo?.mimeType || null
     };
 
     const { data, error } = await supabase
@@ -347,10 +368,37 @@ async function saveMessage(
       return null;
     }
 
-    console.log(`💾 ${direction} message saved: ${data.id}`);
+    console.log(`💾 ${direction} message saved: ${data.id}${mediaInfo?.type ? ` (${mediaInfo.type})` : ''}`);
     return data.id;
   } catch (error) {
     console.error(`❌ Error in saveMessage:`, error);
+    return null;
+  }
+}
+
+// ========== AUDIO TRANSCRIPTION ==========
+
+async function transcribeAudio(
+  supabase: any, 
+  audioUrl: string
+): Promise<string | null> {
+  try {
+    console.log('🎤 Transcribing audio from Make:', audioUrl);
+    
+    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+      body: { audioUrl }
+    });
+    
+    if (error || !data?.success) {
+      console.error('❌ Transcription failed:', error || data?.error);
+      return null;
+    }
+    
+    console.log('✅ Audio transcribed:', data.text?.substring(0, 100));
+    return data.text;
+    
+  } catch (error) {
+    console.error('❌ Error in transcribeAudio:', error);
     return null;
   }
 }
@@ -534,14 +582,88 @@ serve(async (req) => {
 
     // Parse request body
     const body: MakeWebhookRequest = await req.json();
-    const { phone, message, contact_name, message_id, timestamp, message_type } = body;
+    const { 
+      phone, 
+      message, 
+      contact_name, 
+      message_id, 
+      timestamp, 
+      message_type,
+      media_url,
+      media_id,
+      media_mime,
+      media_caption,
+      media_filename
+    } = body;
 
-    console.log(`📥 Make webhook received - Phone: ${phone}, Message: "${message?.substring(0, 50)}..."`);
+    console.log(`📥 Make webhook received - Phone: ${phone}, Type: ${message_type || 'text'}, Message: "${message?.substring(0, 50) || '[media]'}..."`);
 
-    // Validate required fields
-    if (!phone || !message) {
+    // Determine message content based on type
+    let messageContent = message || '';
+    let mediaInfo: MediaInfo | undefined;
+    let mediaProcessed: { type: string; transcribed?: boolean; transcription_preview?: string } | undefined;
+
+    // Handle media types
+    const isAudio = message_type === 'audio' || message_type === 'voice';
+    const isMedia = ['image', 'video', 'document', 'sticker'].includes(message_type || '');
+
+    if (isAudio && media_url) {
+      // Transcribe audio via Whisper
+      console.log(`🎤 Audio message detected, transcribing...`);
+      const transcribedText = await transcribeAudio(supabase, media_url);
+      
+      if (transcribedText) {
+        messageContent = transcribedText;
+        mediaProcessed = {
+          type: 'audio',
+          transcribed: true,
+          transcription_preview: transcribedText.substring(0, 100)
+        };
+        console.log(`🎤 Audio transcribed: "${messageContent.substring(0, 50)}..."`);
+      } else {
+        messageContent = '[O cliente enviou um áudio que não pude transcrever. Por favor, peça para ele digitar a mensagem.]';
+        mediaProcessed = {
+          type: 'audio',
+          transcribed: false
+        };
+        console.log('⚠️ Audio transcription failed, using fallback message');
+      }
+      
+      mediaInfo = {
+        type: 'audio',
+        url: media_url,
+        caption: transcribedText || undefined,
+        mimeType: media_mime
+      };
+      
+    } else if (isMedia && media_url) {
+      // For other media, use caption or generic message
+      const mediaLabel = message_type === 'image' ? 'Imagem' 
+        : message_type === 'video' ? 'Vídeo' 
+        : message_type === 'sticker' ? 'Sticker'
+        : 'Documento';
+      
+      messageContent = media_caption || `[${mediaLabel} recebido]`;
+      
+      mediaInfo = {
+        type: message_type,
+        url: media_url,
+        caption: media_caption,
+        filename: media_filename,
+        mimeType: media_mime
+      };
+      
+      mediaProcessed = {
+        type: message_type || 'unknown'
+      };
+      
+      console.log(`📎 Media received: ${message_type} - ${media_url}`);
+    }
+
+    // Validate required fields (phone is always required, message OR media_url must exist)
+    if (!phone || (!message && !media_url)) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields: phone and message' }),
+        JSON.stringify({ success: false, error: 'Missing required fields: phone and (message or media_url)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -557,13 +679,22 @@ serve(async (req) => {
     const conversation = await findOrCreateConversation(supabase, phoneNumber, 'vendas');
     const conversationId = conversation?.id || null;
 
-    // Save inbound message
-    await saveMessage(supabase, conversationId, phoneNumber, message, 'inbound', message_id);
+    // Save inbound message with media info
+    await saveMessage(supabase, conversationId, phoneNumber, messageContent, 'inbound', message_id, mediaInfo);
 
     // Get conversation history
     const history = conversationId 
       ? await getConversationHistory(supabase, conversationId)
       : [];
+    
+    // Provide context to AI about media
+    let aiPromptMessage = messageContent;
+    
+    if (isAudio && mediaProcessed?.transcribed) {
+      aiPromptMessage = `[O cliente enviou um áudio que foi transcrito automaticamente]\n\n"${messageContent}"`;
+    } else if (isMedia) {
+      aiPromptMessage = `[O cliente enviou ${message_type === 'image' ? 'uma imagem' : message_type === 'video' ? 'um vídeo' : 'um documento'}${media_caption ? ` com legenda: "${media_caption}"` : ''}]`;
+    }
 
     // Detect which AI agent to use
     let aiResponse = '';
@@ -575,7 +706,7 @@ serve(async (req) => {
     const developmentLead = await checkDevelopmentLead(supabase, phoneNumber);
     
     // 2. Or detect development mentioned in message
-    const mentionedDevelopment = await detectDevelopmentFromMessage(supabase, message);
+    const mentionedDevelopment = await detectDevelopmentFromMessage(supabase, messageContent);
 
     if (developmentLead || mentionedDevelopment) {
       // Use Helena Smolka (ai-arya-vendas logic)
@@ -593,7 +724,7 @@ serve(async (req) => {
         
         // Build prompt and call OpenAI
         const systemPrompt = buildQuickTransferPrompt(development, resolvedContactName, isFirstMessage);
-        const result = await callOpenAI(systemPrompt, history, message, toolsQuickTransfer);
+        const result = await callOpenAI(systemPrompt, history, aiPromptMessage, toolsQuickTransfer);
         
         aiResponse = result.content;
 
@@ -639,7 +770,7 @@ serve(async (req) => {
         // Development not found, fallback to Nina
         console.log('⚠️ Development not found, using Nina');
         const systemPrompt = buildVirtualAgentPrompt();
-        const result = await callOpenAI(systemPrompt, history, message);
+        const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
         aiResponse = result.content;
         agent = 'nina';
       }
@@ -647,7 +778,7 @@ serve(async (req) => {
       // Default: Use Nina (virtual agent)
       console.log('🤖 Routing to Nina (virtual agent)');
       const systemPrompt = buildVirtualAgentPrompt();
-      const result = await callOpenAI(systemPrompt, history, message);
+      const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
       aiResponse = result.content;
     }
 
@@ -675,7 +806,8 @@ serve(async (req) => {
         development_detected: developmentDetected,
         c2s_transferred: c2sTransferred,
         conversation_id: conversationId,
-        message_preview: message.substring(0, 100)
+        message_preview: messageContent.substring(0, 100),
+        media_processed: mediaProcessed || null
       }
     });
 
@@ -683,7 +815,7 @@ serve(async (req) => {
       console.error('❌ Error logging activity:', logError);
     }
 
-    console.log(`✅ Make webhook processed - Agent: ${agent}, Response length: ${aiResponse.length}`);
+    console.log(`✅ Make webhook processed - Agent: ${agent}, Response length: ${aiResponse.length}${mediaProcessed ? `, Media: ${mediaProcessed.type}` : ''}`);
 
     // Return response for Make to send via WhatsApp
     return new Response(
@@ -696,7 +828,8 @@ serve(async (req) => {
         metadata: {
           development_detected: developmentDetected,
           c2s_transferred: c2sTransferred,
-          contact_name: contact_name
+          contact_name: contact_name,
+          media_processed: mediaProcessed || null
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
