@@ -156,7 +156,7 @@ export default function WhatsAppProfileSettings() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <MessageCircle className="h-6 w-6 text-green-500" />
-              Perfil WhatsApp da Helena Smolka
+              Perfil da sua Aimee
             </h1>
             <p className="text-muted-foreground mt-1">
               Configure como sua assistente virtual aparece no WhatsApp
