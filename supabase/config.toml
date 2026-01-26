@@ -126,5 +126,8 @@ verify_jwt = false
 [functions.landing-page-webhook]
 verify_jwt = false
 
+[functions.make-webhook]
+verify_jwt = false
+
 [functions.seed-development-images]
 verify_jwt = false
