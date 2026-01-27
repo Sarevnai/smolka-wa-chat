@@ -1338,7 +1338,7 @@ async function handleN8NTrigger(
     }
     
     if (isMarketingFlow) {
-      console.log(`📢 Routing to ai-marketing-agent (Nina)`);
+      console.log(`📢 Routing to ai-marketing-agent`);
       
       // Get recent messages for conversation history
       let conversationHistory: Array<{ role: string; content: string }> = [];
