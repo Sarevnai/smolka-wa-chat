@@ -193,7 +193,7 @@ Estrutura fixa: reconhecer objetivo → conectar com diferenciais reais → faze
 }
 
 function buildVirtualAgentPrompt(): string {
-  return `Você é a Nina, assistente virtual da Smolka Imóveis 🏠
+  return `Você é a Helena, assistente virtual da Smolka Imóveis 🏠
 
 OBJETIVO: Ajudar clientes de forma cordial e eficiente via WhatsApp.
 
@@ -210,6 +210,151 @@ CAPACIDADES:
 - Fornecer informações básicas
 
 Se não souber responder algo específico, diga que vai verificar com um especialista.`;
+}
+
+// ========== TRIAGE FLOW ==========
+
+type TriageStage = 'greeting' | 'awaiting_name' | 'awaiting_triage' | 'completed' | null;
+
+interface ConversationState {
+  triage_stage: TriageStage;
+  customer_name?: string;
+}
+
+async function getConversationState(supabase: any, phoneNumber: string): Promise<ConversationState | null> {
+  try {
+    const { data } = await supabase
+      .from('conversation_states')
+      .select('triage_stage')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+    
+    return data;
+  } catch (error) {
+    console.error('❌ Error getting conversation state:', error);
+    return null;
+  }
+}
+
+async function updateTriageStage(supabase: any, phoneNumber: string, stage: TriageStage): Promise<void> {
+  try {
+    await supabase
+      .from('conversation_states')
+      .upsert({
+        phone_number: phoneNumber,
+        triage_stage: stage,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'phone_number' });
+    
+    console.log(`📊 Triage stage updated to: ${stage}`);
+  } catch (error) {
+    console.error('❌ Error updating triage stage:', error);
+  }
+}
+
+async function getContactName(supabase: any, phoneNumber: string): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('contacts')
+      .select('name')
+      .eq('phone', phoneNumber)
+      .maybeSingle();
+    
+    return data?.name || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function saveContactNameMake(supabase: any, phoneNumber: string, name: string): Promise<void> {
+  try {
+    await supabase
+      .from('contacts')
+      .update({ name, updated_at: new Date().toISOString() })
+      .eq('phone', phoneNumber);
+    
+    console.log(`✅ Contact name saved: ${name}`);
+  } catch (error) {
+    console.error('❌ Error saving contact name:', error);
+  }
+}
+
+function extractNameFromMessage(message: string): string | null {
+  const cleaned = message.trim();
+  
+  // Skip if it's a common greeting without a name
+  if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|hello|hi)$/i.test(cleaned)) {
+    return null;
+  }
+  
+  // Extract name patterns: "sou o/a [name]", "meu nome é [name]", "pode me chamar de [name]"
+  const patterns = [
+    /(?:sou\s+(?:o|a)\s+)([A-Za-zÀ-ÿ]+)/i,
+    /(?:meu\s+nome\s+[eé]\s+)([A-Za-zÀ-ÿ]+)/i,
+    /(?:pode\s+me\s+chamar\s+de\s+)([A-Za-zÀ-ÿ]+)/i,
+    /(?:me\s+chamo\s+)([A-Za-zÀ-ÿ]+)/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = cleaned.match(pattern);
+    if (match && match[1]) {
+      return match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+    }
+  }
+  
+  // If it's a short message (1-2 words), assume it's a name
+  const words = cleaned.split(/\s+/);
+  if (words.length <= 2 && words[0].length >= 2 && words[0].length <= 20) {
+    // Check if first word is alphabetic
+    if (/^[A-Za-zÀ-ÿ]+$/.test(words[0])) {
+      return words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase();
+    }
+  }
+  
+  return null;
+}
+
+function inferDepartmentFromText(text: string): 'locacao' | 'vendas' | 'administrativo' | null {
+  const lower = text.toLowerCase();
+  
+  // Locação patterns
+  if (/alug|locar|loca[çc][aã]o|alugo/.test(lower)) return 'locacao';
+  
+  // Vendas patterns
+  if (/compr|adquir|compra|vender|venda/.test(lower)) return 'vendas';
+  
+  // Administrativo patterns
+  if (/cliente|inquilino|propriet[aá]rio|boleto|contrato|manuten[çc][aã]o|segunda via|pagamento/.test(lower)) return 'administrativo';
+  
+  return null;
+}
+
+async function assignDepartmentMake(
+  supabase: any, 
+  phoneNumber: string, 
+  conversationId: string, 
+  department: 'locacao' | 'vendas' | 'administrativo'
+): Promise<void> {
+  try {
+    // Update conversation
+    await supabase
+      .from('conversations')
+      .update({ department_code: department })
+      .eq('id', conversationId);
+    
+    // Update contact
+    await supabase
+      .from('contacts')
+      .update({ department_code: department })
+      .eq('phone', phoneNumber);
+    
+    // Update triage stage to completed
+    await updateTriageStage(supabase, phoneNumber, 'completed');
+    
+    console.log(`✅ Department assigned: ${department}`);
+  } catch (error) {
+    console.error('❌ Error assigning department:', error);
+  }
 }
 
 // ========== OPENAI INTEGRATION ==========
@@ -897,19 +1042,129 @@ serve(async (req) => {
           aiResponse = `${greetingMessage}\n\n${followUpMessage}`;
         }
       } else {
-        // Development not found, fallback to Nina
-        console.log('⚠️ Development not found, using Nina');
+        // Development not found, fallback to triage flow
+        console.log('⚠️ Development not found, entering triage flow');
+        agent = 'helena';
+        
+        // Get conversation state for triage
+        const convState = await getConversationState(supabase, phoneNumber);
+        const currentStage = convState?.triage_stage || null;
+        const existingName = await getContactName(supabase, phoneNumber);
+        
+        if (!currentStage || currentStage === 'greeting') {
+          // First message - send greeting and ask for name
+          const greetingMsg = `Olá! Aqui é a Helena da Smolka Imóveis 🏠`;
+          
+          if (existingName) {
+            // Already have name, skip to triage
+            aiResponse = `${greetingMsg}\n\nPrazer em falar com você, ${existingName}! 😊\n\nComo posso te ajudar hoje?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+            await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
+          } else {
+            aiResponse = `${greetingMsg}\n\nComo você se chama?`;
+            await updateTriageStage(supabase, phoneNumber, 'awaiting_name');
+          }
+        } else if (currentStage === 'awaiting_name') {
+          // Expecting name
+          const detectedName = extractNameFromMessage(messageContent);
+          
+          if (detectedName) {
+            await saveContactNameMake(supabase, phoneNumber, detectedName);
+            aiResponse = `Prazer, ${detectedName}! 😊\n\nComo posso te ajudar hoje?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+            await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
+          } else {
+            aiResponse = 'Desculpa, não consegui entender 😅 Pode me dizer o seu nome?';
+          }
+        } else if (currentStage === 'awaiting_triage') {
+          // Expecting triage choice
+          const department = inferDepartmentFromText(messageContent);
+          
+          if (department && conversationId) {
+            await assignDepartmentMake(supabase, phoneNumber, conversationId, department);
+            
+            const customerName = existingName || '';
+            const nameGreeting = customerName ? `, ${customerName}` : '';
+            
+            if (department === 'locacao') {
+              aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar.\n\nQual região de Florianópolis você tem interesse?`;
+            } else if (department === 'vendas') {
+              aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nVocê está buscando algo para morar ou para investir?`;
+            } else {
+              aiResponse = `Perfeito${nameGreeting}! 😊\n\nComo posso te ajudar hoje?\n\nVocê pode me contar sobre sua solicitação que vou encaminhar para o setor responsável.`;
+            }
+          } else {
+            // Didn't understand, ask again
+            aiResponse = `Desculpa, não entendi 😅\n\nPode escolher uma das opções?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+          }
+        } else {
+          // Triage completed, use general AI
+          const systemPrompt = buildVirtualAgentPrompt();
+          const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
+          aiResponse = result.content;
+        }
+      }
+    } else {
+      // ========== TRIAGE FLOW FOR NEW LEADS ==========
+      agent = 'helena';
+      console.log('🤖 New lead - entering triage flow');
+      
+      // Get conversation state for triage
+      const convState = await getConversationState(supabase, phoneNumber);
+      const currentStage = convState?.triage_stage || null;
+      const existingName = await getContactName(supabase, phoneNumber);
+      
+      console.log(`📊 Triage state - Stage: ${currentStage}, Name: ${existingName || 'not set'}`);
+      
+      if (!currentStage || currentStage === 'greeting') {
+        // First message - send greeting and ask for name
+        const greetingMsg = `Olá! Aqui é a Helena da Smolka Imóveis 🏠`;
+        
+        if (existingName) {
+          // Already have name, skip to triage
+          aiResponse = `${greetingMsg}\n\nPrazer em falar com você, ${existingName}! 😊\n\nComo posso te ajudar hoje?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+          await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
+        } else {
+          aiResponse = `${greetingMsg}\n\nComo você se chama?`;
+          await updateTriageStage(supabase, phoneNumber, 'awaiting_name');
+        }
+      } else if (currentStage === 'awaiting_name') {
+        // Expecting name
+        const detectedName = extractNameFromMessage(messageContent);
+        
+        if (detectedName) {
+          await saveContactNameMake(supabase, phoneNumber, detectedName);
+          aiResponse = `Prazer, ${detectedName}! 😊\n\nComo posso te ajudar hoje?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+          await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
+        } else {
+          aiResponse = 'Desculpa, não consegui entender 😅 Pode me dizer o seu nome?';
+        }
+      } else if (currentStage === 'awaiting_triage') {
+        // Expecting triage choice
+        const department = inferDepartmentFromText(messageContent);
+        
+        if (department && conversationId) {
+          await assignDepartmentMake(supabase, phoneNumber, conversationId, department);
+          
+          const customerName = existingName || '';
+          const nameGreeting = customerName ? `, ${customerName}` : '';
+          
+          if (department === 'locacao') {
+            aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar.\n\nQual região de Florianópolis você tem interesse?`;
+          } else if (department === 'vendas') {
+            aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nVocê está buscando algo para morar ou para investir?`;
+          } else {
+            aiResponse = `Perfeito${nameGreeting}! 😊\n\nComo posso te ajudar hoje?\n\nVocê pode me contar sobre sua solicitação que vou encaminhar para o setor responsável.`;
+          }
+        } else {
+          // Didn't understand, ask again
+          aiResponse = `Desculpa, não entendi 😅\n\nPode escolher uma das opções?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+        }
+      } else {
+        // Triage completed, use general AI
+        console.log('🤖 Triage completed, using Helena virtual agent');
         const systemPrompt = buildVirtualAgentPrompt();
         const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
         aiResponse = result.content;
-        agent = 'nina';
       }
-    } else {
-      // Default: Use Nina (virtual agent)
-      console.log('🤖 Routing to Nina (virtual agent)');
-      const systemPrompt = buildVirtualAgentPrompt();
-      const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
-      aiResponse = result.content;
     }
 
     // ========== AUDIO TTS GENERATION ==========
@@ -972,9 +1227,11 @@ serve(async (req) => {
       console.error('❌ Error logging activity:', logError);
     }
 
-    console.log(`✅ Make webhook processed - Agent: ${agent}, Response length: ${aiResponse.length}${mediaProcessed ? `, Media: ${mediaProcessed.type}` : ''}${audioResult ? ', Audio: ✅' : ''}`);
+    let agentLabel = agent === 'helena' ? 'helena' : 'helena';
+    console.log(`✅ Make webhook processed - Agent: ${agentLabel}, Response length: ${aiResponse.length}${mediaProcessed ? `, Media: ${mediaProcessed.type}` : ''}${audioResult ? ', Audio: ✅' : ''}`);
 
-    // Return response for Make to send via WhatsApp
+    // Get current triage stage for response metadata
+    const finalState = await getConversationState(supabase, phoneNumber);
     return new Response(
       JSON.stringify({
         success: true,
@@ -994,7 +1251,8 @@ serve(async (req) => {
           contact_name: contact_name,
           media_processed: mediaProcessed || null,
           audio_enabled: audioConfig?.audio_enabled || false,
-          audio_mode: audioConfig?.audio_mode || null
+          audio_mode: audioConfig?.audio_mode || null,
+          triage_stage: finalState?.triage_stage || null
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
