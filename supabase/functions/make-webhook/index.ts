@@ -1006,6 +1006,7 @@ serve(async (req) => {
     let agent = 'nina';
     let developmentDetected: string | null = null;
     let c2sTransferred = false;
+    let sendTriageTemplate = false; // Flag to instruct Make to send triagem_ia template
 
     // 1. Check if this is a development lead (from portal/landing page)
     const developmentLead = await checkDevelopmentLead(supabase, phoneNumber);
@@ -1109,8 +1110,9 @@ serve(async (req) => {
           const greetingMsg = `Olá! Aqui é a Helena da Smolka Imóveis 🏠`;
           
           if (existingName) {
-            // Already have name, skip to triage
-            aiResponse = `${greetingMsg}\n\nPrazer em falar com você, ${existingName}! 😊\n\nComo posso te ajudar hoje?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+            // Already have name, skip to triage - send template with buttons
+            aiResponse = `${greetingMsg}\n\nPrazer em falar com você, ${existingName}! 😊`;
+            sendTriageTemplate = true;
             await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
           } else {
             aiResponse = `${greetingMsg}\n\nComo você se chama?`;
@@ -1122,7 +1124,8 @@ serve(async (req) => {
           
           if (detectedName) {
             await saveContactNameMake(supabase, phoneNumber, detectedName);
-            aiResponse = `Prazer, ${detectedName}! 😊\n\nComo posso te ajudar hoje?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+            aiResponse = `Prazer, ${detectedName}! 😊`;
+            sendTriageTemplate = true;
             await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
           } else {
             aiResponse = 'Desculpa, não consegui entender 😅 Pode me dizer o seu nome?';
@@ -1172,8 +1175,9 @@ serve(async (req) => {
         const greetingMsg = `Olá! Aqui é a Helena da Smolka Imóveis 🏠`;
         
         if (existingName) {
-          // Already have name, skip to triage
-          aiResponse = `${greetingMsg}\n\nPrazer em falar com você, ${existingName}! 😊\n\nComo posso te ajudar hoje?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+          // Already have name, skip to triage - send template with buttons
+          aiResponse = `${greetingMsg}\n\nPrazer em falar com você, ${existingName}! 😊`;
+          sendTriageTemplate = true;
           await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
         } else {
           aiResponse = `${greetingMsg}\n\nComo você se chama?`;
@@ -1185,7 +1189,8 @@ serve(async (req) => {
         
         if (detectedName) {
           await saveContactNameMake(supabase, phoneNumber, detectedName);
-          aiResponse = `Prazer, ${detectedName}! 😊\n\nComo posso te ajudar hoje?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+          aiResponse = `Prazer, ${detectedName}! 😊`;
+          sendTriageTemplate = true;
           await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
         } else {
           aiResponse = 'Desculpa, não consegui entender 😅 Pode me dizer o seu nome?';
@@ -1300,6 +1305,11 @@ serve(async (req) => {
         phone: phoneNumber,
         agent,
         conversation_id: conversationId,
+        // Template to send (for triage flow with buttons)
+        send_template: sendTriageTemplate ? {
+          name: 'triagem_ia',
+          language: 'pt_BR'
+        } : null,
         // Audio information for Make to use
         audio: audioResult ? {
           url: audioResult.audioUrl,
