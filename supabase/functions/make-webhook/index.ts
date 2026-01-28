@@ -1307,7 +1307,7 @@ serve(async (req) => {
         conversation_id: conversationId,
         // Template to send (for triage flow with buttons)
         send_template: sendTriageTemplate ? {
-          name: 'triagem_ia',
+          name: 'triagem',
           language: 'pt_BR'
         } : null,
         // Audio information for Make to use
