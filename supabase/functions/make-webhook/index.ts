@@ -107,10 +107,25 @@ function formatCurrency(value: number | null): string {
 
 // ========== PROMPT BUILDERS ==========
 
-function buildQuickTransferPrompt(dev: Development, contactName?: string, isFirstMessage?: boolean): string {
+function buildQuickTransferPrompt(dev: Development, contactName?: string, isFirstMessage?: boolean, history?: ConversationMessage[]): string {
   const hasName = !!contactName && contactName.toLowerCase() !== 'lead sem nome';
+  const hasHistory = history && history.length > 0;
   
   return `Você é a Helena, assistente de atendimento da Smolka Imóveis, especializada em apresentar o empreendimento ${dev.name} pelo WhatsApp ao Lead vindo da Landing Page oficial.
+
+${hasHistory ? `
+═══════════════════════════════════════════════════════════════
+📜 CONTEXTO IMPORTANTE - LEIA ANTES DE RESPONDER
+═══════════════════════════════════════════════════════════════
+
+Esta conversa já tem histórico. REGRAS OBRIGATÓRIAS:
+- NUNCA repita perguntas que já foram respondidas no histórico
+- Se o cliente já disse o nome, USE esse nome e NÃO pergunte novamente
+- Se o cliente já disse se quer morar ou investir, NÃO pergunte novamente
+- Leia o histórico abaixo e continue de onde a conversa parou
+
+${hasName ? `🔹 NOME DO CLIENTE JÁ CONHECIDO: ${contactName} - USE ESTE NOME!` : ''}
+` : ''}
 
 ═══════════════════════════════════════════════════════════════
 🎯 OBJETIVO
@@ -998,10 +1013,29 @@ serve(async (req) => {
     // 2. Or detect development mentioned in message
     const mentionedDevelopment = await detectDevelopmentFromMessage(supabase, messageContent);
 
+    // List of developments handled by direct WhatsApp API (not Make)
+    const DIRECT_API_DEVELOPMENTS = ['villa maggiore'];
+    
     if (developmentLead || mentionedDevelopment) {
+      const devInfo = developmentLead || mentionedDevelopment!;
+      const devNameLower = (devInfo.development_name || '').toLowerCase();
+      
+      // Check if this development is handled by direct API
+      if (DIRECT_API_DEVELOPMENTS.some(d => devNameLower.includes(d))) {
+        console.log(`⛔ Development "${devInfo.development_name}" is handled by direct WhatsApp API (48 23980016), not Make (48 91631011). Skipping.`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            skipped: true,
+            reason: 'handled_by_direct_api',
+            message: 'Este empreendimento é atendido pelo número da API direta do WhatsApp'
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       // Use Helena Smolka (ai-arya-vendas logic)
       agent = 'helena';
-      const devInfo = developmentLead || mentionedDevelopment!;
       developmentDetected = devInfo.development_name;
       
       console.log(`🏗️ Routing to Helena for development: ${devInfo.development_name}`);
@@ -1010,10 +1044,14 @@ serve(async (req) => {
       
       if (development) {
         const isFirstMessage = history.length === 0;
-        const resolvedContactName = developmentLead?.contact_name || contact_name;
         
-        // Build prompt and call OpenAI
-        const systemPrompt = buildQuickTransferPrompt(development, resolvedContactName, isFirstMessage);
+        // Fetch existing contact name from database to avoid re-asking
+        const existingContactName = await getContactName(supabase, phoneNumber);
+        const resolvedContactName = existingContactName || developmentLead?.contact_name || contact_name;
+        console.log(`👤 Contact name resolved: ${resolvedContactName || 'not set'}`);
+        
+        // Build prompt with history for context awareness
+        const systemPrompt = buildQuickTransferPrompt(development, resolvedContactName, isFirstMessage, history);
         const result = await callOpenAI(systemPrompt, history, aiPromptMessage, toolsQuickTransfer);
         
         aiResponse = result.content;
@@ -1188,12 +1226,20 @@ serve(async (req) => {
     const audioConfig = await getAudioConfig(supabase);
     let audioResult: AudioResult | null = null;
 
-    if (audioConfig?.audio_enabled && aiResponse) {
+    // Generate audio ONLY if user sent a voice/audio message (rapport strategy)
+    // This creates a more personal connection by matching their communication style
+    const userSentVoice = message_type === 'audio' || message_type === 'voice';
+    const shouldGenerateAudio = audioConfig?.audio_enabled && aiResponse && userSentVoice;
+
+    if (shouldGenerateAudio) {
+      console.log('🎙️ Generating audio response to match user voice message (rapport strategy)');
       audioResult = await generateAudioResponse(aiResponse, audioConfig);
       
       if (audioResult) {
-        console.log(`🎤 Audio generated for response: ${audioResult.audioUrl}`);
+        console.log(`🎤 Audio generated: ${audioResult.audioUrl}`);
       }
+    } else if (audioConfig?.audio_enabled && !userSentVoice) {
+      console.log('💬 Text-only response (user sent text, not voice)');
     }
 
     // Save outbound message (AI response) with audio info if available
