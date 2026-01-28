@@ -1031,9 +1031,9 @@ serve(async (req) => {
       console.log(`📎 Media received: ${message_type} - ${media_url}`);
     }
 
-    // Validate required fields (phone is always required, message OR media_url must exist)
-    if (!phone || (!message && !media_url)) {
-      console.warn('⚠️ Incomplete payload:', { phone: !!phone, message: !!message, media_url: !!media_url, keys: Object.keys(body) });
+    // Validate required fields (phone is always required, message OR media_url OR button data must exist)
+    if (!phone || (!message && !media_url && !button_text && !button_payload)) {
+      console.warn('⚠️ Incomplete payload:', { phone: !!phone, message: !!message, media_url: !!media_url, button_text: !!button_text, button_payload: !!button_payload, keys: Object.keys(body) });
       return new Response(
         JSON.stringify({ success: false, error: 'Missing required fields: phone and (message or media_url)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
