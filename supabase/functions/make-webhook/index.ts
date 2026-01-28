@@ -13,13 +13,16 @@ interface MakeWebhookRequest {
   contact_name?: string;
   message_id?: string;
   timestamp?: string;
-  message_type?: string;  // "text" | "audio" | "voice" | "image" | "video" | "document"
+  message_type?: string;  // "text" | "audio" | "voice" | "image" | "video" | "document" | "button"
   // Media fields
   media_url?: string;     // Public URL of the media file
   media_id?: string;      // WhatsApp media ID
   media_mime?: string;    // MIME type (audio/ogg, image/jpeg, etc)
   media_caption?: string; // Media caption
   media_filename?: string;// Filename (for documents)
+  // Button fields (from template quick replies)
+  button_text?: string;   // Text displayed on the button clicked
+  button_payload?: string;// Payload configured for the button
 }
 
 interface MediaInfo {
@@ -329,8 +332,56 @@ function extractNameFromMessage(message: string): string | null {
   return null;
 }
 
+// Mapeamento de botões do template triagem para departamentos
+const TRIAGE_BUTTON_MAP: Record<string, 'locacao' | 'vendas' | 'administrativo'> = {
+  // Button text options (what user sees)
+  'alugar': 'locacao',
+  'comprar': 'vendas',
+  'já sou cliente': 'administrativo',
+  'ja sou cliente': 'administrativo',
+  // Possible payloads
+  'setor de locação': 'locacao',
+  'setor de locacao': 'locacao',
+  'setor de vendas': 'vendas',
+  'setor administrativo': 'administrativo',
+  'locacao': 'locacao',
+  'vendas': 'vendas',
+  'administrativo': 'administrativo',
+  // Numeric alternatives
+  '1': 'locacao',
+  '2': 'vendas',
+  '3': 'administrativo'
+};
+
+function inferDepartmentFromButton(buttonText?: string, buttonPayload?: string): 'locacao' | 'vendas' | 'administrativo' | null {
+  // Try button text first
+  if (buttonText) {
+    const normalized = buttonText.toLowerCase().trim();
+    if (TRIAGE_BUTTON_MAP[normalized]) {
+      console.log(`🔘 Department detected from button_text: "${buttonText}" → ${TRIAGE_BUTTON_MAP[normalized]}`);
+      return TRIAGE_BUTTON_MAP[normalized];
+    }
+  }
+  
+  // Try payload
+  if (buttonPayload) {
+    const normalized = buttonPayload.toLowerCase().trim();
+    if (TRIAGE_BUTTON_MAP[normalized]) {
+      console.log(`🔘 Department detected from button_payload: "${buttonPayload}" → ${TRIAGE_BUTTON_MAP[normalized]}`);
+      return TRIAGE_BUTTON_MAP[normalized];
+    }
+  }
+  
+  return null;
+}
+
 function inferDepartmentFromText(text: string): 'locacao' | 'vendas' | 'administrativo' | null {
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().trim();
+  
+  // First check if it matches any button map entries (including numbers)
+  if (TRIAGE_BUTTON_MAP[lower]) {
+    return TRIAGE_BUTTON_MAP[lower];
+  }
   
   // Locação patterns
   if (/alug|locar|loca[çc][aã]o|alugo/.test(lower)) return 'locacao';
@@ -887,8 +938,15 @@ serve(async (req) => {
       media_id,
       media_mime,
       media_caption,
-      media_filename
+      media_filename,
+      button_text,
+      button_payload
     } = body;
+    
+    // Log button data if present
+    if (button_text || button_payload) {
+      console.log(`🔘 Button data received - text: "${button_text}", payload: "${button_payload}"`);
+    }
 
     // Check if this is a status callback (no phone = likely delivery/read notification)
     // These callbacks don't have the data we need, so we skip them silently with 200 OK
@@ -900,18 +958,27 @@ serve(async (req) => {
       );
     }
 
-    console.log(`📥 Make webhook received - Phone: ${phone}, Type: ${message_type || 'text'}, Message: "${message?.substring(0, 50) || '[media]'}..."`);
+    console.log(`📥 Make webhook received - Phone: ${phone}, Type: ${message_type || 'text'}, Message: "${message?.substring(0, 50) || '[media/button]'}..."`);
 
     // Determine message content based on type
     let messageContent = message || '';
     let mediaInfo: MediaInfo | undefined;
     let mediaProcessed: { type: string; transcribed?: boolean; transcription_preview?: string } | undefined;
 
-    // Handle media types
+    // Handle button type - extract content from button click
+    const isButton = message_type === 'button';
     const isAudio = message_type === 'audio' || message_type === 'voice';
     const isMedia = ['image', 'video', 'document', 'sticker'].includes(message_type || '');
 
-    if (isAudio && media_url) {
+    if (isButton) {
+      // Button click from template - use button_text as the message content
+      messageContent = button_text || button_payload || message || '[Botão clicado]';
+      console.log(`🔘 Button message detected - using content: "${messageContent}"`);
+      
+      mediaProcessed = {
+        type: 'button'
+      };
+    } else if (isAudio && media_url) {
       // Transcribe audio via Whisper
       console.log(`🎤 Audio message detected, transcribing...`);
       const transcribedText = await transcribeAudio(supabase, media_url);
@@ -1130,33 +1197,39 @@ serve(async (req) => {
           } else {
             aiResponse = 'Desculpa, não consegui entender 😅 Pode me dizer o seu nome?';
           }
-        } else if (currentStage === 'awaiting_triage') {
-          // Expecting triage choice
-          const department = inferDepartmentFromText(messageContent);
+      } else if (currentStage === 'awaiting_triage') {
+        // Expecting triage choice - check button first, then text
+        const department = isButton 
+          ? inferDepartmentFromButton(button_text, button_payload) || inferDepartmentFromText(messageContent)
+          : inferDepartmentFromText(messageContent);
+        
+        if (department && conversationId) {
+          await assignDepartmentMake(supabase, phoneNumber, conversationId, department);
           
-          if (department && conversationId) {
-            await assignDepartmentMake(supabase, phoneNumber, conversationId, department);
-            
-            const customerName = existingName || '';
-            const nameGreeting = customerName ? `, ${customerName}` : '';
-            
-            if (department === 'locacao') {
-              aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar.\n\nQual região de Florianópolis você tem interesse?`;
-            } else if (department === 'vendas') {
-              aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nVocê está buscando algo para morar ou para investir?`;
-            } else {
-              aiResponse = `Perfeito${nameGreeting}! 😊\n\nComo posso te ajudar hoje?\n\nVocê pode me contar sobre sua solicitação que vou encaminhar para o setor responsável.`;
-            }
+          const customerName = existingName || '';
+          const nameGreeting = customerName ? `, ${customerName}` : '';
+          
+          // Department-specific pre-attendance prompts
+          if (department === 'locacao') {
+            aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar em Florianópolis.\n\nPra eu buscar as melhores opções, me conta:\n\n📍 Qual região você prefere? (Centro, praias do Norte, Sul da Ilha, Continente...)`;
+          } else if (department === 'vendas') {
+            aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nPra começar: você está buscando algo para *morar* ou para *investir*?`;
           } else {
-            // Didn't understand, ask again
-            aiResponse = `Desculpa, não entendi 😅\n\nPode escolher uma das opções?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+            aiResponse = `Perfeito${nameGreeting}! 😊\n\nSou da Smolka e vou te ajudar com sua solicitação.\n\nPor favor, me conta qual é sua demanda:\n\n📄 Boleto / 2ª via\n📝 Contrato\n🔧 Manutenção\n❓ Outra questão`;
           }
+          
+          console.log(`✅ Department assigned from triage: ${department}`);
         } else {
-          // Triage completed, use general AI
-          const systemPrompt = buildVirtualAgentPrompt();
-          const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
-          aiResponse = result.content;
+          // Didn't understand, resend template
+          sendTriageTemplate = true;
+          aiResponse = `Desculpa, não entendi sua escolha 😅\n\nPor favor, toque em um dos botões abaixo:`;
         }
+      } else {
+        // Triage completed, use general AI
+        const systemPrompt = buildVirtualAgentPrompt();
+        const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
+        aiResponse = result.content;
+      }
       }
     } else {
       // ========== TRIAGE FLOW FOR NEW LEADS ==========
@@ -1196,8 +1269,10 @@ serve(async (req) => {
           aiResponse = 'Desculpa, não consegui entender 😅 Pode me dizer o seu nome?';
         }
       } else if (currentStage === 'awaiting_triage') {
-        // Expecting triage choice
-        const department = inferDepartmentFromText(messageContent);
+        // Expecting triage choice - check button first, then text
+        const department = isButton 
+          ? inferDepartmentFromButton(button_text, button_payload) || inferDepartmentFromText(messageContent)
+          : inferDepartmentFromText(messageContent);
         
         if (department && conversationId) {
           await assignDepartmentMake(supabase, phoneNumber, conversationId, department);
@@ -1205,16 +1280,20 @@ serve(async (req) => {
           const customerName = existingName || '';
           const nameGreeting = customerName ? `, ${customerName}` : '';
           
+          // Department-specific pre-attendance prompts
           if (department === 'locacao') {
-            aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar.\n\nQual região de Florianópolis você tem interesse?`;
+            aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar em Florianópolis.\n\nPra eu buscar as melhores opções, me conta:\n\n📍 Qual região você prefere? (Centro, praias do Norte, Sul da Ilha, Continente...)`;
           } else if (department === 'vendas') {
-            aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nVocê está buscando algo para morar ou para investir?`;
+            aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nPra começar: você está buscando algo para *morar* ou para *investir*?`;
           } else {
-            aiResponse = `Perfeito${nameGreeting}! 😊\n\nComo posso te ajudar hoje?\n\nVocê pode me contar sobre sua solicitação que vou encaminhar para o setor responsável.`;
+            aiResponse = `Perfeito${nameGreeting}! 😊\n\nSou da Smolka e vou te ajudar com sua solicitação.\n\nPor favor, me conta qual é sua demanda:\n\n📄 Boleto / 2ª via\n📝 Contrato\n🔧 Manutenção\n❓ Outra questão`;
           }
+          
+          console.log(`✅ Department assigned from triage: ${department}`);
         } else {
-          // Didn't understand, ask again
-          aiResponse = `Desculpa, não entendi 😅\n\nPode escolher uma das opções?\n\n1️⃣ Quero *alugar* um imóvel\n2️⃣ Quero *comprar* um imóvel\n3️⃣ *Já sou cliente* da Smolka`;
+          // Didn't understand, resend template
+          sendTriageTemplate = true;
+          aiResponse = `Desculpa, não entendi sua escolha 😅\n\nPor favor, toque em um dos botões abaixo:`;
         }
       } else {
         // Triage completed, use general AI
