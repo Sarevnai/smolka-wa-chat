@@ -1,186 +1,288 @@
 
 
-# Disparo do Template de Triagem no Fluxo do Make
+# Correção: Triagem não funciona - Cliques dos Botões não são Processados
 
-## Objetivo
+## Diagnóstico Completo
 
-Fazer com que o fluxo do Make dispare o template oficial `triagem_ia` com os botões de quick reply (Comprar, Alugar, Já sou cliente) quando chegar no momento de triagem, ao invés de enviar apenas texto.
+### Problema 1: JSON do Make Incompleto
 
-## Análise do Template
+O Make.com recebe os cliques dos botões do template, mas o JSON enviado para o `make-webhook` **não inclui os dados dos botões**:
 
-O template `triagem_ia` já existe e está ativo:
-
-```
-Nome: triagem_ia
-Categoria: MARKETING
-Componentes:
-- BODY: "Pra que eu consiga te encaminhar para o *Setor responsável*, selecione um botão."
-- BUTTONS (QUICK_REPLY):
-  - "Comprar"
-  - "Alugar" 
-  - "Já sou cliente"
-```
-
-## Desafio Técnico
-
-O Make.com usa seu próprio módulo WhatsApp (número 4891631011), não a API direta (4823980016). O make-webhook retorna um JSON que o Make usa para enviar respostas.
-
-**Solução**: Adicionar ao JSON de resposta um campo `send_template` que instrui o Make a enviar um template em vez de texto simples.
-
-## Alterações Técnicas
-
-### Arquivo: `supabase/functions/make-webhook/index.ts`
-
-#### 1. Novo campo no retorno JSON (linha ~1296-1318)
-
-Atualmente retorna:
-```typescript
+**JSON Atual:**
+```json
 {
-  success: true,
-  result: aiResponse,      // Texto para o Make enviar
-  audio: {...},
-  metadata: {...}
+  "phone": "{{1.messages[].from}}",
+  "message": "{{1.messages[].text.body}}",
+  "message_type": "{{1.messages[].type}}",
+  "media_url": "{{1.messages[].audio.url}}",
+  "media_mime": "{{1.messages[].audio.mime_type}}",
+  "media_caption": "{{1.messages[].image.caption}}"
 }
 ```
 
-Novo formato quando houver template:
-```typescript
+Quando o cliente clica em "Alugar":
+- `message_type` = `"button"`
+- `text.body` = **vazio** (botões não têm text.body!)
+- `button.text` = `"Alugar"` (não enviado!)
+- `button.payload` = `"Setor de locação"` (não enviado!)
+
+**JSON Corrigido (precisa incluir os campos de botão):**
+```json
 {
-  success: true,
-  result: aiResponse,       // Texto fallback
-  send_template: {          // 🆕 Instrução para Make enviar template
-    name: 'triagem_ia',
-    language: 'pt_BR'
-  },
-  audio: {...},
-  metadata: {...}
+  "phone": "{{1.messages[].from}}",
+  "message": "{{1.messages[].text.body}}",
+  "message_type": "{{1.messages[].type}}",
+  "media_url": "{{1.messages[].audio.url}}",
+  "media_mime": "{{1.messages[].audio.mime_type}}",
+  "media_caption": "{{1.messages[].image.caption}}",
+  "button_text": "{{1.messages[].button.text}}",
+  "button_payload": "{{1.messages[].button.payload}}"
 }
 ```
 
-#### 2. Modificar fluxo de triagem para incluir template (linhas ~1107-1126 e ~1170-1189)
+### Problema 2: Webhook não processa mensagens do tipo "button"
 
-Quando o estágio mudar para `awaiting_triage`, além da mensagem de texto, adicionar flag para enviar template:
+O `make-webhook` não tem lógica para processar mensagens quando `message_type = "button"`. Quando recebe clique de botão:
+1. `message` está vazio
+2. Webhook retorna erro ou entra em fluxo errado
+3. Como `message_type = "button"` mas não há handler, o código não encontra departamento
+
+### Problema 3: Rota de Template sem Filtro
+
+A rota de template no Make (ID 18) **não tem filtro** que verifique `send_template`. Isso significa que:
+- O template pode ser enviado em situações incorretas
+- Ou não ser enviado quando deveria
+
+---
+
+## Solução Completa
+
+### Parte 1: Atualizar JSON no Make.com
+
+Você precisará atualizar o módulo HTTP Request (ID 14) no Make para incluir os campos de botão:
+
+```json
+{
+  "phone": "{{1.messages[].from}}",
+  "message": "{{1.messages[].text.body}}",
+  "message_type": "{{1.messages[].type}}",
+  "media_url": "{{1.messages[].audio.url}}",
+  "media_mime": "{{1.messages[].audio.mime_type}}",
+  "media_caption": "{{1.messages[].image.caption}}",
+  "button_text": "{{1.messages[].button.text}}",
+  "button_payload": "{{1.messages[].button.payload}}"
+}
+```
+
+### Parte 2: Atualizar make-webhook para Processar Botões
+
+O webhook precisa:
+
+1. **Aceitar novos campos** `button_text` e `button_payload`
+2. **Detectar mensagens do tipo "button"**
+3. **Mapear os botões para departamentos**
+4. **Continuar o fluxo de pré-atendimento** após atribuição
 
 ```typescript
-// Variável para controle de template
-let sendTriageTemplate = false;
-
-// No fluxo de triagem, quando chegar na parte de mostrar opções:
-if (!currentStage || currentStage === 'greeting') {
-  if (existingName) {
-    // Já tem nome - enviar template de triagem
-    aiResponse = `Prazer em falar com você, ${existingName}! 😊`;
-    sendTriageTemplate = true;  // 🆕 Flag para enviar template
-    await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
-  } else {
-    aiResponse = `Olá! Aqui é a Helena da Smolka Imóveis 🏠\n\nComo você se chama?`;
-    await updateTriageStage(supabase, phoneNumber, 'awaiting_name');
-  }
+// Novos campos no request
+interface MakeWebhookRequest {
+  phone: string;
+  message: string;
+  message_type?: string;
+  // ... campos existentes ...
+  button_text?: string;     // 🆕 Texto do botão clicado
+  button_payload?: string;  // 🆕 Payload do botão clicado
 }
 
-// Quando recebe o nome:
-if (currentStage === 'awaiting_name') {
-  const detectedName = extractNameFromMessage(messageContent);
-  if (detectedName) {
-    await saveContactNameMake(supabase, phoneNumber, detectedName);
-    aiResponse = `Prazer, ${detectedName}! 😊`;
-    sendTriageTemplate = true;  // 🆕 Flag para enviar template
-    await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
-  }
-}
+// Mapeamento de botões do template triagem
+const TRIAGE_BUTTON_MAP: Record<string, 'locacao' | 'vendas' | 'administrativo'> = {
+  'alugar': 'locacao',
+  'comprar': 'vendas',
+  'já sou cliente': 'administrativo',
+  // Payloads configurados no Make
+  'setor de locação': 'locacao',
+  'setor de vendas': 'vendas',
+  'setor administrativo': 'administrativo'
+};
 ```
 
-#### 3. Incluir no retorno JSON (linha ~1296)
+### Parte 3: Adicionar Filtro na Rota de Template no Make
 
-```typescript
-return new Response(
-  JSON.stringify({
-    success: true,
-    result: aiResponse,
-    // 🆕 Template para Make enviar (quando aplicável)
-    send_template: sendTriageTemplate ? {
-      name: 'triagem_ia',
-      language: 'pt_BR'
-    } : null,
-    phone: phoneNumber,
-    agent,
-    conversation_id: conversationId,
-    audio: audioResult ? {...} : null,
-    metadata: {...}
-  }),
-  { status: 200, headers: {...} }
-);
-```
-
-## Fluxo Corrigido
+Na rota de template (ID 18), adicionar filtro:
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                    MAKE WEBHOOK - TRIAGEM                          │
-└───────────────────────────┬────────────────────────────────────────┘
-                            │
-                            ▼
-              ┌─────────────────────────────┐
-              │   Primeira mensagem?        │
-              └──────────────┬──────────────┘
-                    ┌────────┴────────┐
-                    │                 │
-                    ▼                 ▼
-         ┌──────────────────┐   ┌─────────────────────┐
-         │  Já tem nome?    │   │  Pergunta existente │
-         └────────┬─────────┘   │  (continua fluxo)   │
-                  │             └─────────────────────┘
-         ┌────────┴────────┐
-         │                 │
-         ▼                 ▼
-┌────────────────┐  ┌─────────────────────────────────────┐
-│  NÃO          │  │  SIM                                │
-│  Perguntar    │  │  Saudar + ENVIAR TEMPLATE triagem_ia│
-│  o nome       │  │  (botões: Comprar/Alugar/Cliente)   │
-└───────┬───────┘  └──────────────────────────────────────┘
-        │
-        ▼
-┌────────────────────────────┐
-│  Recebe nome do cliente    │
-└──────────────┬─────────────┘
-               │
-               ▼
-┌────────────────────────────────────────┐
-│  Cumprimentar + ENVIAR TEMPLATE        │
-│  triagem_ia com botões                 │
-└────────────────────────────────────────┘
+Condição: {{14.data.send_template.name}} existe E não está vazio
 ```
 
-## Configuração do Make.com
+### Parte 4: Criar Prompts de Pré-Atendimento por Departamento
 
-O Make.com precisará:
-1. Verificar se `send_template` existe no JSON de resposta
-2. Se existir, usar módulo de template do WhatsApp ao invés de mensagem de texto
-3. Se não existir, enviar o `result` como texto normal
+Após o cliente escolher o departamento, a IA precisa fazer o pré-atendimento adequado:
 
-## Resumo das Alterações
+**Locação:**
+- Perguntar: região de interesse, tipo de imóvel (apto/casa), quartos, faixa de valor
+- Fazer busca no Vista
+- Apresentar opções
+- Transferir para C2S
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/make-webhook/index.ts` | Adicionar variável `sendTriageTemplate`, setar flag quando for mostrar opções de triagem, incluir `send_template` no JSON de resposta |
+**Vendas:**
+- Perguntar: morar ou investir, região, tipo de imóvel, orçamento
+- Fazer busca no Vista
+- Apresentar opções
+- Transferir para C2S
 
-## Resultado Esperado
+**Administrativo:**
+- Perguntar: qual a demanda (boleto, contrato, manutenção, etc.)
+- Classificar com tags
+- Notificar setor interno
+- Manter no pipeline administrativo
 
-1. Cliente envia "Olá"
-2. Make webhook retorna:
-   - `result`: "Olá! Aqui é a Helena da Smolka Imóveis 🏠\n\nComo você se chama?"
-   - `send_template`: null
-3. Make envia texto normalmente
+---
 
-4. Cliente responde "João"
-5. Make webhook retorna:
-   - `result`: "Prazer, João! 😊"
-   - `send_template`: { name: "triagem_ia", language: "pt_BR" }
-6. Make envia:
-   - Primeiro: texto "Prazer, João! 😊"
-   - Depois: template com botões (Comprar/Alugar/Já sou cliente)
+## Alterações no Código
 
-7. Cliente clica no botão "Alugar"
-8. Make envia resposta do botão
-9. Departamento é atribuído corretamente
+### 1. supabase/functions/make-webhook/index.ts
+
+| Linha | Alteração |
+|-------|-----------|
+| ~10-23 | Adicionar `button_text` e `button_payload` à interface |
+| ~885-891 | Extrair novos campos do body |
+| ~330-345 (nova) | Criar mapeamento de botões `TRIAGE_BUTTON_MAP` |
+| ~906-975 | Tratar `message_type === 'button'` para extrair departamento |
+| ~1133-1153 | Usar `button_text`/`button_payload` para detectar departamento |
+| ~1144-1149 | Após atribuir departamento, iniciar pré-atendimento da IA |
+
+### 2. Nova Função: Prompts de Pré-Atendimento
+
+Criar funções para cada departamento:
+- `buildPreAttendanceLocacaoPrompt()`
+- `buildPreAttendanceVendasPrompt()`
+- `buildPreAttendanceAdminPrompt()`
+
+---
+
+## Diagrama do Fluxo Corrigido
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    FLUXO COMPLETO DE TRIAGEM                    │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │  Cliente envia "Olá"    │
+                    └────────────┬────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │  Já tem nome no banco?  │
+                    └────────────┬────────────┘
+                          ┌──────┴──────┐
+                          │             │
+                          ▼             ▼
+                       SIM            NÃO
+                          │             │
+                          │             ▼
+                          │   ┌─────────────────────┐
+                          │   │  Perguntar o nome   │
+                          │   │  "Como posso te     │
+                          │   │   chamar?"          │
+                          │   └──────────┬──────────┘
+                          │              │
+                          │              ▼
+                          │   ┌─────────────────────┐
+                          │   │  Recebe: "João"     │
+                          │   │  Salva nome         │
+                          │   └──────────┬──────────┘
+                          │              │
+                          └──────┬───────┘
+                                 │
+                                 ▼
+                    ┌──────────────────────────────┐
+                    │  Enviar saudação + template  │
+                    │  "Prazer, João! 😊"          │
+                    │  + botões [Comprar][Alugar]  │
+                    │           [Já sou cliente]   │
+                    └────────────┬─────────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────────┐
+                    │  Cliente clica no botão     │
+                    │  (message_type = "button")  │
+                    │  button_text = "Alugar"     │
+                    └────────────┬────────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────────┐
+                    │  Webhook recebe e mapeia    │
+                    │  "Alugar" → locacao         │
+                    └────────────┬────────────────┘
+                                 │
+                     ┌───────────┼───────────┐
+                     │           │           │
+                     ▼           ▼           ▼
+               ┌──────────┐ ┌──────────┐ ┌──────────────┐
+               │ LOCAÇÃO  │ │ VENDAS   │ │ADMINISTRATIVO│
+               └────┬─────┘ └────┬─────┘ └──────┬───────┘
+                    │            │              │
+                    ▼            ▼              ▼
+            Pré-atendimento Pré-atendimento  Identificar
+            com busca Vista com busca Vista   demanda
+                    │            │              │
+                    ▼            ▼              ▼
+            Apresenta        Apresenta      Classificar
+            imóveis          imóveis        com tags
+                    │            │              │
+                    ▼            ▼              ▼
+            Encaminhar      Encaminhar      Notificar
+            para C2S        para C2S        setor interno
+```
+
+---
+
+## Resumo de Alterações
+
+| Componente | Alteração |
+|------------|-----------|
+| **Make.com - HTTP Request** | Adicionar campos `button_text` e `button_payload` no JSON |
+| **Make.com - Rota Template** | Adicionar filtro `send_template.name` existe |
+| **make-webhook** | Adicionar interface para novos campos de botão |
+| **make-webhook** | Criar mapeamento `TRIAGE_BUTTON_MAP` |
+| **make-webhook** | Processar `message_type === 'button'` |
+| **make-webhook** | Criar prompts de pré-atendimento por departamento |
+
+---
+
+## Fluxo de Pré-Atendimento por Departamento
+
+### Locação (após clicar "Alugar")
+```
+IA: "Perfeito, João! 🏠 Vou te ajudar a encontrar o imóvel ideal para alugar.
+     Qual região de Florianópolis você tem interesse?"
+→ Cliente responde região
+→ IA busca no Vista
+→ IA apresenta opções
+→ IA qualifica (quartos, valor, data de mudança)
+→ IA transfere para C2S
+```
+
+### Vendas (após clicar "Comprar")
+```
+IA: "Excelente, João! 🏡 Vou te ajudar a encontrar o imóvel dos seus sonhos.
+     Você está buscando para morar ou para investir?"
+→ Cliente responde
+→ IA pergunta região e tipo
+→ IA busca no Vista
+→ IA apresenta opções
+→ IA transfere para C2S
+```
+
+### Administrativo (após clicar "Já sou cliente")
+```
+IA: "Certo, João! 😊 Como posso te ajudar hoje?
+     Boleto, contrato, manutenção ou outra questão?"
+→ Cliente explica demanda
+→ IA classifica e adiciona tags
+→ IA notifica setor interno
+→ Conversa fica no pipeline administrativo
+```
 
