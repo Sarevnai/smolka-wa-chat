@@ -14,15 +14,13 @@ interface MakeWebhookRequest {
   message_id?: string;
   timestamp?: string;
   message_type?: string;  // "text" | "audio" | "voice" | "image" | "video" | "document" | "button"
-  // Media fields
-  media_url?: string;     // Public URL of the media file
-  media_id?: string;      // WhatsApp media ID
-  media_mime?: string;    // MIME type (audio/ogg, image/jpeg, etc)
-  media_caption?: string; // Media caption
-  media_filename?: string;// Filename (for documents)
-  // Button fields (from template quick replies)
-  button_text?: string;   // Text displayed on the button clicked
-  button_payload?: string;// Payload configured for the button
+  media_url?: string;
+  media_id?: string;
+  media_mime?: string;
+  media_caption?: string;
+  media_filename?: string;
+  button_text?: string;
+  button_payload?: string;
 }
 
 interface MediaInfo {
@@ -76,6 +74,440 @@ interface ConversationMessage {
 
 type DepartmentType = 'locacao' | 'administrativo' | 'vendas' | 'marketing' | null;
 
+// ========== AI AGENT CONFIG (FROM ai-virtual-agent) ==========
+
+interface AIAgentConfig {
+  agent_name: string;
+  company_name: string;
+  company_description: string;
+  services: string[];
+  tone: 'formal' | 'casual' | 'friendly' | 'technical';
+  limitations: string[];
+  faqs: { question: string; answer: string }[];
+  custom_instructions: string;
+  greeting_message: string;
+  fallback_message: string;
+  ai_provider: 'lovable' | 'openai';
+  ai_model: string;
+  max_tokens: number;
+  max_history_messages: number;
+  humanize_responses: boolean;
+  fragment_long_messages: boolean;
+  message_delay_ms: number;
+  emoji_intensity: 'none' | 'low' | 'medium';
+  use_customer_name: boolean;
+  audio_enabled: boolean;
+  audio_voice_id: string;
+  audio_voice_name: string;
+  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
+  audio_channel_mirroring: boolean;
+  audio_max_chars: number;
+  target_audience: string;
+  competitive_advantages: string[];
+  company_values: string;
+  service_areas: string[];
+  rapport_enabled: boolean;
+  rapport_use_name: boolean;
+  rapport_mirror_language: boolean;
+  rapport_show_empathy: boolean;
+  rapport_validate_emotions: boolean;
+  triggers_enabled: boolean;
+  trigger_urgency: boolean;
+  trigger_scarcity: boolean;
+  trigger_social_proof: boolean;
+  trigger_authority: boolean;
+  social_proof_text: string;
+  authority_text: string;
+  objections: { objection: string; response: string }[];
+  knowledge_base_url: string;
+  knowledge_base_content: string;
+  knowledge_base_last_update: string;
+  spin_enabled: boolean;
+  spin_situation_questions: string[];
+  spin_problem_questions: string[];
+  spin_implication_questions: string[];
+  spin_need_questions: string[];
+  escalation_criteria: string[];
+  vista_integration_enabled: boolean;
+}
+
+const defaultConfig: AIAgentConfig = {
+  agent_name: 'Helena',
+  company_name: 'Smolka Imóveis',
+  company_description: 'Administradora de imóveis especializada em locação e gestão de propriedades.',
+  services: ['Locação de imóveis', 'Gestão de propriedades', 'Administração de condomínios'],
+  tone: 'friendly',
+  limitations: [],
+  faqs: [],
+  custom_instructions: '',
+  greeting_message: 'Olá! Sou a {agent_name} da {company_name}. Como posso ajudá-lo?',
+  fallback_message: 'Entendi sua solicitação. Um de nossos atendentes entrará em contato no próximo dia útil.',
+  ai_provider: 'openai',
+  ai_model: 'gpt-4o-mini',
+  max_tokens: 250,
+  max_history_messages: 5,
+  humanize_responses: true,
+  fragment_long_messages: true,
+  message_delay_ms: 2000,
+  emoji_intensity: 'low',
+  use_customer_name: true,
+  audio_enabled: false,
+  audio_voice_id: '',
+  audio_voice_name: 'Sarah',
+  audio_mode: 'text_and_audio',
+  audio_channel_mirroring: true,
+  audio_max_chars: 400,
+  target_audience: '',
+  competitive_advantages: [],
+  company_values: '',
+  service_areas: [],
+  rapport_enabled: true,
+  rapport_use_name: true,
+  rapport_mirror_language: true,
+  rapport_show_empathy: true,
+  rapport_validate_emotions: true,
+  triggers_enabled: true,
+  trigger_urgency: true,
+  trigger_scarcity: true,
+  trigger_social_proof: true,
+  trigger_authority: true,
+  social_proof_text: '',
+  authority_text: '',
+  objections: [],
+  knowledge_base_url: '',
+  knowledge_base_content: '',
+  knowledge_base_last_update: '',
+  spin_enabled: true,
+  spin_situation_questions: [],
+  spin_problem_questions: [],
+  spin_implication_questions: [],
+  spin_need_questions: [],
+  escalation_criteria: [],
+  vista_integration_enabled: true,
+};
+
+// ========== FLORIANÓPOLIS REGIONS MAPPING ==========
+
+interface RegionInfo {
+  nome: string;
+  bairros: string[];
+}
+
+const FLORIANOPOLIS_REGIONS: Record<string, RegionInfo> = {
+  norte: {
+    nome: "Região Norte",
+    bairros: [
+      "Ingleses", "Ingleses do Rio Vermelho", "Santinho", "Canasvieiras", 
+      "Jurerê", "Jurerê Internacional", "Daniela", "Cachoeira do Bom Jesus",
+      "Ponta das Canas", "Lagoinha", "Vargem Grande", "Vargem Pequena",
+      "Vargem do Bom Jesus", "Ratones", "Santo Antônio de Lisboa", "Sambaqui",
+      "Praia Brava", "Rio Vermelho", "São João do Rio Vermelho"
+    ]
+  },
+  sul: {
+    nome: "Região Sul", 
+    bairros: [
+      "Campeche", "Rio Tavares", "Morro das Pedras", "Armação", "Armação do Pântano do Sul",
+      "Pântano do Sul", "Ribeirão da Ilha", "Costa de Dentro", "Carianos",
+      "Aeroporto", "Tapera", "Base Aérea", "Alto Ribeirão", "Caeira da Barra do Sul",
+      "Costeira do Pirajubaé", "Saco dos Limões"
+    ]
+  },
+  leste: {
+    nome: "Região Leste",
+    bairros: [
+      "Lagoa da Conceição", "Barra da Lagoa", "Costa da Lagoa", "Canto da Lagoa",
+      "Praia Mole", "Joaquina", "Praia da Joaquina", "Retiro da Lagoa", 
+      "Canto dos Araçás", "Porto da Lagoa"
+    ]
+  },
+  centro: {
+    nome: "Região Central",
+    bairros: [
+      "Centro", "Agronômica", "Trindade", "Córrego Grande", "Pantanal",
+      "Santa Mônica", "Itacorubi", "João Paulo", "Monte Verde", "Saco Grande",
+      "José Mendes", "Prainha", "Carvoeira", "Serrinha"
+    ]
+  },
+  continente: {
+    nome: "Continente",
+    bairros: [
+      "Estreito", "Coqueiros", "Itaguaçu", "Abraão", "Capoeiras", "Bom Abrigo",
+      "Balneário", "Coloninha", "Jardim Atlântico", "Monte Cristo", "Ponte do Imaruim",
+      "Chico Mendes", "Vila Aparecida", "Sapé", "Bela Vista", "Kobrasol"
+    ]
+  }
+};
+
+function getAllNeighborhoods(): string[] {
+  const all: string[] = [];
+  for (const region of Object.values(FLORIANOPOLIS_REGIONS)) {
+    all.push(...region.bairros);
+  }
+  return all;
+}
+
+function stringSimilarity(str1: string, str2: string): number {
+  const s1 = str1.toLowerCase();
+  const s2 = str2.toLowerCase();
+  
+  if (s1 === s2) return 1;
+  if (s1.includes(s2) || s2.includes(s1)) return 0.9;
+  
+  const len1 = s1.length;
+  const len2 = s2.length;
+  const maxLen = Math.max(len1, len2);
+  
+  if (maxLen === 0) return 1;
+  
+  const matrix: number[][] = [];
+  for (let i = 0; i <= len1; i++) matrix[i] = [i];
+  for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+  
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  
+  return 1 - matrix[len1][len2] / maxLen;
+}
+
+function normalizeNeighborhood(input: string): { normalized: string; confidence: number; original: string } {
+  const trimmed = input.trim();
+  const allNeighborhoods = getAllNeighborhoods();
+  
+  const exactMatch = allNeighborhoods.find(n => n.toLowerCase() === trimmed.toLowerCase());
+  if (exactMatch) return { normalized: exactMatch, confidence: 1.0, original: trimmed };
+  
+  const partialMatch = allNeighborhoods.find(n => 
+    n.toLowerCase().startsWith(trimmed.toLowerCase()) ||
+    trimmed.toLowerCase().startsWith(n.toLowerCase())
+  );
+  if (partialMatch) return { normalized: partialMatch, confidence: 0.95, original: trimmed };
+  
+  let bestMatch = trimmed;
+  let bestScore = 0;
+  
+  for (const neighborhood of allNeighborhoods) {
+    const similarity = stringSimilarity(trimmed, neighborhood);
+    if (similarity > bestScore && similarity >= 0.6) {
+      bestScore = similarity;
+      bestMatch = neighborhood;
+    }
+  }
+  
+  return { normalized: bestMatch, confidence: bestScore, original: trimmed };
+}
+
+function isRegionName(input: string): boolean {
+  const normalized = input.toLowerCase().trim()
+    .replace(/^região\s+/, '')
+    .replace(/^regiao\s+/, '');
+  return Object.keys(FLORIANOPOLIS_REGIONS).includes(normalized);
+}
+
+function expandRegionToNeighborhoods(input: string): { 
+  isRegion: boolean;
+  neighborhoods: string[];
+  regionName?: string;
+  suggestion?: string;
+} {
+  const normalized = input.toLowerCase().trim()
+    .replace(/^região\s+/, '')
+    .replace(/^regiao\s+/, '');
+  
+  if (FLORIANOPOLIS_REGIONS[normalized]) {
+    const region = FLORIANOPOLIS_REGIONS[normalized];
+    return {
+      isRegion: true,
+      neighborhoods: region.bairros,
+      regionName: region.nome,
+      suggestion: `A ${region.nome} tem ótimas opções! Posso sugerir: ${region.bairros.slice(0, 4).join(', ')}... Tem preferência?`
+    };
+  }
+  
+  const result = normalizeNeighborhood(input);
+  
+  if (result.confidence < 0.8 && result.confidence > 0.5) {
+    return {
+      isRegion: false,
+      neighborhoods: [result.normalized],
+      suggestion: `Você quis dizer ${result.normalized}?`
+    };
+  }
+  
+  return { isRegion: false, neighborhoods: [result.normalized] };
+}
+
+function generateRegionKnowledge(): string {
+  const lines: string[] = ['\n📍 CONHECIMENTO LOCAL DE FLORIANÓPOLIS:', ''];
+  
+  for (const [key, region] of Object.entries(FLORIANOPOLIS_REGIONS)) {
+    lines.push(`${region.nome.toUpperCase()}: ${region.bairros.slice(0, 8).join(', ')}${region.bairros.length > 8 ? '...' : ''}`);
+  }
+  
+  lines.push('');
+  lines.push('⚡ REGIÕES:');
+  lines.push('- "norte" → Ingleses, Canasvieiras, Jurerê...');
+  lines.push('- "sul" → Campeche, Armação, Ribeirão...');
+  lines.push('- "leste" ou "lagoa" → Lagoa da Conceição, Barra...');
+  lines.push('- "centro" → Trindade, Agronômica, Itacorubi...');
+  lines.push('- "continente" → Estreito, Coqueiros...');
+  lines.push('');
+  lines.push('⚡ CORREÇÃO DE ERROS: "Tridade" → "Trindade", "Ingleseis" → "Ingleses"');
+  
+  return lines.join('\n');
+}
+
+// ========== PROPERTY LINK EXTRACTION ==========
+
+function extractPropertyCodeFromUrl(message: string): string | null {
+  if (!message) return null;
+  
+  const smolkaUrlMatch = message.match(/smolkaimoveis\.com\.br\/imovel\/([^\s]+)/i);
+  if (smolkaUrlMatch && smolkaUrlMatch[1]) {
+    const urlPath = smolkaUrlMatch[1];
+    const allNumbers = urlPath.match(/\d+/g);
+    if (allNumbers && allNumbers.length > 0) {
+      const lastNumber = allNumbers[allNumbers.length - 1];
+      if (lastNumber.length >= 3 && lastNumber.length <= 6) {
+        console.log(`🔗 Property code extracted from URL: ${lastNumber}`);
+        return lastNumber;
+      }
+    }
+  }
+  
+  const fallbackPatterns = [
+    /codigo[=\/](\d{3,6})\b/i,
+    /\/imovel\/(\d{3,6})(?:\s|$|\/|\?)/i
+  ];
+  
+  for (const pattern of fallbackPatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+  
+  return null;
+}
+
+function containsPropertyUrl(message: string): boolean {
+  return /smolkaimoveis\.com\.br\/imovel\//i.test(message) ||
+         /vistasoft.*imovel/i.test(message);
+}
+
+// ========== HUMANIZATION ==========
+
+const emojiSets = {
+  greeting: ['😊', '👋', '🙂', '☺️'],
+  agreement: ['✅', '👍', '😊', '🙂'],
+  thinking: ['🤔', '💭', '📋', ''],
+  sorry: ['😔', '🙏', '', ''],
+  help: ['💡', '📞', '🏠', ''],
+  thanks: ['🙏', '😊', '✨', ''],
+  farewell: ['👋', '😊', '🙂', ''],
+};
+
+function getRandomEmoji(context: keyof typeof emojiSets, intensity: string): string {
+  if (intensity === 'none') return '';
+  const set = emojiSets[context];
+  const maxIndex = intensity === 'low' ? 2 : set.length;
+  const emoji = set[Math.floor(Math.random() * maxIndex)];
+  return emoji ? ` ${emoji}` : '';
+}
+
+const humanPhrases = {
+  thinking: ['Deixa eu verificar...', 'Um momento...', 'Vou conferir isso...'],
+  agreement: ['Entendi!', 'Certo!', 'Perfeito!', 'Claro!'],
+  transition: ['Olha só,', 'Então,', 'Bom,', 'Veja bem,'],
+  empathy: ['Entendo sua situação.', 'Compreendo.', 'Faz sentido.'],
+};
+
+function getRandomPhrase(type: keyof typeof humanPhrases): string {
+  const phrases = humanPhrases[type];
+  return phrases[Math.floor(Math.random() * phrases.length)];
+}
+
+// ========== VALIDATION ==========
+
+const FORBIDDEN_RESPONSE_PATTERNS = [
+  /quintoandar/i,
+  /vivareal/i,
+  /zap\s*im[oó]veis/i,
+  /olx/i,
+  /imovelweb/i,
+  /outras?\s*imobili[aá]rias?/i,
+];
+
+function validateAIResponse(response: string): { valid: boolean; reason?: string } {
+  if (!response) return { valid: true };
+  
+  for (const pattern of FORBIDDEN_RESPONSE_PATTERNS) {
+    if (pattern.test(response)) {
+      console.log(`🚫 Invalid AI response - matched pattern: ${pattern}`);
+      return { valid: false, reason: `Contains forbidden content` };
+    }
+  }
+  return { valid: true };
+}
+
+const FALLBACK_RESPONSE = "Olá! Sou da Smolka Imóveis 🏠 Como posso ajudar você?";
+
+// ========== CONFIG LOADERS ==========
+
+async function getAIAgentConfig(supabase: any): Promise<AIAgentConfig> {
+  try {
+    const { data } = await supabase
+      .from('system_settings')
+      .select('setting_value')
+      .eq('setting_key', 'ai_agent_config')
+      .maybeSingle();
+    
+    return data?.setting_value 
+      ? { ...defaultConfig, ...data.setting_value }
+      : defaultConfig;
+  } catch (error) {
+    console.error('❌ Error loading AI agent config:', error);
+    return defaultConfig;
+  }
+}
+
+interface EssentialQuestion {
+  id: string;
+  question: string;
+  category: string;
+  isQualifying: boolean;
+  enabled: boolean;
+}
+
+interface AIBehaviorConfig {
+  id: string;
+  essential_questions: EssentialQuestion[];
+  functions: any[];
+  reengagement_hours: number;
+  send_cold_leads: boolean;
+  require_cpf_for_visit: boolean;
+}
+
+async function getAIBehaviorConfig(supabase: any): Promise<AIBehaviorConfig | null> {
+  try {
+    const { data } = await supabase
+      .from('ai_behavior_config')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+    return data;
+  } catch (error) {
+    console.error('❌ Error loading AI behavior config:', error);
+    return null;
+  }
+}
+
 // ========== UTILITY FUNCTIONS ==========
 
 function normalizePhoneNumber(phone: string): string {
@@ -86,13 +518,10 @@ function getPhoneVariations(phoneNumber: string): string[] {
   const variations = [phoneNumber];
   
   if (phoneNumber.startsWith('55') && phoneNumber.length === 12) {
-    const withNine = phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4);
-    variations.push(withNine);
+    variations.push(phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4));
   }
-  
   if (phoneNumber.startsWith('55') && phoneNumber.length === 13) {
-    const withoutNine = phoneNumber.slice(0, 4) + phoneNumber.slice(5);
-    variations.push(withoutNine);
+    variations.push(phoneNumber.slice(0, 4) + phoneNumber.slice(5));
   }
   
   return variations;
@@ -108,112 +537,251 @@ function formatCurrency(value: number | null): string {
   }).format(value);
 }
 
+// ========== OPENAI TOOLS WITH VISTA ==========
+
+const toolsWithVista = [
+  {
+    type: "function",
+    function: {
+      name: "buscar_imoveis",
+      description: "Busca imóveis no catálogo da Smolka Imóveis. Use quando o cliente quiser alugar ou comprar e tiver informado região/bairro.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: {
+            type: "string",
+            description: "Tipo do imóvel",
+            enum: ["apartamento", "casa", "terreno", "comercial", "cobertura", "kitnet", "sobrado", "sala"]
+          },
+          bairro: {
+            type: "string",
+            description: "Nome do bairro de Florianópolis"
+          },
+          cidade: {
+            type: "string",
+            description: "Nome da cidade (padrão: Florianópolis)"
+          },
+          preco_min: {
+            type: "number",
+            description: "Valor mínimo em reais"
+          },
+          preco_max: {
+            type: "number",
+            description: "Valor máximo em reais"
+          },
+          quartos: {
+            type: "number",
+            description: "Número de dormitórios"
+          },
+          finalidade: {
+            type: "string",
+            description: "OBRIGATÓRIO. Use 'locacao' para alugar, 'venda' para comprar",
+            enum: ["venda", "locacao"]
+          }
+        },
+        required: ["finalidade"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "enviar_lead_c2s",
+      description: "Transferir lead qualificado para corretor. Use após qualificar o cliente (nome, interesse, tipo, região).",
+      parameters: {
+        type: "object",
+        properties: {
+          nome: { type: "string", description: "Nome do cliente" },
+          interesse: { type: "string", description: "Interesse: morar, investir, alugar" },
+          tipo_imovel: { type: "string", description: "Tipo de imóvel desejado" },
+          bairro: { type: "string", description: "Bairro de interesse" },
+          faixa_preco: { type: "string", description: "Faixa de preço" },
+          quartos: { type: "number", description: "Número de quartos" },
+          resumo: { type: "string", description: "Resumo da conversa" }
+        },
+        required: ["nome", "interesse"]
+      }
+    }
+  }
+];
+
+const toolsQuickTransfer = [
+  {
+    type: "function",
+    function: {
+      name: "enviar_lead_c2s",
+      description: "Transferir lead qualificado para corretor especializado no C2S.",
+      parameters: {
+        type: "object",
+        properties: {
+          nome: { type: "string", description: "Nome do cliente" },
+          interesse: { type: "string", description: "Interesse: morar, investir, conhecer" },
+          motivacao: { type: "string", description: "O que chamou atenção do cliente" },
+          resumo: { type: "string", description: "Resumo da conversa" }
+        },
+        required: ["nome", "interesse", "resumo"]
+      }
+    }
+  }
+];
+
 // ========== PROMPT BUILDERS ==========
 
 function buildQuickTransferPrompt(dev: Development, contactName?: string, isFirstMessage?: boolean, history?: ConversationMessage[]): string {
   const hasName = !!contactName && contactName.toLowerCase() !== 'lead sem nome';
   const hasHistory = history && history.length > 0;
   
-  return `Você é a Helena, assistente de atendimento da Smolka Imóveis, especializada em apresentar o empreendimento ${dev.name} pelo WhatsApp ao Lead vindo da Landing Page oficial.
+  return `Você é a Helena, assistente de atendimento da Smolka Imóveis, especializada em apresentar o empreendimento ${dev.name}.
 
-${hasHistory ? `
-═══════════════════════════════════════════════════════════════
-📜 CONTEXTO IMPORTANTE - LEIA ANTES DE RESPONDER
-═══════════════════════════════════════════════════════════════
+${hasHistory ? `📜 CONTEXTO: Esta conversa já tem histórico. NÃO repita perguntas já respondidas.
+${hasName ? `🔹 NOME DO CLIENTE: ${contactName} - USE ESTE NOME!` : ''}` : ''}
 
-Esta conversa já tem histórico. REGRAS OBRIGATÓRIAS:
-- NUNCA repita perguntas que já foram respondidas no histórico
-- Se o cliente já disse o nome, USE esse nome e NÃO pergunte novamente
-- Se o cliente já disse se quer morar ou investir, NÃO pergunte novamente
-- Leia o histórico abaixo e continue de onde a conversa parou
+🎯 OBJETIVO:
+- Qualificar o lead: nome, morar ou investir, prioridades
+- Encaminhar para especialista humano com resumo
 
-${hasName ? `🔹 NOME DO CLIENTE JÁ CONHECIDO: ${contactName} - USE ESTE NOME!` : ''}
-` : ''}
-
-═══════════════════════════════════════════════════════════════
-🎯 OBJETIVO
-═══════════════════════════════════════════════════════════════
-
-- Dar boas-vindas e apresentar rapidamente o ${dev.name}
-- Qualificar o lead de forma leve
-- Descobrir: nome, se é para morar ou investir, e o que é mais importante (localização, lazer, bem-estar, tamanho, etc.)
-- Encaminhar para especialista humano com resumo das informações
-
-═══════════════════════════════════════════════════════════════
-📋 REGRAS GERAIS
-═══════════════════════════════════════════════════════════════
-
-- Tom cordial, objetivo e consultivo, sem parecer panfleto
-- SEMPRE uma pergunta por mensagem, mantendo ritmo de chat
-- Mensagens curtas, evitando blocos grandes
+📋 REGRAS:
+- Tom cordial e objetivo
+- Uma pergunta por mensagem
+- Mensagens curtas
 - Use emojis com moderação
 
-═══════════════════════════════════════════════════════════════
-💬 FLUXO DE MENSAGENS
-═══════════════════════════════════════════════════════════════
-
 ${isFirstMessage ? `
-🆕 ESTA É A PRIMEIRA MENSAGEM DO LEAD
-- NÃO inclua saudação na sua resposta (já foi enviada pelo sistema com a imagem)
-- ${hasName ? `Já sabemos o nome: ${contactName}. Responda: "Prazer em te conhecer, ${contactName}! 😊 Você está buscando algo para morar ou para investir?"` : `Responda APENAS: "Pra começar bem, como posso te chamar?"`}
+🆕 PRIMEIRA MENSAGEM:
+${hasName ? `Responda: "Prazer em te conhecer, ${contactName}! 😊 Você está buscando algo para morar ou para investir?"` : `Responda APENAS: "Pra começar bem, como posso te chamar?"`}
 ` : ''}
 
-📝 APÓS RECEBER O NOME:
-- Responda: "Prazer em te conhecer, [nome]! 😊"
-- Emende: "Você está buscando algo para morar ou para investir?"
-
-═══════════════════════════════════════════════════════════════
-🏠 SE FOR PARA MORAR
-═══════════════════════════════════════════════════════════════
-
-Reconheça o objetivo e traga benefícios:
-"Perfeito, [nome]! O ${dev.name} foi pensado para quem quer morar bem em Florianópolis, em um endereço exclusivo no João Paulo, entre o centro e as praias do norte da Ilha, com lazer completo, piscina climatizada, academia e área de bem-estar."
-
-Pergunte: "Desses pontos, o que pesa mais pra você hoje: localização, área de lazer ou conforto do apartamento em si?"
-
-═══════════════════════════════════════════════════════════════
-📈 SE FOR PARA INVESTIR
-═══════════════════════════════════════════════════════════════
-
-Reconheça o objetivo e traga benefícios:
-"Excelente, [nome]! O ${dev.name} é uma ótima opção para investir em Florianópolis, porque está no João Paulo, um bairro estratégico entre o centro e o norte da Ilha, com padrão construtivo de alto nível e lazer completo, o que atrai bons inquilinos e tende a valorizar no longo prazo."
-
-Pergunte: "Você pensa mais em renda com aluguel ou em valorização do imóvel ao longo dos anos?"
-
-═══════════════════════════════════════════════════════════════
-🔄 ENCAMINHAMENTO PARA ESPECIALISTA
-═══════════════════════════════════════════════════════════════
-
-Após descobrir: nome + objetivo (morar/investir) + prioridade principal
-
-Finalize: "Perfeito, [nome]! Vou te conectar com um dos nossos especialistas da Smolka que conhece todos os detalhes do ${dev.name} e vai te mostrar as melhores opções conforme o que você me contou."
-
-Use a função enviar_lead_c2s com:
-- nome
-- objetivo (morar/investir)  
-- prioridade principal
-- breve resumo do contexto
-
-═══════════════════════════════════════════════════════════════
-⚠️ REGRA-CHAVE
-═══════════════════════════════════════════════════════════════
-
-NUNCA responder com discurso genérico. SEMPRE usar "morar" ou "investir" para customizar o benefício e a pergunta seguinte.
-
-Estrutura fixa: reconhecer objetivo → conectar com diferenciais reais → fazer pergunta de aprofundamento.
-
+🔄 ENCAMINHAMENTO:
+Após ter nome + objetivo + prioridade, use enviar_lead_c2s com resumo.
 - NÃO responda perguntas técnicas detalhadas
-- Se perguntarem detalhes, diga: "O especialista vai te explicar tudo em detalhes!"
-- NÃO envie materiais
-- Seja simpática, breve e eficiente
-- IMPORTANTE: Só use enviar_lead_c2s APÓS ter o nome E objetivo (morar/investir) E prioridade
-- ⚠️ NUNCA inclua instruções internas nas mensagens!`;
+- Seja simpática, breve e eficiente`;
 }
 
-function buildVirtualAgentPrompt(): string {
-  return `Você é a Helena, assistente virtual da Smolka Imóveis 🏠
+function buildLocacaoPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[]): string {
+  const hasName = !!contactName;
+  const hasHistory = history && history.length > 0;
+  
+  return `🚨 REGRA ZERO: Você é ${config.agent_name} da ${config.company_name} em Florianópolis/SC.
+
+${hasName ? `👤 CLIENTE: ${contactName} - Use o nome naturalmente.` : '⭐ Ainda não sabemos o nome. Pergunte: "A propósito, como posso te chamar?"'}
+
+${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas no histórico.` : ''}
+
+🎯 OBJETIVO: Ajudar o cliente a ALUGAR um imóvel em Florianópolis.
+
+📍 FLUXO DE ATENDIMENTO - LOCAÇÃO:
+1. QUALIFICAÇÃO: Coletar região, tipo, quartos, faixa de preço
+2. BUSCA: Usar buscar_imoveis IMEDIATAMENTE quando tiver 2+ critérios
+3. APRESENTAÇÃO: Dizer "Achei uma opção ótima!" (sistema envia foto)
+4. FOLLOW-UP: Perguntar "Faz sentido pra você?"
+5. AGENDAMENTO: Coletar dados para visita
+
+${generateRegionKnowledge()}
+
+🏠 BUSCA DE IMÓVEIS:
+- SEMPRE defina finalidade='locacao'
+- Use buscar_imoveis assim que tiver bairro OU tipo
+- Não espere ter TUDO - comece a buscar!
+
+⚠️ REGRAS CRÍTICAS:
+- NUNCA repita perguntas já respondidas
+- Se cliente disse "centro", NÃO pergunte região novamente
+- Mensagens curtas e diretas (max 3 linhas)
+- Um emoji por mensagem no máximo
+
+💬 ESTILO LAÍS (consultivo e acolhedor):
+- "Me conta, o que você tá buscando?"
+- "Achei uma opção ótima pra você! 🎉"
+- "Faz sentido pra você? 😊"
+- "Posso agendar uma visita?"`;
+}
+
+function buildVendasPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[]): string {
+  const hasName = !!contactName;
+  const hasHistory = history && history.length > 0;
+  
+  return `🚨 REGRA ZERO: Você é ${config.agent_name} da ${config.company_name} em Florianópolis/SC.
+
+${hasName ? `👤 CLIENTE: ${contactName} - Use o nome naturalmente.` : '⭐ Ainda não sabemos o nome. Pergunte: "A propósito, como posso te chamar?"'}
+
+${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas.` : ''}
+
+🎯 OBJETIVO: Ajudar o cliente a COMPRAR/INVESTIR em imóvel.
+
+📍 FLUXO DE ATENDIMENTO - VENDAS:
+1. DESCOBRIR: Morar ou investir?
+2. QUALIFICAÇÃO: Região, tipo, quartos, faixa de preço
+3. BUSCA: Usar buscar_imoveis quando tiver 2+ critérios
+4. APRESENTAÇÃO: Mostrar opções encontradas
+5. TRANSFERÊNCIA: Usar enviar_lead_c2s quando qualificado
+
+${generateRegionKnowledge()}
+
+🏠 BUSCA DE IMÓVEIS:
+- SEMPRE defina finalidade='venda'
+- Use buscar_imoveis assim que tiver bairro OU tipo
+- Normalize bairros antes de buscar
+
+📤 TRANSFERÊNCIA C2S:
+Quando tiver: nome + interesse + região + tipo + faixa de preço
+→ Usar enviar_lead_c2s com resumo
+→ Dizer: "Vou te conectar com um especialista em vendas!"
+
+⚠️ REGRAS:
+- NUNCA repita perguntas já respondidas
+- Mensagens curtas e diretas
+- Estilo consultivo, não robótico`;
+}
+
+function buildAdminPrompt(config: AIAgentConfig, contactName?: string): string {
+  const hasName = !!contactName;
+  
+  return `Você é ${config.agent_name} da ${config.company_name} - Setor Administrativo.
+
+${hasName ? `👤 CLIENTE: ${contactName}` : ''}
+
+🎯 OBJETIVO: Ajudar clientes que já são locatários ou proprietários.
+
+📋 DEMANDAS COMUNS:
+- 📄 Boleto / 2ª via de pagamento
+- 📝 Contrato (renovação, rescisão, dúvidas)
+- 🔧 Manutenção (solicitações, acompanhamento)
+- 💰 Financeiro (pagamentos, cobranças)
+- ❓ Outras questões administrativas
+
+🔄 FLUXO:
+1. Identificar a demanda específica
+2. Coletar informações necessárias (contrato, imóvel, etc.)
+3. Orientar próximos passos
+4. Informar que um atendente vai dar continuidade
+
+💬 ESTILO:
+- Profissional e empático
+- Mensagens objetivas
+- Validar as preocupações do cliente
+
+⚠️ LIMITAÇÕES:
+- NÃO emita boletos (apenas oriente)
+- NÃO resolva questões de manutenção (registre e encaminhe)
+- Para assuntos complexos: "Vou registrar sua solicitação e um atendente entrará em contato."`;
+}
+
+function buildVirtualAgentPrompt(config: AIAgentConfig, contactName?: string): string {
+  const hasName = !!contactName;
+  
+  return `Você é ${config.agent_name}, assistente virtual da ${config.company_name} 🏠
+
+${hasName ? `👤 CLIENTE: ${contactName}` : ''}
 
 OBJETIVO: Ajudar clientes de forma cordial e eficiente via WhatsApp.
+
+CAPACIDADES:
+- Tirar dúvidas sobre a empresa
+- Explicar serviços (locação, vendas, administração)
+- Encaminhar para o departamento correto
+- Buscar imóveis no catálogo
+
+${generateRegionKnowledge()}
 
 REGRAS:
 - Seja simpática e profissional
@@ -221,13 +789,122 @@ REGRAS:
 - Use emojis com moderação
 - Responda em português brasileiro
 
-CAPACIDADES:
-- Tirar dúvidas sobre a empresa
-- Explicar serviços disponíveis (locação, vendas, administração)
-- Encaminhar para o departamento correto
-- Fornecer informações básicas
+Se não souber algo específico, diga que vai verificar com um especialista.`;
+}
 
-Se não souber responder algo específico, diga que vai verificar com um especialista.`;
+// ========== PROPERTY SEARCH & FORMAT ==========
+
+async function searchProperties(supabase: any, params: Record<string, any>): Promise<any> {
+  try {
+    let normalizedParams = { ...params };
+    
+    if (params.bairro) {
+      const expansion = expandRegionToNeighborhoods(params.bairro);
+      
+      if (expansion.isRegion) {
+        console.log(`📍 Region detected: ${params.bairro} → ${expansion.regionName}`);
+        normalizedParams.bairro = expansion.neighborhoods[0];
+      } else {
+        const normalized = normalizeNeighborhood(params.bairro);
+        if (normalized.confidence < 1.0 && normalized.confidence >= 0.6) {
+          console.log(`📍 Normalized "${params.bairro}" → "${normalized.normalized}"`);
+        }
+        normalizedParams.bairro = normalized.normalized;
+      }
+    }
+    
+    console.log('🏠 Searching properties:', normalizedParams);
+    
+    const { data, error } = await supabase.functions.invoke('vista-search-properties', {
+      body: normalizedParams
+    });
+
+    if (error) {
+      console.error('❌ Vista search error:', error);
+      return { success: false, properties: [], error: error.message };
+    }
+
+    console.log(`✅ Vista returned ${data?.properties?.length || 0} properties`);
+    return data;
+  } catch (e) {
+    console.error('❌ Error calling Vista:', e);
+    return { success: false, properties: [], error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+async function getPropertyByListingId(supabase: any, listingId: string): Promise<any | null> {
+  try {
+    console.log(`🏠 Fetching property: ${listingId}`);
+    
+    const { data, error } = await supabase.functions.invoke('vista-get-property', {
+      body: { codigo: listingId }
+    });
+    
+    if (error || !data?.success) return null;
+    
+    console.log(`✅ Found property:`, data.property?.codigo);
+    return data.property;
+  } catch (e) {
+    console.error(`❌ Error fetching property:`, e);
+    return null;
+  }
+}
+
+function formatPropertyMessage(property: any): string {
+  const lines = [`🏠 *${property.tipo} em ${property.bairro}*`];
+  
+  if (property.quartos > 0) {
+    const suiteText = property.suites > 0 ? ` (${property.suites} suíte${property.suites > 1 ? 's' : ''})` : '';
+    lines.push(`• ${property.quartos} quarto${property.quartos > 1 ? 's' : ''}${suiteText}`);
+  }
+  if (property.vagas > 0) lines.push(`• ${property.vagas} vaga${property.vagas > 1 ? 's' : ''}`);
+  if (property.area_util > 0) lines.push(`• ${property.area_util}m²`);
+  lines.push(`• ${property.preco_formatado}`);
+  if (property.valor_condominio > 0) {
+    lines.push(`• Condomínio: ${formatCurrency(property.valor_condominio)}`);
+  }
+  lines.push(`🔗 ${property.link}`);
+  
+  return lines.join('\n');
+}
+
+// ========== C2S INTEGRATION ==========
+
+async function sendLeadToC2S(
+  supabase: any,
+  params: Record<string, any>, 
+  phoneNumber: string, 
+  conversationHistory: string,
+  contactName?: string
+): Promise<{ success: boolean; c2s_lead_id?: string; error?: string }> {
+  try {
+    console.log('🏢 Sending lead to C2S:', params);
+    
+    const { data, error } = await supabase.functions.invoke('c2s-create-lead', {
+      body: {
+        name: params.nome || contactName || 'Lead WhatsApp',
+        phone: phoneNumber,
+        type_negotiation: params.finalidade === 'locacao' ? 'Locação' : 'Compra',
+        property_type: params.tipo_imovel,
+        neighborhood: params.bairro,
+        price_range: params.faixa_preco,
+        bedrooms: params.quartos,
+        description: params.interesse || params.resumo,
+        conversation_history: conversationHistory,
+      }
+    });
+
+    if (error) {
+      console.error('❌ C2S send error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Lead sent to C2S');
+    return { success: true, c2s_lead_id: data?.c2s_lead_id };
+  } catch (e) {
+    console.error('❌ Error calling C2S:', e);
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
 }
 
 // ========== TRIAGE FLOW ==========
@@ -246,7 +923,6 @@ async function getConversationState(supabase: any, phoneNumber: string): Promise
       .select('triage_stage')
       .eq('phone_number', phoneNumber)
       .maybeSingle();
-    
     return data;
   } catch (error) {
     console.error('❌ Error getting conversation state:', error);
@@ -263,7 +939,6 @@ async function updateTriageStage(supabase: any, phoneNumber: string, stage: Tria
         triage_stage: stage,
         updated_at: new Date().toISOString()
       }, { onConflict: 'phone_number' });
-    
     console.log(`📊 Triage stage updated to: ${stage}`);
   } catch (error) {
     console.error('❌ Error updating triage stage:', error);
@@ -277,7 +952,6 @@ async function getContactName(supabase: any, phoneNumber: string): Promise<strin
       .select('name')
       .eq('phone', phoneNumber)
       .maybeSingle();
-    
     return data?.name || null;
   } catch (error) {
     return null;
@@ -290,7 +964,6 @@ async function saveContactNameMake(supabase: any, phoneNumber: string, name: str
       .from('contacts')
       .update({ name, updated_at: new Date().toISOString() })
       .eq('phone', phoneNumber);
-    
     console.log(`✅ Contact name saved: ${name}`);
   } catch (error) {
     console.error('❌ Error saving contact name:', error);
@@ -300,12 +973,10 @@ async function saveContactNameMake(supabase: any, phoneNumber: string, name: str
 function extractNameFromMessage(message: string): string | null {
   const cleaned = message.trim();
   
-  // Skip if it's a common greeting without a name
   if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|hello|hi)$/i.test(cleaned)) {
     return null;
   }
   
-  // Extract name patterns: "sou o/a [name]", "meu nome é [name]", "pode me chamar de [name]"
   const patterns = [
     /(?:sou\s+(?:o|a)\s+)([A-Za-zÀ-ÿ]+)/i,
     /(?:meu\s+nome\s+[eé]\s+)([A-Za-zÀ-ÿ]+)/i,
@@ -320,10 +991,8 @@ function extractNameFromMessage(message: string): string | null {
     }
   }
   
-  // If it's a short message (1-2 words), assume it's a name
   const words = cleaned.split(/\s+/);
   if (words.length <= 2 && words[0].length >= 2 && words[0].length <= 20) {
-    // Check if first word is alphabetic
     if (/^[A-Za-zÀ-ÿ]+$/.test(words[0])) {
       return words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase();
     }
@@ -332,14 +1001,11 @@ function extractNameFromMessage(message: string): string | null {
   return null;
 }
 
-// Mapeamento de botões do template triagem para departamentos
 const TRIAGE_BUTTON_MAP: Record<string, 'locacao' | 'vendas' | 'administrativo'> = {
-  // Button text options (what user sees)
   'alugar': 'locacao',
   'comprar': 'vendas',
   'já sou cliente': 'administrativo',
   'ja sou cliente': 'administrativo',
-  // Possible payloads
   'setor de locação': 'locacao',
   'setor de locacao': 'locacao',
   'setor de vendas': 'vendas',
@@ -347,27 +1013,24 @@ const TRIAGE_BUTTON_MAP: Record<string, 'locacao' | 'vendas' | 'administrativo'>
   'locacao': 'locacao',
   'vendas': 'vendas',
   'administrativo': 'administrativo',
-  // Numeric alternatives
   '1': 'locacao',
   '2': 'vendas',
   '3': 'administrativo'
 };
 
 function inferDepartmentFromButton(buttonText?: string, buttonPayload?: string): 'locacao' | 'vendas' | 'administrativo' | null {
-  // Try button text first
   if (buttonText) {
     const normalized = buttonText.toLowerCase().trim();
     if (TRIAGE_BUTTON_MAP[normalized]) {
-      console.log(`🔘 Department detected from button_text: "${buttonText}" → ${TRIAGE_BUTTON_MAP[normalized]}`);
+      console.log(`🔘 Department from button_text: "${buttonText}" → ${TRIAGE_BUTTON_MAP[normalized]}`);
       return TRIAGE_BUTTON_MAP[normalized];
     }
   }
   
-  // Try payload
   if (buttonPayload) {
     const normalized = buttonPayload.toLowerCase().trim();
     if (TRIAGE_BUTTON_MAP[normalized]) {
-      console.log(`🔘 Department detected from button_payload: "${buttonPayload}" → ${TRIAGE_BUTTON_MAP[normalized]}`);
+      console.log(`🔘 Department from button_payload: "${buttonPayload}" → ${TRIAGE_BUTTON_MAP[normalized]}`);
       return TRIAGE_BUTTON_MAP[normalized];
     }
   }
@@ -378,18 +1041,9 @@ function inferDepartmentFromButton(buttonText?: string, buttonPayload?: string):
 function inferDepartmentFromText(text: string): 'locacao' | 'vendas' | 'administrativo' | null {
   const lower = text.toLowerCase().trim();
   
-  // First check if it matches any button map entries (including numbers)
-  if (TRIAGE_BUTTON_MAP[lower]) {
-    return TRIAGE_BUTTON_MAP[lower];
-  }
-  
-  // Locação patterns
+  if (TRIAGE_BUTTON_MAP[lower]) return TRIAGE_BUTTON_MAP[lower];
   if (/alug|locar|loca[çc][aã]o|alugo/.test(lower)) return 'locacao';
-  
-  // Vendas patterns
   if (/compr|adquir|compra|vender|venda/.test(lower)) return 'vendas';
-  
-  // Administrativo patterns
   if (/cliente|inquilino|propriet[aá]rio|boleto|contrato|manuten[çc][aã]o|segunda via|pagamento/.test(lower)) return 'administrativo';
   
   return null;
@@ -402,19 +1056,16 @@ async function assignDepartmentMake(
   department: 'locacao' | 'vendas' | 'administrativo'
 ): Promise<void> {
   try {
-    // Update conversation
     await supabase
       .from('conversations')
       .update({ department_code: department })
       .eq('id', conversationId);
     
-    // Update contact
     await supabase
       .from('contacts')
       .update({ department_code: department })
       .eq('phone', phoneNumber);
     
-    // Update triage stage to completed
     await updateTriageStage(supabase, phoneNumber, 'completed');
     
     console.log(`✅ Department assigned: ${department}`);
@@ -424,26 +1075,6 @@ async function assignDepartmentMake(
 }
 
 // ========== OPENAI INTEGRATION ==========
-
-const toolsQuickTransfer = [
-  {
-    type: "function",
-    function: {
-      name: "enviar_lead_c2s",
-      description: "Transferir lead qualificado para corretor especializado no C2S. Use APÓS coletar nome E fazer 1-2 perguntas de qualificação.",
-      parameters: {
-        type: "object",
-        properties: {
-          nome: { type: "string", description: "Nome do cliente" },
-          interesse: { type: "string", description: "Interesse: morar, investir, conhecer" },
-          motivacao: { type: "string", description: "O que chamou atenção do cliente no empreendimento" },
-          resumo: { type: "string", description: "Resumo breve da conversa e qualificação" }
-        },
-        required: ["nome", "interesse", "resumo"]
-      }
-    }
-  }
-];
 
 async function callOpenAI(
   systemPrompt: string, 
@@ -506,7 +1137,6 @@ async function findOrCreateConversation(
   departmentCode: DepartmentType = null
 ): Promise<{ id: string; department_code: DepartmentType; contact_id: string | null } | null> {
   try {
-    // Try to find existing active conversation
     const { data: existingConv } = await supabase
       .from('conversations')
       .select('id, department_code, contact_id')
@@ -521,20 +1151,18 @@ async function findOrCreateConversation(
       return existingConv;
     }
 
-    // Get or create contact
     const { data: contact } = await supabase
       .from('contacts')
       .select('id, department_code')
       .eq('phone', phoneNumber)
       .maybeSingle();
 
-    // Create new conversation
     const { data: newConv, error } = await supabase
       .from('conversations')
       .insert({
         phone_number: phoneNumber,
         contact_id: contact?.id || null,
-        department_code: departmentCode || contact?.department_code || 'vendas',
+        department_code: departmentCode || contact?.department_code || null,
         status: 'active',
         last_message_at: new Date().toISOString()
       })
@@ -562,7 +1190,8 @@ async function saveMessage(
   body: string,
   direction: 'inbound' | 'outbound',
   messageId?: string,
-  mediaInfo?: MediaInfo
+  mediaInfo?: MediaInfo,
+  departmentCode?: DepartmentType
 ): Promise<number | null> {
   try {
     const messageData: any = {
@@ -573,8 +1202,7 @@ async function saveMessage(
       direction,
       body,
       wa_timestamp: new Date().toISOString(),
-      department_code: 'vendas',
-      // Media fields
+      department_code: departmentCode || null,
       media_type: mediaInfo?.type || null,
       media_url: mediaInfo?.url || null,
       media_caption: mediaInfo?.caption || null,
@@ -593,7 +1221,7 @@ async function saveMessage(
       return null;
     }
 
-    console.log(`💾 ${direction} message saved: ${data.id}${mediaInfo?.type ? ` (${mediaInfo.type})` : ''}`);
+    console.log(`💾 ${direction} message saved: ${data.id}`);
     return data.id;
   } catch (error) {
     console.error(`❌ Error in saveMessage:`, error);
@@ -603,10 +1231,7 @@ async function saveMessage(
 
 // ========== AUDIO TRANSCRIPTION & TTS ==========
 
-async function transcribeAudio(
-  supabase: any, 
-  audioUrl: string
-): Promise<string | null> {
+async function transcribeAudio(supabase: any, audioUrl: string): Promise<string | null> {
   try {
     console.log('🎤 Transcribing audio from Make:', audioUrl);
     
@@ -621,7 +1246,6 @@ async function transcribeAudio(
     
     console.log('✅ Audio transcribed:', data.text?.substring(0, 100));
     return data.text;
-    
   } catch (error) {
     console.error('❌ Error in transcribeAudio:', error);
     return null;
@@ -652,19 +1276,15 @@ async function getAudioConfig(supabase: any): Promise<AudioConfig | null> {
   }
 }
 
-async function generateAudioResponse(
-  text: string,
-  audioConfig: AudioConfig
-): Promise<AudioResult | null> {
+async function generateAudioResponse(text: string, audioConfig: AudioConfig): Promise<AudioResult | null> {
   if (!audioConfig.audio_enabled) return null;
   
-  // Limit text length for audio
   const textToConvert = text.length > audioConfig.audio_max_chars 
     ? text.substring(0, audioConfig.audio_max_chars) + '...'
     : text;
   
   try {
-    console.log('🎙️ Generating TTS audio for Make response...');
+    console.log('🎙️ Generating TTS audio...');
     
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
     if (!ELEVENLABS_API_KEY) {
@@ -672,7 +1292,6 @@ async function generateAudioResponse(
       return null;
     }
 
-    // Call ElevenLabs TTS API directly
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${audioConfig.audio_voice_id}`,
       {
@@ -705,7 +1324,6 @@ async function generateAudioResponse(
     const audioBuffer = await response.arrayBuffer();
     console.log('✅ MP3 audio generated:', audioBuffer.byteLength, 'bytes');
 
-    // Upload to Supabase Storage
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const storageSupabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -724,7 +1342,6 @@ async function generateAudioResponse(
       return null;
     }
 
-    // Get public URL
     const { data: urlData } = storageSupabase
       .storage
       .from('whatsapp-media')
@@ -734,10 +1351,9 @@ async function generateAudioResponse(
     
     return {
       audioUrl: urlData.publicUrl,
-      isVoiceMessage: false, // MP3 plays as audio file, not voice message
+      isVoiceMessage: false,
       contentType: 'audio/mpeg'
     };
-    
   } catch (error) {
     console.error('❌ Error in generateAudioResponse:', error);
     return null;
@@ -780,12 +1396,7 @@ async function checkDevelopmentLead(
     
     const { data: portalLead } = await supabase
       .from('portal_leads_log')
-      .select(`
-        id,
-        development_id,
-        contact_name,
-        developments!inner(name, slug)
-      `)
+      .select(`id, development_id, contact_name, developments!inner(name, slug)`)
       .in('contact_phone', phoneVariations)
       .not('development_id', 'is', null)
       .gte('created_at', cutoffTime)
@@ -829,23 +1440,14 @@ async function detectDevelopmentFromMessage(
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       
       if (normalizedName.length >= 5 && normalizedMessage.includes(normalizedName)) {
-        console.log(`🏗️ Development detected in message: "${dev.name}"`);
+        console.log(`🏗️ Development detected: "${dev.name}"`);
         return { development_id: dev.id, development_name: dev.name };
-      }
-      
-      if (dev.slug) {
-        const normalizedSlug = dev.slug.toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        if (normalizedSlug.length >= 5 && normalizedMessage.includes(normalizedSlug)) {
-          console.log(`🏗️ Development detected by slug: "${dev.name}"`);
-          return { development_id: dev.id, development_name: dev.name };
-        }
       }
     }
 
     return null;
   } catch (error) {
-    console.error('❌ Error detecting development from message:', error);
+    console.error('❌ Error detecting development:', error);
     return null;
   }
 }
@@ -873,22 +1475,19 @@ async function createOrUpdateContact(
       .maybeSingle();
 
     if (existing) {
-      // Update name if provided and not already set
       if (contactName && !existing.name) {
         await supabase
           .from('contacts')
-          .update({ name: contactName, department_code: 'vendas' })
+          .update({ name: contactName })
           .eq('id', existing.id);
       }
     } else {
-      // Create new contact
       await supabase
         .from('contacts')
         .insert({
           phone: phoneNumber,
           name: contactName || null,
-          status: 'ativo',
-          department_code: 'vendas'
+          status: 'ativo'
         });
     }
   } catch (error) {
@@ -921,121 +1520,74 @@ serve(async (req) => {
       );
     }
 
+    // Load AI Agent Config from database
+    const agentConfig = await getAIAgentConfig(supabase);
+    const behaviorConfig = await getAIBehaviorConfig(supabase);
+    console.log(`🤖 Loaded config: agent_name=${agentConfig.agent_name}, vista=${agentConfig.vista_integration_enabled}`);
+
     // Parse request body
     const body: MakeWebhookRequest = await req.json();
     
-    // Debug: log raw payload for analysis
-    console.log('📦 Raw payload keys:', Object.keys(body).join(', '));
-    
     const { 
-      phone, 
-      message, 
-      contact_name, 
-      message_id, 
-      timestamp, 
-      message_type,
-      media_url,
-      media_id,
-      media_mime,
-      media_caption,
-      media_filename,
-      button_text,
-      button_payload
+      phone, message, contact_name, message_id, timestamp, message_type,
+      media_url, media_id, media_mime, media_caption, media_filename,
+      button_text, button_payload
     } = body;
     
-    // Log button data if present
     if (button_text || button_payload) {
-      console.log(`🔘 Button data received - text: "${button_text}", payload: "${button_payload}"`);
+      console.log(`🔘 Button data: text="${button_text}", payload="${button_payload}"`);
     }
 
-    // Check if this is a status callback (no phone = likely delivery/read notification)
-    // These callbacks don't have the data we need, so we skip them silently with 200 OK
+    // Skip status callbacks
     if (!phone && !message && !media_url) {
-      console.log('📌 Ignoring status callback (no phone/message/media)');
+      console.log('📌 Ignoring status callback');
       return new Response(
         JSON.stringify({ success: true, skipped: true, reason: 'status_callback' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`📥 Make webhook received - Phone: ${phone}, Type: ${message_type || 'text'}, Message: "${message?.substring(0, 50) || '[media/button]'}..."`);
+    console.log(`📥 Make webhook - Phone: ${phone}, Type: ${message_type || 'text'}, Msg: "${message?.substring(0, 50) || '[media/button]'}..."`);
 
     // Determine message content based on type
     let messageContent = message || '';
     let mediaInfo: MediaInfo | undefined;
     let mediaProcessed: { type: string; transcribed?: boolean; transcription_preview?: string } | undefined;
 
-    // Handle button type - extract content from button click
     const isButton = message_type === 'button';
     const isAudio = message_type === 'audio' || message_type === 'voice';
     const isMedia = ['image', 'video', 'document', 'sticker'].includes(message_type || '');
 
     if (isButton) {
-      // Button click from template - use button_text as the message content
       messageContent = button_text || button_payload || message || '[Botão clicado]';
-      console.log(`🔘 Button message detected - using content: "${messageContent}"`);
-      
-      mediaProcessed = {
-        type: 'button'
-      };
+      console.log(`🔘 Button message: "${messageContent}"`);
+      mediaProcessed = { type: 'button' };
     } else if (isAudio && media_url) {
-      // Transcribe audio via Whisper
-      console.log(`🎤 Audio message detected, transcribing...`);
+      console.log(`🎤 Audio message, transcribing...`);
       const transcribedText = await transcribeAudio(supabase, media_url);
       
       if (transcribedText) {
         messageContent = transcribedText;
-        mediaProcessed = {
-          type: 'audio',
-          transcribed: true,
-          transcription_preview: transcribedText.substring(0, 100)
-        };
-        console.log(`🎤 Audio transcribed: "${messageContent.substring(0, 50)}..."`);
+        mediaProcessed = { type: 'audio', transcribed: true, transcription_preview: transcribedText.substring(0, 100) };
+        console.log(`🎤 Transcribed: "${messageContent.substring(0, 50)}..."`);
       } else {
-        messageContent = '[O cliente enviou um áudio que não pude transcrever. Por favor, peça para ele digitar a mensagem.]';
-        mediaProcessed = {
-          type: 'audio',
-          transcribed: false
-        };
-        console.log('⚠️ Audio transcription failed, using fallback message');
+        messageContent = '[Áudio não transcrito - peça para digitar]';
+        mediaProcessed = { type: 'audio', transcribed: false };
       }
       
-      mediaInfo = {
-        type: 'audio',
-        url: media_url,
-        caption: transcribedText || undefined,
-        mimeType: media_mime
-      };
-      
+      mediaInfo = { type: 'audio', url: media_url, caption: transcribedText || undefined, mimeType: media_mime };
     } else if (isMedia && media_url) {
-      // For other media, use caption or generic message
-      const mediaLabel = message_type === 'image' ? 'Imagem' 
-        : message_type === 'video' ? 'Vídeo' 
-        : message_type === 'sticker' ? 'Sticker'
-        : 'Documento';
-      
+      const mediaLabel = message_type === 'image' ? 'Imagem' : message_type === 'video' ? 'Vídeo' : 'Documento';
       messageContent = media_caption || `[${mediaLabel} recebido]`;
-      
-      mediaInfo = {
-        type: message_type,
-        url: media_url,
-        caption: media_caption,
-        filename: media_filename,
-        mimeType: media_mime
-      };
-      
-      mediaProcessed = {
-        type: message_type || 'unknown'
-      };
-      
-      console.log(`📎 Media received: ${message_type} - ${media_url}`);
+      mediaInfo = { type: message_type, url: media_url, caption: media_caption, filename: media_filename, mimeType: media_mime };
+      mediaProcessed = { type: message_type || 'unknown' };
     }
 
-    // Validate required fields (phone is always required, message OR media_url OR button data must exist)
+    // Validate required fields
     if (!phone || (!message && !media_url && !button_text && !button_payload)) {
-      console.warn('⚠️ Incomplete payload:', { phone: !!phone, message: !!message, media_url: !!media_url, button_text: !!button_text, button_payload: !!button_payload, keys: Object.keys(body) });
+      console.warn('⚠️ Incomplete payload');
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields: phone and (message or media_url)' }),
+        JSON.stringify({ success: false, error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -1048,100 +1600,91 @@ serve(async (req) => {
     await createOrUpdateContact(supabase, phoneNumber, contact_name);
 
     // Find or create conversation
-    const conversation = await findOrCreateConversation(supabase, phoneNumber, 'vendas');
+    const conversation = await findOrCreateConversation(supabase, phoneNumber);
     const conversationId = conversation?.id || null;
+    const currentDepartment = conversation?.department_code;
 
-    // Save inbound message with media info
-    await saveMessage(supabase, conversationId, phoneNumber, messageContent, 'inbound', message_id, mediaInfo);
+    // Save inbound message
+    await saveMessage(supabase, conversationId, phoneNumber, messageContent, 'inbound', message_id, mediaInfo, currentDepartment);
 
     // Get conversation history
-    const history = conversationId 
-      ? await getConversationHistory(supabase, conversationId)
-      : [];
+    const history = conversationId ? await getConversationHistory(supabase, conversationId) : [];
     
-    // Provide context to AI about media
+    // Build AI prompt message with context
     let aiPromptMessage = messageContent;
-    
     if (isAudio && mediaProcessed?.transcribed) {
-      aiPromptMessage = `[O cliente enviou um áudio que foi transcrito automaticamente]\n\n"${messageContent}"`;
+      aiPromptMessage = `[Áudio transcrito]: "${messageContent}"`;
     } else if (isMedia) {
-      aiPromptMessage = `[O cliente enviou ${message_type === 'image' ? 'uma imagem' : message_type === 'video' ? 'um vídeo' : 'um documento'}${media_caption ? ` com legenda: "${media_caption}"` : ''}]`;
+      aiPromptMessage = `[${message_type === 'image' ? 'Imagem' : 'Mídia'} recebida${media_caption ? `: "${media_caption}"` : ''}]`;
     }
 
-    // Detect which AI agent to use
+    // Process property links
+    const propertyCode = extractPropertyCodeFromUrl(messageContent);
+    let propertyContext = '';
+    if (propertyCode) {
+      const property = await getPropertyByListingId(supabase, propertyCode);
+      if (property) {
+        propertyContext = `\n\n[CONTEXTO: Cliente enviou link do imóvel ${propertyCode}:\n${formatPropertyMessage(property)}]`;
+        aiPromptMessage += propertyContext;
+      }
+    }
+
+    // Initialize response variables
     let aiResponse = '';
-    let agent = 'nina';
+    let agent = 'helena';
     let developmentDetected: string | null = null;
     let c2sTransferred = false;
-    let sendTriageTemplate = false; // Flag to instruct Make to send triagem_ia template
+    let sendTriageTemplate = false;
+    let propertiesToSend: any[] = [];
 
-    // 1. Check if this is a development lead (from portal/landing page)
+    // ===== CHECK DEVELOPMENT LEAD =====
     const developmentLead = await checkDevelopmentLead(supabase, phoneNumber);
-    
-    // 2. Or detect development mentioned in message
     const mentionedDevelopment = await detectDevelopmentFromMessage(supabase, messageContent);
-
-    // List of developments handled by direct WhatsApp API (not Make)
+    
     const DIRECT_API_DEVELOPMENTS = ['villa maggiore'];
     
     if (developmentLead || mentionedDevelopment) {
       const devInfo = developmentLead || mentionedDevelopment!;
       const devNameLower = (devInfo.development_name || '').toLowerCase();
       
-      // Check if this development is handled by direct API
       if (DIRECT_API_DEVELOPMENTS.some(d => devNameLower.includes(d))) {
-        console.log(`⛔ Development "${devInfo.development_name}" is handled by direct WhatsApp API (48 23980016), not Make (48 91631011). Skipping.`);
+        console.log(`⛔ Development handled by direct API, skipping`);
         return new Response(
-          JSON.stringify({
-            success: true,
-            skipped: true,
-            reason: 'handled_by_direct_api',
-            message: 'Este empreendimento é atendido pelo número da API direta do WhatsApp'
-          }),
+          JSON.stringify({ success: true, skipped: true, reason: 'handled_by_direct_api' }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      // Use Helena Smolka (ai-arya-vendas logic)
-      agent = 'helena';
       developmentDetected = devInfo.development_name;
-      
-      console.log(`🏗️ Routing to Helena for development: ${devInfo.development_name}`);
+      console.log(`🏗️ Routing to Helena for: ${developmentDetected}`);
 
       const development = await getDevelopment(supabase, devInfo.development_id);
       
       if (development) {
         const isFirstMessage = history.length === 0;
-        
-        // Fetch existing contact name from database to avoid re-asking
         const existingContactName = await getContactName(supabase, phoneNumber);
         const resolvedContactName = existingContactName || developmentLead?.contact_name || contact_name;
-        console.log(`👤 Contact name resolved: ${resolvedContactName || 'not set'}`);
         
-        // Build prompt with history for context awareness
         const systemPrompt = buildQuickTransferPrompt(development, resolvedContactName, isFirstMessage, history);
         const result = await callOpenAI(systemPrompt, history, aiPromptMessage, toolsQuickTransfer);
         
         aiResponse = result.content;
 
-        // Process tool calls (C2S transfer)
+        // Process tool calls
         for (const toolCall of result.toolCalls) {
           if (toolCall.function.name === 'enviar_lead_c2s') {
             const args = JSON.parse(toolCall.function.arguments);
-            console.log(`🔧 C2S transfer requested:`, args);
+            console.log(`🔧 C2S transfer:`, args);
             
             try {
               await supabase.functions.invoke('c2s-create-lead', {
                 body: {
-                  name: args.nome || resolvedContactName || 'Lead sem nome',
+                  name: args.nome || resolvedContactName || 'Lead',
                   phone: phoneNumber,
                   property_type: args.interesse,
                   additional_info: `🚀 LEAD VIA MAKE - ${development.name}\nInteresse: ${args.interesse}\nMotivação: ${args.motivacao || 'N/A'}\nResumo: ${args.resumo}`,
-                  conversation_summary: args.resumo,
                   development_id: development.id,
                   development_name: development.name,
-                  interesse: args.interesse,
-                  motivacao: args.motivacao
                 }
               });
               c2sTransferred = true;
@@ -1152,103 +1695,29 @@ serve(async (req) => {
           }
         }
 
-        // Handle first message greeting for developments
         if (isFirstMessage) {
           const hasName = !!resolvedContactName && resolvedContactName.toLowerCase() !== 'lead sem nome';
-          const greetingMessage = `Que bom seu interesse no ${development.name}, no bairro João Paulo, em Florianópolis! 🏠 Entre o azul do mar e o verde das montanhas, é um lugar pensado para viver com calma e bem-estar.`;
+          const greetingMessage = `Que bom seu interesse no ${development.name}! 🏠`;
           const followUpMessage = hasName 
-            ? `Prazer em te conhecer, ${resolvedContactName}! 😊 Você está buscando algo para morar ou para investir?`
-            : 'Pra começar bem, como posso te chamar?';
-          
+            ? `Prazer, ${resolvedContactName}! 😊 Você está buscando algo para morar ou investir?`
+            : 'Pra começar, como posso te chamar?';
           aiResponse = `${greetingMessage}\n\n${followUpMessage}`;
         }
-      } else {
-        // Development not found, fallback to triage flow
-        console.log('⚠️ Development not found, entering triage flow');
-        agent = 'helena';
-        
-        // Get conversation state for triage
-        const convState = await getConversationState(supabase, phoneNumber);
-        const currentStage = convState?.triage_stage || null;
-        const existingName = await getContactName(supabase, phoneNumber);
-        
-        if (!currentStage || currentStage === 'greeting') {
-          // First message - send greeting and ask for name
-          const greetingMsg = `Olá! Aqui é a Helena da Smolka Imóveis 🏠`;
-          
-          if (existingName) {
-            // Already have name, skip to triage - send template with buttons
-            aiResponse = `${greetingMsg}\n\nPrazer em falar com você, ${existingName}! 😊`;
-            sendTriageTemplate = true;
-            await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
-          } else {
-            aiResponse = `${greetingMsg}\n\nComo você se chama?`;
-            await updateTriageStage(supabase, phoneNumber, 'awaiting_name');
-          }
-        } else if (currentStage === 'awaiting_name') {
-          // Expecting name
-          const detectedName = extractNameFromMessage(messageContent);
-          
-          if (detectedName) {
-            await saveContactNameMake(supabase, phoneNumber, detectedName);
-            aiResponse = `Prazer, ${detectedName}! 😊`;
-            sendTriageTemplate = true;
-            await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
-          } else {
-            aiResponse = 'Desculpa, não consegui entender 😅 Pode me dizer o seu nome?';
-          }
-      } else if (currentStage === 'awaiting_triage') {
-        // Expecting triage choice - check button first, then text
-        const department = isButton 
-          ? inferDepartmentFromButton(button_text, button_payload) || inferDepartmentFromText(messageContent)
-          : inferDepartmentFromText(messageContent);
-        
-        if (department && conversationId) {
-          await assignDepartmentMake(supabase, phoneNumber, conversationId, department);
-          
-          const customerName = existingName || '';
-          const nameGreeting = customerName ? `, ${customerName}` : '';
-          
-          // Department-specific pre-attendance prompts
-          if (department === 'locacao') {
-            aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar em Florianópolis.\n\nPra eu buscar as melhores opções, me conta:\n\n📍 Qual região você prefere? (Centro, praias do Norte, Sul da Ilha, Continente...)`;
-          } else if (department === 'vendas') {
-            aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nPra começar: você está buscando algo para *morar* ou para *investir*?`;
-          } else {
-            aiResponse = `Perfeito${nameGreeting}! 😊\n\nSou da Smolka e vou te ajudar com sua solicitação.\n\nPor favor, me conta qual é sua demanda:\n\n📄 Boleto / 2ª via\n📝 Contrato\n🔧 Manutenção\n❓ Outra questão`;
-          }
-          
-          console.log(`✅ Department assigned from triage: ${department}`);
-        } else {
-          // Didn't understand, resend template
-          sendTriageTemplate = true;
-          aiResponse = `Desculpa, não entendi sua escolha 😅\n\nPor favor, toque em um dos botões abaixo:`;
-        }
-      } else {
-        // Triage completed, use general AI
-        const systemPrompt = buildVirtualAgentPrompt();
-        const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
-        aiResponse = result.content;
-      }
       }
     } else {
-      // ========== TRIAGE FLOW FOR NEW LEADS ==========
-      agent = 'helena';
-      console.log('🤖 New lead - entering triage flow');
+      // ===== TRIAGE FLOW FOR NEW LEADS =====
+      console.log('🤖 Entering triage flow');
       
-      // Get conversation state for triage
       const convState = await getConversationState(supabase, phoneNumber);
       const currentStage = convState?.triage_stage || null;
       const existingName = await getContactName(supabase, phoneNumber);
       
-      console.log(`📊 Triage state - Stage: ${currentStage}, Name: ${existingName || 'not set'}`);
+      console.log(`📊 Triage - Stage: ${currentStage}, Name: ${existingName || 'none'}, Dept: ${currentDepartment || 'none'}`);
       
       if (!currentStage || currentStage === 'greeting') {
-        // First message - send greeting and ask for name
-        const greetingMsg = `Olá! Aqui é a Helena da Smolka Imóveis 🏠`;
+        const greetingMsg = `Olá! Aqui é a ${agentConfig.agent_name} da ${agentConfig.company_name} 🏠`;
         
         if (existingName) {
-          // Already have name, skip to triage - send template with buttons
           aiResponse = `${greetingMsg}\n\nPrazer em falar com você, ${existingName}! 😊`;
           sendTriageTemplate = true;
           await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
@@ -1257,7 +1726,6 @@ serve(async (req) => {
           await updateTriageStage(supabase, phoneNumber, 'awaiting_name');
         }
       } else if (currentStage === 'awaiting_name') {
-        // Expecting name
         const detectedName = extractNameFromMessage(messageContent);
         
         if (detectedName) {
@@ -1269,7 +1737,6 @@ serve(async (req) => {
           aiResponse = 'Desculpa, não consegui entender 😅 Pode me dizer o seu nome?';
         }
       } else if (currentStage === 'awaiting_triage') {
-        // Expecting triage choice - check button first, then text
         const department = isButton 
           ? inferDepartmentFromButton(button_text, button_payload) || inferDepartmentFromText(messageContent)
           : inferDepartmentFromText(messageContent);
@@ -1277,69 +1744,105 @@ serve(async (req) => {
         if (department && conversationId) {
           await assignDepartmentMake(supabase, phoneNumber, conversationId, department);
           
-          const customerName = existingName || '';
-          const nameGreeting = customerName ? `, ${customerName}` : '';
+          const nameGreeting = existingName ? `, ${existingName}` : '';
           
-          // Department-specific pre-attendance prompts
           if (department === 'locacao') {
-            aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar em Florianópolis.\n\nPra eu buscar as melhores opções, me conta:\n\n📍 Qual região você prefere? (Centro, praias do Norte, Sul da Ilha, Continente...)`;
+            aiResponse = `Ótimo${nameGreeting}! 🏠\n\nVou te ajudar a encontrar o imóvel ideal para alugar em Florianópolis.\n\nPra buscar as melhores opções, me conta:\n📍 Qual região você prefere?`;
           } else if (department === 'vendas') {
-            aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nPra começar: você está buscando algo para *morar* ou para *investir*?`;
+            aiResponse = `Excelente${nameGreeting}! 🏡\n\nVou te ajudar a encontrar o imóvel dos seus sonhos.\n\nPra começar: você está buscando para *morar* ou para *investir*?`;
           } else {
-            aiResponse = `Perfeito${nameGreeting}! 😊\n\nSou da Smolka e vou te ajudar com sua solicitação.\n\nPor favor, me conta qual é sua demanda:\n\n📄 Boleto / 2ª via\n📝 Contrato\n🔧 Manutenção\n❓ Outra questão`;
+            aiResponse = `Perfeito${nameGreeting}! 😊\n\nSou da Smolka e vou te ajudar com sua solicitação.\n\nQual sua demanda?\n📄 Boleto/2ª via\n📝 Contrato\n🔧 Manutenção\n❓ Outra questão`;
           }
           
-          console.log(`✅ Department assigned from triage: ${department}`);
+          console.log(`✅ Department assigned: ${department}`);
         } else {
-          // Didn't understand, resend template
           sendTriageTemplate = true;
-          aiResponse = `Desculpa, não entendi sua escolha 😅\n\nPor favor, toque em um dos botões abaixo:`;
+          aiResponse = `Desculpa, não entendi 😅\n\nPor favor, toque em um dos botões:`;
         }
       } else {
-        // Triage completed, use general AI
-        console.log('🤖 Triage completed, using Helena virtual agent');
-        const systemPrompt = buildVirtualAgentPrompt();
-        const result = await callOpenAI(systemPrompt, history, aiPromptMessage);
+        // ===== TRIAGE COMPLETED - USE DEPARTMENT-SPECIFIC PROMPTS =====
+        console.log(`🤖 Triage completed, dept: ${currentDepartment}`);
+        
+        let systemPrompt: string;
+        let tools = toolsWithVista;
+        
+        if (currentDepartment === 'locacao') {
+          systemPrompt = buildLocacaoPrompt(agentConfig, existingName || undefined, history);
+        } else if (currentDepartment === 'vendas') {
+          systemPrompt = buildVendasPrompt(agentConfig, existingName || undefined, history);
+        } else if (currentDepartment === 'administrativo') {
+          systemPrompt = buildAdminPrompt(agentConfig, existingName || undefined);
+          tools = []; // Admin doesn't need property search
+        } else {
+          systemPrompt = buildVirtualAgentPrompt(agentConfig, existingName || undefined);
+        }
+        
+        const result = await callOpenAI(systemPrompt, history, aiPromptMessage, tools);
         aiResponse = result.content;
+
+        // ===== PROCESS TOOL CALLS =====
+        for (const toolCall of result.toolCalls) {
+          const args = JSON.parse(toolCall.function.arguments);
+          console.log(`🔧 Tool call: ${toolCall.function.name}`, args);
+          
+          if (toolCall.function.name === 'buscar_imoveis') {
+            const searchResult = await searchProperties(supabase, args);
+            
+            if (searchResult.success && searchResult.properties?.length > 0) {
+              propertiesToSend = searchResult.properties.slice(0, 3);
+              
+              // Generate follow-up message for properties found
+              if (!aiResponse || aiResponse.length < 10) {
+                const nameGreet = existingName ? `, ${existingName}` : '';
+                aiResponse = `Achei ${propertiesToSend.length} ${propertiesToSend.length === 1 ? 'opção' : 'opções'} pra você${nameGreet}! 🎉`;
+              }
+              
+              console.log(`✅ Found ${propertiesToSend.length} properties`);
+            } else {
+              if (!aiResponse || aiResponse.length < 10) {
+                aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔 Podemos flexibilizar algo?`;
+              }
+            }
+          }
+          
+          if (toolCall.function.name === 'enviar_lead_c2s') {
+            const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
+            const c2sResult = await sendLeadToC2S(supabase, args, phoneNumber, historyText, existingName || undefined);
+            
+            if (c2sResult.success) {
+              c2sTransferred = true;
+              console.log('✅ Lead sent to C2S');
+            }
+          }
+        }
+
+        // Validate response
+        const validation = validateAIResponse(aiResponse);
+        if (!validation.valid) {
+          aiResponse = FALLBACK_RESPONSE;
+        }
       }
     }
 
-    // ========== AUDIO TTS GENERATION ==========
-    
-    // Get audio configuration
+    // ===== AUDIO TTS GENERATION =====
     const audioConfig = await getAudioConfig(supabase);
     let audioResult: AudioResult | null = null;
 
-    // Generate audio ONLY if user sent a voice/audio message (rapport strategy)
-    // This creates a more personal connection by matching their communication style
     const userSentVoice = message_type === 'audio' || message_type === 'voice';
     const shouldGenerateAudio = audioConfig?.audio_enabled && aiResponse && userSentVoice;
 
     if (shouldGenerateAudio) {
-      console.log('🎙️ Generating audio response to match user voice message (rapport strategy)');
+      console.log('🎙️ Generating audio response (rapport strategy)');
       audioResult = await generateAudioResponse(aiResponse, audioConfig);
-      
-      if (audioResult) {
-        console.log(`🎤 Audio generated: ${audioResult.audioUrl}`);
-      }
-    } else if (audioConfig?.audio_enabled && !userSentVoice) {
-      console.log('💬 Text-only response (user sent text, not voice)');
     }
 
-    // Save outbound message (AI response) with audio info if available
+    // Save outbound message
     if (aiResponse && conversationId) {
       await saveMessage(
-        supabase, 
-        conversationId, 
-        phoneNumber, 
-        aiResponse, 
-        'outbound',
+        supabase, conversationId, phoneNumber, aiResponse, 'outbound',
         undefined,
-        audioResult ? {
-          type: 'audio',
-          url: audioResult.audioUrl,
-          mimeType: audioResult.contentType
-        } : undefined
+        audioResult ? { type: 'audio', url: audioResult.audioUrl, mimeType: audioResult.contentType } : undefined,
+        currentDepartment
       );
     }
 
@@ -1352,7 +1855,7 @@ serve(async (req) => {
     }
 
     // Log the interaction
-    const { error: logError } = await supabase.from('activity_logs').insert({
+    await supabase.from('activity_logs').insert({
       user_id: '00000000-0000-0000-0000-000000000000',
       action_type: 'make_webhook_processed',
       target_table: 'messages',
@@ -1362,21 +1865,17 @@ serve(async (req) => {
         development_detected: developmentDetected,
         c2s_transferred: c2sTransferred,
         conversation_id: conversationId,
-        message_preview: messageContent.substring(0, 100),
-        media_processed: mediaProcessed || null,
+        department: currentDepartment,
+        properties_found: propertiesToSend.length,
         audio_generated: !!audioResult
       }
     });
 
-    if (logError) {
-      console.error('❌ Error logging activity:', logError);
-    }
+    console.log(`✅ Processed - Agent: ${agent}, Dept: ${currentDepartment}, Props: ${propertiesToSend.length}, Audio: ${!!audioResult}`);
 
-    let agentLabel = agent === 'helena' ? 'helena' : 'helena';
-    console.log(`✅ Make webhook processed - Agent: ${agentLabel}, Response length: ${aiResponse.length}${mediaProcessed ? `, Media: ${mediaProcessed.type}` : ''}${audioResult ? ', Audio: ✅' : ''}`);
-
-    // Get current triage stage for response metadata
+    // Get final triage stage
     const finalState = await getConversationState(supabase, phoneNumber);
+    
     return new Response(
       JSON.stringify({
         success: true,
@@ -1384,24 +1883,31 @@ serve(async (req) => {
         phone: phoneNumber,
         agent,
         conversation_id: conversationId,
-        // Template to send (for triage flow with buttons)
-        send_template: sendTriageTemplate ? {
-          name: 'triagem',
-          language: 'pt_BR'
-        } : null,
-        // Audio information for Make to use
+        department: currentDepartment,
+        // Properties found for Make to send
+        properties: propertiesToSend.length > 0 ? propertiesToSend.map(p => ({
+          codigo: p.codigo,
+          foto_destaque: p.foto_destaque,
+          tipo: p.tipo,
+          bairro: p.bairro,
+          quartos: p.quartos,
+          preco_formatado: p.preco_formatado,
+          link: p.link
+        })) : undefined,
+        // Template to send
+        send_template: sendTriageTemplate ? { name: 'triagem', language: 'pt_BR' } : null,
+        // Audio for Make to send
         audio: audioResult ? {
           url: audioResult.audioUrl,
           type: audioResult.contentType,
           is_voice_message: audioResult.isVoiceMessage
         } : null,
+        // C2S transfer status
+        c2s_transferred: c2sTransferred,
         metadata: {
           development_detected: developmentDetected,
-          c2s_transferred: c2sTransferred,
-          contact_name: contact_name,
           media_processed: mediaProcessed || null,
           audio_enabled: audioConfig?.audio_enabled || false,
-          audio_mode: audioConfig?.audio_mode || null,
           triage_stage: finalState?.triage_stage || null
         }
       }),
@@ -1415,7 +1921,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: false, 
         error: error.message || 'Internal server error',
-        result: 'Desculpe, tive um problema técnico. Pode tentar novamente em instantes?'
+        result: 'Desculpe, tive um problema técnico. Pode tentar novamente?'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
