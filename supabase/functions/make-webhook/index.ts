@@ -857,6 +857,10 @@ serve(async (req) => {
 
     // Parse request body
     const body: MakeWebhookRequest = await req.json();
+    
+    // Debug: log raw payload for analysis
+    console.log('📦 Raw payload keys:', Object.keys(body).join(', '));
+    
     const { 
       phone, 
       message, 
@@ -870,6 +874,16 @@ serve(async (req) => {
       media_caption,
       media_filename
     } = body;
+
+    // Check if this is a status callback (no phone = likely delivery/read notification)
+    // These callbacks don't have the data we need, so we skip them silently with 200 OK
+    if (!phone && !message && !media_url) {
+      console.log('📌 Ignoring status callback (no phone/message/media)');
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: 'status_callback' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log(`📥 Make webhook received - Phone: ${phone}, Type: ${message_type || 'text'}, Message: "${message?.substring(0, 50) || '[media]'}..."`);
 
@@ -937,6 +951,7 @@ serve(async (req) => {
 
     // Validate required fields (phone is always required, message OR media_url must exist)
     if (!phone || (!message && !media_url)) {
+      console.warn('⚠️ Incomplete payload:', { phone: !!phone, message: !!message, media_url: !!media_url, keys: Object.keys(body) });
       return new Response(
         JSON.stringify({ success: false, error: 'Missing required fields: phone and (message or media_url)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
