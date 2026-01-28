@@ -1,73 +1,186 @@
 
 
-# Correção: Triagem Não Iniciada - Lead Associado ao Villa Maggiore
+# Disparo do Template de Triagem no Fluxo do Make
 
-## Diagnóstico
+## Objetivo
 
-Os logs confirmam exatamente o problema:
+Fazer com que o fluxo do Make dispare o template oficial `triagem_ia` com os botões de quick reply (Comprar, Alugar, Já sou cliente) quando chegar no momento de triagem, ao invés de enviar apenas texto.
+
+## Análise do Template
+
+O template `triagem_ia` já existe e está ativo:
 
 ```
-🏗️ Development lead found: Villa Maggiore
-⛔ Development "Villa Maggiore" is handled by direct WhatsApp API (48 23980016), not Make (48 91631011). Skipping.
+Nome: triagem_ia
+Categoria: MARKETING
+Componentes:
+- BODY: "Pra que eu consiga te encaminhar para o *Setor responsável*, selecione um botão."
+- BUTTONS (QUICK_REPLY):
+  - "Comprar"
+  - "Alugar" 
+  - "Já sou cliente"
 ```
 
-### Causa Raiz
+## Desafio Técnico
 
-O telefone **554888182882** possui um registro na tabela `portal_leads_log` criado em 26/01/2026 (há ~44 horas), que ainda está **dentro do período de 72 horas**:
+O Make.com usa seu próprio módulo WhatsApp (número 4891631011), não a API direta (4823980016). O make-webhook retorna um JSON que o Make usa para enviar respostas.
 
-| Campo | Valor |
-|-------|-------|
-| Telefone | 554888182882 |
-| Empreendimento | Villa Maggiore |
-| Idade | 1 dia 19:44:11 |
-| Dentro das 72h? | **SIM** |
+**Solução**: Adicionar ao JSON de resposta um campo `send_template` que instrui o Make a enviar um template em vez de texto simples.
 
-A função `checkDevelopmentLead` encontra esse registro e assume que é um lead do Villa Maggiore. Como implementamos o bloqueio de Villa Maggiore no Make, o sistema faz **skip** e a triagem nunca acontece.
+## Alterações Técnicas
 
----
+### Arquivo: `supabase/functions/make-webhook/index.ts`
 
-## Solução: Limpar também a `portal_leads_log`
+#### 1. Novo campo no retorno JSON (linha ~1296-1318)
 
-Precisamos adicionar a limpeza da `portal_leads_log` ao reset do contato:
-
-```sql
--- Adicionar à limpeza de reset
-DELETE FROM portal_leads_log WHERE contact_phone = '554888182882';
+Atualmente retorna:
+```typescript
+{
+  success: true,
+  result: aiResponse,      // Texto para o Make enviar
+  audio: {...},
+  metadata: {...}
+}
 ```
 
----
-
-## Plano de Implementação
-
-### 1. Executar limpeza adicional
-
-Criar uma migration para limpar o registro antigo:
-
-```sql
--- Limpar portal_leads_log para permitir teste de triagem
-DELETE FROM portal_leads_log WHERE contact_phone = '554888182882';
+Novo formato quando houver template:
+```typescript
+{
+  success: true,
+  result: aiResponse,       // Texto fallback
+  send_template: {          // 🆕 Instrução para Make enviar template
+    name: 'triagem_ia',
+    language: 'pt_BR'
+  },
+  audio: {...},
+  metadata: {...}
+}
 ```
 
-### 2. Atualizar documentação de reset
+#### 2. Modificar fluxo de triagem para incluir template (linhas ~1107-1126 e ~1170-1189)
 
-Para futuros resets, incluir a tabela `portal_leads_log` na lista de tabelas a limpar.
+Quando o estágio mudar para `awaiting_triage`, além da mensagem de texto, adicionar flag para enviar template:
 
----
+```typescript
+// Variável para controle de template
+let sendTriageTemplate = false;
 
-## Alterações
+// No fluxo de triagem, quando chegar na parte de mostrar opções:
+if (!currentStage || currentStage === 'greeting') {
+  if (existingName) {
+    // Já tem nome - enviar template de triagem
+    aiResponse = `Prazer em falar com você, ${existingName}! 😊`;
+    sendTriageTemplate = true;  // 🆕 Flag para enviar template
+    await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
+  } else {
+    aiResponse = `Olá! Aqui é a Helena da Smolka Imóveis 🏠\n\nComo você se chama?`;
+    await updateTriageStage(supabase, phoneNumber, 'awaiting_name');
+  }
+}
 
-| Arquivo | Tipo | Alteração |
-|---------|------|-----------|
-| Nova migration | SQL | Deletar registros de `portal_leads_log` para o telefone de teste |
+// Quando recebe o nome:
+if (currentStage === 'awaiting_name') {
+  const detectedName = extractNameFromMessage(messageContent);
+  if (detectedName) {
+    await saveContactNameMake(supabase, phoneNumber, detectedName);
+    aiResponse = `Prazer, ${detectedName}! 😊`;
+    sendTriageTemplate = true;  // 🆕 Flag para enviar template
+    await updateTriageStage(supabase, phoneNumber, 'awaiting_triage');
+  }
+}
+```
 
----
+#### 3. Incluir no retorno JSON (linha ~1296)
+
+```typescript
+return new Response(
+  JSON.stringify({
+    success: true,
+    result: aiResponse,
+    // 🆕 Template para Make enviar (quando aplicável)
+    send_template: sendTriageTemplate ? {
+      name: 'triagem_ia',
+      language: 'pt_BR'
+    } : null,
+    phone: phoneNumber,
+    agent,
+    conversation_id: conversationId,
+    audio: audioResult ? {...} : null,
+    metadata: {...}
+  }),
+  { status: 200, headers: {...} }
+);
+```
+
+## Fluxo Corrigido
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    MAKE WEBHOOK - TRIAGEM                          │
+└───────────────────────────┬────────────────────────────────────────┘
+                            │
+                            ▼
+              ┌─────────────────────────────┐
+              │   Primeira mensagem?        │
+              └──────────────┬──────────────┘
+                    ┌────────┴────────┐
+                    │                 │
+                    ▼                 ▼
+         ┌──────────────────┐   ┌─────────────────────┐
+         │  Já tem nome?    │   │  Pergunta existente │
+         └────────┬─────────┘   │  (continua fluxo)   │
+                  │             └─────────────────────┘
+         ┌────────┴────────┐
+         │                 │
+         ▼                 ▼
+┌────────────────┐  ┌─────────────────────────────────────┐
+│  NÃO          │  │  SIM                                │
+│  Perguntar    │  │  Saudar + ENVIAR TEMPLATE triagem_ia│
+│  o nome       │  │  (botões: Comprar/Alugar/Cliente)   │
+└───────┬───────┘  └──────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────┐
+│  Recebe nome do cliente    │
+└──────────────┬─────────────┘
+               │
+               ▼
+┌────────────────────────────────────────┐
+│  Cumprimentar + ENVIAR TEMPLATE        │
+│  triagem_ia com botões                 │
+└────────────────────────────────────────┘
+```
+
+## Configuração do Make.com
+
+O Make.com precisará:
+1. Verificar se `send_template` existe no JSON de resposta
+2. Se existir, usar módulo de template do WhatsApp ao invés de mensagem de texto
+3. Se não existir, enviar o `result` como texto normal
+
+## Resumo das Alterações
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/make-webhook/index.ts` | Adicionar variável `sendTriageTemplate`, setar flag quando for mostrar opções de triagem, incluir `send_template` no JSON de resposta |
 
 ## Resultado Esperado
 
-Após a limpeza:
+1. Cliente envia "Olá"
+2. Make webhook retorna:
+   - `result`: "Olá! Aqui é a Helena da Smolka Imóveis 🏠\n\nComo você se chama?"
+   - `send_template`: null
+3. Make envia texto normalmente
 
-1. `checkDevelopmentLead` retornará `null` (sem lead de empreendimento)
-2. `detectDevelopmentFromMessage` não encontrará "villa maggiore" na mensagem "Olá"
-3. O fluxo entrará na **triagem genérica** da Helena
-4. A Helena perguntará: "Olá! Como posso te ajudar? Você quer: 1) Alugar, 2) Comprar, ou 3) Já é cliente?"
+4. Cliente responde "João"
+5. Make webhook retorna:
+   - `result`: "Prazer, João! 😊"
+   - `send_template`: { name: "triagem_ia", language: "pt_BR" }
+6. Make envia:
+   - Primeiro: texto "Prazer, João! 😊"
+   - Depois: template com botões (Comprar/Alugar/Já sou cliente)
+
+7. Cliente clica no botão "Alugar"
+8. Make envia resposta do botão
+9. Departamento é atribuído corretamente
 
