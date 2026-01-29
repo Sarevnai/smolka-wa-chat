@@ -1,119 +1,143 @@
 
-# Plano: Registrar Mensagens do Make.com na Plataforma
+# Plano: Disparar Dados para Webhook Externo do Make.com
 
-## Problema Identificado
-O Make.com está enviando as fotos dos imóveis diretamente via módulo nativo do WhatsApp, mas essas mensagens **não estão sendo registradas no banco de dados**. Por isso, vocês não veem o contexto das imagens enviadas na plataforma.
+## Objetivo
+Adicionar um disparo HTTP para o webhook `https://hook.us2.make.com/crfpetpkyvxwn1lrhq2aqmmbjvgnhhl3` com os dados processados pelo `make-webhook`, permitindo que o Make.com envie as mensagens via módulo nativo do WhatsApp enquanto a plataforma mantém o registro completo da conversa.
 
-## Solução
-Substituir o módulo nativo "WhatsApp > Send an Image" por um **HTTP Request** que chama a edge function `send-wa-media` do Supabase. Essa função:
-1. Envia a imagem via WhatsApp API
-2. **Salva a mensagem no banco de dados**
-3. **Vincula automaticamente à conversa correta**
+## Fluxo Proposto
 
----
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     FLUXO ATUALIZADO                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   [Make.com] → [make-webhook Supabase]                                  │
+│                        │                                                │
+│                        ▼                                                │
+│              ┌─────────────────────┐                                    │
+│              │  Processa mensagem  │                                    │
+│              │  Busca imóveis      │                                    │
+│              │  Gera resposta IA   │                                    │
+│              └─────────────────────┘                                    │
+│                        │                                                │
+│          ┌─────────────┴─────────────┐                                  │
+│          ▼                           ▼                                  │
+│   ┌─────────────────┐     ┌─────────────────────────────┐              │
+│   │ Salva mensagens │     │ Dispara para webhook externo│              │
+│   │ no banco (DB)   │     │ hook.us2.make.com/...       │              │
+│   └─────────────────┘     └─────────────────────────────┘              │
+│          │                           │                                  │
+│          ▼                           ▼                                  │
+│   [Plataforma Lovable]     [Make.com → WhatsApp Nativo]                │
+│   (vê todo o contexto)     (envia p/ cliente real)                     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-## Configuração no Make.com
+## Payload Enviado para o Webhook Externo
 
-### Passo 1: Remover o Módulo "Send an Image"
-- Delete o módulo nativo do WhatsApp que está dentro do Iterator
-
-### Passo 2: Adicionar HTTP Request (dentro do Iterator)
-No lugar do módulo removido, adicione um novo **HTTP > Make a request**
-
-#### Configurações:
-| Campo | Valor |
-|-------|-------|
-| **URL** | `https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/send-wa-media` |
-| **Method** | POST |
-| **Headers** | `Content-Type: application/json`<br>`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwanhzZ3h4aG9nemtrdXpueWtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NDk3NjcsImV4cCI6MjA3MzAyNTc2N30.tTbVFi-CkgJZroJa-V0QPAPU5sYU3asmD-2yn2ytca0` |
-| **Body Type** | Raw (application/json) |
-
-#### Body (JSON):
 ```json
 {
-  "to": "{{1.messages[1].from}}",
-  "mediaUrl": "{{15.foto_destaque}}",
-  "mediaType": "image/jpeg",
-  "caption": "🏠 *{{15.tipo}}* - {{15.bairro}}\n\n🛏️ {{15.quartos}} quarto(s)\n💰 {{15.preco_formatado}}\n\n🔗 {{15.link}}"
+  "phone": "5548991234567",
+  "result": "Encontrei 3 imóveis perfeitos para você!",
+  "properties": [
+    {
+      "codigo": "1234",
+      "foto_destaque": "https://...",
+      "tipo": "Apartamento",
+      "bairro": "Centro",
+      "quartos": "2",
+      "preco_formatado": "R$ 2.500",
+      "link": "https://..."
+    }
+  ],
+  "audio": { "url": "...", "type": "audio/mpeg" },
+  "conversation_id": "uuid..."
 }
 ```
 
-> **Nota**: Substitua `15` pelo ID real do seu módulo Iterator
+## Alteracoes Tecnicas
 
----
+### Arquivo: `supabase/functions/make-webhook/index.ts`
 
-## Diagrama do Fluxo Atualizado
+1. **Adicionar funcao de disparo para webhook externo** (antes do return final, linha ~1879):
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                     CENÁRIO MAKE.COM                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│   [1] WhatsApp Watch Events                                     │
-│           │                                                     │
-│           ▼                                                     │
-│   ┌───────────────────────────────────────┐                    │
-│   │ Filtro: messages[1].id exists         │                    │
-│   └───────────────────────────────────────┘                    │
-│           │                                                     │
-│           ▼                                                     │
-│   [14] HTTP → make-webhook (Supabase)                          │
-│           │                                                     │
-│           ▼                                                     │
-│   ┌───────────────────────────────────────┐                    │
-│   │            ROUTER                      │                    │
-│   └───────────────────────────────────────┘                    │
-│        │                              │                         │
-│   [Tem imóveis]                 [Sem imóveis]                   │
-│        │                              │                         │
-│        ▼                              ▼                         │
-│   [Iterator]                  HTTP → send-wa-message            │
-│   {{14.data.properties}}      (envia data.result)               │
-│        │                                                        │
-│        ▼ (para cada imóvel)                                     │
-│   ┌─────────────────────────────────────┐                      │
-│   │  HTTP → send-wa-media (Supabase)    │  ← NOVO              │
-│   │  • Envia imagem via WhatsApp        │                      │
-│   │  • Salva no banco de dados          │                      │
-│   │  • Vincula à conversa               │                      │
-│   └─────────────────────────────────────┘                      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+```typescript
+// Dispara para webhook externo do Make.com para envio via WhatsApp nativo
+const externalWebhookUrl = 'https://hook.us2.make.com/crfpetpkyvxwn1lrhq2aqmmbjvgnhhl3';
+
+const webhookPayload = {
+  phone: phoneNumber,
+  result: aiResponse,
+  properties: propertiesToSend.length > 0 ? propertiesToSend.map(p => ({
+    codigo: p.codigo,
+    foto_destaque: p.foto_destaque,
+    tipo: p.tipo,
+    bairro: p.bairro,
+    quartos: p.quartos,
+    preco_formatado: p.preco_formatado,
+    link: p.link
+  })) : undefined,
+  audio: audioResult ? {
+    url: audioResult.audioUrl,
+    type: audioResult.contentType,
+    is_voice_message: audioResult.isVoiceMessage
+  } : undefined,
+  conversation_id: conversationId,
+  department: currentDepartment,
+  contact_name: existingName || null
+};
+
+try {
+  console.log('📤 Dispatching to external webhook...');
+  const webhookResponse = await fetch(externalWebhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(webhookPayload)
+  });
+  console.log(`✅ External webhook response: ${webhookResponse.status}`);
+} catch (webhookError) {
+  console.error('⚠️ External webhook dispatch failed:', webhookError);
+  // Nao bloqueia o fluxo principal
+}
 ```
 
----
+2. **Posicao no codigo**: Inserir apos salvar a mensagem no banco (linha 1847) e antes do return (linha 1879)
 
-## Benefícios da Mudança
+## Configuracao no Make.com (Segundo Cenario)
 
-| Antes (Módulo Nativo) | Depois (send-wa-media) |
-|----------------------|------------------------|
-| ❌ Imagem vai para o cliente | ✅ Imagem vai para o cliente |
-| ❌ Não aparece na plataforma | ✅ Aparece no chat da plataforma |
-| ❌ Sem contexto do atendimento | ✅ Vinculada à conversa correta |
-| ❌ Não salva no banco | ✅ Registrada na tabela `messages` |
+O webhook externo (`hook.us2.make.com/...`) deve ter a seguinte estrutura:
 
----
+```text
+[Webhook] → [Router]
+               │
+     ┌─────────┴─────────┐
+     │                   │
+[Tem properties?]   [Sem properties]
+     │                   │
+     ▼                   ▼
+[Iterator]          [WhatsApp: Send Text]
+{{properties}}      {{result}}
+     │
+     ▼
+[WhatsApp: Send Image]
+• Media URL: {{foto_destaque}}
+• Caption: formatado
+• To: {{phone}}
+```
 
-## Configuração Extra: Enviar Mensagem de Texto Final
+## Beneficios
 
-Após o Iterator terminar, adicione outro HTTP Request para enviar o texto resumo (`data.result`):
+| Aspecto | Resultado |
+|---------|-----------|
+| Plataforma Lovable | Ve todas as mensagens (inbound + outbound) |
+| Cliente WhatsApp | Recebe imagens e texto via modulo nativo |
+| Janela 24h | Contornada pelo modulo nativo do Make.com |
+| Rastreabilidade | 100% das interacoes registradas no banco |
 
-| Campo | Valor |
-|-------|-------|
-| **URL** | `https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/send-wa-message` |
-| **Method** | POST |
-| **Body** | `{"to": "{{1.messages[1].from}}", "text": "{{14.data.result}}"}` |
+## Resumo das Acoes
 
----
-
-## Resumo das Ações
-1. **Remover** módulo nativo "WhatsApp > Send an Image"
-2. **Adicionar** HTTP Request dentro do Iterator chamando `send-wa-media`
-3. **Configurar** headers com Authorization Bearer
-4. **Mapear** campos: to, mediaUrl, mediaType, caption
-5. **Testar** enviando mensagem real e verificando na plataforma
-
----
-
-## Observação Importante
-Essa solução usa as edge functions existentes do projeto. Não é necessário alterar nenhum código no Supabase - apenas a configuração do Make.com.
+1. Editar `supabase/functions/make-webhook/index.ts`
+2. Adicionar fetch para o webhook externo com o payload completo
+3. Configurar segundo cenario no Make.com para receber e enviar via WhatsApp nativo
+4. Testar fluxo completo: mensagem do cliente → resposta aparece na plataforma E chega no WhatsApp
