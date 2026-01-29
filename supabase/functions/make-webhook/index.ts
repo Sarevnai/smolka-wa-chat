@@ -1873,6 +1873,44 @@ serve(async (req) => {
 
     console.log(`✅ Processed - Agent: ${agent}, Dept: ${currentDepartment}, Props: ${propertiesToSend.length}, Audio: ${!!audioResult}`);
 
+    // ===== DISPATCH TO EXTERNAL MAKE.COM WEBHOOK =====
+    const externalWebhookUrl = 'https://hook.us2.make.com/crfpetpkyvxwn1lrhq2aqmmbjvgnhhl3';
+    
+    const webhookPayload = {
+      phone: phoneNumber,
+      result: aiResponse,
+      properties: propertiesToSend.length > 0 ? propertiesToSend.map(p => ({
+        codigo: p.codigo,
+        foto_destaque: p.foto_destaque,
+        tipo: p.tipo,
+        bairro: p.bairro,
+        quartos: p.quartos,
+        preco_formatado: p.preco_formatado,
+        link: p.link
+      })) : undefined,
+      audio: audioResult ? {
+        url: audioResult.audioUrl,
+        type: audioResult.contentType,
+        is_voice_message: audioResult.isVoiceMessage
+      } : undefined,
+      conversation_id: conversationId,
+      department: currentDepartment,
+      contact_name: existingName || null
+    };
+
+    try {
+      console.log('📤 Dispatching to external webhook...');
+      const webhookResponse = await fetch(externalWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(webhookPayload)
+      });
+      console.log(`✅ External webhook response: ${webhookResponse.status}`);
+    } catch (webhookError) {
+      console.error('⚠️ External webhook dispatch failed:', webhookError);
+      // Não bloqueia o fluxo principal
+    }
+
     // Get final triage stage
     const finalState = await getConversationState(supabase, phoneNumber);
     
