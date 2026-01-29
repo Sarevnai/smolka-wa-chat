@@ -665,23 +665,41 @@ function buildLocacaoPrompt(config: AIAgentConfig, contactName?: string, history
 
 ${hasName ? `👤 CLIENTE: ${contactName} - Use o nome naturalmente.` : '⭐ Ainda não sabemos o nome. Pergunte: "A propósito, como posso te chamar?"'}
 
-${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas no histórico.` : ''}
+${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas.` : ''}
 
 🎯 OBJETIVO: Ajudar o cliente a ALUGAR um imóvel em Florianópolis.
 
 📍 FLUXO DE ATENDIMENTO - LOCAÇÃO:
 1. QUALIFICAÇÃO: Coletar região, tipo, quartos, faixa de preço
-2. BUSCA: Usar buscar_imoveis IMEDIATAMENTE quando tiver 2+ critérios
-3. APRESENTAÇÃO: Dizer "Achei uma opção ótima!" (sistema envia foto)
-4. FOLLOW-UP: Perguntar "Faz sentido pra você?"
-5. AGENDAMENTO: Coletar dados para visita
+2. BUSCA: Usar buscar_imoveis quando tiver 2+ critérios
+3. APRESENTAÇÃO: Sistema envia 1 imóvel por vez
+4. PERGUNTA: "Esse imóvel faz sentido pra você?"
+5. AGUARDE resposta antes de mostrar outro
 
 ${generateRegionKnowledge()}
 
-🏠 BUSCA DE IMÓVEIS:
-- SEMPRE defina finalidade='locacao'
-- Use buscar_imoveis assim que tiver bairro OU tipo
-- Não espere ter TUDO - comece a buscar!
+🏠 REGRAS PARA APRESENTAR IMÓVEIS:
+- NUNCA envie lista grande. Sistema envia 1 imóvel por vez.
+- Estrutura obrigatória:
+  1. Contexto: "Encontrei um imóvel que pode combinar com o que você busca."
+  2. Dados: tipo, bairro, quartos, preço, diferencial
+  3. Pergunta: "Esse imóvel faz sentido pra você?"
+- AGUARDE a resposta antes de mostrar outro imóvel
+- Se cliente disser NÃO: pergunte o que não se encaixou
+- Se cliente demonstrar INTERESSE: iniciar encaminhamento ao consultor
+
+🚫 REGRA CRÍTICA - NUNCA AGENDAR VISITAS:
+- NUNCA ofereça datas, horários ou confirmação de visita
+- SEMPRE diga: "Quem vai agendar a visita é um consultor da Smolka Imóveis"
+- SEMPRE diga: "Vou te conectar com um consultor especializado"
+
+📤 FLUXO DE ENCAMINHAMENTO C2S:
+Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
+1. Confirmar: "Perfeito! Posso te conectar com um consultor para organizar a visita?"
+2. Se concordar: coletar/confirmar nome, telefone, código do imóvel
+3. Usar enviar_lead_c2s com todos os dados
+4. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
+5. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
 
 ⚠️ REGRAS CRÍTICAS:
 - NUNCA repita perguntas já respondidas
@@ -689,11 +707,11 @@ ${generateRegionKnowledge()}
 - Mensagens curtas e diretas (max 3 linhas)
 - Um emoji por mensagem no máximo
 
-💬 ESTILO LAÍS (consultivo e acolhedor):
-- "Me conta, o que você tá buscando?"
-- "Achei uma opção ótima pra você! 🎉"
-- "Faz sentido pra você? 😊"
-- "Posso agendar uma visita?"`;
+💬 ESTILO CONSULTIVO:
+- "Encontrei um imóvel que pode combinar com o que você busca! 🏠"
+- "Esse imóvel faz sentido pra você?"
+- "Entendi! O que não se encaixou? Preço, tamanho ou localização?"
+- "Vou te conectar com um consultor especializado 😊"`;
 }
 
 function buildVendasPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[]): string {
@@ -712,25 +730,45 @@ ${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já res
 1. DESCOBRIR: Morar ou investir?
 2. QUALIFICAÇÃO: Região, tipo, quartos, faixa de preço
 3. BUSCA: Usar buscar_imoveis quando tiver 2+ critérios
-4. APRESENTAÇÃO: Mostrar opções encontradas
-5. TRANSFERÊNCIA: Usar enviar_lead_c2s quando qualificado
+4. APRESENTAÇÃO: Sistema envia 1 imóvel por vez
+5. PERGUNTA: "Esse imóvel faz sentido pra você?"
+6. AGUARDE resposta antes de mostrar outro
 
 ${generateRegionKnowledge()}
 
-🏠 BUSCA DE IMÓVEIS:
-- SEMPRE defina finalidade='venda'
-- Use buscar_imoveis assim que tiver bairro OU tipo
-- Normalize bairros antes de buscar
+🏠 REGRAS PARA APRESENTAR IMÓVEIS:
+- NUNCA envie lista grande. Sistema envia 1 imóvel por vez.
+- Estrutura obrigatória:
+  1. Contexto: "Encontrei um imóvel que pode combinar com o que você busca."
+  2. Dados: tipo, bairro, quartos, preço, diferencial
+  3. Pergunta: "Esse imóvel faz sentido pra você?"
+- AGUARDE a resposta antes de mostrar outro imóvel
+- Se cliente disser NÃO: pergunte o que não se encaixou
+- Se cliente demonstrar INTERESSE: iniciar encaminhamento ao consultor
 
-📤 TRANSFERÊNCIA C2S:
-Quando tiver: nome + interesse + região + tipo + faixa de preço
-→ Usar enviar_lead_c2s com resumo
-→ Dizer: "Vou te conectar com um especialista em vendas!"
+🚫 REGRA CRÍTICA - NUNCA AGENDAR VISITAS:
+- NUNCA ofereça datas, horários ou confirmação de visita
+- SEMPRE diga: "Quem vai agendar a visita é um consultor da Smolka Imóveis"
+- SEMPRE diga: "Vou te conectar com um consultor especializado"
 
-⚠️ REGRAS:
+📤 FLUXO DE ENCAMINHAMENTO C2S:
+Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
+1. Confirmar: "Perfeito! Posso te conectar com um consultor para organizar a visita?"
+2. Se concordar: coletar/confirmar nome, telefone, código do imóvel
+3. Usar enviar_lead_c2s com todos os dados
+4. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
+5. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
+
+⚠️ REGRAS CRÍTICAS:
 - NUNCA repita perguntas já respondidas
 - Mensagens curtas e diretas
-- Estilo consultivo, não robótico`;
+- Estilo consultivo, não robótico
+
+💬 ESTILO CONSULTIVO:
+- "Encontrei um imóvel que pode combinar com o que você busca! 🏠"
+- "Esse imóvel faz sentido pra você?"
+- "Entendi! O que não se encaixou? Preço, tamanho ou localização?"
+- "Vou te conectar com um consultor especializado 😊"`;
 }
 
 function buildAdminPrompt(config: AIAgentConfig, contactName?: string): string {
@@ -904,6 +942,58 @@ async function sendLeadToC2S(
   } catch (e) {
     console.error('❌ Error calling C2S:', e);
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+// ========== CONSULTATIVE FLOW FUNCTIONS ==========
+
+function analyzePropertyFeedback(message: string): 'positive' | 'negative' | 'neutral' {
+  const positive = /gostei|interess|visitar|marcar|quero|esse|perfeito|[oó]timo|bom|show|pode ser|adorei|amei|lindo|maravilh|excelente|isso|sim|quero ver|agendar/i;
+  const negative = /não|caro|longe|pequeno|grande|outro|próximo|diferente|menos|mais|demais|muito|acima|baixo|descartado|n[aã]o gostei|ruim|horr[ií]vel|nao/i;
+  
+  if (positive.test(message)) return 'positive';
+  if (negative.test(message)) return 'negative';
+  return 'neutral';
+}
+
+async function getConsultativeState(supabase: any, phoneNumber: string): Promise<{
+  pending_properties: any[];
+  current_property_index: number;
+  awaiting_property_feedback: boolean;
+} | null> {
+  try {
+    const { data } = await supabase
+      .from('conversation_states')
+      .select('pending_properties, current_property_index, awaiting_property_feedback')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+    return data;
+  } catch (error) {
+    console.error('❌ Error getting consultative state:', error);
+    return null;
+  }
+}
+
+async function updateConsultativeState(
+  supabase: any, 
+  phoneNumber: string, 
+  updates: {
+    pending_properties?: any[];
+    current_property_index?: number;
+    awaiting_property_feedback?: boolean;
+  }
+): Promise<void> {
+  try {
+    await supabase
+      .from('conversation_states')
+      .upsert({
+        phone_number: phoneNumber,
+        ...updates,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'phone_number' });
+    console.log(`📊 Consultative state updated:`, updates);
+  } catch (error) {
+    console.error('❌ Error updating consultative state:', error);
   }
 }
 
@@ -1763,55 +1853,149 @@ serve(async (req) => {
         // ===== TRIAGE COMPLETED - USE DEPARTMENT-SPECIFIC PROMPTS =====
         console.log(`🤖 Triage completed, dept: ${currentDepartment}`);
         
-        let systemPrompt: string;
-        let tools = toolsWithVista;
+        // Check for consultative flow state (awaiting feedback on property)
+        const consultativeState = await getConsultativeState(supabase, phoneNumber);
+        const isAwaitingFeedback = consultativeState?.awaiting_property_feedback === true;
+        const pendingProperties = consultativeState?.pending_properties || [];
+        const currentIndex = consultativeState?.current_property_index || 0;
         
-        if (currentDepartment === 'locacao') {
-          systemPrompt = buildLocacaoPrompt(agentConfig, existingName || undefined, history);
-        } else if (currentDepartment === 'vendas') {
-          systemPrompt = buildVendasPrompt(agentConfig, existingName || undefined, history);
-        } else if (currentDepartment === 'administrativo') {
-          systemPrompt = buildAdminPrompt(agentConfig, existingName || undefined);
-          tools = []; // Admin doesn't need property search
-        } else {
-          systemPrompt = buildVirtualAgentPrompt(agentConfig, existingName || undefined);
-        }
-        
-        const result = await callOpenAI(systemPrompt, history, aiPromptMessage, tools);
-        aiResponse = result.content;
-
-        // ===== PROCESS TOOL CALLS =====
-        for (const toolCall of result.toolCalls) {
-          const args = JSON.parse(toolCall.function.arguments);
-          console.log(`🔧 Tool call: ${toolCall.function.name}`, args);
+        if (isAwaitingFeedback && pendingProperties.length > 0) {
+          // Analyze feedback on previously presented property
+          const feedback = analyzePropertyFeedback(messageContent);
+          console.log(`📊 Property feedback: ${feedback}`);
           
-          if (toolCall.function.name === 'buscar_imoveis') {
-            const searchResult = await searchProperties(supabase, args);
+          if (feedback === 'positive') {
+            // Client interested - trigger C2S flow
+            console.log('✅ Positive feedback - initiating C2S flow');
+            const currentProperty = pendingProperties[currentIndex];
             
-            if (searchResult.success && searchResult.properties?.length > 0) {
-              propertiesToSend = searchResult.properties.slice(0, 3);
-              
-              // Generate follow-up message for properties found
-              if (!aiResponse || aiResponse.length < 10) {
-                const nameGreet = existingName ? `, ${existingName}` : '';
-                aiResponse = `Achei ${propertiesToSend.length} ${propertiesToSend.length === 1 ? 'opção' : 'opções'} pra você${nameGreet}! 🎉`;
-              }
-              
-              console.log(`✅ Found ${propertiesToSend.length} properties`);
-            } else {
-              if (!aiResponse || aiResponse.length < 10) {
-                aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔 Podemos flexibilizar algo?`;
+            // Update state to stop showing more properties
+            await updateConsultativeState(supabase, phoneNumber, {
+              awaiting_property_feedback: false
+            });
+            
+            // Build context for AI to handle C2S
+            const c2sContext = `
+[CONTEXTO: Cliente demonstrou interesse no imóvel ${currentProperty?.codigo || 'N/A'} - ${currentProperty?.tipo || ''} em ${currentProperty?.bairro || ''}.
+PRÓXIMO PASSO: Confirmar dados do cliente e usar enviar_lead_c2s para transferir.
+LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]`;
+            
+            const systemPrompt = currentDepartment === 'locacao' 
+              ? buildLocacaoPrompt(agentConfig, existingName || undefined, history)
+              : buildVendasPrompt(agentConfig, existingName || undefined, history);
+            
+            const result = await callOpenAI(systemPrompt, history, messageContent + c2sContext, toolsWithVista);
+            aiResponse = result.content;
+            
+            // Process C2S tool call if triggered
+            for (const toolCall of result.toolCalls) {
+              if (toolCall.function.name === 'enviar_lead_c2s') {
+                const args = JSON.parse(toolCall.function.arguments);
+                const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
+                const c2sResult = await sendLeadToC2S(supabase, args, phoneNumber, historyText, existingName || undefined);
+                
+                if (c2sResult.success) {
+                  c2sTransferred = true;
+                  console.log('✅ Lead sent to C2S after positive feedback');
+                }
               }
             }
+            
+          } else if (feedback === 'negative') {
+            // Client not interested - ask why and show next property
+            console.log('📉 Negative feedback - showing next property');
+            
+            const nextIndex = currentIndex + 1;
+            
+            if (nextIndex < pendingProperties.length) {
+              // Show next property
+              propertiesToSend = [pendingProperties[nextIndex]];
+              
+              await updateConsultativeState(supabase, phoneNumber, {
+                current_property_index: nextIndex,
+                awaiting_property_feedback: true
+              });
+              
+              const nameGreet = existingName ? `, ${existingName}` : '';
+              aiResponse = `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
+              
+              console.log(`📤 Showing next property: index ${nextIndex}`);
+            } else {
+              // No more properties
+              await updateConsultativeState(supabase, phoneNumber, {
+                awaiting_property_feedback: false,
+                pending_properties: []
+              });
+              
+              aiResponse = `Entendi! Essas eram as opções que encontrei com esses critérios. 🤔\n\nPodemos ajustar a busca? Me conta o que não se encaixou (preço, tamanho, localização).`;
+            }
+          } else {
+            // Neutral feedback - ask for clarification
+            const currentProperty = pendingProperties[currentIndex];
+            aiResponse = `O que você achou desse imóvel em ${currentProperty?.bairro || 'N/A'}? Faz sentido pra você? 😊`;
+          }
+        } else {
+          // Normal flow - no pending feedback
+          let systemPrompt: string;
+          let tools = toolsWithVista;
+          
+          if (currentDepartment === 'locacao') {
+            systemPrompt = buildLocacaoPrompt(agentConfig, existingName || undefined, history);
+          } else if (currentDepartment === 'vendas') {
+            systemPrompt = buildVendasPrompt(agentConfig, existingName || undefined, history);
+          } else if (currentDepartment === 'administrativo') {
+            systemPrompt = buildAdminPrompt(agentConfig, existingName || undefined);
+            tools = []; // Admin doesn't need property search
+          } else {
+            systemPrompt = buildVirtualAgentPrompt(agentConfig, existingName || undefined);
           }
           
-          if (toolCall.function.name === 'enviar_lead_c2s') {
-            const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
-            const c2sResult = await sendLeadToC2S(supabase, args, phoneNumber, historyText, existingName || undefined);
+          const result = await callOpenAI(systemPrompt, history, aiPromptMessage, tools);
+          aiResponse = result.content;
+
+          // ===== PROCESS TOOL CALLS =====
+          for (const toolCall of result.toolCalls) {
+            const args = JSON.parse(toolCall.function.arguments);
+            console.log(`🔧 Tool call: ${toolCall.function.name}`, args);
             
-            if (c2sResult.success) {
-              c2sTransferred = true;
-              console.log('✅ Lead sent to C2S');
+            if (toolCall.function.name === 'buscar_imoveis') {
+              const searchResult = await searchProperties(supabase, args);
+              
+              if (searchResult.success && searchResult.properties?.length > 0) {
+                // CONSULTATIVE FLOW: Save ALL properties, send only FIRST
+                const allProperties = searchResult.properties.slice(0, 5);
+                
+                await updateConsultativeState(supabase, phoneNumber, {
+                  pending_properties: allProperties,
+                  current_property_index: 0,
+                  awaiting_property_feedback: true
+                });
+                
+                // Send only the FIRST property
+                propertiesToSend = [allProperties[0]];
+                
+                // Generate consultive message
+                if (!aiResponse || aiResponse.length < 10) {
+                  const nameGreet = existingName ? `, ${existingName}` : '';
+                  aiResponse = `Encontrei um imóvel que pode combinar com o que você busca${nameGreet}! 🏠`;
+                }
+                
+                console.log(`✅ Consultative flow: saved ${allProperties.length} properties, sending 1`);
+              } else {
+                if (!aiResponse || aiResponse.length < 10) {
+                  aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔 Podemos flexibilizar algo?`;
+                }
+              }
+            }
+            
+            if (toolCall.function.name === 'enviar_lead_c2s') {
+              const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
+              const c2sResult = await sendLeadToC2S(supabase, args, phoneNumber, historyText, existingName || undefined);
+              
+              if (c2sResult.success) {
+                c2sTransferred = true;
+                console.log('✅ Lead sent to C2S');
+              }
             }
           }
         }
@@ -1873,8 +2057,17 @@ serve(async (req) => {
 
     console.log(`✅ Processed - Agent: ${agent}, Dept: ${currentDepartment}, Props: ${propertiesToSend.length}, Audio: ${!!audioResult}`);
 
-    // Get final triage stage
+    // Get final triage stage and consultative state
     const finalState = await getConversationState(supabase, phoneNumber);
+    const finalConsultativeState = await getConsultativeState(supabase, phoneNumber);
+    
+    // Build presentation state for Make.com
+    const presentationState = finalConsultativeState?.awaiting_property_feedback ? {
+      awaiting_feedback: true,
+      current_index: finalConsultativeState.current_property_index || 0,
+      total_found: (finalConsultativeState.pending_properties || []).length,
+      property_code: propertiesToSend[0]?.codigo || null
+    } : null;
     
     return new Response(
       JSON.stringify({
@@ -1884,7 +2077,7 @@ serve(async (req) => {
         agent,
         conversation_id: conversationId,
         department: currentDepartment,
-        // Properties found for Make to send
+        // Properties found for Make to send (1 at a time in consultative flow)
         properties: propertiesToSend.length > 0 ? propertiesToSend.map(p => ({
           codigo: p.codigo,
           foto_destaque: p.foto_destaque,
@@ -1892,8 +2085,13 @@ serve(async (req) => {
           bairro: p.bairro,
           quartos: p.quartos,
           preco_formatado: p.preco_formatado,
-          link: p.link
+          link: p.link,
+          area_util: p.area_util,
+          vagas: p.vagas,
+          valor_condominio: p.valor_condominio
         })) : undefined,
+        // Consultative presentation state
+        presentation_state: presentationState,
         // Template to send
         send_template: sendTriageTemplate ? { name: 'triagem', language: 'pt_BR' } : null,
         // Audio for Make to send
@@ -1908,7 +2106,8 @@ serve(async (req) => {
           development_detected: developmentDetected,
           media_processed: mediaProcessed || null,
           audio_enabled: audioConfig?.audio_enabled || false,
-          triage_stage: finalState?.triage_stage || null
+          triage_stage: finalState?.triage_stage || null,
+          consultative_flow: !!presentationState
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
