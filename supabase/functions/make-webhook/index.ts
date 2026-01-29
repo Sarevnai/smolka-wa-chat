@@ -902,6 +902,125 @@ async function searchProperties(supabase: any, params: Record<string, any>): Pro
   }
 }
 
+// ========== FALLBACK SEARCH (PROGRESSIVE WIDENING) ==========
+
+interface FallbackSearchResult {
+  success: boolean;
+  properties: any[];
+  searchType: 'exact' | 'sem_quartos' | 'sem_bairro' | 'no_results';
+  originalParams: Record<string, any>;
+  usedParams: Record<string, any>;
+  relaxedFields: string[];
+}
+
+async function searchPropertiesWithFallback(
+  supabase: any, 
+  params: Record<string, any>
+): Promise<FallbackSearchResult> {
+  const relaxedFields: string[] = [];
+  
+  // Attempt 1: Exact search with all criteria
+  console.log('🔍 Fallback search - Attempt 1: exact criteria');
+  let result = await searchProperties(supabase, params);
+  
+  if (result.success && result.properties?.length > 0) {
+    return { 
+      success: true, 
+      properties: result.properties, 
+      searchType: 'exact',
+      originalParams: params,
+      usedParams: params,
+      relaxedFields: []
+    };
+  }
+  
+  // Attempt 2: Remove bedrooms filter
+  if (params.quartos) {
+    console.log('🔍 Fallback search - Attempt 2: removing quartos filter');
+    const paramsNoQuartos = { ...params };
+    delete paramsNoQuartos.quartos;
+    relaxedFields.push('quartos');
+    
+    result = await searchProperties(supabase, paramsNoQuartos);
+    
+    if (result.success && result.properties?.length > 0) {
+      return { 
+        success: true, 
+        properties: result.properties, 
+        searchType: 'sem_quartos',
+        originalParams: params,
+        usedParams: paramsNoQuartos,
+        relaxedFields: ['quartos']
+      };
+    }
+  }
+  
+  // Attempt 3: Remove neighborhood filter (keep only type + price)
+  if (params.bairro) {
+    console.log('🔍 Fallback search - Attempt 3: removing bairro filter');
+    const paramsNoBairro = { ...params };
+    delete paramsNoBairro.bairro;
+    delete paramsNoBairro.quartos;
+    
+    result = await searchProperties(supabase, paramsNoBairro);
+    
+    if (result.success && result.properties?.length > 0) {
+      return { 
+        success: true, 
+        properties: result.properties, 
+        searchType: 'sem_bairro',
+        originalParams: params,
+        usedParams: paramsNoBairro,
+        relaxedFields: ['quartos', 'bairro']
+      };
+    }
+  }
+  
+  // No results found even with relaxed criteria
+  console.log('🔍 Fallback search - No results found');
+  return { 
+    success: true, 
+    properties: [], 
+    searchType: 'no_results',
+    originalParams: params,
+    usedParams: params,
+    relaxedFields: []
+  };
+}
+
+function buildFallbackMessage(
+  searchType: 'exact' | 'sem_quartos' | 'sem_bairro' | 'no_results',
+  originalParams: Record<string, any>,
+  properties: any[],
+  contactName?: string
+): string {
+  const nameGreet = contactName ? `, ${contactName}` : '';
+  
+  switch (searchType) {
+    case 'exact':
+      return `Encontrei uma opção que combina com o que você busca${nameGreet}! 🏠`;
+    
+    case 'sem_quartos':
+      const requestedBedrooms = originalParams.quartos;
+      const foundBedrooms = properties[0]?.quartos;
+      if (foundBedrooms && requestedBedrooms) {
+        return `Não encontrei com ${requestedBedrooms} quarto${requestedBedrooms > 1 ? 's' : ''}${nameGreet}, mas tenho uma opção de ${foundBedrooms} quarto${foundBedrooms > 1 ? 's' : ''} que pode te interessar 🏠`;
+      }
+      return `Encontrei uma opção${nameGreet}! 🏠`;
+    
+    case 'sem_bairro':
+      const requestedNeighborhood = originalParams.bairro;
+      const foundNeighborhood = properties[0]?.bairro;
+      if (requestedNeighborhood && foundNeighborhood) {
+        return `Não encontrei em ${requestedNeighborhood}${nameGreet}, mas olha essa opção em ${foundNeighborhood} 🏠`;
+      }
+      return `Encontrei uma opção em outra região${nameGreet}! 🏠`;
+    
+    case 'no_results':
+      return `Não encontrei imóveis com esses critérios no momento 😔\n\nO que você prefere ajustar: preço, região ou número de quartos?`;
+  }
+}
+
 async function getPropertyByListingId(supabase: any, listingId: string): Promise<any | null> {
   try {
     console.log(`🏠 Fetching property: ${listingId}`);
@@ -1192,7 +1311,8 @@ function extractQualificationData(message: string): ExtractedQualificationData {
 async function updateQualificationData(
   supabase: any,
   phoneNumber: string,
-  newData: ExtractedQualificationData
+  newData: ExtractedQualificationData,
+  forceUpdate: boolean = false // When true, overwrites existing values (for flexibilization)
 ): Promise<void> {
   // Skip if no data to update
   if (Object.keys(newData).length === 0) {
@@ -1214,18 +1334,37 @@ async function updateQualificationData(
       last_interaction_at: now
     };
     
-    // Only update fields that are not already set (don't overwrite existing data)
-    // EXCEPTION: budget_max CAN be updated (for "pode ser mais caro" flow)
-    if (newData.detected_neighborhood && !existing?.detected_neighborhood) {
-      updatePayload.detected_neighborhood = newData.detected_neighborhood;
+    // For flexibilization (forceUpdate=true), always overwrite if value is different
+    // For normal extraction, only set if field is empty
+    
+    if (newData.detected_neighborhood) {
+      if (forceUpdate || !existing?.detected_neighborhood) {
+        if (forceUpdate && existing?.detected_neighborhood && existing.detected_neighborhood !== newData.detected_neighborhood) {
+          console.log(`📝 Neighborhood updated from "${existing.detected_neighborhood}" to "${newData.detected_neighborhood}" (flexibilization)`);
+        }
+        updatePayload.detected_neighborhood = newData.detected_neighborhood;
+      }
     }
-    if (newData.detected_property_type && !existing?.detected_property_type) {
-      updatePayload.detected_property_type = newData.detected_property_type;
+    
+    if (newData.detected_property_type) {
+      if (forceUpdate || !existing?.detected_property_type) {
+        if (forceUpdate && existing?.detected_property_type && existing.detected_property_type !== newData.detected_property_type) {
+          console.log(`📝 Property type updated from "${existing.detected_property_type}" to "${newData.detected_property_type}" (flexibilization)`);
+        }
+        updatePayload.detected_property_type = newData.detected_property_type;
+      }
     }
-    if (newData.detected_bedrooms && !existing?.detected_bedrooms) {
-      updatePayload.detected_bedrooms = newData.detected_bedrooms;
+    
+    if (newData.detected_bedrooms) {
+      if (forceUpdate || !existing?.detected_bedrooms) {
+        if (forceUpdate && existing?.detected_bedrooms && existing.detected_bedrooms !== newData.detected_bedrooms) {
+          console.log(`📝 Bedrooms updated from ${existing.detected_bedrooms} to ${newData.detected_bedrooms} (flexibilization)`);
+        }
+        updatePayload.detected_bedrooms = newData.detected_bedrooms;
+      }
     }
-    // BUDGET: Always update if new value is provided and different
+    
+    // BUDGET: Always update if new value is provided and different (both normal and flexibilization)
     if (newData.detected_budget_max) {
       if (!existing?.detected_budget_max || newData.detected_budget_max !== existing.detected_budget_max) {
         if (existing?.detected_budget_max) {
@@ -1234,8 +1373,11 @@ async function updateQualificationData(
         updatePayload.detected_budget_max = newData.detected_budget_max;
       }
     }
-    if (newData.detected_interest && !existing?.detected_interest) {
-      updatePayload.detected_interest = newData.detected_interest;
+    
+    if (newData.detected_interest) {
+      if (forceUpdate || !existing?.detected_interest) {
+        updatePayload.detected_interest = newData.detected_interest;
+      }
     }
     
     // Skip if only timestamps in payload (no new data to save)
@@ -1363,6 +1505,89 @@ function isWaitingSignal(message: string): boolean {
   return waitingPatterns.some(pattern => pattern.test(lower));
 }
 
+// ========== FLEXIBILIZATION DETECTION ==========
+
+interface FlexibilizationResult {
+  detected: boolean;
+  updates: {
+    detected_bedrooms?: number;
+    detected_budget_max?: number;
+    detected_neighborhood?: string;
+    detected_property_type?: string;
+  };
+  fields: string[];
+}
+
+function detectFlexibilization(message: string): FlexibilizationResult {
+  const lower = message.toLowerCase();
+  const updates: FlexibilizationResult['updates'] = {};
+  const fields: string[] = [];
+  
+  // "pode ser 2 quartos" / "aceito 2 quartos" / "2 quartos tá bom"
+  const quartosFlex = message.match(/(?:pode\s+ser|aceito|tá\s+bom|ta\s+bom|ok\s+com|pode\s+ter|até|ate)\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i);
+  if (quartosFlex) {
+    updates.detected_bedrooms = parseInt(quartosFlex[1]);
+    fields.push('quartos');
+    console.log(`📝 Flexibilization detected: bedrooms → ${updates.detected_bedrooms}`);
+  }
+  
+  // "pode ser até 15 mil" / "até 15000" / "máximo 15k"
+  const budgetFlex = message.match(/(?:pode\s+ser\s+)?(?:até|ate|máximo|maximo|no\s+máximo|no\s+maximo|limite\s+de?)\s*(?:r\$\s*)?(\d+[.,]?\d*)\s*(?:mil|k|reais)?/i);
+  if (budgetFlex) {
+    let value = parseFloat(budgetFlex[1].replace(',', '.'));
+    // If "mil" or "k" mentioned and value is small, multiply
+    if (/mil|k/i.test(message) && value < 100) value *= 1000;
+    // If value is very small (< 100), assume it's in thousands
+    if (value < 100) value *= 1000;
+    updates.detected_budget_max = value;
+    fields.push('orçamento');
+    console.log(`📝 Flexibilization detected: budget → R$ ${updates.detected_budget_max}`);
+  }
+  
+  // "pode ser no Ribeirão" / "aceito Campeche" / "pode ser região sul"
+  const regionFlex = message.match(/(?:pode\s+ser\s+)?(?:no|em|na|região|regiao)\s+([a-záàâãéèêíïóôõöúç\s]+?)(?:\s*[,.]|$)/i);
+  if (regionFlex && regionFlex[1].length > 2 && regionFlex[1].length < 30) {
+    const neighborhood = regionFlex[1].trim();
+    // Validate it's a real neighborhood/region
+    const allNeighborhoods = getAllNeighborhoods();
+    const isValidNeighborhood = allNeighborhoods.some(n => 
+      n.toLowerCase().includes(neighborhood.toLowerCase()) ||
+      neighborhood.toLowerCase().includes(n.toLowerCase())
+    ) || Object.keys(FLORIANOPOLIS_REGIONS).includes(neighborhood.toLowerCase());
+    
+    if (isValidNeighborhood) {
+      const normalized = normalizeNeighborhood(neighborhood);
+      updates.detected_neighborhood = normalized.normalized;
+      fields.push('bairro');
+      console.log(`📝 Flexibilization detected: neighborhood → ${updates.detected_neighborhood}`);
+    }
+  }
+  
+  // "pode ser apartamento" / "aceito casa também"
+  const typeFlex = message.match(/(?:pode\s+ser\s+)?(?:um|uma)?\s*(apartamento|casa|kitnet|studio|cobertura|sobrado|terreno|comercial)/i);
+  if (typeFlex) {
+    const typeMap: Record<string, string> = {
+      'apartamento': 'Apartamento',
+      'casa': 'Casa',
+      'kitnet': 'Kitnet',
+      'studio': 'Studio',
+      'cobertura': 'Cobertura',
+      'sobrado': 'Sobrado',
+      'terreno': 'Terreno',
+      'comercial': 'Comercial'
+    };
+    updates.detected_property_type = typeMap[typeFlex[1].toLowerCase()] || typeFlex[1];
+    fields.push('tipo');
+    console.log(`📝 Flexibilization detected: property type → ${updates.detected_property_type}`);
+  }
+  
+  return {
+    detected: fields.length > 0,
+    updates,
+    fields
+  };
+}
+
 async function getLastOutboundMessage(supabase: any, conversationId: string): Promise<string | null> {
   try {
     const { data } = await supabase
@@ -1378,6 +1603,20 @@ async function getLastOutboundMessage(supabase: any, conversationId: string): Pr
   } catch (error) {
     return null;
   }
+}
+
+// ========== ANTI-REPETITION ==========
+
+function isSameMessage(msg1: string | null, msg2: string): boolean {
+  if (!msg1) return false;
+  
+  // Normalize both messages for comparison
+  const normalize = (s: string) => s.toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[😊🏠😔🤔💰📍🛏️✅❌]/g, '')
+    .trim();
+  
+  return normalize(msg1) === normalize(msg2);
 }
 
 // ========== GET QUALIFICATION PROGRESS ==========
@@ -2411,7 +2650,15 @@ serve(async (req) => {
         // ===== TRIAGE COMPLETED - USE DEPARTMENT-SPECIFIC PROMPTS =====
         console.log(`🤖 Triage completed, dept: ${currentDepartment}`);
         
-        // ===== NEW: EXTRACT AND SAVE QUALIFICATION DATA FIRST =====
+        // ===== NEW: DETECT FLEXIBILIZATION FIRST (before normal extraction) =====
+        const flexibilization = detectFlexibilization(messageContent);
+        if (flexibilization.detected) {
+          console.log(`📝 Flexibilization detected: ${flexibilization.fields.join(', ')}`);
+          // Force update with forceUpdate=true to overwrite existing values
+          await updateQualificationData(supabase, phoneNumber, flexibilization.updates as ExtractedQualificationData, true);
+        }
+        
+        // ===== EXTRACT AND SAVE QUALIFICATION DATA =====
         const extractedData = extractQualificationData(messageContent);
         if (Object.keys(extractedData).length > 0) {
           console.log(`📊 Extracted qualification data:`, extractedData);
@@ -2531,15 +2778,15 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
             
             // Check if we can search
             if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
-              console.log(`✅ Has criteria, forcing auto-search`);
+              console.log(`✅ Has criteria, forcing auto-search with fallback`);
               
               const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
               if (searchParams) {
                 console.log(`🏠 Auto-search params:`, searchParams);
-                const searchResult = await searchProperties(supabase, searchParams);
+                const fallbackResult = await searchPropertiesWithFallback(supabase, searchParams);
                 
-                if (searchResult.success && searchResult.properties?.length > 0) {
-                  const allProperties = searchResult.properties.slice(0, 5);
+                if (fallbackResult.properties.length > 0) {
+                  const allProperties = fallbackResult.properties.slice(0, 5);
                   
                   await updateConsultativeState(supabase, phoneNumber, {
                     pending_properties: allProperties,
@@ -2549,10 +2796,9 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                   });
                   
                   propertiesToSend = [allProperties[0]];
-                  const nameGreet = existingName ? `, ${existingName}` : '';
-                  aiResponse = `Encontrei um imóvel que pode combinar com o que você busca${nameGreet}! 🏠`;
+                  aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
                   
-                  console.log(`✅ Auto-search: found ${allProperties.length} properties, sending 1`);
+                  console.log(`✅ Auto-search with fallback: found ${allProperties.length} properties (${fallbackResult.searchType})`);
                 } else {
                   aiResponse = `Não encontrei imóveis com esses critérios no momento 😔\n\nO que você prefere ajustar: preço, região ou número de quartos?`;
                 }
