@@ -1,208 +1,119 @@
 
+# Plano: Registrar Mensagens do Make.com na Plataforma
 
-# Plano: Corrigir Erros e Adicionar Disparo para Webhook Externo
+## Problema Identificado
+O Make.com está enviando as fotos dos imóveis diretamente via módulo nativo do WhatsApp, mas essas mensagens **não estão sendo registradas no banco de dados**. Por isso, vocês não veem o contexto das imagens enviadas na plataforma.
 
-## Parte 1: Correção de Erros de Build
-
-Antes de implementar o disparo, preciso corrigir o erro de tipo na edge function `make-webhook`:
-
-### Arquivo: `supabase/functions/make-webhook/index.ts`
-
-**Linha 1917-1929** - Corrigir erro `'error' is of type 'unknown'`:
-
-```typescript
-// ANTES (linha 1923):
-error: error.message || 'Internal server error',
-
-// DEPOIS:
-const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-error: errorMessage,
-```
+## Solução
+Substituir o módulo nativo "WhatsApp > Send an Image" por um **HTTP Request** que chama a edge function `send-wa-media` do Supabase. Essa função:
+1. Envia a imagem via WhatsApp API
+2. **Salva a mensagem no banco de dados**
+3. **Vincula automaticamente à conversa correta**
 
 ---
 
-## Parte 2: Adicionar Disparo para Webhook Externo
+## Configuração no Make.com
 
-### Localização no código
+### Passo 1: Remover o Módulo "Send an Image"
+- Delete o módulo nativo do WhatsApp que está dentro do Iterator
 
-Inserir o bloco de disparo **antes do return final** (aproximadamente linha 1895, antes de `} catch (error)`).
+### Passo 2: Adicionar HTTP Request (dentro do Iterator)
+No lugar do módulo removido, adicione um novo **HTTP > Make a request**
 
-### Código a adicionar
+#### Configurações:
+| Campo | Valor |
+|-------|-------|
+| **URL** | `https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/send-wa-media` |
+| **Method** | POST |
+| **Headers** | `Content-Type: application/json`<br>`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwanhzZ3h4aG9nemtrdXpueWtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NDk3NjcsImV4cCI6MjA3MzAyNTc2N30.tTbVFi-CkgJZroJa-V0QPAPU5sYU3asmD-2yn2ytca0` |
+| **Body Type** | Raw (application/json) |
 
-```typescript
-// ========================================
-// DISPARO PARA WEBHOOK EXTERNO (Make.com)
-// ========================================
-const externalWebhookUrl = 'https://hook.us2.make.com/crfpetpkyvxwn1lrhq2aqmmbjvgnhhl3';
-
-const webhookPayload = {
-  phone: phoneNumber,
-  result: aiResponse,
-  properties: propertiesToSend.length > 0 ? propertiesToSend.map(p => ({
-    codigo: p.codigo,
-    foto_destaque: p.foto_destaque,
-    tipo: p.tipo,
-    bairro: p.bairro,
-    cidade: p.cidade || 'Florianópolis',
-    quartos: String(p.quartos || ''),
-    suites: String(p.suites || ''),
-    vagas: String(p.vagas || ''),
-    area_util: String(p.area_util || ''),
-    preco: p.preco || 0,
-    preco_formatado: p.preco_formatado || '',
-    valor_condominio: p.valor_condominio || 0,
-    endereco: p.endereco || '',
-    link: p.link || '',
-    caracteristicas: p.caracteristicas || []
-  })) : [],
-  audio: audioResult ? {
-    url: audioResult.audioUrl,
-    type: audioResult.contentType,
-    is_voice_message: audioResult.isVoiceMessage
-  } : null,
-  conversation_id: conversationId,
-  department: currentDepartment,
-  contact_name: existingName || null
-};
-
-// Dispara de forma assíncrona (não bloqueia o retorno)
-try {
-  console.log('📤 Dispatching to external Make.com webhook...');
-  console.log('📦 Payload:', JSON.stringify(webhookPayload, null, 2));
-  
-  const webhookResponse = await fetch(externalWebhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(webhookPayload)
-  });
-  
-  const responseText = await webhookResponse.text();
-  console.log(`✅ External webhook response: ${webhookResponse.status} - ${responseText}`);
-} catch (webhookError) {
-  console.error('⚠️ External webhook dispatch failed:', webhookError);
-  // Não bloqueia o fluxo principal - apenas loga o erro
+#### Body (JSON):
+```json
+{
+  "to": "{{1.messages[1].from}}",
+  "mediaUrl": "{{15.foto_destaque}}",
+  "mediaType": "image/jpeg",
+  "caption": "🏠 *{{15.tipo}}* - {{15.bairro}}\n\n🛏️ {{15.quartos}} quarto(s)\n💰 {{15.preco_formatado}}\n\n🔗 {{15.link}}"
 }
 ```
 
----
-
-## Parte 3: Posição Exata no Código
-
-O código deve ser inserido **após** salvar a mensagem outbound no banco (aproximadamente linha 1850-1860) e **antes** do return final (linha ~1895).
-
-Procurar por este trecho no código:
-
-```typescript
-// Após este bloco:
-console.log(`✅ AI response saved with ID: ${outboundData.id}`);
-
-// Inserir o bloco de disparo AQUI
-
-// Antes deste return:
-return new Response(
-  JSON.stringify({
-    success: true,
-    result: aiResponse,
-    ...
-```
+> **Nota**: Substitua `15` pelo ID real do seu módulo Iterator
 
 ---
 
-## Fluxo Resultante
+## Diagrama do Fluxo Atualizado
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                     FLUXO COMPLETO                              │
+│                     CENÁRIO MAKE.COM                            │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│   [Cliente envia mensagem no WhatsApp]                         │
-│                    │                                            │
-│                    ▼                                            │
-│   [Make.com Cenário 1] ──────► [make-webhook Supabase]         │
-│                                         │                       │
-│                    ┌────────────────────┼────────────────────┐  │
-│                    │                    │                    │  │
-│                    ▼                    ▼                    ▼  │
-│              [Processa IA]      [Busca imóveis]     [Gera áudio]│
-│                    │                    │                    │  │
-│                    └────────────────────┴────────────────────┘  │
-│                                         │                       │
-│                    ┌────────────────────┴────────────────────┐  │
-│                    │                                         │  │
-│                    ▼                                         ▼  │
-│         [Salva no banco DB]              [POST para webhook]    │
-│         [Atualiza conversa]              [hook.us2.make.com/...]│
-│                    │                                         │  │
-│                    ▼                                         ▼  │
-│         [Plataforma Lovable]             [Make.com Cenário 2]   │
-│         [vê todo o contexto]             [Envia via WhatsApp]   │
-│                                                              │  │
-│                                                              ▼  │
-│                                          [Cliente recebe msg]   │
+│   [1] WhatsApp Watch Events                                     │
+│           │                                                     │
+│           ▼                                                     │
+│   ┌───────────────────────────────────────┐                    │
+│   │ Filtro: messages[1].id exists         │                    │
+│   └───────────────────────────────────────┘                    │
+│           │                                                     │
+│           ▼                                                     │
+│   [14] HTTP → make-webhook (Supabase)                          │
+│           │                                                     │
+│           ▼                                                     │
+│   ┌───────────────────────────────────────┐                    │
+│   │            ROUTER                      │                    │
+│   └───────────────────────────────────────┘                    │
+│        │                              │                         │
+│   [Tem imóveis]                 [Sem imóveis]                   │
+│        │                              │                         │
+│        ▼                              ▼                         │
+│   [Iterator]                  HTTP → send-wa-message            │
+│   {{14.data.properties}}      (envia data.result)               │
+│        │                                                        │
+│        ▼ (para cada imóvel)                                     │
+│   ┌─────────────────────────────────────┐                      │
+│   │  HTTP → send-wa-media (Supabase)    │  ← NOVO              │
+│   │  • Envia imagem via WhatsApp        │                      │
+│   │  • Salva no banco de dados          │                      │
+│   │  • Vincula à conversa               │                      │
+│   └─────────────────────────────────────┘                      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Payload que o Make.com Receberá
+## Benefícios da Mudança
 
-```json
-{
-  "phone": "5548991234567",
-  "result": "Olá! Encontrei 2 imóveis perfeitos para você! 🏠",
-  "properties": [
-    {
-      "codigo": "14593",
-      "foto_destaque": "https://cdn.vistahost.com.br/.../foto.jpg",
-      "tipo": "Apartamento",
-      "bairro": "Centro",
-      "cidade": "Florianópolis",
-      "quartos": "2",
-      "suites": "1",
-      "vagas": "2",
-      "area_util": "80",
-      "preco": 6500,
-      "preco_formatado": "R$ 6.500/mês",
-      "valor_condominio": 1171.33,
-      "endereco": "Rua Duarte Schutel",
-      "link": "https://smolkaimoveis.com.br/imovel/14593",
-      "caracteristicas": ["2 dormitórios", "2 vagas"]
-    }
-  ],
-  "audio": null,
-  "conversation_id": "uuid...",
-  "department": "locacao",
-  "contact_name": "Ian Veras"
-}
-```
+| Antes (Módulo Nativo) | Depois (send-wa-media) |
+|----------------------|------------------------|
+| ❌ Imagem vai para o cliente | ✅ Imagem vai para o cliente |
+| ❌ Não aparece na plataforma | ✅ Aparece no chat da plataforma |
+| ❌ Sem contexto do atendimento | ✅ Vinculada à conversa correta |
+| ❌ Não salva no banco | ✅ Registrada na tabela `messages` |
 
 ---
 
-## Mapeamento para o Make.com (Cenário 2)
+## Configuração Extra: Enviar Mensagem de Texto Final
 
-| Campo do Payload | Uso no Make.com |
-|-----------------|-----------------|
-| `phone` | To (número do destinatário) |
-| `result` | Body da mensagem de texto |
-| `properties` | Array para Iterator |
-| `properties[].foto_destaque` | Media URL da imagem |
-| `properties[].tipo` | Tipo do imóvel (caption) |
-| `properties[].bairro` | Bairro (caption) |
-| `properties[].quartos` | Quartos (caption) |
-| `properties[].preco_formatado` | Preço (caption) |
-| `properties[].link` | Link do imóvel (caption) |
-| `audio.url` | URL do áudio (se existir) |
-| `contact_name` | Nome do contato |
+Após o Iterator terminar, adicione outro HTTP Request para enviar o texto resumo (`data.result`):
+
+| Campo | Valor |
+|-------|-------|
+| **URL** | `https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/send-wa-message` |
+| **Method** | POST |
+| **Body** | `{"to": "{{1.messages[1].from}}", "text": "{{14.data.result}}"}` |
 
 ---
 
 ## Resumo das Ações
+1. **Remover** módulo nativo "WhatsApp > Send an Image"
+2. **Adicionar** HTTP Request dentro do Iterator chamando `send-wa-media`
+3. **Configurar** headers com Authorization Bearer
+4. **Mapear** campos: to, mediaUrl, mediaType, caption
+5. **Testar** enviando mensagem real e verificando na plataforma
 
-1. Corrigir erro de tipo na linha 1923 do `make-webhook`
-2. Adicionar bloco de disparo para webhook externo antes do return
-3. Deploy automático da edge function
-4. Testar enviando mensagem real pelo WhatsApp
-5. Verificar nos logs se o disparo foi feito
-6. Configurar Cenário 2 no Make.com para processar o payload
+---
 
+## Observação Importante
+Essa solução usa as edge functions existentes do projeto. Não é necessário alterar nenhum código no Supabase - apenas a configuração do Make.com.
