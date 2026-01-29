@@ -1045,6 +1045,228 @@ interface QualificationData {
   detected_interest: string | null;
 }
 
+// ========== NEW: EXTRACT QUALIFICATION DATA FROM MESSAGE ==========
+
+interface ExtractedQualificationData {
+  detected_neighborhood?: string;
+  detected_property_type?: string;
+  detected_bedrooms?: number;
+  detected_budget_max?: number;
+  detected_interest?: string;
+}
+
+function extractQualificationData(message: string): ExtractedQualificationData {
+  const data: ExtractedQualificationData = {};
+  const lower = message.toLowerCase();
+  
+  // ===== DETECT REGION/NEIGHBORHOOD =====
+  // Known neighborhoods in Florianópolis
+  const knownNeighborhoods = [
+    'centro', 'beira mar', 'beira-mar', 'beiramar', 'ingleses', 'jurere', 'jurerê',
+    'canasvieiras', 'lagoa', 'lagoa da conceição', 'itacorubi', 'trindade',
+    'coqueiros', 'estreito', 'kobrasol', 'campinas', 'barreiros', 'pantanal',
+    'santa monica', 'santa mônica', 'agronômica', 'agronomica', 'corrego grande',
+    'córrego grande', 'cacupe', 'cacupé', 'saco grande', 'rio tavares', 'campeche',
+    'armação', 'armacao', 'ribeirao', 'ribeirão', 'ribeirao da ilha', 'pântano do sul',
+    'pantano do sul', 'barra da lagoa', 'daniela', 'santo antonio', 'santo antônio',
+    'ratones', 'vargem grande', 'vargem pequena', 'cachoeira do bom jesus', 'santinho',
+    'praia brava', 'ponta das canas', 'costeira', 'capoeiras', 'abraao', 'abraão',
+    'coloninha', 'jardim atlantico', 'jardim atlântico', 'monte verde', 'joao paulo',
+    'joão paulo', 'saco dos limoes', 'saco dos limões', 'carvoeira', 'serrinha',
+    'tapera', 'carianos', 'costeira do pirajubae', 'costeira do pirajubaé'
+  ];
+  
+  // Also check for region names
+  const regionPatterns = [
+    { pattern: /\b(norte|regiao norte|região norte)\b/i, value: 'Norte (Ingleses, Canasvieiras)' },
+    { pattern: /\b(sul|regiao sul|região sul)\b/i, value: 'Sul (Campeche, Armação)' },
+    { pattern: /\b(leste|regiao leste|região leste)\b/i, value: 'Leste (Lagoa)' },
+    { pattern: /\b(continente)\b/i, value: 'Continente (Estreito, Coqueiros)' }
+  ];
+  
+  // Check region patterns first
+  for (const { pattern, value } of regionPatterns) {
+    if (pattern.test(lower)) {
+      data.detected_neighborhood = value;
+      console.log(`📍 Detected region: "${value}"`);
+      break;
+    }
+  }
+  
+  // If no region found, check specific neighborhoods
+  if (!data.detected_neighborhood) {
+    for (const neighborhood of knownNeighborhoods) {
+      if (lower.includes(neighborhood)) {
+        // Capitalize first letter
+        data.detected_neighborhood = neighborhood.charAt(0).toUpperCase() + neighborhood.slice(1);
+        console.log(`📍 Detected neighborhood: "${data.detected_neighborhood}"`);
+        break;
+      }
+    }
+  }
+  
+  // ===== DETECT PROPERTY TYPE =====
+  const typePatterns = [
+    { pattern: /\b(apartamento|apto)\b/i, value: 'Apartamento' },
+    { pattern: /\b(casa)\b/i, value: 'Casa' },
+    { pattern: /\b(kitnet|kit|kitnete)\b/i, value: 'Kitnet' },
+    { pattern: /\b(studio|estudio|estúdio)\b/i, value: 'Studio' },
+    { pattern: /\b(cobertura)\b/i, value: 'Cobertura' },
+    { pattern: /\b(sala\s*comercial|comercial|loja)\b/i, value: 'Comercial' },
+    { pattern: /\b(terreno|lote)\b/i, value: 'Terreno' },
+    { pattern: /\b(sobrado)\b/i, value: 'Sobrado' }
+  ];
+  
+  for (const { pattern, value } of typePatterns) {
+    if (pattern.test(lower)) {
+      data.detected_property_type = value;
+      console.log(`🏠 Detected property type: "${value}"`);
+      break;
+    }
+  }
+  
+  // ===== DETECT BEDROOMS =====
+  const bedroomPatterns = [
+    /(\d+)\s*(?:quartos?|dormit[oó]rios?|qtos?|dorms?)/i,
+    /(?:de|com)\s*(\d+)\s*(?:q|quarto)/i,
+    /(\d+)\s*(?:d|dorm)/i
+  ];
+  
+  for (const pattern of bedroomPatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const num = parseInt(match[1]);
+      if (num >= 1 && num <= 10) {
+        data.detected_bedrooms = num;
+        console.log(`🛏️ Detected bedrooms: ${num}`);
+        break;
+      }
+    }
+  }
+  
+  // ===== DETECT BUDGET =====
+  const budgetPatterns = [
+    // "até 3 mil", "ate 3mil", "até 3000"
+    /(?:até|ate|max|máximo|no máximo)\s*(?:R\$\s*)?(\d+[.,]?\d*)\s*(?:mil|k)?/i,
+    // "R$ 3.000", "R$3000"
+    /R\$\s*(\d+[.,]?\d*)\s*(?:mil|k)?/i,
+    // "3 mil", "3mil"
+    /(\d+)\s*(?:mil|k)\b/i,
+    // "3000 reais", "5000"
+    /(\d{4,})\s*(?:reais)?/i
+  ];
+  
+  for (const pattern of budgetPatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      let value = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
+      
+      // If value is small and message contains "mil" or "k", multiply by 1000
+      if (value < 100 && /mil|k/i.test(message)) {
+        value *= 1000;
+      }
+      
+      // Validate reasonable budget range (500 to 100000)
+      if (value >= 500 && value <= 100000) {
+        data.detected_budget_max = value;
+        console.log(`💰 Detected budget: R$ ${value}`);
+        break;
+      }
+    }
+  }
+  
+  // ===== DETECT INTEREST (morar/investir) =====
+  if (/\b(morar|moradia|para mim|próprio|residir|vou morar|pra morar)\b/i.test(lower)) {
+    data.detected_interest = 'morar';
+    console.log(`🎯 Detected interest: morar`);
+  } else if (/\b(investir|investimento|renda|alugar pra|para alugar|capital|retorno)\b/i.test(lower)) {
+    data.detected_interest = 'investir';
+    console.log(`🎯 Detected interest: investir`);
+  }
+  
+  return data;
+}
+
+// ========== NEW: UPDATE QUALIFICATION DATA IN DATABASE ==========
+
+async function updateQualificationData(
+  supabase: any,
+  phoneNumber: string,
+  newData: ExtractedQualificationData
+): Promise<void> {
+  // Skip if no data to update
+  if (Object.keys(newData).length === 0) {
+    return;
+  }
+  
+  try {
+    // Check if record already exists
+    const { data: existing } = await supabase
+      .from('lead_qualification')
+      .select('id, detected_neighborhood, detected_property_type, detected_bedrooms, detected_budget_max, detected_interest')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+    
+    const now = new Date().toISOString();
+    
+    // Only update fields that are not already set (don't overwrite existing data)
+    const updatePayload: any = {
+      updated_at: now,
+      last_interaction_at: now
+    };
+    
+    if (newData.detected_neighborhood && !existing?.detected_neighborhood) {
+      updatePayload.detected_neighborhood = newData.detected_neighborhood;
+    }
+    if (newData.detected_property_type && !existing?.detected_property_type) {
+      updatePayload.detected_property_type = newData.detected_property_type;
+    }
+    if (newData.detected_bedrooms && !existing?.detected_bedrooms) {
+      updatePayload.detected_bedrooms = newData.detected_bedrooms;
+    }
+    if (newData.detected_budget_max && !existing?.detected_budget_max) {
+      updatePayload.detected_budget_max = newData.detected_budget_max;
+    }
+    if (newData.detected_interest && !existing?.detected_interest) {
+      updatePayload.detected_interest = newData.detected_interest;
+    }
+    
+    // Skip if only timestamps in payload (no new data to save)
+    if (Object.keys(updatePayload).length <= 2) {
+      console.log(`📋 No new qualification data to save (already exists)`);
+      return;
+    }
+    
+    if (existing?.id) {
+      // Update existing record
+      const { error } = await supabase
+        .from('lead_qualification')
+        .update(updatePayload)
+        .eq('id', existing.id);
+      
+      if (error) throw error;
+      console.log(`📝 Lead qualification UPDATED:`, updatePayload);
+    } else {
+      // Create new record
+      const { error } = await supabase
+        .from('lead_qualification')
+        .insert({
+          phone_number: phoneNumber,
+          qualification_status: 'qualifying',
+          started_at: now,
+          ...updatePayload
+        });
+      
+      if (error) throw error;
+      console.log(`📝 Lead qualification CREATED:`, updatePayload);
+    }
+  } catch (error) {
+    console.error('❌ Error updating qualification data:', error);
+  }
+}
+
+// ========== GET QUALIFICATION PROGRESS ==========
+
 async function getQualificationProgress(supabase: any, phoneNumber: string): Promise<{
   progress: QualificationProgress;
   data: QualificationData | null;
@@ -2073,6 +2295,13 @@ serve(async (req) => {
       } else {
         // ===== TRIAGE COMPLETED - USE DEPARTMENT-SPECIFIC PROMPTS =====
         console.log(`🤖 Triage completed, dept: ${currentDepartment}`);
+        
+        // ===== NEW: EXTRACT AND SAVE QUALIFICATION DATA FIRST =====
+        const extractedData = extractQualificationData(messageContent);
+        if (Object.keys(extractedData).length > 0) {
+          console.log(`📊 Extracted qualification data:`, extractedData);
+          await updateQualificationData(supabase, phoneNumber, extractedData);
+        }
         
         // Check for consultative flow state (awaiting feedback on property)
         const consultativeState = await getConsultativeState(supabase, phoneNumber);
