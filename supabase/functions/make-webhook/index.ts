@@ -1209,12 +1209,13 @@ async function updateQualificationData(
     
     const now = new Date().toISOString();
     
-    // Only update fields that are not already set (don't overwrite existing data)
     const updatePayload: any = {
       updated_at: now,
       last_interaction_at: now
     };
     
+    // Only update fields that are not already set (don't overwrite existing data)
+    // EXCEPTION: budget_max CAN be updated (for "pode ser mais caro" flow)
     if (newData.detected_neighborhood && !existing?.detected_neighborhood) {
       updatePayload.detected_neighborhood = newData.detected_neighborhood;
     }
@@ -1224,8 +1225,14 @@ async function updateQualificationData(
     if (newData.detected_bedrooms && !existing?.detected_bedrooms) {
       updatePayload.detected_bedrooms = newData.detected_bedrooms;
     }
-    if (newData.detected_budget_max && !existing?.detected_budget_max) {
-      updatePayload.detected_budget_max = newData.detected_budget_max;
+    // BUDGET: Always update if new value is provided and different
+    if (newData.detected_budget_max) {
+      if (!existing?.detected_budget_max || newData.detected_budget_max !== existing.detected_budget_max) {
+        if (existing?.detected_budget_max) {
+          console.log(`💰 Budget updated from R$ ${existing.detected_budget_max} to R$ ${newData.detected_budget_max}`);
+        }
+        updatePayload.detected_budget_max = newData.detected_budget_max;
+      }
     }
     if (newData.detected_interest && !existing?.detected_interest) {
       updatePayload.detected_interest = newData.detected_interest;
@@ -1262,6 +1269,114 @@ async function updateQualificationData(
     }
   } catch (error) {
     console.error('❌ Error updating qualification data:', error);
+  }
+}
+
+// ========== DETERMINISTIC AUTO-SEARCH HELPERS ==========
+
+function hasMinimumCriteriaToSearch(department: string | null, progress: QualificationProgress): boolean {
+  // For LOCAÇÃO: region + budget + (type OR bedrooms)
+  if (department === 'locacao') {
+    return progress.has_region && progress.has_budget && (progress.has_type || progress.has_bedrooms);
+  }
+  
+  // For VENDAS: purpose + region + budget + (type OR bedrooms)
+  if (department === 'vendas') {
+    return progress.has_purpose && progress.has_region && progress.has_budget && (progress.has_type || progress.has_bedrooms);
+  }
+  
+  return false;
+}
+
+function buildSearchParamsFromQualification(department: string | null, qualData: QualificationData | null): Record<string, any> | null {
+  if (!qualData) return null;
+  
+  const params: Record<string, any> = {
+    cidade: 'Florianópolis',
+    limit: 5
+  };
+  
+  // Finalidade based on department
+  if (department === 'locacao') {
+    params.finalidade = 'locacao';
+  } else if (department === 'vendas') {
+    params.finalidade = 'venda';
+  }
+  
+  // Map neighborhood
+  if (qualData.detected_neighborhood) {
+    // Handle region names vs specific neighborhoods
+    const regionMap: Record<string, string> = {
+      'Norte (Ingleses, Canasvieiras)': 'Ingleses',
+      'Sul (Campeche, Armação)': 'Campeche',
+      'Leste (Lagoa)': 'Lagoa da Conceição',
+      'Continente (Estreito, Coqueiros)': 'Estreito'
+    };
+    params.bairro = regionMap[qualData.detected_neighborhood] || qualData.detected_neighborhood;
+  }
+  
+  // Map property type
+  if (qualData.detected_property_type) {
+    const typeMap: Record<string, string> = {
+      'Apartamento': 'apartamento',
+      'Casa': 'casa',
+      'Kitnet': 'kitnet',
+      'Studio': 'kitnet',
+      'Cobertura': 'cobertura',
+      'Comercial': 'comercial',
+      'Terreno': 'terreno',
+      'Sobrado': 'sobrado'
+    };
+    params.tipo = typeMap[qualData.detected_property_type] || qualData.detected_property_type.toLowerCase();
+  }
+  
+  // Bedrooms
+  if (qualData.detected_bedrooms) {
+    params.quartos = qualData.detected_bedrooms;
+  }
+  
+  // Budget
+  if (qualData.detected_budget_max) {
+    params.preco_max = qualData.detected_budget_max;
+  }
+  
+  return params;
+}
+
+function isWaitingSignal(message: string): boolean {
+  const lower = message.toLowerCase().trim();
+  
+  const waitingPatterns = [
+    /^(ok|okay|beleza|show|blz|certo|pode|perfeito|bom|ótimo|otimo)$/i,
+    /fico\s+(?:no\s+)?aguardo/i,
+    /aguardando/i,
+    /pode\s+(?:buscar|procurar|mandar|enviar|pesquisar)/i,
+    /vou\s+aguardar/i,
+    /t[aá]\s+bom/i,
+    /^sim$/i,
+    /por\s+favor/i,
+    /manda\s+a[ií]/i,
+    /quero\s+ver/i,
+    /mostra\s+(?:pra|para)\s+mim/i
+  ];
+  
+  return waitingPatterns.some(pattern => pattern.test(lower));
+}
+
+async function getLastOutboundMessage(supabase: any, conversationId: string): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('messages')
+      .select('body')
+      .eq('conversation_id', conversationId)
+      .eq('direction', 'outbound')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    return data?.body || null;
+  } catch (error) {
+    return null;
   }
 }
 
@@ -2404,77 +2519,182 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
           const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
           console.log(`📊 Qualification progress:`, qualProgress);
           
-          let systemPrompt: string;
-          let tools = toolsWithVista;
-          
-          if (currentDepartment === 'locacao') {
-            systemPrompt = buildLocacaoPrompt(agentConfig, existingName || undefined, history, qualData);
-          } else if (currentDepartment === 'vendas') {
-            systemPrompt = buildVendasPrompt(agentConfig, existingName || undefined, history, qualData);
-          } else if (currentDepartment === 'administrativo') {
-            systemPrompt = buildAdminPrompt(agentConfig, existingName || undefined);
-            tools = []; // Admin doesn't need property search
-          } else {
-            systemPrompt = buildVirtualAgentPrompt(agentConfig, existingName || undefined);
+          // ===== DETECT PRICE FLEXIBILITY (moved to main flow) =====
+          const priceFlexibility = detectPriceFlexibility(messageContent);
+          if (priceFlexibility.type !== 'none' && !priceFlexibility.hasNewValue) {
+            console.log(`💰 Price flexibility detected in main flow: ${priceFlexibility.type}`);
+            aiResponse = priceFlexibility.suggestedQuestion!;
           }
-          
-          const result = await callOpenAI(systemPrompt, history, aiPromptMessage, tools);
-          aiResponse = result.content;
-          
-          // ===== ANTI-LOOP DETECTION =====
-          if (isLoopingQuestion(aiResponse, qualData)) {
-            console.log('🔄 Loop detected! Replacing with next qualification question');
-            const nextQuestion = getNextQualificationQuestion(qualProgress, currentDepartment || 'locacao');
-            if (nextQuestion) {
-              aiResponse = nextQuestion;
-            } else {
-              // Has enough info - can search
-              aiResponse = 'Perfeito! Com essas informações, vou buscar as melhores opções pra você 😊';
-            }
-          }
-
-          // ===== PROCESS TOOL CALLS =====
-          for (const toolCall of result.toolCalls) {
-            const args = JSON.parse(toolCall.function.arguments);
-            console.log(`🔧 Tool call: ${toolCall.function.name}`, args);
+          // ===== DETECT WAITING SIGNAL ("fico no aguardo", "ok", etc) =====
+          else if (isWaitingSignal(messageContent)) {
+            console.log(`⏳ Waiting signal detected: "${messageContent}"`);
             
-            if (toolCall.function.name === 'buscar_imoveis') {
-              const searchResult = await searchProperties(supabase, args);
+            // Check if we can search
+            if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
+              console.log(`✅ Has criteria, forcing auto-search`);
               
-              if (searchResult.success && searchResult.properties?.length > 0) {
-                // CONSULTATIVE FLOW: Save ALL properties, send only FIRST
-                const allProperties = searchResult.properties.slice(0, 5);
+              const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
+              if (searchParams) {
+                console.log(`🏠 Auto-search params:`, searchParams);
+                const searchResult = await searchProperties(supabase, searchParams);
                 
-                await updateConsultativeState(supabase, phoneNumber, {
-                  pending_properties: allProperties,
-                  current_property_index: 0,
-                  awaiting_property_feedback: true
-                });
-                
-                // Send only the FIRST property
-                propertiesToSend = [allProperties[0]];
-                
-                // Generate consultive message
-                if (!aiResponse || aiResponse.length < 10) {
+                if (searchResult.success && searchResult.properties?.length > 0) {
+                  const allProperties = searchResult.properties.slice(0, 5);
+                  
+                  await updateConsultativeState(supabase, phoneNumber, {
+                    pending_properties: allProperties,
+                    current_property_index: 0,
+                    awaiting_property_feedback: true,
+                    last_search_params: searchParams
+                  });
+                  
+                  propertiesToSend = [allProperties[0]];
                   const nameGreet = existingName ? `, ${existingName}` : '';
                   aiResponse = `Encontrei um imóvel que pode combinar com o que você busca${nameGreet}! 🏠`;
-                }
-                
-                console.log(`✅ Consultative flow: saved ${allProperties.length} properties, sending 1`);
-              } else {
-                if (!aiResponse || aiResponse.length < 10) {
-                  aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔 Podemos flexibilizar algo?`;
+                  
+                  console.log(`✅ Auto-search: found ${allProperties.length} properties, sending 1`);
+                } else {
+                  aiResponse = `Não encontrei imóveis com esses critérios no momento 😔\n\nO que você prefere ajustar: preço, região ou número de quartos?`;
                 }
               }
+            } else {
+              // Not enough criteria - ask next question
+              const nextQuestion = getNextQualificationQuestion(qualProgress, currentDepartment || 'locacao');
+              if (nextQuestion) {
+                aiResponse = nextQuestion;
+              } else {
+                aiResponse = `Me conta mais sobre o que você procura 😊`;
+              }
             }
-            
-            if (toolCall.function.name === 'enviar_lead_c2s') {
-              const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
-              const c2sResult = await sendLeadToC2S(supabase, args, phoneNumber, historyText, existingName || undefined);
+          }
+          // ===== NORMAL FLOW - CHECK FOR AUTO-SEARCH OR AI =====
+          else {
+            // Check if we now have enough criteria to search automatically
+            if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
+              console.log(`✅ Has minimum criteria - triggering auto-search`);
               
-              if (c2sResult.success) {
-                c2sTransferred = true;
-                console.log('✅ Lead sent to C2S');
+              const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
+              if (searchParams) {
+                console.log(`🏠 Auto-search params:`, searchParams);
+                const searchResult = await searchProperties(supabase, searchParams);
+                
+                if (searchResult.success && searchResult.properties?.length > 0) {
+                  const allProperties = searchResult.properties.slice(0, 5);
+                  
+                  await updateConsultativeState(supabase, phoneNumber, {
+                    pending_properties: allProperties,
+                    current_property_index: 0,
+                    awaiting_property_feedback: true,
+                    last_search_params: searchParams
+                  });
+                  
+                  propertiesToSend = [allProperties[0]];
+                  const nameGreet = existingName ? `, ${existingName}` : '';
+                  aiResponse = `Perfeito${nameGreet}! Encontrei algumas opções que combinam com o que você busca 🏠`;
+                  
+                  console.log(`✅ Auto-search: found ${allProperties.length} properties, sending 1`);
+                } else {
+                  aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔\n\nO que você prefere flexibilizar: valor, região ou quartos?`;
+                }
+              }
+            } else {
+              // Use deterministic qualification question first
+              const nextQuestion = getNextQualificationQuestion(qualProgress, currentDepartment || 'locacao');
+              
+              if (nextQuestion) {
+                // Just use the deterministic question - no OpenAI needed
+                const nameGreet = existingName ? `, ${existingName}` : '';
+                aiResponse = `${getRandomPhrase('agreement')}${nameGreet} ${nextQuestion}`;
+                console.log(`📝 Using deterministic qualification question`);
+              } else {
+                // All questions answered but criteria not met (shouldn't happen) - use AI
+                let systemPrompt: string;
+                let tools = toolsWithVista;
+                
+                if (currentDepartment === 'locacao') {
+                  systemPrompt = buildLocacaoPrompt(agentConfig, existingName || undefined, history, qualData);
+                } else if (currentDepartment === 'vendas') {
+                  systemPrompt = buildVendasPrompt(agentConfig, existingName || undefined, history, qualData);
+                } else if (currentDepartment === 'administrativo') {
+                  systemPrompt = buildAdminPrompt(agentConfig, existingName || undefined);
+                  tools = []; // Admin doesn't need property search
+                } else {
+                  systemPrompt = buildVirtualAgentPrompt(agentConfig, existingName || undefined);
+                }
+                
+                const result = await callOpenAI(systemPrompt, history, aiPromptMessage, tools);
+                aiResponse = result.content;
+                
+                // ===== ANTI-LOOP DETECTION =====
+                if (isLoopingQuestion(aiResponse, qualData)) {
+                  console.log('🔄 Loop detected! Replacing with fallback');
+                  // Check for auto-search as fallback
+                  if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
+                    const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
+                    if (searchParams) {
+                      const searchResult = await searchProperties(supabase, searchParams);
+                      if (searchResult.success && searchResult.properties?.length > 0) {
+                        const allProperties = searchResult.properties.slice(0, 5);
+                        await updateConsultativeState(supabase, phoneNumber, {
+                          pending_properties: allProperties,
+                          current_property_index: 0,
+                          awaiting_property_feedback: true,
+                          last_search_params: searchParams
+                        });
+                        propertiesToSend = [allProperties[0]];
+                        aiResponse = `Encontrei um imóvel que pode combinar com o que você busca! 🏠`;
+                      } else {
+                        aiResponse = `Não encontrei imóveis com esses critérios 😔 O que você prefere ajustar?`;
+                      }
+                    }
+                  } else {
+                    const nextQ = getNextQualificationQuestion(qualProgress, currentDepartment || 'locacao');
+                    aiResponse = nextQ || 'Me conta mais sobre o que você busca 😊';
+                  }
+                }
+  
+                // ===== PROCESS TOOL CALLS (fallback for AI-triggered search) =====
+                for (const toolCall of result.toolCalls) {
+                  const args = JSON.parse(toolCall.function.arguments);
+                  console.log(`🔧 Tool call: ${toolCall.function.name}`, args);
+                  
+                  if (toolCall.function.name === 'buscar_imoveis') {
+                    const searchResult = await searchProperties(supabase, args);
+                    
+                    if (searchResult.success && searchResult.properties?.length > 0) {
+                      const allProperties = searchResult.properties.slice(0, 5);
+                      
+                      await updateConsultativeState(supabase, phoneNumber, {
+                        pending_properties: allProperties,
+                        current_property_index: 0,
+                        awaiting_property_feedback: true
+                      });
+                      
+                      propertiesToSend = [allProperties[0]];
+                      
+                      if (!aiResponse || aiResponse.length < 10) {
+                        const nameGreet = existingName ? `, ${existingName}` : '';
+                        aiResponse = `Encontrei um imóvel que pode combinar com o que você busca${nameGreet}! 🏠`;
+                      }
+                      
+                      console.log(`✅ Consultative flow: saved ${allProperties.length} properties, sending 1`);
+                    } else {
+                      if (!aiResponse || aiResponse.length < 10) {
+                        aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔 Podemos flexibilizar algo?`;
+                      }
+                    }
+                  }
+                  
+                  if (toolCall.function.name === 'enviar_lead_c2s') {
+                    const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
+                    const c2sResult = await sendLeadToC2S(supabase, args, phoneNumber, historyText, existingName || undefined);
+                    
+                    if (c2sResult.success) {
+                      c2sTransferred = true;
+                      console.log('✅ Lead sent to C2S');
+                    }
+                  }
+                }
               }
             }
           }
