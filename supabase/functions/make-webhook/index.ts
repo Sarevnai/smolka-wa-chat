@@ -657,9 +657,10 @@ Após ter nome + objetivo + prioridade, use enviar_lead_c2s com resumo.
 - Seja simpática, breve e eficiente`;
 }
 
-function buildLocacaoPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[]): string {
+function buildLocacaoPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[], qualificationData?: QualificationData | null): string {
   const hasName = !!contactName;
   const hasHistory = history && history.length > 0;
+  const contextSummary = buildContextSummary(qualificationData || null);
   
   return `🚨 REGRA ZERO: Você é ${config.agent_name} da ${config.company_name} em Florianópolis/SC.
 
@@ -667,10 +668,30 @@ ${hasName ? `👤 CLIENTE: ${contactName} - Use o nome naturalmente.` : '⭐ Ain
 
 ${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas.` : ''}
 
+${contextSummary}
+
+⛔ ANTI-LOOP - LEIA COM ATENÇÃO:
+- Se dados acima mostram "Região: Centro", NÃO pergunte região
+- Se dados mostram "Quartos: 2", NÃO pergunte quartos
+- NUNCA repita uma pergunta já respondida
+- Se cliente já disse algo, use essa informação
+
+⚡ REGRA DE OURO - UMA PERGUNTA POR VEZ:
+- NUNCA faça 2 perguntas na mesma mensagem
+- Se falta região, pergunte APENAS região
+- Se falta tipo, pergunte APENAS tipo
+- Após cada resposta, faça a PRÓXIMA pergunta
+- Só busque imóveis quando tiver 2+ critérios
+
+💬 EXEMPLOS CORRETOS:
+- ✅ "Qual região você prefere?"
+- ✅ "Quantos quartos você precisa?"
+- ❌ "Qual região e quantos quartos?" (ERRADO - 2 perguntas)
+
 🎯 OBJETIVO: Ajudar o cliente a ALUGAR um imóvel em Florianópolis.
 
 📍 FLUXO DE ATENDIMENTO - LOCAÇÃO:
-1. QUALIFICAÇÃO: Coletar região, tipo, quartos, faixa de preço
+1. QUALIFICAÇÃO: Coletar região, tipo, quartos, faixa de preço (UMA pergunta por vez!)
 2. BUSCA: Usar buscar_imoveis quando tiver 2+ critérios
 3. APRESENTAÇÃO: Sistema envia 1 imóvel por vez
 4. PERGUNTA: "Esse imóvel faz sentido pra você?"
@@ -701,12 +722,6 @@ Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
 4. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
 5. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
 
-⚠️ REGRAS CRÍTICAS:
-- NUNCA repita perguntas já respondidas
-- Se cliente disse "centro", NÃO pergunte região novamente
-- Mensagens curtas e diretas (max 3 linhas)
-- Um emoji por mensagem no máximo
-
 💬 ESTILO CONSULTIVO:
 - "Encontrei um imóvel que pode combinar com o que você busca! 🏠"
 - "Esse imóvel faz sentido pra você?"
@@ -714,9 +729,10 @@ Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
 - "Vou te conectar com um consultor especializado 😊"`;
 }
 
-function buildVendasPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[]): string {
+function buildVendasPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[], qualificationData?: QualificationData | null): string {
   const hasName = !!contactName;
   const hasHistory = history && history.length > 0;
+  const contextSummary = buildContextSummary(qualificationData || null);
   
   return `🚨 REGRA ZERO: Você é ${config.agent_name} da ${config.company_name} em Florianópolis/SC.
 
@@ -724,11 +740,32 @@ ${hasName ? `👤 CLIENTE: ${contactName} - Use o nome naturalmente.` : '⭐ Ain
 
 ${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas.` : ''}
 
+${contextSummary}
+
+⛔ ANTI-LOOP - LEIA COM ATENÇÃO:
+- Se dados acima mostram "Região: Centro", NÃO pergunte região
+- Se dados mostram "Quartos: 2", NÃO pergunte quartos
+- Se dados mostram "Objetivo: morar", NÃO pergunte objetivo
+- NUNCA repita uma pergunta já respondida
+- Se cliente já disse algo, use essa informação
+
+⚡ REGRA DE OURO - UMA PERGUNTA POR VEZ:
+- NUNCA faça 2 perguntas na mesma mensagem
+- Se falta objetivo (morar/investir), pergunte APENAS isso
+- Se falta região, pergunte APENAS região
+- Após cada resposta, faça a PRÓXIMA pergunta
+- Só busque imóveis quando tiver 2+ critérios
+
+💬 EXEMPLOS CORRETOS:
+- ✅ "Você busca para morar ou investir?"
+- ✅ "Qual região te interessa?"
+- ❌ "Qual região e quantos quartos?" (ERRADO - 2 perguntas)
+
 🎯 OBJETIVO: Ajudar o cliente a COMPRAR/INVESTIR em imóvel.
 
 📍 FLUXO DE ATENDIMENTO - VENDAS:
-1. DESCOBRIR: Morar ou investir?
-2. QUALIFICAÇÃO: Região, tipo, quartos, faixa de preço
+1. DESCOBRIR: Morar ou investir? (se não sabe)
+2. QUALIFICAÇÃO: Região, tipo, quartos, faixa de preço (UMA pergunta por vez!)
 3. BUSCA: Usar buscar_imoveis quando tiver 2+ critérios
 4. APRESENTAÇÃO: Sistema envia 1 imóvel por vez
 5. PERGUNTA: "Esse imóvel faz sentido pra você?"
@@ -758,11 +795,6 @@ Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
 3. Usar enviar_lead_c2s com todos os dados
 4. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
 5. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
-
-⚠️ REGRAS CRÍTICAS:
-- NUNCA repita perguntas já respondidas
-- Mensagens curtas e diretas
-- Estilo consultivo, não robótico
 
 💬 ESTILO CONSULTIVO:
 - "Encontrei um imóvel que pode combinar com o que você busca! 🏠"
@@ -954,6 +986,195 @@ function analyzePropertyFeedback(message: string): 'positive' | 'negative' | 'ne
   if (positive.test(message)) return 'positive';
   if (negative.test(message)) return 'negative';
   return 'neutral';
+}
+
+// ========== PRICE FLEXIBILITY DETECTION ==========
+
+interface PriceFlexibility {
+  type: 'increase' | 'decrease' | 'none';
+  hasNewValue: boolean;
+  suggestedQuestion: string | null;
+}
+
+function detectPriceFlexibility(message: string): PriceFlexibility {
+  const lower = message.toLowerCase();
+  
+  // Patterns for price INCREASE without specific value
+  const increaseNoValue = /pode ser mais caro|aceito pagar mais|flexivel|flexível|aumento|valor maior|preço maior|pago mais|posso pagar mais|aumentar o valor|subir o preço/i;
+  
+  // Patterns for price DECREASE without specific value
+  const decreaseNoValue = /mais barato|menos|menor valor|mais em conta|orçamento menor|diminuir|reduzir|abaixar/i;
+  
+  // Check if message contains numeric value
+  const hasValue = /\d+\s*(mil|k|reais|R\$|\$)/i.test(message) || /\d{4,}/i.test(message);
+  
+  if (increaseNoValue.test(lower) && !hasValue) {
+    return {
+      type: 'increase',
+      hasNewValue: false,
+      suggestedQuestion: 'Até quanto você considera pagar? Assim consigo buscar opções melhores pra você 😊'
+    };
+  }
+  
+  if (decreaseNoValue.test(lower) && !hasValue) {
+    return {
+      type: 'decrease',
+      hasNewValue: false,
+      suggestedQuestion: 'Qual seria o valor máximo ideal pra você? 😊'
+    };
+  }
+  
+  return { type: 'none', hasNewValue: hasValue, suggestedQuestion: null };
+}
+
+// ========== QUALIFICATION PROGRESS TRACKING ==========
+
+interface QualificationProgress {
+  has_region: boolean;
+  has_type: boolean;
+  has_bedrooms: boolean;
+  has_budget: boolean;
+  has_purpose: boolean;
+}
+
+interface QualificationData {
+  detected_neighborhood: string | null;
+  detected_property_type: string | null;
+  detected_bedrooms: number | null;
+  detected_budget_max: number | null;
+  detected_interest: string | null;
+}
+
+async function getQualificationProgress(supabase: any, phoneNumber: string): Promise<{
+  progress: QualificationProgress;
+  data: QualificationData | null;
+}> {
+  try {
+    const { data } = await supabase
+      .from('lead_qualification')
+      .select('detected_neighborhood, detected_property_type, detected_bedrooms, detected_budget_max, detected_interest')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+    
+    return {
+      progress: {
+        has_region: !!data?.detected_neighborhood,
+        has_type: !!data?.detected_property_type,
+        has_bedrooms: !!data?.detected_bedrooms,
+        has_budget: !!data?.detected_budget_max,
+        has_purpose: !!data?.detected_interest
+      },
+      data: data || null
+    };
+  } catch (error) {
+    console.error('❌ Error getting qualification progress:', error);
+    return {
+      progress: { has_region: false, has_type: false, has_bedrooms: false, has_budget: false, has_purpose: false },
+      data: null
+    };
+  }
+}
+
+function getNextQualificationQuestion(progress: QualificationProgress, department: string): string | null {
+  // For LOCAÇÃO - order: region → type → bedrooms → budget
+  if (department === 'locacao') {
+    if (!progress.has_region) return '📍 Qual região de Florianópolis você prefere?';
+    if (!progress.has_type) return '🏠 Você busca apartamento, casa ou outro tipo?';
+    if (!progress.has_bedrooms) return '🛏️ Quantos quartos você precisa?';
+    if (!progress.has_budget) return '💰 Qual sua faixa de valor para o aluguel?';
+    return null; // Can search
+  }
+  
+  // For VENDAS - order: purpose → region → type → bedrooms → budget
+  if (department === 'vendas') {
+    if (!progress.has_purpose) return 'Você está buscando para *morar* ou para *investir*?';
+    if (!progress.has_region) return '📍 Qual região de Florianópolis te interessa?';
+    if (!progress.has_type) return '🏠 Que tipo de imóvel você busca?';
+    if (!progress.has_bedrooms) return '🛏️ Quantos quartos são ideais pra você?';
+    if (!progress.has_budget) return '💰 Qual faixa de investimento você considera?';
+    return null;
+  }
+  
+  return null;
+}
+
+// ========== ANTI-LOOP SYSTEM ==========
+
+function buildContextSummary(qualificationData: QualificationData | null): string {
+  if (!qualificationData) return '';
+  
+  const collected: string[] = [];
+  
+  if (qualificationData.detected_neighborhood) {
+    collected.push(`📍 Região: ${qualificationData.detected_neighborhood}`);
+  }
+  if (qualificationData.detected_property_type) {
+    collected.push(`🏠 Tipo: ${qualificationData.detected_property_type}`);
+  }
+  if (qualificationData.detected_bedrooms) {
+    collected.push(`🛏️ Quartos: ${qualificationData.detected_bedrooms}`);
+  }
+  if (qualificationData.detected_budget_max) {
+    collected.push(`💰 Orçamento: até R$ ${qualificationData.detected_budget_max.toLocaleString('pt-BR')}`);
+  }
+  if (qualificationData.detected_interest) {
+    collected.push(`🎯 Objetivo: ${qualificationData.detected_interest}`);
+  }
+  
+  if (collected.length === 0) return '';
+  
+  return `
+📋 DADOS JÁ COLETADOS (NÃO PERGUNTE DE NOVO):
+${collected.join('\n')}
+`;
+}
+
+function isLoopingQuestion(aiResponse: string, qualificationData: QualificationData | null): boolean {
+  if (!qualificationData) return false;
+  
+  const lower = aiResponse.toLowerCase();
+  
+  // If already has region and AI asked region again
+  if (qualificationData.detected_neighborhood) {
+    if (/qual\s+(regi[aã]o|bairro)|onde\s+voc[eê]|localiza[cç][aã]o|prefer[eê]ncia.*regi|que\s+regi/i.test(lower)) {
+      console.log('⚠️ Loop detected: asking region again');
+      return true;
+    }
+  }
+  
+  // If already has bedrooms and AI asked again
+  if (qualificationData.detected_bedrooms) {
+    if (/quantos?\s+quartos?|n[uú]mero\s+de\s+(quartos?|dormit[oó]rios?)|quantos\s+dormit/i.test(lower)) {
+      console.log('⚠️ Loop detected: asking bedrooms again');
+      return true;
+    }
+  }
+  
+  // If already has budget and AI asked again
+  if (qualificationData.detected_budget_max) {
+    if (/faixa\s+de\s+(valor|pre[cç]o)|or[cç]amento|quanto\s+(quer|pode)\s+pagar|qual.*valor/i.test(lower)) {
+      console.log('⚠️ Loop detected: asking budget again');
+      return true;
+    }
+  }
+  
+  // If already has property type and AI asked again
+  if (qualificationData.detected_property_type) {
+    if (/que\s+tipo|qual\s+tipo|tipo\s+de\s+im[oó]vel|apartamento.*casa|busca\s+apartamento/i.test(lower)) {
+      console.log('⚠️ Loop detected: asking property type again');
+      return true;
+    }
+  }
+  
+  // If already has purpose and AI asked again (for vendas)
+  if (qualificationData.detected_interest) {
+    if (/morar\s+ou\s+investir|para\s+morar|para\s+investir|objetivo|finalidade/i.test(lower)) {
+      console.log('⚠️ Loop detected: asking purpose again');
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 async function getConsultativeState(supabase: any, phoneNumber: string): Promise<{
@@ -1880,9 +2101,12 @@ serve(async (req) => {
 PRÓXIMO PASSO: Confirmar dados do cliente e usar enviar_lead_c2s para transferir.
 LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]`;
             
+            // Get qualification data for context
+            const { data: qualData } = await getQualificationProgress(supabase, phoneNumber);
+            
             const systemPrompt = currentDepartment === 'locacao' 
-              ? buildLocacaoPrompt(agentConfig, existingName || undefined, history)
-              : buildVendasPrompt(agentConfig, existingName || undefined, history);
+              ? buildLocacaoPrompt(agentConfig, existingName || undefined, history, qualData)
+              : buildVendasPrompt(agentConfig, existingName || undefined, history, qualData);
             
             const result = await callOpenAI(systemPrompt, history, messageContent + c2sContext, toolsWithVista);
             aiResponse = result.content;
@@ -1902,32 +2126,42 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
             }
             
           } else if (feedback === 'negative') {
-            // Client not interested - ask why and show next property
-            console.log('📉 Negative feedback - showing next property');
+            // ===== PRICE FLEXIBILITY DETECTION =====
+            const priceFlexibility = detectPriceFlexibility(messageContent);
             
-            const nextIndex = currentIndex + 1;
-            
-            if (nextIndex < pendingProperties.length) {
-              // Show next property
-              propertiesToSend = [pendingProperties[nextIndex]];
-              
-              await updateConsultativeState(supabase, phoneNumber, {
-                current_property_index: nextIndex,
-                awaiting_property_feedback: true
-              });
-              
-              const nameGreet = existingName ? `, ${existingName}` : '';
-              aiResponse = `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
-              
-              console.log(`📤 Showing next property: index ${nextIndex}`);
+            if (priceFlexibility.type !== 'none' && !priceFlexibility.hasNewValue) {
+              // Client wants to flex price but didn't give value
+              console.log(`💰 Price flexibility detected: ${priceFlexibility.type}, asking for value`);
+              aiResponse = priceFlexibility.suggestedQuestion!;
+              // DON'T show next property - wait for value
             } else {
-              // No more properties
-              await updateConsultativeState(supabase, phoneNumber, {
-                awaiting_property_feedback: false,
-                pending_properties: []
-              });
+              // Normal negative feedback - show next property
+              console.log('📉 Negative feedback - showing next property');
               
-              aiResponse = `Entendi! Essas eram as opções que encontrei com esses critérios. 🤔\n\nPodemos ajustar a busca? Me conta o que não se encaixou (preço, tamanho, localização).`;
+              const nextIndex = currentIndex + 1;
+              
+              if (nextIndex < pendingProperties.length) {
+                // Show next property
+                propertiesToSend = [pendingProperties[nextIndex]];
+                
+                await updateConsultativeState(supabase, phoneNumber, {
+                  current_property_index: nextIndex,
+                  awaiting_property_feedback: true
+                });
+                
+                const nameGreet = existingName ? `, ${existingName}` : '';
+                aiResponse = `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
+                
+                console.log(`📤 Showing next property: index ${nextIndex}`);
+              } else {
+                // No more properties
+                await updateConsultativeState(supabase, phoneNumber, {
+                  awaiting_property_feedback: false,
+                  pending_properties: []
+                });
+                
+                aiResponse = `Entendi! Essas eram as opções que encontrei com esses critérios. 🤔\n\nPodemos ajustar a busca? Me conta o que não se encaixou (preço, tamanho, localização).`;
+              }
             }
           } else {
             // Neutral feedback - ask for clarification
@@ -1936,13 +2170,18 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
           }
         } else {
           // Normal flow - no pending feedback
+          
+          // ===== LOAD QUALIFICATION DATA FOR CONTEXT =====
+          const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
+          console.log(`📊 Qualification progress:`, qualProgress);
+          
           let systemPrompt: string;
           let tools = toolsWithVista;
           
           if (currentDepartment === 'locacao') {
-            systemPrompt = buildLocacaoPrompt(agentConfig, existingName || undefined, history);
+            systemPrompt = buildLocacaoPrompt(agentConfig, existingName || undefined, history, qualData);
           } else if (currentDepartment === 'vendas') {
-            systemPrompt = buildVendasPrompt(agentConfig, existingName || undefined, history);
+            systemPrompt = buildVendasPrompt(agentConfig, existingName || undefined, history, qualData);
           } else if (currentDepartment === 'administrativo') {
             systemPrompt = buildAdminPrompt(agentConfig, existingName || undefined);
             tools = []; // Admin doesn't need property search
@@ -1952,6 +2191,18 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
           
           const result = await callOpenAI(systemPrompt, history, aiPromptMessage, tools);
           aiResponse = result.content;
+          
+          // ===== ANTI-LOOP DETECTION =====
+          if (isLoopingQuestion(aiResponse, qualData)) {
+            console.log('🔄 Loop detected! Replacing with next qualification question');
+            const nextQuestion = getNextQualificationQuestion(qualProgress, currentDepartment || 'locacao');
+            if (nextQuestion) {
+              aiResponse = nextQuestion;
+            } else {
+              // Has enough info - can search
+              aiResponse = 'Perfeito! Com essas informações, vou buscar as melhores opções pra você 😊';
+            }
+          }
 
           // ===== PROCESS TOOL CALLS =====
           for (const toolCall of result.toolCalls) {
