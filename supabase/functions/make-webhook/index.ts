@@ -1263,30 +1263,42 @@ function extractQualificationData(message: string): ExtractedQualificationData {
     }
   }
   
-  // ===== DETECT BUDGET =====
+  // ===== DETECT BUDGET (improved parsing for Brazilian format) =====
   const budgetPatterns = [
-    // "até 3 mil", "ate 3mil", "até 3000"
-    /(?:até|ate|max|máximo|no máximo)\s*(?:R\$\s*)?(\d+[.,]?\d*)\s*(?:mil|k)?/i,
-    // "R$ 3.000", "R$3000"
-    /R\$\s*(\d+[.,]?\d*)\s*(?:mil|k)?/i,
-    // "3 mil", "3mil"
+    // "até 3.000.000", "ate 15.000", "até R$ 3.000.000"
+    /(?:até|ate|max|máximo|no máximo)\s*(?:R\$\s*)?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:mil|k)?/i,
+    // "R$ 3.000.000", "R$15.000", "R$ 7000"
+    /R\$\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:mil|k)?/i,
+    // "3 mil", "3mil", "15k"
     /(\d+)\s*(?:mil|k)\b/i,
-    // "3000 reais", "5000"
-    /(\d{4,})\s*(?:reais)?/i
+    // "3000 reais", "15000", "3.000.000"
+    /(\d{1,3}(?:[.,]\d{3})*)\s*(?:reais)?/i
   ];
   
   for (const pattern of budgetPatterns) {
     const match = message.match(pattern);
     if (match && match[1]) {
-      let value = parseFloat(match[1].replace(/\./g, '').replace(',', '.'));
+      let rawValue = match[1];
+      let value: number;
+      
+      // Check if it's a formatted number like "3.000.000" or "15.000" (Brazilian format)
+      if (rawValue.includes('.') && /\.\d{3}/.test(rawValue)) {
+        // Dots are thousand separators
+        value = parseFloat(rawValue.replace(/\./g, '').replace(',', '.'));
+      } else if (rawValue.includes(',')) {
+        // Comma might be decimal separator
+        value = parseFloat(rawValue.replace(',', '.'));
+      } else {
+        value = parseFloat(rawValue);
+      }
       
       // If value is small and message contains "mil" or "k", multiply by 1000
-      if (value < 100 && /mil|k/i.test(message)) {
+      if (value < 1000 && /mil|k/i.test(message)) {
         value *= 1000;
       }
       
-      // Validate reasonable budget range (500 to 100000)
-      if (value >= 500 && value <= 100000) {
+      // Validate reasonable budget range (500 to 100,000,000 for vendas)
+      if (value >= 500 && value <= 100000000) {
         data.detected_budget_max = value;
         console.log(`💰 Detected budget: R$ ${value}`);
         break;
@@ -1519,10 +1531,11 @@ interface FlexibilizationResult {
 }
 
 function detectFlexibilization(message: string): FlexibilizationResult {
-  const lower = message.toLowerCase();
+  const lower = message.toLowerCase().trim();
   const updates: FlexibilizationResult['updates'] = {};
   const fields: string[] = [];
   
+  // ===== PATTERN 1: Explicit flexibilization =====
   // "pode ser 2 quartos" / "aceito 2 quartos" / "2 quartos tá bom"
   const quartosFlex = message.match(/(?:pode\s+ser|aceito|tá\s+bom|ta\s+bom|ok\s+com|pode\s+ter|até|ate)\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i);
   if (quartosFlex) {
@@ -1531,54 +1544,154 @@ function detectFlexibilization(message: string): FlexibilizationResult {
     console.log(`📝 Flexibilization detected: bedrooms → ${updates.detected_bedrooms}`);
   }
   
-  // "pode ser até 15 mil" / "até 15000" / "máximo 15k"
-  const budgetFlex = message.match(/(?:pode\s+ser\s+)?(?:até|ate|máximo|maximo|no\s+máximo|no\s+maximo|limite\s+de?)\s*(?:r\$\s*)?(\d+[.,]?\d*)\s*(?:mil|k|reais)?/i);
-  if (budgetFlex) {
-    let value = parseFloat(budgetFlex[1].replace(',', '.'));
-    // If "mil" or "k" mentioned and value is small, multiply
-    if (/mil|k/i.test(message) && value < 100) value *= 1000;
-    // If value is very small (< 100), assume it's in thousands
-    if (value < 100) value *= 1000;
-    updates.detected_budget_max = value;
-    fields.push('orçamento');
-    console.log(`📝 Flexibilization detected: budget → R$ ${updates.detected_budget_max}`);
-  }
+  // ===== PATTERN 2: Budget with improved parsing =====
+  // Handle values like "3.000.000", "15.000", "15mil", "15k", "R$ 15.000"
+  const budgetPatterns = [
+    // "pode ser até 15.000" / "até R$ 3.000.000" / "máximo 15k"
+    /(?:pode\s+ser\s+)?(?:até|ate|máximo|maximo|no\s+máximo|no\s+maximo|limite\s+de?)\s*(?:r\$\s*)?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:mil|k|reais)?/i,
+    // Direct value mention: "15 mil", "3.000.000", "R$ 15.000"
+    /(?:r\$\s*)?(\d{1,3}(?:[.,]\d{3})*)\s*(?:mil|k)?(?:\s*reais)?/i
+  ];
   
-  // "pode ser no Ribeirão" / "aceito Campeche" / "pode ser região sul"
-  const regionFlex = message.match(/(?:pode\s+ser\s+)?(?:no|em|na|região|regiao)\s+([a-záàâãéèêíïóôõöúç\s]+?)(?:\s*[,.]|$)/i);
-  if (regionFlex && regionFlex[1].length > 2 && regionFlex[1].length < 30) {
-    const neighborhood = regionFlex[1].trim();
-    // Validate it's a real neighborhood/region
-    const allNeighborhoods = getAllNeighborhoods();
-    const isValidNeighborhood = allNeighborhoods.some(n => 
-      n.toLowerCase().includes(neighborhood.toLowerCase()) ||
-      neighborhood.toLowerCase().includes(n.toLowerCase())
-    ) || Object.keys(FLORIANOPOLIS_REGIONS).includes(neighborhood.toLowerCase());
-    
-    if (isValidNeighborhood) {
-      const normalized = normalizeNeighborhood(neighborhood);
-      updates.detected_neighborhood = normalized.normalized;
-      fields.push('bairro');
-      console.log(`📝 Flexibilization detected: neighborhood → ${updates.detected_neighborhood}`);
+  for (const pattern of budgetPatterns) {
+    const budgetFlex = message.match(pattern);
+    if (budgetFlex && !updates.detected_budget_max) {
+      let rawValue = budgetFlex[1];
+      let value: number;
+      
+      // Check if it's a formatted number like "3.000.000" or "15.000"
+      if (rawValue.includes('.') && /\.\d{3}/.test(rawValue)) {
+        // Dots are thousand separators (Brazilian format)
+        value = parseFloat(rawValue.replace(/\./g, '').replace(',', '.'));
+      } else if (rawValue.includes(',')) {
+        // Comma might be decimal separator
+        value = parseFloat(rawValue.replace(',', '.'));
+      } else {
+        value = parseFloat(rawValue);
+      }
+      
+      // If "mil" or "k" mentioned and value is small, multiply
+      if (/mil|k/i.test(message) && value < 1000) {
+        value *= 1000;
+      }
+      
+      // Validate reasonable budget range (500 to 100,000,000)
+      if (value >= 500 && value <= 100000000) {
+        updates.detected_budget_max = value;
+        fields.push('orçamento');
+        console.log(`📝 Flexibilization detected: budget → R$ ${updates.detected_budget_max}`);
+        break;
+      }
     }
   }
   
-  // "pode ser apartamento" / "aceito casa também"
-  const typeFlex = message.match(/(?:pode\s+ser\s+)?(?:um|uma)?\s*(apartamento|casa|kitnet|studio|cobertura|sobrado|terreno|comercial)/i);
+  // ===== PATTERN 3: Simple keyword responses (answering AI's triage question) =====
+  // When AI asks "qual região?" and user responds with just a region name
+  const simpleKeywords: Record<string, string> = {
+    'valor': 'budget',
+    'preço': 'budget',
+    'preco': 'budget',
+    'orçamento': 'budget',
+    'orcamento': 'budget',
+    'região': 'region',
+    'regiao': 'region',
+    'bairro': 'region',
+    'local': 'region',
+    'localização': 'region',
+    'quartos': 'bedrooms',
+    'quarto': 'bedrooms',
+    'dormitórios': 'bedrooms',
+    'dormitorios': 'bedrooms'
+  };
+  
+  // If user sent a single keyword like "valor" or "região", it's not a flexibilization
+  // but if they sent a region/neighborhood name directly, extract it
+  if (!updates.detected_neighborhood && lower.length < 30) {
+    // Check if it's a direct neighborhood/region answer
+    const allNeighborhoods = getAllNeighborhoods();
+    for (const neighborhood of allNeighborhoods) {
+      if (lower === neighborhood.toLowerCase() || 
+          lower.includes(neighborhood.toLowerCase()) ||
+          neighborhood.toLowerCase().includes(lower)) {
+        const normalized = normalizeNeighborhood(lower);
+        if (normalized.confidence >= 0.7) {
+          updates.detected_neighborhood = normalized.normalized;
+          fields.push('bairro');
+          console.log(`📝 Direct neighborhood answer detected: ${updates.detected_neighborhood}`);
+          break;
+        }
+      }
+    }
+    
+    // Check for region names
+    for (const regionKey of Object.keys(FLORIANOPOLIS_REGIONS)) {
+      if (lower === regionKey || lower.includes(regionKey)) {
+        const region = FLORIANOPOLIS_REGIONS[regionKey];
+        updates.detected_neighborhood = region.bairros[0]; // Use first neighborhood of region
+        fields.push('bairro');
+        console.log(`📝 Direct region answer detected: ${regionKey} → ${updates.detected_neighborhood}`);
+        break;
+      }
+    }
+  }
+  
+  // ===== PATTERN 4: "pode ser no Ribeirão" / "aceito Campeche" =====
+  if (!updates.detected_neighborhood) {
+    const regionFlex = message.match(/(?:pode\s+ser\s+)?(?:no|em|na|região|regiao)\s+([a-záàâãéèêíïóôõöúç\s]+?)(?:\s*[,.]|$)/i);
+    if (regionFlex && regionFlex[1].length > 2 && regionFlex[1].length < 30) {
+      const neighborhood = regionFlex[1].trim();
+      const allNeighborhoods = getAllNeighborhoods();
+      const isValidNeighborhood = allNeighborhoods.some(n => 
+        n.toLowerCase().includes(neighborhood.toLowerCase()) ||
+        neighborhood.toLowerCase().includes(n.toLowerCase())
+      ) || Object.keys(FLORIANOPOLIS_REGIONS).includes(neighborhood.toLowerCase());
+      
+      if (isValidNeighborhood) {
+        const normalized = normalizeNeighborhood(neighborhood);
+        updates.detected_neighborhood = normalized.normalized;
+        fields.push('bairro');
+        console.log(`📝 Flexibilization detected: neighborhood → ${updates.detected_neighborhood}`);
+      }
+    }
+  }
+  
+  // ===== PATTERN 5: Property type =====
+  // "pode ser apartamento" / "aceito casa também" / just "casa" or "apartamento"
+  const typeFlex = message.match(/(?:pode\s+ser\s+)?(?:um|uma)?\s*(apartamento|apto|casa|kitnet|kit|studio|estúdio|estudio|cobertura|sobrado|terreno|comercial|loja|sala)/i);
   if (typeFlex) {
     const typeMap: Record<string, string> = {
       'apartamento': 'Apartamento',
+      'apto': 'Apartamento',
       'casa': 'Casa',
       'kitnet': 'Kitnet',
+      'kit': 'Kitnet',
       'studio': 'Studio',
+      'estúdio': 'Studio',
+      'estudio': 'Studio',
       'cobertura': 'Cobertura',
       'sobrado': 'Sobrado',
       'terreno': 'Terreno',
-      'comercial': 'Comercial'
+      'comercial': 'Comercial',
+      'loja': 'Comercial',
+      'sala': 'Comercial'
     };
     updates.detected_property_type = typeMap[typeFlex[1].toLowerCase()] || typeFlex[1];
     fields.push('tipo');
     console.log(`📝 Flexibilization detected: property type → ${updates.detected_property_type}`);
+  }
+  
+  // ===== PATTERN 6: Bedrooms as simple number =====
+  // User responds "2" or "3 quartos" to bedroom question
+  if (!updates.detected_bedrooms) {
+    const simpleBedroomMatch = message.match(/^(\d)\s*(?:quartos?|qtos?)?$/i);
+    if (simpleBedroomMatch) {
+      const num = parseInt(simpleBedroomMatch[1]);
+      if (num >= 1 && num <= 10) {
+        updates.detected_bedrooms = num;
+        fields.push('quartos');
+        console.log(`📝 Simple bedroom answer detected: ${num}`);
+      }
+    }
   }
   
   return {
@@ -2817,15 +2930,16 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
           else {
             // Check if we now have enough criteria to search automatically
             if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
-              console.log(`✅ Has minimum criteria - triggering auto-search`);
+              console.log(`✅ Has minimum criteria - triggering auto-search with fallback`);
               
               const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
               if (searchParams) {
                 console.log(`🏠 Auto-search params:`, searchParams);
-                const searchResult = await searchProperties(supabase, searchParams);
+                // USE FALLBACK SEARCH instead of regular search
+                const fallbackResult = await searchPropertiesWithFallback(supabase, searchParams);
                 
-                if (searchResult.success && searchResult.properties?.length > 0) {
-                  const allProperties = searchResult.properties.slice(0, 5);
+                if (fallbackResult.properties.length > 0) {
+                  const allProperties = fallbackResult.properties.slice(0, 5);
                   
                   await updateConsultativeState(supabase, phoneNumber, {
                     pending_properties: allProperties,
@@ -2835,10 +2949,10 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                   });
                   
                   propertiesToSend = [allProperties[0]];
-                  const nameGreet = existingName ? `, ${existingName}` : '';
-                  aiResponse = `Perfeito${nameGreet}! Encontrei algumas opções que combinam com o que você busca 🏠`;
+                  // Use contextual message based on search type
+                  aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
                   
-                  console.log(`✅ Auto-search: found ${allProperties.length} properties, sending 1`);
+                  console.log(`✅ Auto-search with fallback: found ${allProperties.length} properties (${fallbackResult.searchType})`);
                 } else {
                   aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔\n\nO que você prefere flexibilizar: valor, região ou quartos?`;
                 }
@@ -2873,14 +2987,14 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                 
                 // ===== ANTI-LOOP DETECTION =====
                 if (isLoopingQuestion(aiResponse, qualData)) {
-                  console.log('🔄 Loop detected! Replacing with fallback');
-                  // Check for auto-search as fallback
+                  console.log('🔄 Loop detected! Replacing with fallback search');
+                  // Check for auto-search as fallback - USE FALLBACK SEARCH
                   if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
                     const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
                     if (searchParams) {
-                      const searchResult = await searchProperties(supabase, searchParams);
-                      if (searchResult.success && searchResult.properties?.length > 0) {
-                        const allProperties = searchResult.properties.slice(0, 5);
+                      const fallbackResult = await searchPropertiesWithFallback(supabase, searchParams);
+                      if (fallbackResult.properties.length > 0) {
+                        const allProperties = fallbackResult.properties.slice(0, 5);
                         await updateConsultativeState(supabase, phoneNumber, {
                           pending_properties: allProperties,
                           current_property_index: 0,
@@ -2888,7 +3002,7 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                           last_search_params: searchParams
                         });
                         propertiesToSend = [allProperties[0]];
-                        aiResponse = `Encontrei um imóvel que pode combinar com o que você busca! 🏠`;
+                        aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
                       } else {
                         aiResponse = `Não encontrei imóveis com esses critérios 😔 O que você prefere ajustar?`;
                       }
@@ -2905,10 +3019,11 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                   console.log(`🔧 Tool call: ${toolCall.function.name}`, args);
                   
                   if (toolCall.function.name === 'buscar_imoveis') {
-                    const searchResult = await searchProperties(supabase, args);
+                    // USE FALLBACK SEARCH for AI-triggered searches too
+                    const fallbackResult = await searchPropertiesWithFallback(supabase, args);
                     
-                    if (searchResult.success && searchResult.properties?.length > 0) {
-                      const allProperties = searchResult.properties.slice(0, 5);
+                    if (fallbackResult.properties.length > 0) {
+                      const allProperties = fallbackResult.properties.slice(0, 5);
                       
                       await updateConsultativeState(supabase, phoneNumber, {
                         pending_properties: allProperties,
@@ -2919,11 +3034,10 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                       propertiesToSend = [allProperties[0]];
                       
                       if (!aiResponse || aiResponse.length < 10) {
-                        const nameGreet = existingName ? `, ${existingName}` : '';
-                        aiResponse = `Encontrei um imóvel que pode combinar com o que você busca${nameGreet}! 🏠`;
+                        aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
                       }
                       
-                      console.log(`✅ Consultative flow: saved ${allProperties.length} properties, sending 1`);
+                      console.log(`✅ Consultative flow with fallback: saved ${allProperties.length} properties (${fallbackResult.searchType})`);
                     } else {
                       if (!aiResponse || aiResponse.length < 10) {
                         aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔 Podemos flexibilizar algo?`;
@@ -2950,6 +3064,37 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
         const validation = validateAIResponse(aiResponse);
         if (!validation.valid) {
           aiResponse = FALLBACK_RESPONSE;
+        }
+        
+        // ===== ANTI-REPETITION CHECK =====
+        if (conversationId && aiResponse) {
+          const lastOutbound = await getLastOutboundMessage(supabase, conversationId);
+          if (isSameMessage(lastOutbound, aiResponse)) {
+            console.log('⚠️ Duplicate message detected - generating alternative');
+            
+            // Check if we can search
+            if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
+              const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
+              if (searchParams) {
+                const fallbackResult = await searchPropertiesWithFallback(supabase, searchParams);
+                if (fallbackResult.properties.length > 0) {
+                  const allProperties = fallbackResult.properties.slice(0, 5);
+                  await updateConsultativeState(supabase, phoneNumber, {
+                    pending_properties: allProperties,
+                    current_property_index: 0,
+                    awaiting_property_feedback: true
+                  });
+                  propertiesToSend = [allProperties[0]];
+                  aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
+                } else {
+                  aiResponse = 'Entendi que você está flexibilizando os critérios. Me confirma: quer que eu busque com qual valor máximo e região? 😊';
+                }
+              }
+            } else {
+              // Ask a specific clarifying question
+              aiResponse = 'Entendi! Pra refinar a busca, me conta: qual o valor máximo que você considera? 💰';
+            }
+          }
         }
       }
     }
