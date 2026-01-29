@@ -818,7 +818,9 @@ export type Database = {
       conversation_states: {
         Row: {
           ai_started_at: string | null
+          awaiting_property_feedback: boolean | null
           created_at: string | null
+          current_property_index: number | null
           id: string
           is_ai_active: boolean | null
           last_ai_message_at: string | null
@@ -835,7 +837,9 @@ export type Database = {
         }
         Insert: {
           ai_started_at?: string | null
+          awaiting_property_feedback?: boolean | null
           created_at?: string | null
+          current_property_index?: number | null
           id?: string
           is_ai_active?: boolean | null
           last_ai_message_at?: string | null
@@ -852,7 +856,9 @@ export type Database = {
         }
         Update: {
           ai_started_at?: string | null
+          awaiting_property_feedback?: boolean | null
           created_at?: string | null
+          current_property_index?: number | null
           id?: string
           is_ai_active?: boolean | null
           last_ai_message_at?: string | null
