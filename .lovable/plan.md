@@ -1,83 +1,119 @@
 
-Objetivo
-- Fazer o Make.com parar de chamar o Supabase em “status callbacks” (que retornam `{ skipped: true, reason: "status_callback" }`) e garantir que o HTTP Request (Módulo 14) só rode quando existe uma mensagem real, para aí sim o retorno conter `data.properties`.
+# Plano: Registrar Mensagens do Make.com na Plataforma
 
-Diagnóstico (com base no seu blueprint)
-- No seu cenário atual, o filtro do Módulo 14 está assim:
-  - Nome: “Apenas mensagens reais”
-  - Condição única: `{{1.messages}} exists`
-- Em eventos de status (delivered/read/sent), o Make/connector costuma manter o campo `messages` “existindo” (como array vazio), então `exists` passa mesmo sem mensagem.
-- Resultado: o Módulo 14 continua sendo executado em callbacks de status e o Supabase devolve exatamente o que você está vendo: `skipped: true, reason: "status_callback"`.
+## Problema Identificado
+O Make.com está enviando as fotos dos imóveis diretamente via módulo nativo do WhatsApp, mas essas mensagens **não estão sendo registradas no banco de dados**. Por isso, vocês não veem o contexto das imagens enviadas na plataforma.
 
-O que vamos mudar (Make.com)
-1) Corrigir o filtro “Apenas mensagens reais” (Módulo 14)
-- No cenário: clique no link/ícone do filtro do Módulo 14 (HTTP Request) “Apenas mensagens reais”.
-- Troque o filtro para garantir “mensagens não vazias”.
+## Solução
+Substituir o módulo nativo "WhatsApp > Send an Image" por um **HTTP Request** que chama a edge function `send-wa-media` do Supabase. Essa função:
+1. Envia a imagem via WhatsApp API
+2. **Salva a mensagem no banco de dados**
+3. **Vincula automaticamente à conversa correta**
 
-Opção A (recomendada, mais simples e funciona bem)
-- Regra 1: `{{1.messages}}` → Operator: Exists
-- Regra 2: `{{length(1.messages)}}` → Numeric operators: Greater than → `0`
-- As duas regras precisam estar no mesmo bloco (AND).
+---
 
-Opção B (a mais robusta quando “messages” pode existir vazio)
-- Regra 1: `{{1.messages[1].id}}` → Operator: Exists
-  - (Em status callback não existe `messages[1]`, então não passa.)
+## Configuração no Make.com
 
-Opção C (alternativa por “statuses”)
-- Regra 1: `{{1.statuses}}` → Operator: Does not exist
-  - ou `{{length(1.statuses)}}` → Equals `0` (se o Make sempre criar `statuses` como array)
-- Combine com Opção A ou B se quiser redundância.
+### Passo 1: Remover o Módulo "Send an Image"
+- Delete o módulo nativo do WhatsApp que está dentro do Iterator
 
-2) Salvar e testar com um único disparo controlado
-- Salve o cenário no Make.com.
-- Rode “Run once”.
-- Envie uma mensagem real para o WhatsApp (texto simples): “Quero alugar apartamento no centro, 2 quartos”.
-- Resultado esperado no History:
-  - Deve aparecer a execução do evento de mensagem (messages preenchido).
-  - As execuções de status (delivered/read) devem parar de chegar no Módulo 14 (ou nem executar o Módulo 14).
+### Passo 2: Adicionar HTTP Request (dentro do Iterator)
+No lugar do módulo removido, adicione um novo **HTTP > Make a request**
 
-3) Validar onde olhar o `data.properties`
-- No History da execução que passou pelo filtro, abra o “Output” do Módulo 14 (HTTP Request).
-- Procure por:
-  - `data.success = true`
-  - `data.result` (texto)
-  - `data.properties` (array)
-- Observação importante: você só verá `data.properties` na execução do evento de mensagem real. Em status callback, o Supabase corretamente retorna `skipped`.
+#### Configurações:
+| Campo | Valor |
+|-------|-------|
+| **URL** | `https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/send-wa-media` |
+| **Method** | POST |
+| **Headers** | `Content-Type: application/json`<br>`Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndwanhzZ3h4aG9nemtrdXpueWtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NDk3NjcsImV4cCI6MjA3MzAyNTc2N30.tTbVFi-CkgJZroJa-V0QPAPU5sYU3asmD-2yn2ytca0` |
+| **Body Type** | Raw (application/json) |
 
-4) (Recomendado) Ajustar o body do Módulo 14 para evitar campos vazios por causa de array mapping
-No seu blueprint, o body do Módulo 14 usa `{{1.messages[].from}}` etc. Isso pode funcionar, mas é mais seguro mapear sempre o primeiro item:
-- phone: `{{1.messages[1].from}}` (ou `{{1.contacts[1].wa_id}}`)
-- message_type: `{{1.messages[1].type}}`
-- message: `{{1.messages[1].text.body}}`
-- button_text: `{{1.messages[1].button.text}}`
-- button_payload: `{{1.messages[1].button.payload}}`
+#### Body (JSON):
+```json
+{
+  "to": "{{1.messages[1].from}}",
+  "mediaUrl": "{{15.foto_destaque}}",
+  "mediaType": "image/jpeg",
+  "caption": "🏠 *{{15.tipo}}* - {{15.bairro}}\n\n🛏️ {{15.quartos}} quarto(s)\n💰 {{15.preco_formatado}}\n\n🔗 {{15.link}}"
+}
+```
 
-Nota sobre áudio no seu blueprint:
-- Você está usando `{{1.messages[].audio.url}}`, mas no schema do módulo 1 (watchEvents2) “audio” tem `id` e não `url`.
-- Isso não impede `properties`, mas para áudio funcionar depois, você precisará enviar `audio.id` e deixar o Supabase baixar o arquivo via Graph API (ou o Make buscar a URL antes).
+> **Nota**: Substitua `15` pelo ID real do seu módulo Iterator
 
-5) Depois que `data.properties` aparecer: configurar o envio de imóveis (Iterator + Send Image)
-- Router (após o Módulo 14) com rota “Tem imóveis”:
-  - Condição: `{{14.data.properties}} exists` AND `{{length(14.data.properties)}} > 0`
-- Adicionar Iterator:
-  - Array: `{{14.data.properties}}`
-- Dentro do Iterator, usar WhatsApp “Send an Image”:
-  - Image URL: `{{iterator.foto_destaque}}`
-  - Caption: montar com `tipo`, `bairro`, `quartos`, `preco_formatado`, `link`
-- Rota alternativa “Sem imóveis”:
-  - Enviar apenas `{{14.data.result}}`
+---
 
-Critérios de sucesso (o que deve acontecer)
-- O Módulo 14 não executa mais nos eventos de status (logo você para de ver `skipped: status_callback` ali).
-- Em mensagens reais, o Módulo 14 mostra `data.properties` no Output.
-- A partir daí, o Router/Iterator consegue consumir `data.properties` e enviar as imagens.
+## Diagrama do Fluxo Atualizado
 
-Se após corrigir o filtro você ainda ver `skipped: status_callback` no Módulo 14
-- Isso quase sempre significa que o filtro ainda está “Exists” apenas, ou que as regras estão em blocos diferentes (virando OR sem querer).
-- Use a Opção B (`{{1.messages[1].id}} exists`) que é a mais difícil de “falsos positivos”.
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                     CENÁRIO MAKE.COM                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   [1] WhatsApp Watch Events                                     │
+│           │                                                     │
+│           ▼                                                     │
+│   ┌───────────────────────────────────────┐                    │
+│   │ Filtro: messages[1].id exists         │                    │
+│   └───────────────────────────────────────┘                    │
+│           │                                                     │
+│           ▼                                                     │
+│   [14] HTTP → make-webhook (Supabase)                          │
+│           │                                                     │
+│           ▼                                                     │
+│   ┌───────────────────────────────────────┐                    │
+│   │            ROUTER                      │                    │
+│   └───────────────────────────────────────┘                    │
+│        │                              │                         │
+│   [Tem imóveis]                 [Sem imóveis]                   │
+│        │                              │                         │
+│        ▼                              ▼                         │
+│   [Iterator]                  HTTP → send-wa-message            │
+│   {{14.data.properties}}      (envia data.result)               │
+│        │                                                        │
+│        ▼ (para cada imóvel)                                     │
+│   ┌─────────────────────────────────────┐                      │
+│   │  HTTP → send-wa-media (Supabase)    │  ← NOVO              │
+│   │  • Envia imagem via WhatsApp        │                      │
+│   │  • Salva no banco de dados          │                      │
+│   │  • Vincula à conversa               │                      │
+│   └─────────────────────────────────────┘                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-Referência direta do problema no seu blueprint (para você comparar)
-- Hoje está:
-  - Módulo 14 → filter → conditions: `{{1.messages}} exist`
-- Precisa virar:
-  - Módulo 14 → filter → conditions: `{{1.messages}} exist` AND `length(1.messages) > 0` (ou `messages[1].id exist`)
+---
+
+## Benefícios da Mudança
+
+| Antes (Módulo Nativo) | Depois (send-wa-media) |
+|----------------------|------------------------|
+| ❌ Imagem vai para o cliente | ✅ Imagem vai para o cliente |
+| ❌ Não aparece na plataforma | ✅ Aparece no chat da plataforma |
+| ❌ Sem contexto do atendimento | ✅ Vinculada à conversa correta |
+| ❌ Não salva no banco | ✅ Registrada na tabela `messages` |
+
+---
+
+## Configuração Extra: Enviar Mensagem de Texto Final
+
+Após o Iterator terminar, adicione outro HTTP Request para enviar o texto resumo (`data.result`):
+
+| Campo | Valor |
+|-------|-------|
+| **URL** | `https://wpjxsgxxhogzkkuznyke.supabase.co/functions/v1/send-wa-message` |
+| **Method** | POST |
+| **Body** | `{"to": "{{1.messages[1].from}}", "text": "{{14.data.result}}"}` |
+
+---
+
+## Resumo das Ações
+1. **Remover** módulo nativo "WhatsApp > Send an Image"
+2. **Adicionar** HTTP Request dentro do Iterator chamando `send-wa-media`
+3. **Configurar** headers com Authorization Bearer
+4. **Mapear** campos: to, mediaUrl, mediaType, caption
+5. **Testar** enviando mensagem real e verificando na plataforma
+
+---
+
+## Observação Importante
+Essa solução usa as edge functions existentes do projeto. Não é necessário alterar nenhum código no Supabase - apenas a configuração do Make.com.
