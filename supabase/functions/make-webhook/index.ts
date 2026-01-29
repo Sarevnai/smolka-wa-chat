@@ -1875,6 +1875,59 @@ serve(async (req) => {
 
     // Get final triage stage
     const finalState = await getConversationState(supabase, phoneNumber);
+
+    // ========================================
+    // DISPARO PARA WEBHOOK EXTERNO (Make.com)
+    // ========================================
+    const externalWebhookUrl = 'https://hook.us2.make.com/crfpetpkyvxwn1lrhq2aqmmbjvgnhhl3';
+
+    const webhookPayload = {
+      phone: phoneNumber,
+      result: aiResponse,
+      properties: propertiesToSend.length > 0 ? propertiesToSend.map(p => ({
+        codigo: p.codigo,
+        foto_destaque: p.foto_destaque,
+        tipo: p.tipo,
+        bairro: p.bairro,
+        cidade: p.cidade || 'Florianópolis',
+        quartos: String(p.quartos || ''),
+        suites: String(p.suites || ''),
+        vagas: String(p.vagas || ''),
+        area_util: String(p.area_util || ''),
+        preco: p.preco || 0,
+        preco_formatado: p.preco_formatado || '',
+        valor_condominio: p.valor_condominio || 0,
+        endereco: p.endereco || '',
+        link: p.link || '',
+        caracteristicas: p.caracteristicas || []
+      })) : [],
+      audio: audioResult ? {
+        url: audioResult.audioUrl,
+        type: audioResult.contentType,
+        is_voice_message: audioResult.isVoiceMessage
+      } : null,
+      conversation_id: conversationId,
+      department: currentDepartment,
+      contact_name: existingName || null
+    };
+
+    // Dispara de forma assíncrona (não bloqueia o retorno)
+    try {
+      console.log('📤 Dispatching to external Make.com webhook...');
+      console.log('📦 Payload:', JSON.stringify(webhookPayload, null, 2));
+      
+      const webhookResponse = await fetch(externalWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(webhookPayload)
+      });
+      
+      const responseText = await webhookResponse.text();
+      console.log(`✅ External webhook response: ${webhookResponse.status} - ${responseText}`);
+    } catch (webhookError) {
+      console.error('⚠️ External webhook dispatch failed:', webhookError);
+      // Não bloqueia o fluxo principal - apenas loga o erro
+    }
     
     return new Response(
       JSON.stringify({
@@ -1916,11 +1969,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error in make-webhook:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Internal server error',
+        error: errorMessage,
         result: 'Desculpe, tive um problema técnico. Pode tentar novamente?'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
