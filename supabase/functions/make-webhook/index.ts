@@ -2850,6 +2850,10 @@ serve(async (req) => {
         const pendingProperties = consultativeState?.pending_properties || [];
         const currentIndex = consultativeState?.current_property_index || 0;
         
+        // ===== LOAD QUALIFICATION DATA FOR ALL PATHS (hoisted to prevent scope issues) =====
+        const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
+        console.log(`📊 Qualification progress:`, qualProgress);
+        
         if (isAwaitingFeedback && pendingProperties.length > 0) {
           // Analyze feedback on previously presented property
           const feedback = analyzePropertyFeedback(messageContent);
@@ -2871,9 +2875,7 @@ serve(async (req) => {
 PRÓXIMO PASSO: Confirmar dados do cliente e usar enviar_lead_c2s para transferir.
 LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]`;
             
-            // Get qualification data for context
-            const { data: qualData } = await getQualificationProgress(supabase, phoneNumber);
-            
+            // qualData already loaded above
             const systemPrompt = getPromptForDepartment(agentConfig, currentDepartment, existingName || undefined, history, qualData);
             
             const result = await callOpenAI(systemPrompt, history, messageContent + c2sContext, toolsWithVista);
@@ -2938,10 +2940,7 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
           }
         } else {
           // Normal flow - no pending feedback
-          
-          // ===== LOAD QUALIFICATION DATA FOR CONTEXT =====
-          const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
-          console.log(`📊 Qualification progress:`, qualProgress);
+          // (qualProgress and qualData already loaded above)
           
           // ===== DETECT PRICE FLEXIBILITY (moved to main flow) =====
           const priceFlexibility = detectPriceFlexibility(messageContent);
