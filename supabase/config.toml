@@ -131,3 +131,6 @@ verify_jwt = false
 
 [functions.seed-development-images]
 verify_jwt = false
+
+[functions.send-via-make]
+verify_jwt = false

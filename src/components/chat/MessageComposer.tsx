@@ -21,7 +21,8 @@ interface AttachedFile {
 }
 
 interface MessageComposerProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, attendantName?: string) => void;
+  onSendMedia?: (mediaUrl: string, mediaType: string, caption?: string, filename?: string, attendantName?: string) => Promise<boolean>;
   disabled?: boolean;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
@@ -29,10 +30,12 @@ interface MessageComposerProps {
   onVoiceRecord?: () => void;
   selectedContact?: string;
   attendantControls?: ReactNode;
+  departmentCode?: string | null;
 }
 
 export function MessageComposer({
   onSendMessage,
+  onSendMedia,
   disabled = false,
   onTypingStart,
   onTypingStop,
@@ -40,6 +43,7 @@ export function MessageComposer({
   onVoiceRecord,
   selectedContact,
   attendantControls,
+  departmentCode,
 }: MessageComposerProps) {
   const [message, setMessage] = useState("");
   const [selectedAttendant, setSelectedAttendant] = useState("none");
@@ -119,25 +123,40 @@ export function MessageComposer({
       try {
         let formattedMessage = message.trim();
         
-        // Add attendant prefix if an attendant is selected
-        if (selectedAttendant && selectedAttendant !== "none") {
-          formattedMessage = `*${selectedAttendant}*\n\n${formattedMessage}`;
+        // Get attendant name for prefixing (only if not "none")
+        const attendantForSend = selectedAttendant !== "none" ? selectedAttendant : undefined;
+        
+        // Add attendant prefix to message if an attendant is selected
+        if (attendantForSend) {
+          formattedMessage = `*${attendantForSend}*\n\n${formattedMessage}`;
         }
         
         // Send attached files first
         for (const file of attachedFiles) {
-          await sendMediaMessage(
-            selectedContact,
-            file.publicUrl,
-            file.mimeType,
-            formattedMessage || undefined,
-            file.fileName
-          );
+          if (onSendMedia) {
+            // Use the new onSendMedia prop if available (with department routing)
+            await onSendMedia(
+              file.publicUrl,
+              file.mimeType,
+              formattedMessage || undefined,
+              file.fileName,
+              attendantForSend
+            );
+          } else {
+            // Fallback to direct send
+            await sendMediaMessage(
+              selectedContact,
+              file.publicUrl,
+              file.mimeType,
+              formattedMessage || undefined,
+              file.fileName
+            );
+          }
         }
         
         // If there are no files but there's a message, send text message
         if (attachedFiles.length === 0 && formattedMessage) {
-          await onSendMessage(formattedMessage);
+          await onSendMessage(formattedMessage, attendantForSend);
         }
         
         // Clear message and attachments
