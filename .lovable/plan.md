@@ -1,40 +1,16 @@
-
 # Plano: Migrar Atendimento Humano para Make.com
 
-## Resumo Executivo
-
-Migrar o envio de mensagens dos atendentes humanos (Locação, Administração, Vendas) para passar pelo Make.com, mantendo a API WhatsApp direta apenas para campanhas e empreendimentos.
+## Status: ✅ IMPLEMENTADO
 
 ---
 
-## Arquitetura Atual
+## Resumo
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          FRONTEND                                        │
-│                    (MessageComposer.tsx)                                 │
-└──────────────────────────────┬──────────────────────────────────────────┘
-                               │
-          ┌────────────────────┼────────────────────┐
-          │                    │                    │
-          ▼                    ▼                    ▼
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│ send-wa-message │  │  send-wa-media  │  │  send-bulk-msgs │
-│  (Edge Function)│  │ (Edge Function) │  │  (Campanhas)    │
-└────────┬────────┘  └────────┬────────┘  └────────┬────────┘
-         │                    │                    │
-         └────────────────────┴────────────────────┘
-                               │
-                               ▼
-                    ┌─────────────────┐
-                    │  WhatsApp API   │
-                    │   (Meta Graph)  │
-                    └─────────────────┘
-```
+Mensagens dos atendentes humanos (Locação, Administração, Vendas) agora são roteadas via Make.com, mantendo a API WhatsApp direta apenas para campanhas e empreendimentos.
 
 ---
 
-## Arquitetura Proposta
+## Arquitetura Implementada
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -47,7 +23,7 @@ Migrar o envio de mensagens dos atendentes humanos (Locação, Administração, 
       ▼                        ▼                            │
 ┌─────────────────┐    ┌─────────────────┐                  │
 │ send-via-make   │    │  send-wa-message│                  │
-│  (NOVA Edge Fn) │    │  send-wa-media  │                  │
+│  (Edge Function)│    │  send-wa-media  │                  │
 └────────┬────────┘    │  (MANTIDOS)     │                  │
          │             └────────┬────────┘                  │
          ▼                      │                           │
@@ -66,195 +42,117 @@ Migrar o envio de mensagens dos atendentes humanos (Locação, Administração, 
 
 ---
 
-## Componentes a Implementar
+## Componentes Implementados
 
-### 1. Nova Edge Function: `send-via-make`
+### 1. Edge Function: `send-via-make` ✅
 
-| Campo | Descrição |
-|-------|-----------|
-| Endpoint | `POST /functions/v1/send-via-make` |
-| Função | Recebe mensagens do frontend e envia para Make.com |
-| Autenticação | JWT do usuário logado (como `send-wa-message`) |
+| Campo | Valor |
+|-------|-------|
+| Arquivo | `supabase/functions/send-via-make/index.ts` |
+| JWT | `verify_jwt = false` (valida manualmente) |
+| Secret | `MAKE_OUTBOUND_WEBHOOK_URL` |
 
-**Payload de entrada (do frontend):**
+**Funcionalidades:**
+- Valida JWT do usuário logado
+- Insere mensagem no banco de dados (direction: 'outbound')
+- Envia payload para webhook do Make.com
+- Atualiza `last_message_at` da conversa
 
-```typescript
+**Payload enviado para Make.com:**
+```json
 {
-  to: string;              // Telefone do destinatário
-  text?: string;           // Texto da mensagem
-  mediaUrl?: string;       // URL do media (se for arquivo)
-  mediaType?: string;      // MIME type
-  caption?: string;        // Legenda do arquivo
-  filename?: string;       // Nome do arquivo
-  conversation_id?: string; // ID da conversa
-  attendant_name?: string; // Nome do atendente (para registro)
-  department?: string;     // Departamento (locacao, vendas, administrativo)
+  "action": "send_message",
+  "phone": "5548999999999",
+  "message": "Texto da mensagem",
+  "media_url": null,
+  "media_type": null,
+  "caption": null,
+  "filename": null,
+  "attendant": "Nome do Atendente",
+  "department": "locacao",
+  "conversation_id": "uuid",
+  "message_id": 12345,
+  "timestamp": "2025-01-30T12:00:00.000Z"
 }
 ```
 
-**Payload de saída (para Make.com):**
+### 2. Hook: `useSendMessage` ✅
 
-```typescript
+| Campo | Valor |
+|-------|-------|
+| Arquivo | `src/hooks/useSendMessage.ts` |
+
+**Funcionalidades:**
+- `shouldUseMake(departmentCode)` - Determina se usa Make ou API direta
+- `sendTextMessage(options)` - Envia texto com roteamento automático
+- `sendMediaMessage(options)` - Envia mídia com roteamento automático
+
+**Roteamento:**
+- Make.com → `locacao`, `vendas`, `administrativo`
+- API Direta → `marketing`, `empreendimentos`, `null`
+
+### 3. Atualizações no Frontend ✅
+
+**ChatWindow.tsx:**
+- Usa `useSendMessage` hook para roteamento
+- Passa `departmentCode` para MessageComposer
+- `sendMessage()` agora recebe `attendantName` opcional
+
+**MessageComposer.tsx:**
+- Nova prop `onSendMedia` para mídia com roteamento
+- Nova prop `departmentCode` para contexto
+- `onSendMessage` agora recebe `attendantName`
+
+---
+
+## Configuração Necessária no Make.com
+
+Criar um cenário que:
+
+1. **Webhook** - Recebe POST do Supabase
+2. **Router** - Filtra por `action === 'send_message'`
+3. **HTTP Request** - Envia para WhatsApp Graph API:
+   - Se `media_url`: Enviar mídia com caption
+   - Se `message`: Enviar texto
+
+**Exemplo de resposta esperada:**
+```json
 {
-  action: 'send_message';
-  phone: string;
-  message?: string;
-  media_url?: string;
-  media_type?: string;
-  caption?: string;
-  filename?: string;
-  attendant: string;
-  department: string;
-  conversation_id: string;
-  timestamp: string;
+  "success": true,
+  "wa_message_id": "wamid.xxx"
 }
 ```
 
-### 2. Novo Webhook no Make.com
+---
 
-O Make.com precisa de um cenário para:
-1. Receber o payload de `send-via-make`
-2. Verificar `action === 'send_message'`
-3. Enviar via HTTP Request para WhatsApp Graph API
-4. Responder com sucesso/erro
+## Arquivos Modificados
 
-### 3. Atualização do Frontend
-
-**Arquivo:** `src/hooks/useMediaUpload.ts`
-
-- Nova função: `sendViaMAke()`
-- Detectar departamento da conversa
-- Rotear para `send-via-make` ao invés de `send-wa-message`/`send-wa-media`
-
-**Arquivo:** `src/components/chat/ChatWindow.tsx`
-
-- Atualizar `sendMessage()` para usar Make quando departamento for: locacao, vendas, administrativo
-- Manter envio direto para: marketing (campanhas) e empreendimentos
-
-**Arquivo:** `src/components/chat/MessageComposer.tsx`
-
-- Passar departamento para o hook de envio
+| Arquivo | Ação |
+|---------|------|
+| `supabase/functions/send-via-make/index.ts` | ✅ Criado |
+| `src/hooks/useSendMessage.ts` | ✅ Criado |
+| `src/components/chat/ChatWindow.tsx` | ✅ Modificado |
+| `src/components/chat/MessageComposer.tsx` | ✅ Modificado |
+| `supabase/config.toml` | ✅ Modificado |
 
 ---
 
-## Detalhes Técnicos
+## Próximos Passos
 
-### Edge Function: `send-via-make/index.ts`
-
-```typescript
-// Estrutura básica
-serve(async (req) => {
-  // 1. Validar autenticação JWT
-  // 2. Extrair dados da request
-  // 3. Registrar mensagem no banco (direction: 'outbound')
-  // 4. Enviar para Make.com webhook
-  // 5. Retornar resultado
-});
-```
-
-**URL do Make.com:** A ser configurada como secret `MAKE_OUTBOUND_WEBHOOK_URL`
-
-### Lógica de Roteamento no Frontend
-
-```typescript
-// Em ChatWindow.tsx ou hook dedicado
-const shouldUseMake = (departmentCode: string) => {
-  return ['locacao', 'vendas', 'administrativo'].includes(departmentCode);
-};
-
-const sendMessage = async (text: string) => {
-  const department = conversationData?.department_code;
-  
-  if (shouldUseMake(department)) {
-    // Usar send-via-make
-    await supabase.functions.invoke('send-via-make', {
-      body: { to: phoneNumber, text, department, conversation_id }
-    });
-  } else {
-    // Manter envio direto (campanhas, marketing)
-    await fetch(`${SUPABASE_URL}/functions/v1/send-wa-message`, ...);
-  }
-};
-```
+1. [x] ~~Adicionar secret `MAKE_OUTBOUND_WEBHOOK_URL`~~ ✅
+2. [x] ~~Criar edge function `send-via-make`~~ ✅
+3. [x] ~~Criar hook `useSendMessage`~~ ✅
+4. [x] ~~Atualizar `ChatWindow.tsx`~~ ✅
+5. [x] ~~Atualizar `MessageComposer.tsx`~~ ✅
+6. [ ] **Configurar cenário no Make.com** (pendente - requer ação do usuário)
+7. [ ] Testar fluxo completo
 
 ---
 
-## Arquivos a Criar/Modificar
+## Testes Recomendados
 
-| Arquivo | Ação | Descrição |
-|---------|------|-----------|
-| `supabase/functions/send-via-make/index.ts` | **CRIAR** | Nova edge function para enviar via Make |
-| `src/hooks/useSendMessage.ts` | **CRIAR** | Hook para centralizar lógica de envio |
-| `src/components/chat/ChatWindow.tsx` | **MODIFICAR** | Usar novo hook com roteamento |
-| `src/components/chat/MessageComposer.tsx` | **MODIFICAR** | Passar departamento para envio |
-| `src/hooks/useMediaUpload.ts` | **MODIFICAR** | Adicionar envio de mídia via Make |
-| `supabase/config.toml` | **MODIFICAR** | Adicionar nova função |
-
----
-
-## Secrets Necessários
-
-| Nome | Descrição |
-|------|-----------|
-| `MAKE_OUTBOUND_WEBHOOK_URL` | URL do webhook Make.com para envio de mensagens |
-| `MAKE_API_KEY` | Já existente - pode ser reutilizado para autenticação |
-
----
-
-## Fluxo de Mensagens Atualizado
-
-### Atendimento Humano (Locação/Vendas/Admin)
-
-```
-1. Atendente digita mensagem no ChatWindow
-2. Frontend detecta departamento = 'locacao' (ou vendas/admin)
-3. Chama send-via-make com payload
-4. Edge function:
-   a. Salva mensagem no banco (messages table)
-   b. Envia para Make.com webhook
-5. Make.com:
-   a. Recebe payload com action='send_message'
-   b. Envia para WhatsApp Graph API
-6. Realtime atualiza interface
-```
-
-### Campanhas e Empreendimentos
-
-```
-1. Sistema dispara campanha ou atendimento de empreendimento
-2. Usa send-wa-message / send-wa-media diretamente
-3. WhatsApp API envia mensagem
-4. Mensagem registrada no banco
-```
-
----
-
-## Benefícios
-
-1. **Centralização**: Todo atendimento passa pelo Make.com, facilitando monitoramento
-2. **Flexibilidade**: Make.com pode adicionar lógica de automação sobre mensagens humanas
-3. **Consistência**: Mesmo pipeline para IA e humanos
-4. **Rastreabilidade**: Make.com logs disponíveis para auditoria
-5. **Escalabilidade**: Make.com pode fazer rate limiting e fila de mensagens
-
----
-
-## Considerações
-
-1. **Latência**: Adiciona ~200-500ms de latência extra (Make.com processing)
-2. **Dependência**: Atendimento humano fica dependente do Make.com
-3. **Fallback**: Considerar implementar fallback para API direta se Make falhar
-4. **Custo**: Mais operações no Make.com (verificar plano de uso)
-
----
-
-## Etapas de Implementação
-
-1. Criar secret `MAKE_OUTBOUND_WEBHOOK_URL`
-2. Criar edge function `send-via-make`
-3. Configurar cenário no Make.com para receber e processar
-4. Criar hook `useSendMessage` com lógica de roteamento
-5. Atualizar `ChatWindow.tsx` para usar novo hook
-6. Atualizar `MessageComposer.tsx` e `useMediaUpload.ts`
-7. Testar fluxo completo
-8. Deploy e validação
+1. Enviar mensagem de texto em conversa de Locação → deve ir via Make
+2. Enviar imagem em conversa de Vendas → deve ir via Make
+3. Enviar mensagem em conversa de Marketing → deve ir via API direta
+4. Verificar logs no Supabase Edge Functions
+5. Verificar histórico de execuções no Make.com

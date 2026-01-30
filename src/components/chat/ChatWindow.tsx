@@ -28,6 +28,7 @@ import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useConversationState } from "@/hooks/useConversationState";
 import { useMediaGallery } from "@/hooks/useMediaGallery";
 import { useChatSettings } from "@/hooks/useChatSettings";
+import { useSendMessage } from "@/hooks/useSendMessage";
 import { useToast } from "@/hooks/use-toast";
 import { useContactByPhone } from "@/hooks/useContacts";
 import { useRealtimeMessages } from "@/contexts/RealtimeMessagesContext";
@@ -38,7 +39,6 @@ import { DemandClassification } from "./DemandClassification";
 import { CreateTicketModal } from "./CreateTicketModal";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageRow } from "@/lib/messages";
-import { SUPABASE_PROJECT_URL } from "@/lib/supabaseClient";
 import { MessageFlagsFilter } from "./MessageFlagsFilter";
 import { type FlagType } from "@/hooks/useMessageFlags";
 import { formatPhoneNumber, cn } from "@/lib/utils";
@@ -213,7 +213,10 @@ export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
     };
   }, [conversationId, subscribeToConversation, scrollToBottom]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  // Use the new centralized send message hook with department routing
+  const { sendTextMessage, sendMediaMessage: sendMediaViaHook, isSending: hookSending } = useSendMessage();
+
+  const sendMessage = useCallback(async (text: string, attendantName?: string) => {
     if (!text.trim() || sending) return;
 
     try {
@@ -222,13 +225,6 @@ export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
       
       // Auto-takeover: mark that human is handling this conversation
       await markHumanMessage();
-
-      // Get current session for authorization
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error("Sessão expirada. Faça login novamente.");
-      }
 
       let messageText = text.trim();
       
@@ -240,26 +236,20 @@ export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
         setReplyTo(null); // Clear reply
       }
 
-      const response = await fetch(`${SUPABASE_PROJECT_URL}/functions/v1/send-wa-message`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          to: phoneNumber,
-          text: messageText,
-        }),
+      // Use the new hook with department-based routing
+      const result = await sendTextMessage({
+        to: phoneNumber,
+        text: messageText,
+        conversationId: conversationId,
+        attendantName: attendantName,
+        departmentCode: conversationData?.department_code,
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        // Message will be added via realtime subscription from database
-        // No need for optimistic UI update anymore
-      } else {
+      if (!result.success) {
         throw new Error(result.error || "Erro ao enviar mensagem");
       }
+      
+      // Message will be added via realtime subscription from database
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
@@ -270,7 +260,7 @@ export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
     } finally {
       setSending(false);
     }
-  }, [sending, replyTo, phoneNumber, stopTyping, toast, markHumanMessage]);
+  }, [sending, replyTo, phoneNumber, conversationId, conversationData?.department_code, stopTyping, toast, markHumanMessage, sendTextMessage]);
 
   const handleReply = useCallback((message: MessageRow) => {
     setReplyTo(message);
@@ -702,12 +692,26 @@ export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
             {/* Message Composer */}
             <MessageComposer
               onSendMessage={sendMessage}
+              onSendMedia={async (mediaUrl, mediaType, caption, filename, attendantName) => {
+                const result = await sendMediaViaHook({
+                  to: phoneNumber,
+                  mediaUrl,
+                  mediaType,
+                  caption,
+                  filename,
+                  conversationId: conversationId,
+                  attendantName,
+                  departmentCode: conversationData?.department_code,
+                });
+                return result.success;
+              }}
               disabled={sending}
               onTypingStart={startTyping}
               onTypingStop={stopTyping}
               replyTo={replyTo}
               onVoiceRecord={() => setShowVoiceRecorder(true)}
               selectedContact={phoneNumber}
+              departmentCode={conversationData?.department_code}
               attendantControls={
                 <Button
                   variant={isAIActive ? "default" : "outline"}
