@@ -1,69 +1,84 @@
 
-# Plano: Adicionar Descrição dos Imóveis para Helena Consultiva
-
-## Objetivo
-
-Fazer com que a Helena tenha acesso às descrições dos imóveis retornadas pela API Vista, permitindo respostas mais consultivas e personalizadas para cada propriedade.
-
----
+# Plano: Corrigir Erro `qualProgress is not defined` no Make-Webhook
 
 ## Diagnóstico
 
-### Situação Atual
+### Causa Raiz
+O erro `ReferenceError: qualProgress is not defined` ocorre devido a um **problema de escopo de variáveis**.
 
-| Componente | Status | Descrição |
-|------------|--------|-----------|
-| `vista-search-properties` | OK | Já busca `Descricao` (linha 102) |
-| `vista-get-property` | OK | Já busca `Descricao` (linha 59) |
-| `formatPropertyMessage()` (make-webhook) | **NÃO USA** | Não inclui descrição |
-| `formatPropertyMessage()` (ai-virtual-agent) | **NÃO USA** | Não inclui descrição |
-| Retorno para Make.com | **NÃO INCLUI** | Campo `descricao` não está no mapeamento |
+### Estrutura Atual do Código (Problemática)
 
-### O Problema
+```
+if (isAwaitingFeedback && pendingProperties.length > 0) {
+  // BLOCO A - Processamento de feedback
+  const { data: qualData } = await getQualificationProgress(...);  // ⚠️ Só qualData!
+  
+} else {
+  // BLOCO B - Fluxo normal
+  const { progress: qualProgress, data: qualData } = await getQualificationProgress(...);
+}
 
-A descrição do imóvel JÁ é retornada pela API Vista, mas está sendo **ignorada** em todas as formatações. A Helena vê apenas:
-- Tipo + Bairro
-- Quartos/Suítes
-- Vagas
-- Área
-- Preço
-- Link
+// FORA DOS BLOCOS (linha 3129-3158):
+// ===== ANTI-REPETITION CHECK =====
+if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {  // ❌ ERRO!
+  const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
+}
+```
 
-**Não vê:** Vista para o mar, piscina, churrasqueira, reformado, mobiliado, etc.
+### Cenário do Erro
+1. Cliente está em `isAwaitingFeedback=true` (dando feedback sobre um imóvel)
+2. Código entra no Bloco A (linhas 2853-2938)
+3. `qualProgress` **nunca é definida** neste caminho
+4. Código sai do bloco if/else e chega na anti-repetição
+5. Linha 3136 tenta usar `qualProgress` → **ReferenceError**
 
 ---
 
-## Solução Proposta
+## Solução
 
-### 1. Atualizar `formatPropertyMessage()` no make-webhook
+### Mover a definição de `qualProgress` e `qualData` para ANTES do if/else
 
-Adicionar a descrição de forma resumida (primeiros 150 caracteres):
+| Antes | Depois |
+|-------|--------|
+| Variáveis definidas dentro de blocos separados | Variáveis definidas uma vez no escopo superior |
 
-```
-🏠 *Apartamento em Canasvieiras*
-• 2 quartos (1 suíte)
-• 2 vagas
-• 85m²
-• R$ 3.500/mês
-📝 Apartamento com vista mar, mobiliado, ar condicionado em todos...
-🔗 smolkaimoveis.com.br/imovel/17346
-```
+### Mudanças no Código
 
-### 2. Incluir descrição no retorno para Make.com
+**Arquivo**: `supabase/functions/make-webhook/index.ts`
 
-Adicionar o campo `descricao` no array `properties` retornado para o Make.com poder usar:
-
+**Antes** (linhas ~2847-2943):
 ```typescript
-properties: propertiesToSend.map(p => ({
-  codigo: p.codigo,
-  // ... outros campos
-  descricao: p.descricao, // <- ADICIONAR
-}))
+// Check for consultative flow state
+const consultativeState = await getConsultativeState(...);
+const isAwaitingFeedback = ...;
+
+if (isAwaitingFeedback && pendingProperties.length > 0) {
+  // ... código que usa qualData localmente
+  const { data: qualData } = await getQualificationProgress(...);
+  
+} else {
+  // Normal flow
+  const { progress: qualProgress, data: qualData } = await getQualificationProgress(...);
+}
 ```
 
-### 3. Atualizar contexto no prompt da IA
+**Depois**:
+```typescript
+// Check for consultative flow state
+const consultativeState = await getConsultativeState(...);
+const isAwaitingFeedback = ...;
 
-Quando a IA recebe o contexto do imóvel (para links diretos), incluir a descrição para ela poder ser consultiva.
+// ===== CARREGAR DADOS DE QUALIFICAÇÃO NO ESCOPO SUPERIOR =====
+const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
+console.log(`📊 Qualification progress:`, qualProgress);
+
+if (isAwaitingFeedback && pendingProperties.length > 0) {
+  // ... usar qualData já definido
+  
+} else {
+  // Normal flow - qualProgress e qualData já disponíveis
+}
+```
 
 ---
 
@@ -71,75 +86,53 @@ Quando a IA recebe o contexto do imóvel (para links diretos), incluir a descri�
 
 | Arquivo | Mudança |
 |---------|---------|
-| `supabase/functions/make-webhook/index.ts` | Atualizar `formatPropertyMessage()` para incluir descrição resumida; Adicionar `descricao` no retorno de properties |
-| `supabase/functions/ai-virtual-agent/index.ts` | Atualizar `formatPropertyMessage()` e `formatPropertyDetailsLikeLais()` para incluir descrição |
+| `supabase/functions/make-webhook/index.ts` | Mover definição de `qualProgress`/`qualData` para antes do if/else (linha ~2852) |
 
 ---
 
-## Detalhes Técnicos
+## Detalhes da Implementação
 
-### Função `formatPropertyMessage()` atualizada
+### 1. Adicionar definição no escopo superior (linha ~2852)
 
+Adicionar após a linha que define `currentIndex`:
 ```typescript
-function formatPropertyMessage(property: any): string {
-  const lines = [`🏠 *${property.tipo} em ${property.bairro}*`];
-  
-  if (property.quartos > 0) {
-    const suiteText = property.suites > 0 ? ` (${property.suites} suíte${property.suites > 1 ? 's' : ''})` : '';
-    lines.push(`• ${property.quartos} quarto${property.quartos > 1 ? 's' : ''}${suiteText}`);
-  }
-  if (property.vagas > 0) lines.push(`• ${property.vagas} vaga${property.vagas > 1 ? 's' : ''}`);
-  if (property.area_util > 0) lines.push(`• ${property.area_util}m²`);
-  lines.push(`• ${property.preco_formatado}`);
-  if (property.valor_condominio > 0) {
-    lines.push(`• Condomínio: ${formatCurrency(property.valor_condominio)}`);
-  }
-  
-  // NOVA: Adicionar descrição resumida se disponível
-  if (property.descricao && property.descricao.length > 0) {
-    const descResumida = property.descricao.length > 150 
-      ? property.descricao.substring(0, 150).trim() + '...'
-      : property.descricao;
-    lines.push(`📝 ${descResumida}`);
-  }
-  
-  lines.push(`🔗 ${property.link}`);
-  
-  return lines.join('\n');
-}
+const currentIndex = consultativeState?.current_property_index || 0;
+
+// ===== LOAD QUALIFICATION DATA FOR ALL PATHS =====
+const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
+console.log(`📊 Qualification progress:`, qualProgress);
 ```
 
-### Retorno atualizado para Make.com
+### 2. Remover definição duplicada do bloco else (linha ~2943)
 
+Remover estas linhas do bloco else:
 ```typescript
-properties: propertiesToSend.map(p => ({
-  codigo: p.codigo,
-  foto_destaque: p.foto_destaque,
-  tipo: p.tipo,
-  bairro: p.bairro,
-  quartos: p.quartos,
-  preco_formatado: p.preco_formatado,
-  link: p.link,
-  area_util: p.area_util,
-  vagas: p.vagas,
-  valor_condominio: p.valor_condominio,
-  descricao: p.descricao // <- ADICIONAR
-}))
+// ❌ REMOVER - Agora está no escopo superior
+const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
+console.log(`📊 Qualification progress:`, qualProgress);
 ```
+
+### 3. Remover definição local do bloco if (linha ~2875)
+
+Alterar de:
+```typescript
+const { data: qualData } = await getQualificationProgress(supabase, phoneNumber);
+```
+Para usar a variável já existente (ou remover se não houver uso diferente).
 
 ---
 
 ## Benefícios
 
-1. **Helena mais consultiva**: Pode mencionar diferenciais como "vista mar", "churrasqueira", "piscina"
-2. **Respostas personalizadas**: "Esse apartamento tem ar condicionado em todos os cômodos, ideal para o verão de Floripa!"
-3. **Make.com**: Pode usar descrição nos captions das imagens
-4. **Sem custo adicional**: A informação já está sendo buscada, só não estava sendo usada
+1. **Corrige o erro imediato**: `qualProgress` sempre existirá quando o código de anti-repetição executar
+2. **Evita chamadas duplicadas**: A função `getQualificationProgress` é chamada apenas uma vez
+3. **Código mais limpo**: Variáveis disponíveis em todo o escopo do triage completed
 
 ---
 
-## Limite de Caracteres
+## Validação
 
-Para não poluir as mensagens, a descrição será:
-- Truncada em 150 caracteres para mensagens WhatsApp
-- Completa no contexto interno da IA (para ela usar em respostas consultivas)
+Após a correção, verificar nos logs:
+- Não deve haver mais `ReferenceError: qualProgress is not defined`
+- O log `📊 Qualification progress:` deve aparecer em todos os cenários
+- O fluxo de anti-repetição deve funcionar corretamente
