@@ -10,7 +10,8 @@ import {
   Users,
   Loader2,
   TrendingUp,
-  HelpCircle
+  HelpCircle,
+  FileText
 } from "lucide-react";
 
 // Tab Components
@@ -21,6 +22,7 @@ import { AIAudioTab } from "@/components/ai-config/AIAudioTab";
 import { AIProfilesTab } from "@/components/ai-config/AIProfilesTab";
 import { AISalesTab } from "@/components/ai-config/AISalesTab";
 import { AIQualificationTab } from "@/components/ai-config/AIQualificationTab";
+import { AIPromptTab } from "@/components/ai-config/AIPromptTab";
 import { useAIUnifiedConfig } from "@/hooks/useAIUnifiedConfig";
 
 export default function AIUnifiedConfig() {
@@ -61,7 +63,7 @@ export default function AIUnifiedConfig() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:inline-grid">
             <TabsTrigger value="identity" className="gap-2">
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Identidade</span>
@@ -89,6 +91,10 @@ export default function AIUnifiedConfig() {
             <TabsTrigger value="profiles" className="gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Perfis</span>
+            </TabsTrigger>
+            <TabsTrigger value="prompt" className="gap-2">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Prompt</span>
             </TabsTrigger>
           </TabsList>
 
@@ -150,6 +156,16 @@ export default function AIUnifiedConfig() {
           {/* Profiles Tab */}
           <TabsContent value="profiles">
             <AIProfilesTab />
+          </TabsContent>
+
+          {/* Prompt Tab */}
+          <TabsContent value="prompt">
+            <AIPromptTab 
+              config={config} 
+              updateConfig={updateConfig}
+              saveConfig={saveConfig}
+              isSaving={isSaving}
+            />
           </TabsContent>
         </Tabs>
       </div>

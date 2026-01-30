@@ -76,6 +76,14 @@ export interface AIAgentConfig {
     force_ai_mode: boolean;
     pause_periods: { start: string; end: string; reason?: string }[];
   };
+  // Prompt Overrides per department
+  prompt_overrides: {
+    locacao: string | null;
+    vendas: string | null;
+    administrativo: string | null;
+    geral: string | null;
+    empreendimentos: string | null;
+  };
 }
 
 const defaultConfig: AIAgentConfig = {
@@ -178,6 +186,13 @@ const defaultConfig: AIAgentConfig = {
     },
     force_ai_mode: false,
     pause_periods: [],
+  },
+  prompt_overrides: {
+    locacao: null,
+    vendas: null,
+    administrativo: null,
+    geral: null,
+    empreendimentos: null,
   },
 };
 
