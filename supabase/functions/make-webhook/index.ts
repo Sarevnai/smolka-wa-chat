@@ -129,6 +129,14 @@ interface AIAgentConfig {
   spin_need_questions: string[];
   escalation_criteria: string[];
   vista_integration_enabled: boolean;
+  // Prompt overrides per department
+  prompt_overrides?: {
+    locacao?: string | null;
+    vendas?: string | null;
+    administrativo?: string | null;
+    geral?: string | null;
+    empreendimentos?: string | null;
+  };
 }
 
 const defaultConfig: AIAgentConfig = {
@@ -860,6 +868,54 @@ REGRAS:
 - Responda em português brasileiro
 
 Se não souber algo específico, diga que vai verificar com um especialista.`;
+}
+
+// ========== PROMPT OVERRIDE HELPER ==========
+
+interface QualificationData {
+  detected_neighborhood?: string;
+  detected_property_type?: string;
+  detected_bedrooms?: number;
+  detected_budget_min?: number;
+  detected_budget_max?: number;
+  detected_interest?: string;
+  qualification_score?: number;
+  questions_answered?: number;
+}
+
+function getPromptForDepartment(
+  config: AIAgentConfig,
+  department: DepartmentType,
+  contactName?: string,
+  history?: ConversationMessage[],
+  qualificationData?: QualificationData | null
+): string {
+  // Check for override first
+  const deptKey = department || 'geral';
+  const override = config.prompt_overrides?.[deptKey as keyof typeof config.prompt_overrides];
+  
+  if (override) {
+    console.log(`📝 Using custom prompt override for department: ${deptKey}`);
+    // Replace placeholders in override
+    let customPrompt = override;
+    if (contactName) {
+      customPrompt = customPrompt.replace(/{nome do contato}/g, contactName);
+      customPrompt = customPrompt.replace(/{nome}/g, contactName);
+    }
+    return customPrompt;
+  }
+  
+  // Fall back to generated prompts
+  switch (department) {
+    case 'locacao':
+      return buildLocacaoPrompt(config, contactName, history, qualificationData);
+    case 'vendas':
+      return buildVendasPrompt(config, contactName, history, qualificationData);
+    case 'administrativo':
+      return buildAdminPrompt(config, contactName);
+    default:
+      return buildVirtualAgentPrompt(config, contactName);
+  }
 }
 
 // ========== PROPERTY SEARCH & FORMAT ==========
@@ -2808,9 +2864,7 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
             // Get qualification data for context
             const { data: qualData } = await getQualificationProgress(supabase, phoneNumber);
             
-            const systemPrompt = currentDepartment === 'locacao' 
-              ? buildLocacaoPrompt(agentConfig, existingName || undefined, history, qualData)
-              : buildVendasPrompt(agentConfig, existingName || undefined, history, qualData);
+            const systemPrompt = getPromptForDepartment(agentConfig, currentDepartment, existingName || undefined, history, qualData);
             
             const result = await callOpenAI(systemPrompt, history, messageContent + c2sContext, toolsWithVista);
             aiResponse = result.content;
@@ -2968,18 +3022,14 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                 console.log(`📝 Using deterministic qualification question`);
               } else {
                 // All questions answered but criteria not met (shouldn't happen) - use AI
-                let systemPrompt: string;
                 let tools = toolsWithVista;
                 
-                if (currentDepartment === 'locacao') {
-                  systemPrompt = buildLocacaoPrompt(agentConfig, existingName || undefined, history, qualData);
-                } else if (currentDepartment === 'vendas') {
-                  systemPrompt = buildVendasPrompt(agentConfig, existingName || undefined, history, qualData);
-                } else if (currentDepartment === 'administrativo') {
-                  systemPrompt = buildAdminPrompt(agentConfig, existingName || undefined);
-                  tools = []; // Admin doesn't need property search
-                } else {
-                  systemPrompt = buildVirtualAgentPrompt(agentConfig, existingName || undefined);
+                // Use helper function that checks for overrides
+                const systemPrompt = getPromptForDepartment(agentConfig, currentDepartment, existingName || undefined, history, qualData);
+                
+                // Disable tools for admin department
+                if (currentDepartment === 'administrativo') {
+                  tools = [];
                 }
                 
                 const result = await callOpenAI(systemPrompt, history, aiPromptMessage, tools);
