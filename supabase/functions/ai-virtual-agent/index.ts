@@ -1209,6 +1209,15 @@ function formatPropertyMessage(property: any): string {
     lines.push(`• Condomínio: ${condFormatado}`);
   }
   
+  // Add truncated description if available (max 150 chars for WhatsApp readability)
+  if (property.descricao && property.descricao.trim().length > 0) {
+    const descricaoLimpa = property.descricao.trim();
+    const descricaoResumida = descricaoLimpa.length > 150 
+      ? descricaoLimpa.substring(0, 150).trim() + '...'
+      : descricaoLimpa;
+    lines.push(`📝 ${descricaoResumida}`);
+  }
+  
   lines.push(`🔗 ${property.link}`);
   
   return lines.join('\n');
@@ -1270,6 +1279,16 @@ function formatPropertyDetailsLikeLais(property: any, portalOrigin?: string): st
       maximumFractionDigits: 0,
     });
     lines.push(`• Condomínio: ${condFormatado}`);
+  }
+  
+  // Add truncated description if available (max 150 chars for WhatsApp readability)
+  const descricao = property.descricao || property.Descricao;
+  if (descricao && descricao.trim().length > 0) {
+    const descricaoLimpa = descricao.trim();
+    const descricaoResumida = descricaoLimpa.length > 150 
+      ? descricaoLimpa.substring(0, 150).trim() + '...'
+      : descricaoLimpa;
+    lines.push(`📝 ${descricaoResumida}`);
   }
   
   // Link

@@ -1108,6 +1108,16 @@ function formatPropertyMessage(property: any): string {
   if (property.valor_condominio > 0) {
     lines.push(`• Condomínio: ${formatCurrency(property.valor_condominio)}`);
   }
+  
+  // Add truncated description if available (max 150 chars for WhatsApp readability)
+  if (property.descricao && property.descricao.trim().length > 0) {
+    const descricaoLimpa = property.descricao.trim();
+    const descricaoResumida = descricaoLimpa.length > 150 
+      ? descricaoLimpa.substring(0, 150).trim() + '...'
+      : descricaoLimpa;
+    lines.push(`📝 ${descricaoResumida}`);
+  }
+  
   lines.push(`🔗 ${property.link}`);
   
   return lines.join('\n');
@@ -3229,7 +3239,8 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
           link: p.link,
           area_util: p.area_util,
           vagas: p.vagas,
-          valor_condominio: p.valor_condominio
+          valor_condominio: p.valor_condominio,
+          descricao: p.descricao || ''
         })) : undefined,
         // Consultative presentation state
         presentation_state: presentationState,
