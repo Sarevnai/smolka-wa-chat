@@ -1164,23 +1164,128 @@ async function sendLeadToC2S(
 
 // ========== CONSULTATIVE FLOW FUNCTIONS ==========
 
-function analyzePropertyFeedback(message: string): 'positive' | 'negative' | 'more_options' | 'neutral' {
-  // FIRST: Detect "more options" request (priority over negative)
-  // Matches: "mais opções", "outras opções", "tem mais", "mostra outro", "próximo", "outro imóvel"
-  const moreOptions = /mais\s+op[çc][oõ]es|outr[ao]s?\s+op[çc][oõ]es|tem\s+mais|mostra\s+outro|pr[oó]ximo|outro\s+im[oó]vel|pode\s+me\s+mostrar\s+mais|mais\s+um|mais\s+algum|me\s+mostra\s+mais|quero\s+ver\s+outro|pode\s+mostrar\s+outro/i;
-  if (moreOptions.test(message)) {
+function analyzePropertyFeedback(message: string): 'positive' | 'negative' | 'more_options' | 'interested_but_more' | 'neutral' {
+  const lower = message.toLowerCase().trim();
+  
+  // ===== EXPANDED PATTERNS =====
+  
+  // Pedido de mais opções (expandido com padrões coloquiais)
+  const moreOptionsPatterns = [
+    /mais\s+op[çc][oõ]es/i,
+    /outr[ao]s?\s+op[çc][oõ]es/i,
+    /tem\s+mais/i,
+    /mostr[ae]\s+outr[oa]/i,
+    /pr[oó]xim[oa]/i,
+    /outro\s+im[oó]vel/i,
+    /pode\s+me\s+mostrar\s+mais/i,
+    /mais\s+um/i,
+    /mais\s+algum/i,
+    /quero\s+ver\s+outr[oa]/i,
+    /pode\s+mostrar\s+outr[oa]/i,
+    /envia\s+outr[oa]/i,
+    /manda\s+outr[oa]/i,
+    /t[eê]m\s+outr[oa]/i,
+    /algum\s+outr[oa]/i,
+    /ver\s+mais/i,
+    /mais\s+esse[s]?\s+n[aã]o/i,
+    /pass[ae]\s+pro\s+pr[oó]ximo/i,
+    /pul[ae]\s+esse/i,
+    /segue|seguinte/i,
+    /avan[çc]ar/i,
+    /me\s+mostra\s+mais/i,
+  ];
+  
+  // Feedback positivo (interesse real confirmado)
+  const positivePatterns = [
+    /gostei\s+(?:muito\s+)?(?:desse|dele|dessa)/i,
+    /interess(?:ei|ado|ada|ante)/i,
+    /quero\s+visitar/i,
+    /quero\s+conhecer/i,
+    /marcar\s+visita/i,
+    /agendar/i,
+    /quero\s+esse/i,
+    /é\s+esse/i,
+    /perfeito/i,
+    /[oó]timo/i,
+    /excelente/i,
+    /adorei/i,
+    /amei/i,
+    /fechado/i,
+    /fechou/i,
+    /curti\s+(?:muito\s+)?(?:esse|esse\s+aqui)/i,
+    /pode\s+ser\s+esse/i,
+    /vamos\s+(?:nesse|nessa|com\s+esse)/i,
+    /quero\s+saber\s+mais\s+(?:sobre\s+)?esse/i,
+    /lindo/i,
+    /maravilh/i,
+  ];
+  
+  // Feedback negativo (rejeição real)
+  const negativePatterns = [
+    /n[aã]o\s+gostei/i,
+    /n[aã]o\s+curti/i,
+    /n[aã]o\s+(?:me\s+)?interess/i,
+    /muito\s+caro/i,
+    /acima\s+do\s+(?:meu\s+)?or[çc]amento/i,
+    /fora\s+do\s+(?:meu\s+)?or[çc]amento/i,
+    /longe\s+demais/i,
+    /(?:muito\s+)?pequen[oa]/i,
+    /(?:muito\s+)?grande/i,
+    /n[aã]o\s+serve/i,
+    /n[aã]o\s+(?:é|e)\s+o\s+que\s+(?:eu\s+)?(?:procuro|quero)/i,
+    /descart(?:o|ei|ado)/i,
+    /horr[ií]vel/i,
+    /p[eé]ssim[oa]/i,
+    /ruim/i,
+    /n[aã]o\s+quero/i,
+  ];
+  
+  // ===== COMPOUND DETECTION (PRIORITY) =====
+  
+  const hasMoreIntent = moreOptionsPatterns.some(p => p.test(lower));
+  const hasPositiveIntent = positivePatterns.some(p => p.test(lower));
+  const hasNegativeIntent = negativePatterns.some(p => p.test(lower));
+  
+  // RULE 1: Negative + More → more_options (rejected but wants alternatives)
+  // Ex: "não gostei, tem outro?", "esse não serve, próximo"
+  if (hasNegativeIntent && hasMoreIntent) {
+    console.log('📊 Compound detected: negative + more → more_options');
+    return 'more_options';
+  }
+  
+  // RULE 2: Positive + More → interested_but_more (liked but wants to compare)
+  // Ex: "gostei, mas quero ver mais", "curti, tem outras opções?"
+  if (hasPositiveIntent && hasMoreIntent) {
+    console.log('📊 Compound detected: positive + more → interested_but_more');
+    return 'interested_but_more';
+  }
+  
+  // RULE 3: "mas/porém" followed by action → more_options
+  // Ex: "ok, mas mostra outro", "tá, mas tem mais?"
+  const butMorePattern = /(?:mas|por[eé]m|entretanto)\s*(?:,?\s*)(?:mostr|tem|quero|ver|envi|mand)/i;
+  if (butMorePattern.test(lower)) {
+    console.log('📊 Compound detected: but + action → more_options');
+    return 'more_options';
+  }
+  
+  // ===== SIMPLE DETECTION (in order of specificity) =====
+  
+  if (hasMoreIntent) {
     console.log('📊 Detected feedback: more_options');
     return 'more_options';
   }
   
-  // THEN: Positive feedback
-  const positive = /gostei|interess|visitar|marcar|quero\s+esse|perfeito|[oó]timo|bom|show|pode ser|adorei|amei|lindo|maravilh|excelente|isso|sim|quero ver|agendar|é\s+esse|curti|fechado|fechou/i;
+  if (hasPositiveIntent) {
+    console.log('📊 Detected feedback: positive');
+    return 'positive';
+  }
   
-  // MODIFIED: Remove "mais", "outro", "próximo" from negative (now in more_options)
-  const negative = /caro|longe|pequeno|grande|diferente|menos|demais|muito|acima|baixo|descartado|n[aã]o\s+gostei|ruim|horr[ií]vel|nao\s+quero|não\s+quero|não\s+serve|nao\s+serve|não\s+curti|nao\s+curti/i;
+  if (hasNegativeIntent) {
+    console.log('📊 Detected feedback: negative');
+    return 'negative';
+  }
   
-  if (positive.test(message)) return 'positive';
-  if (negative.test(message)) return 'negative';
+  console.log('📊 Detected feedback: neutral');
   return 'neutral';
 }
 
@@ -3010,8 +3115,8 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
               }
             }
             
-          } else if (feedback === 'negative' || feedback === 'more_options') {
-            // ===== PRICE FLEXIBILITY DETECTION (only for negative feedback) =====
+          } else if (feedback === 'negative' || feedback === 'more_options' || feedback === 'interested_but_more') {
+            // ===== PRICE FLEXIBILITY DETECTION (only for pure negative feedback) =====
             if (feedback === 'negative') {
               const priceFlexibility = detectPriceFlexibility(messageContent);
               
@@ -3023,15 +3128,13 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
               }
             }
             
-            // If no price flexibility or feedback is more_options, show next property
+            // Show next property for all three feedback types
             if (!aiResponse) {
-              // Advance to next property
               console.log(`📊 Feedback "${feedback}" - showing next property`);
               
               const nextIndex = currentIndex + 1;
               
               if (nextIndex < pendingProperties.length) {
-                // Show next property
                 propertiesToSend = [pendingProperties[nextIndex]];
                 
                 await updateConsultativeState(supabase, phoneNumber, {
@@ -3040,20 +3143,29 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                 });
                 
                 const nameGreet = existingName ? `, ${existingName}` : '';
-                // Differentiate messages based on feedback type
-                aiResponse = feedback === 'more_options'
-                  ? `Claro${nameGreet}! 😊 Tenho mais esta opção:`
-                  : `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
+                
+                // Customized responses for each feedback type
+                if (feedback === 'interested_but_more') {
+                  aiResponse = `Que bom que gostou${nameGreet}! 😊 Vou guardar esse. Enquanto isso, olha essa outra opção:`;
+                } else if (feedback === 'more_options') {
+                  aiResponse = `Claro${nameGreet}! 😊 Tenho mais esta opção:`;
+                } else {
+                  aiResponse = `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
+                }
                 
                 console.log(`📤 Showing next property: index ${nextIndex}`);
               } else {
-                // No more properties
+                // No more properties available
                 await updateConsultativeState(supabase, phoneNumber, {
                   awaiting_property_feedback: false,
                   pending_properties: []
                 });
                 
-                aiResponse = `Entendi! Essas eram as opções que encontrei com esses critérios. 🤔\n\nPodemos ajustar a busca? Me conta o que não se encaixou (preço, tamanho, localização).`;
+                if (feedback === 'interested_but_more') {
+                  aiResponse = `Essas são as opções que encontrei! 😊 Quer que eu encaminhe o primeiro que você curtiu para um consultor entrar em contato?`;
+                } else {
+                  aiResponse = `Entendi! Essas eram as opções que encontrei com esses critérios. 🤔\n\nPodemos ajustar a busca? Me conta o que não se encaixou (preço, tamanho, localização).`;
+                }
               }
             }
           } else {
