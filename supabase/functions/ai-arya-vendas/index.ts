@@ -679,6 +679,98 @@ serve(async (req) => {
 
     console.log(`🏗️ Arya Vendas - Phone: ${phone_number}, Development: ${development_id || development_slug}`);
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🚫 OUT OF SCOPE DETECTION - Redirect locação/administrativo
+    // ═══════════════════════════════════════════════════════════════
+    // This channel (API Direta Meta) handles ONLY empreendimentos/vendas
+    // Locação and Administrativo requests should go to 48 9 9163-1011
+    
+    const OUT_OF_SCOPE_PATTERNS = {
+      locacao: [
+        /\b(alugar|aluguel|loca[çc][aã]o|locar|alugo|quero\s+alugar)\b/i,
+        /\b(apartamento|casa|kit(net)?)\s+(pra|para|de)?\s*alug/i,
+        /\bim[oó]vel\s+(pra|para)?\s*locar\b/i,
+        /\b(procurando|procuro|busco|quero)\s+.{0,20}(alugar|aluguel|loca[çc][aã]o)\b/i,
+        /\b(pra|para)\s+alugar\b/i,
+      ],
+      administrativo: [
+        /\b(boleto|2[ªa]\s*via|segunda\s*via)\b/i,
+        /\b(pagar|pagamento)\s+.{0,15}(boleto|aluguel|conta)\b/i,
+        /\b(contrato|rescis[aã]o|renova[çc][aã]o|distrato)\b/i,
+        /\b(manuten[çc][aã]o|conserto|reparo|vazamento|problema)\s+.{0,15}(im[oó]vel|apartamento|casa)?\b/i,
+        /\b(j[aá]\s*sou\s*cliente|inquilino|propriet[aá]rio|locat[aá]rio)\b/i,
+        /\b(falar\s+com|preciso\s+do|atendimento|sac|suporte)\s+.{0,10}(atendente|humano|pessoa)?\b/i,
+        /\b(meu\s+im[oó]vel|minha\s+casa|meu\s+apartamento)\b/i,
+        /\b(problema|defeito|quebrou|n[aã]o\s+funciona)\b/i,
+      ]
+    };
+
+    function detectOutOfScope(msg: string): 'locacao' | 'administrativo' | null {
+      const lower = msg.toLowerCase();
+      
+      for (const pattern of OUT_OF_SCOPE_PATTERNS.locacao) {
+        if (pattern.test(lower)) return 'locacao';
+      }
+      
+      for (const pattern of OUT_OF_SCOPE_PATTERNS.administrativo) {
+        if (pattern.test(lower)) return 'administrativo';
+      }
+      
+      return null;
+    }
+
+    const REDIRECT_MESSAGES = {
+      locacao: `Entendi que você busca um imóvel para alugar! 🏠
+
+Para locação, nossa equipe especializada pode te ajudar melhor pelo número:
+📱 *48 9 9163-1011*
+
+Lá você vai ter atendimento completo para encontrar o imóvel ideal! 😊`,
+
+      administrativo: `Entendi! Para questões administrativas como boletos, contratos ou manutenção, nosso time de suporte pode te ajudar:
+📱 *48 9 9163-1011*
+
+Eles vão resolver sua solicitação rapidinho! 😊`
+    };
+
+    // Check for out-of-scope requests BEFORE any processing
+    const outOfScope = detectOutOfScope(message);
+    if (outOfScope) {
+      console.log(`⚠️ Out of scope detected: ${outOfScope} - Redirecting to 48 9 9163-1011`);
+      
+      const redirectMessage = REDIRECT_MESSAGES[outOfScope];
+      
+      // Send redirect message via WhatsApp
+      await sendWhatsAppMessage(phone_number, redirectMessage);
+      
+      // Log the redirect for metrics
+      await supabase.from('activity_logs').insert({
+        user_id: '00000000-0000-0000-0000-000000000000',
+        action_type: 'ai_arya_redirect_out_of_scope',
+        target_table: 'conversations',
+        target_id: phone_number,
+        metadata: {
+          detected_scope: outOfScope,
+          message_preview: message.substring(0, 100),
+          redirected_to: '48 9 9163-1011',
+          channel: 'api_direta_meta',
+          development_requested: development_id || development_slug || null
+        }
+      }).catch(console.error);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          action: 'redirected_out_of_scope',
+          scope_detected: outOfScope,
+          redirected_to: '48 9 9163-1011',
+          message_sent: redirectMessage
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    // ═══════════════════════════════════════════════════════════════
+
     // Check if quick transfer mode is enabled
     const { data: quickModeSetting } = await supabase
       .from('system_settings')
