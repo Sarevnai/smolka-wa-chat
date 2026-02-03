@@ -3049,11 +3049,11 @@ serve(async (req) => {
       console.log(`🔘 Button data: text="${button_text}", payload="${button_payload}"`);
     }
 
-    // Skip status callbacks
+    // Skip status callbacks - return result: null so Make.com Router can proceed
     if (!phone && !message && !media_url) {
       console.log('📌 Ignoring status callback');
       return new Response(
-        JSON.stringify({ success: true, skipped: true, reason: 'status_callback' }),
+        JSON.stringify({ success: true, skipped: true, reason: 'status_callback', result: null }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -3159,11 +3159,56 @@ serve(async (req) => {
       const devNameLower = (devInfo.development_name || '').toLowerCase();
       
       if (DIRECT_API_DEVELOPMENTS.some(d => devNameLower.includes(d))) {
-        console.log(`⛔ Development handled by direct API, skipping`);
-        return new Response(
-          JSON.stringify({ success: true, skipped: true, reason: 'handled_by_direct_api' }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.log(`🔄 Routing ${devInfo.development_name} lead to ai-arya-vendas via internal call`);
+        
+        // Call ai-arya-vendas to generate response for this development lead
+        try {
+          const { data: aryaResult, error: aryaError } = await supabase.functions.invoke('ai-arya-vendas', {
+            body: {
+              phone_number: phoneNumber,
+              message: messageContent,
+              development_id: devInfo.development_id,
+              conversation_history: history,
+              contact_name: contact_name
+            }
+          });
+
+          if (aryaError) {
+            console.error(`❌ ai-arya-vendas error:`, aryaError);
+            return new Response(
+              JSON.stringify({ 
+                success: false, 
+                error: 'ai-arya-vendas failed', 
+                result: null 
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          console.log(`✅ ai-arya-vendas responded for ${devInfo.development_name}`);
+          
+          // Return response in format Make.com expects
+          // ai-arya-vendas sends messages directly, so we return success with no result for Make
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              routed_to: 'ai-arya-vendas',
+              development: devInfo.development_name,
+              result: null // Arya already sent the messages directly
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (routeError) {
+          console.error(`❌ Error routing to ai-arya-vendas:`, routeError);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'routing_failed', 
+              result: null 
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
       
       developmentDetected = devInfo.development_name;
