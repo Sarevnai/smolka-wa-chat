@@ -134,3 +134,6 @@ verify_jwt = false
 
 [functions.send-via-make]
 verify_jwt = false
+
+[functions.release-stale-handovers]
+verify_jwt = false

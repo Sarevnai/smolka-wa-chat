@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { MessageRow } from '@/lib/messages';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
@@ -23,6 +23,10 @@ interface RealtimeMessagesProviderProps {
   currentConversation?: string | null;
 }
 
+// Cache for deduplication - moved outside component to persist across renders
+const seenMessageIdsGlobal = new Set<number>();
+const MESSAGE_CACHE_SIZE = 1000;
+
 export function RealtimeMessagesProvider({ children, currentConversation }: RealtimeMessagesProviderProps) {
   const [lastMessage, setLastMessage] = useState<MessageRow | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -30,14 +34,34 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
   const { activeDepartment, isAdmin } = useDepartment();
   const { department: userDepartment } = useUserDepartment();
   
-  // Determine effective department for filtering notifications
-  const effectiveDepartment: DepartmentType | null = isAdmin ? activeDepartment : userDepartment;
+  // Use refs for values that shouldn't trigger reconnection
+  const currentConversationRef = useRef(currentConversation);
+  const playNotificationSoundRef = useRef(playNotificationSound);
   
-  // Use refs for stable callbacks and deduplication
-  const seenMessageIds = useRef(new Set<number>());
+  // Update refs when values change (without causing reconnection)
+  useEffect(() => {
+    currentConversationRef.current = currentConversation;
+  }, [currentConversation]);
+  
+  useEffect(() => {
+    playNotificationSoundRef.current = playNotificationSound;
+  }, [playNotificationSound]);
+  
+  // Memoize effective department to prevent unnecessary recalculations
+  const effectiveDepartment: DepartmentType | null = useMemo(() => {
+    return isAdmin ? activeDepartment : userDepartment;
+  }, [isAdmin, activeDepartment, userDepartment]);
+  
+  // Use ref for effectiveDepartment to avoid reconnection on department change
+  const effectiveDepartmentRef = useRef(effectiveDepartment);
+  useEffect(() => {
+    effectiveDepartmentRef.current = effectiveDepartment;
+  }, [effectiveDepartment]);
+  
+  // Stable refs for subscriptions (won't cause reconnection)
   const phoneSubscriptions = useRef(new Map<string, Set<(message: MessageRow) => void>>());
   const conversationSubscriptions = useRef(new Map<string, Set<(message: MessageRow) => void>>());
-  const MESSAGE_CACHE_SIZE = 1000;
+  const seenMessageIds = useRef(seenMessageIdsGlobal);
 
   // Subscribe to a specific phone number (legacy - for ChatList compatibility)
   const subscribeToPhone = useCallback((phoneNumber: string, callback: (message: MessageRow) => void) => {
@@ -178,25 +202,26 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
           
           // Play notification sound for inbound messages (filtered by department)
           if (newMessage.direction === 'inbound') {
-            const currentPhone = (currentConversation || '').replace(/\D/g, '');
+            const currentPhone = (currentConversationRef.current || '').replace(/\D/g, '');
             
             // Play sound if not in current conversation or window not focused
-            if (!currentConversation || messageFrom !== currentPhone || !document.hasFocus()) {
+            if (!currentConversationRef.current || messageFrom !== currentPhone || !document.hasFocus()) {
               // Check if message belongs to user's department before playing sound
               const checkDepartmentAndPlaySound = async () => {
-                if (effectiveDepartment && (newMessage as any).conversation_id) {
+                const deptFilter = effectiveDepartmentRef.current;
+                if (deptFilter && (newMessage as any).conversation_id) {
                   const msgDepartment = await getConversationDepartmentCached((newMessage as any).conversation_id);
                   // Only play if message is from user's department or pending triage (null)
-                  if (msgDepartment === effectiveDepartment || msgDepartment === null) {
+                  if (msgDepartment === deptFilter || msgDepartment === null) {
                     console.log('🔊 [RealtimeContext] Tocando som (departamento corresponde)');
-                    playNotificationSound();
+                    playNotificationSoundRef.current();
                   } else {
-                    console.log('🔇 [RealtimeContext] Som não tocado (departamento diferente):', msgDepartment, '!=', effectiveDepartment);
+                    console.log('🔇 [RealtimeContext] Som não tocado (departamento diferente):', msgDepartment, '!=', deptFilter);
                   }
                 } else {
                   // No department filter, play sound for all
                   console.log('🔊 [RealtimeContext] Tocando som de notificação');
-                  playNotificationSound();
+                  playNotificationSoundRef.current();
                 }
               };
               checkDepartmentAndPlaySound();
@@ -267,7 +292,7 @@ export function RealtimeMessagesProvider({ children, currentConversation }: Real
       console.log('🔌 [RealtimeContext] Removendo canal global');
       supabase.removeChannel(channel);
     };
-  }, [currentConversation, playNotificationSound, effectiveDepartment]);
+  }, []); // Empty dependency array - channel should only be created once
 
   return (
     <RealtimeMessagesContext.Provider value={{ lastMessage, subscribeToPhone, subscribeToConversation, isConnected }}>
