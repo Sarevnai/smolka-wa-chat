@@ -1098,6 +1098,151 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ========== ANTI-LOOP SYSTEM (ported from make-webhook) ==========
+
+interface QualificationDataForLoop {
+  detected_neighborhood?: string | null;
+  detected_bedrooms?: number | null;
+  detected_budget_max?: number | null;
+  detected_property_type?: string | null;
+  detected_interest?: string | null;
+}
+
+function buildContextSummaryForAntiLoop(qualificationData: QualificationDataForLoop | null): string {
+  if (!qualificationData) return '';
+  
+  const collected: string[] = [];
+  
+  if (qualificationData.detected_neighborhood) {
+    collected.push(`📍 Região: ${qualificationData.detected_neighborhood}`);
+  }
+  if (qualificationData.detected_property_type) {
+    collected.push(`🏠 Tipo: ${qualificationData.detected_property_type}`);
+  }
+  if (qualificationData.detected_bedrooms) {
+    collected.push(`🛏️ Quartos: ${qualificationData.detected_bedrooms}`);
+  }
+  if (qualificationData.detected_budget_max) {
+    collected.push(`💰 Orçamento: até R$ ${qualificationData.detected_budget_max.toLocaleString('pt-BR')}`);
+  }
+  if (qualificationData.detected_interest) {
+    collected.push(`🎯 Objetivo: ${qualificationData.detected_interest}`);
+  }
+  
+  if (collected.length === 0) return '';
+  
+  return `
+📋 DADOS JÁ COLETADOS (NÃO PERGUNTE DE NOVO):
+${collected.join('\n')}
+`;
+}
+
+function isLoopingQuestion(aiResponse: string, qualificationData: QualificationDataForLoop | null): boolean {
+  if (!qualificationData) return false;
+  
+  const lower = aiResponse.toLowerCase();
+  
+  // If already has region and AI asked region again
+  if (qualificationData.detected_neighborhood) {
+    if (/qual\s+(regi[aã]o|bairro)|onde\s+voc[eê]|localiza[cç][aã]o|prefer[eê]ncia.*regi|que\s+regi/i.test(lower)) {
+      console.log('⚠️ [ANTI-LOOP] Loop detected: asking region again');
+      return true;
+    }
+  }
+  
+  // If already has bedrooms and AI asked again
+  if (qualificationData.detected_bedrooms) {
+    if (/quantos?\s+quartos?|n[uú]mero\s+de\s+(quartos?|dormit[oó]rios?)|quantos\s+dormit/i.test(lower)) {
+      console.log('⚠️ [ANTI-LOOP] Loop detected: asking bedrooms again');
+      return true;
+    }
+  }
+  
+  // If already has budget and AI asked again
+  if (qualificationData.detected_budget_max) {
+    if (/faixa\s+de\s+(valor|pre[cç]o)|or[cç]amento|quanto\s+(quer|pode)\s+pagar|qual.*valor/i.test(lower)) {
+      console.log('⚠️ [ANTI-LOOP] Loop detected: asking budget again');
+      return true;
+    }
+  }
+  
+  // If already has property type and AI asked again
+  if (qualificationData.detected_property_type) {
+    if (/que\s+tipo|qual\s+tipo|tipo\s+de\s+im[oó]vel|apartamento.*casa|busca\s+apartamento/i.test(lower)) {
+      console.log('⚠️ [ANTI-LOOP] Loop detected: asking property type again');
+      return true;
+    }
+  }
+  
+  // If already has purpose and AI asked again (for vendas)
+  if (qualificationData.detected_interest) {
+    if (/morar\s+ou\s+investir|para\s+morar|para\s+investir|objetivo|finalidade/i.test(lower)) {
+      console.log('⚠️ [ANTI-LOOP] Loop detected: asking purpose again');
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Get the next logical question to ask based on what's missing
+function getNextLogicalQuestion(qualificationData: QualificationDataForLoop | null): string {
+  if (!qualificationData) {
+    return "Qual região de Floripa você prefere? 😊";
+  }
+  
+  // Order: Region → Type → Bedrooms → Budget
+  if (!qualificationData.detected_neighborhood) {
+    return "Qual região de Floripa você prefere? 😊";
+  }
+  if (!qualificationData.detected_property_type) {
+    return "Você busca apartamento, casa ou outro tipo de imóvel?";
+  }
+  if (!qualificationData.detected_bedrooms) {
+    return "Quantos quartos você precisa?";
+  }
+  if (!qualificationData.detected_budget_max) {
+    return "E qual seria sua faixa de orçamento mensal?";
+  }
+  
+  // All collected - proceed to search
+  return "Perfeito! Vou buscar opções pra você! 🏠";
+}
+
+// Anti-repetition: check if AI is sending the exact same message
+let lastAIMessages: Map<string, string> = new Map();
+
+function isRepetitiveMessage(phoneNumber: string, message: string): boolean {
+  const lastMessage = lastAIMessages.get(phoneNumber);
+  if (lastMessage && lastMessage === message) {
+    console.log('⚠️ [ANTI-LOOP] Repetitive message detected - same as last');
+    return true;
+  }
+  lastAIMessages.set(phoneNumber, message);
+  
+  // Cleanup old entries to prevent memory leak
+  if (lastAIMessages.size > 1000) {
+    const keys = Array.from(lastAIMessages.keys());
+    keys.slice(0, 500).forEach(k => lastAIMessages.delete(k));
+  }
+  
+  return false;
+}
+
+async function getQualificationDataForAntiLoop(phoneNumber: string): Promise<QualificationDataForLoop | null> {
+  try {
+    const { data } = await supabase
+      .from('lead_qualification')
+      .select('detected_neighborhood, detected_bedrooms, detected_budget_max, detected_property_type, detected_interest')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+    return data;
+  } catch (error) {
+    console.error('❌ Error getting qualification data for anti-loop:', error);
+    return null;
+  }
+}
+
 // Sanitize AI message: remove markdown images, URLs, and clean formatting
 function sanitizeAIMessage(text: string): string {
   if (!text) return '';
@@ -3600,7 +3745,31 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       console.log(`✅ Using fallback response instead`);
     }
 
-    console.log('✅ AI response (validated):', aiMessage?.substring(0, 100));
+    // ========== ANTI-LOOP SYSTEM ==========
+    // Check if AI is repeating questions already answered
+    const qualDataForLoop = await getQualificationDataForAntiLoop(phoneNumber);
+    
+    if (aiMessage && isLoopingQuestion(aiMessage, qualDataForLoop)) {
+      console.log('🔄 [ANTI-LOOP] Replacing looping question with next logical step');
+      const nextQuestion = getNextLogicalQuestion(qualDataForLoop);
+      
+      // If all data collected, trigger property search
+      if (nextQuestion.includes('Vou buscar')) {
+        console.log('🏠 [ANTI-LOOP] All data collected, should trigger search');
+        // The search will be handled by the tool call flow
+      }
+      
+      aiMessage = nextQuestion;
+    }
+    
+    // Check for exact message repetition
+    if (aiMessage && isRepetitiveMessage(phoneNumber, aiMessage)) {
+      console.log('🔄 [ANTI-LOOP] Replacing repetitive message');
+      aiMessage = getNextLogicalQuestion(qualDataForLoop);
+    }
+    // ========== END ANTI-LOOP SYSTEM ==========
+
+    console.log('✅ AI response (validated + anti-loop):', aiMessage?.substring(0, 100));
 
     // Process and send messages
     let messagesSent = 0;

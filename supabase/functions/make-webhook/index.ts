@@ -2039,28 +2039,66 @@ async function saveContactNameMake(supabase: any, phoneNumber: string, name: str
 function extractNameFromMessage(message: string): string | null {
   const cleaned = message.trim();
   
-  if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|hello|hi)$/i.test(cleaned)) {
+  // Ignore common greetings
+  if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|hello|hi|obrigad[oa]|valeu|blz|ok)$/i.test(cleaned)) {
     return null;
   }
   
+  // Ignore common non-name words
+  const invalidNames = [
+    'sim', 'não', 'nao', 'ok', 'oi', 'olá', 'ola', 'bom', 'boa', 'dia', 'tarde', 'noite',
+    'obrigado', 'obrigada', 'tchau', 'até', 'ate', 'valeu', 'blz', 'beleza',
+    'quero', 'preciso', 'tenho', 'busco', 'procuro', 'apartamento', 'casa', 'imovel', 'imóvel',
+    'alugar', 'comprar', 'vender', 'aluguel', 'venda', 'locação', 'locacao',
+    'centro', 'trindade', 'ingleses', 'campeche', 'lagoa', 'floripa', 'florianópolis',
+    'texto', 'áudio', 'audio', 'mensagem', 'foto', 'imagem', 'pode', 'posso', 'claro'
+  ];
+  
+  // Patterns that explicitly indicate a name - NOW SUPPORTS COMPOUND NAMES (e.g., "Ana Paula")
   const patterns = [
-    /(?:sou\s+(?:o|a)\s+)([A-Za-zÀ-ÿ]+)/i,
-    /(?:meu\s+nome\s+[eé]\s+)([A-Za-zÀ-ÿ]+)/i,
-    /(?:pode\s+me\s+chamar\s+de\s+)([A-Za-zÀ-ÿ]+)/i,
-    /(?:me\s+chamo\s+)([A-Za-zÀ-ÿ]+)/i,
+    // "Sou o/a João Silva" or "Sou João Silva" - captures up to 3 words
+    /(?:sou\s+(?:o|a)\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})/i,
+    // "Meu nome é Maria Santos"
+    /(?:meu\s+nome\s+[eé]\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})/i,
+    // "Pode me chamar de Ana Paula"
+    /(?:pode\s+me\s+chamar\s+de\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})/i,
+    // "Me chamo Carlos Eduardo"
+    /(?:me\s+chamo\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})/i,
+    // "É a Maria" or "É o João"
+    /^(?:[eé]h?\s+(?:o|a)\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})$/i,
   ];
   
   for (const pattern of patterns) {
     const match = cleaned.match(pattern);
     if (match && match[1]) {
-      return match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+      const extractedName = match[1].trim();
+      const firstWord = extractedName.split(/\s+/)[0].toLowerCase();
+      
+      // Validate: first word is not a common invalid word
+      if (!invalidNames.includes(firstWord) && extractedName.length >= 2 && extractedName.length <= 40) {
+        // Capitalize each word properly
+        return extractedName.split(/\s+/).map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        ).join(' ');
+      }
     }
   }
   
+  // Short response handling: "Ana Paula" or "João" (1-3 words, all valid name characters)
   const words = cleaned.split(/\s+/);
-  if (words.length <= 2 && words[0].length >= 2 && words[0].length <= 20) {
-    if (/^[A-Za-zÀ-ÿ]+$/.test(words[0])) {
-      return words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase();
+  if (words.length >= 1 && words.length <= 3) {
+    // Check all words are valid name parts
+    const allValidNameWords = words.every(word => 
+      /^[A-Za-zÀ-ÿ]+$/.test(word) && 
+      word.length >= 2 && 
+      word.length <= 20 &&
+      !invalidNames.includes(word.toLowerCase())
+    );
+    
+    if (allValidNameWords) {
+      return words.map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ');
     }
   }
   
