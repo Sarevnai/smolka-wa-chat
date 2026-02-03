@@ -36,6 +36,21 @@ interface PropertyResult {
   valor_condominio: number;
 }
 
+interface SkipReasons {
+  metadata: number;
+  tipoMismatch: number;
+  noPrice: number;
+  wrongFinalidade: number;
+  bedroomMismatch: number;
+  invalidObject: number;
+}
+
+interface SkippedSample {
+  codigo: string;
+  reason: string;
+  details: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -55,6 +70,18 @@ serve(async (req) => {
 
     // Store tipo for client-side filtering (Vista API categoria filter is unreliable)
     const tipoFilter = params.tipo?.toLowerCase();
+    
+    // Log search configuration for debugging
+    console.log('🔧 Vista search config:', {
+      tipoFilter: tipoFilter || 'nenhum',
+      finalidade: params.finalidade || 'qualquer',
+      precoRange: params.preco_min || params.preco_max 
+        ? `R$${params.preco_min || 0} - R$${params.preco_max || '∞'}` 
+        : 'sem limite',
+      quartosFiltro: params.quartos || 'qualquer',
+      bairro: params.bairro || 'qualquer',
+      cidade: params.cidade || 'qualquer'
+    });
     
     // Build filter object for Vista API - only use reliable filters
     const filter: Record<string, any> = {};
@@ -147,19 +174,40 @@ serve(async (req) => {
     // Transform Vista response to our standard format
     const properties: PropertyResult[] = [];
     
+    // Initialize skip tracking
+    const skipReasons: SkipReasons = {
+      metadata: 0,
+      tipoMismatch: 0,
+      noPrice: 0,
+      wrongFinalidade: 0,
+      bedroomMismatch: 0,
+      invalidObject: 0,
+    };
+    const skippedSamples: SkippedSample[] = [];
+    
     // Vista returns object with property codes as keys
     if (data && typeof data === 'object') {
       const entries = Object.entries(data);
       console.log(`📋 Processing ${entries.length} entries from Vista`);
       
       for (const [codigo, imovel] of entries) {
-        if (!imovel || typeof imovel !== 'object') continue;
+        // Skip invalid objects
+        if (!imovel || typeof imovel !== 'object') {
+          skipReasons.invalidObject++;
+          continue;
+        }
         
         const prop = imovel as Record<string, any>;
         
         // Skip if it's pagination info or metadata
-        if (codigo === 'paginas' || codigo === 'pagina' || codigo === 'total' || codigo === 'qtd') continue;
-        if (codigo === 'status' || codigo === 'message') continue;
+        if (codigo === 'paginas' || codigo === 'pagina' || codigo === 'total' || codigo === 'qtd') {
+          skipReasons.metadata++;
+          continue;
+        }
+        if (codigo === 'status' || codigo === 'message') {
+          skipReasons.metadata++;
+          continue;
+        }
         
         // Client-side category filtering since Vista API filter is unreliable
         const categoria = (prop.Categoria || '').toLowerCase();
@@ -171,7 +219,17 @@ serve(async (req) => {
             (tipoFilter === 'terreno' && categoria.includes('terreno')) ||
             (tipoFilter === 'comercial' && (categoria.includes('comercial') || categoria.includes('sala') || categoria.includes('loja')));
           
-          if (!tipoMatches) continue;
+          if (!tipoMatches) {
+            skipReasons.tipoMismatch++;
+            if (skippedSamples.length < 5) {
+              skippedSamples.push({
+                codigo,
+                reason: 'tipo',
+                details: `Categoria Vista: "${categoria}" | Filtro: "${tipoFilter}"`
+              });
+            }
+            continue;
+          }
         }
         
         // Determine price - use whichever is available, prefer based on finalidade
@@ -182,11 +240,31 @@ serve(async (req) => {
         let modalidade: string;
         
         if (params.finalidade === 'locacao') {
-          if (valorLocacao === 0) continue; // Skip if no rental price
+          if (valorLocacao === 0) {
+            skipReasons.wrongFinalidade++;
+            if (skippedSamples.length < 5) {
+              skippedSamples.push({
+                codigo,
+                reason: 'sem_preco_locacao',
+                details: `ValorVenda: R$${valorVenda} | ValorLocacao: R$${valorLocacao}`
+              });
+            }
+            continue;
+          }
           preco = valorLocacao;
           modalidade = 'aluguel';
         } else if (params.finalidade === 'venda') {
-          if (valorVenda === 0) continue; // Skip if no sale price
+          if (valorVenda === 0) {
+            skipReasons.wrongFinalidade++;
+            if (skippedSamples.length < 5) {
+              skippedSamples.push({
+                codigo,
+                reason: 'sem_preco_venda',
+                details: `ValorVenda: R$${valorVenda} | ValorLocacao: R$${valorLocacao}`
+              });
+            }
+            continue;
+          }
           preco = valorVenda;
           modalidade = 'venda';
         } else {
@@ -198,7 +276,15 @@ serve(async (req) => {
             preco = valorLocacao;
             modalidade = 'aluguel';
           } else {
-            continue; // No price available
+            skipReasons.noPrice++;
+            if (skippedSamples.length < 5) {
+              skippedSamples.push({
+                codigo,
+                reason: 'sem_preco',
+                details: `ValorVenda: R$${valorVenda} | ValorLocacao: R$${valorLocacao}`
+              });
+            }
+            continue;
           }
         }
         
@@ -230,7 +316,14 @@ serve(async (req) => {
         
         // Client-side bedroom filtering for exact match
         if (params.quartos && dormitorios !== params.quartos) {
-          console.log(`⏩ Skipping ${codigo}: has ${dormitorios} quartos, wanted ${params.quartos}`);
+          skipReasons.bedroomMismatch++;
+          if (skippedSamples.length < 5) {
+            skippedSamples.push({
+              codigo,
+              reason: 'quartos',
+              details: `Tem: ${dormitorios} | Quer: ${params.quartos}`
+            });
+          }
           continue;
         }
         
@@ -264,12 +357,54 @@ serve(async (req) => {
           caracteristicas,
           valor_condominio: parseFloat(prop.ValorCondominio || '0'),
         });
+        
+        // Log accepted properties (first 3 only)
+        if (properties.length <= 3) {
+          console.log(`✓ Accepted ${codigo}: ${prop.Categoria} | ${dormitorios}q | R$${preco}`);
+        }
+        
         // Respect the user's limit
         if (properties.length >= (params.limit || 3)) break;
+      }
+      
+      // Log filter summary
+      const totalSkipped = Object.values(skipReasons).reduce((a, b) => a + b, 0);
+      console.log('📊 FILTER SUMMARY:', {
+        totalFromVista: entries.length,
+        skipped: {
+          metadata: skipReasons.metadata,
+          invalidObject: skipReasons.invalidObject,
+          tipoMismatch: skipReasons.tipoMismatch,
+          wrongFinalidade: skipReasons.wrongFinalidade,
+          noPrice: skipReasons.noPrice,
+          bedroomMismatch: skipReasons.bedroomMismatch,
+          totalSkipped
+        },
+        passed: properties.length,
+        limitApplied: params.limit || 3
+      });
+      
+      // Log sample of skipped properties when zero results
+      if (properties.length === 0 && skippedSamples.length > 0) {
+        console.log('🔍 ZERO RESULTS - Sample of skipped properties:', skippedSamples);
       }
     }
 
     console.log(`✅ Found ${properties.length} properties matching criteria`);
+    
+    // Special alert for zero results
+    if (properties.length === 0) {
+      const entries = data && typeof data === 'object' ? Object.entries(data) : [];
+      console.warn('⚠️ ZERO RESULTS ALERT:', {
+        searchParams: params,
+        vistaReturned: entries.length,
+        allSkipReasons: skipReasons,
+        samples: skippedSamples,
+        suggestion: entries.length > 0 
+          ? 'Vista retornou dados, mas todos foram filtrados. Verificar filtros client-side.'
+          : 'Vista não retornou nenhum imóvel. Verificar filtros da API ou dados no CRM.'
+      });
+    }
 
     return new Response(
       JSON.stringify({ 
