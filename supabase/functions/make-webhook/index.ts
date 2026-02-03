@@ -1164,9 +1164,20 @@ async function sendLeadToC2S(
 
 // ========== CONSULTATIVE FLOW FUNCTIONS ==========
 
-function analyzePropertyFeedback(message: string): 'positive' | 'negative' | 'neutral' {
-  const positive = /gostei|interess|visitar|marcar|quero|esse|perfeito|[oó]timo|bom|show|pode ser|adorei|amei|lindo|maravilh|excelente|isso|sim|quero ver|agendar/i;
-  const negative = /não|caro|longe|pequeno|grande|outro|próximo|diferente|menos|mais|demais|muito|acima|baixo|descartado|n[aã]o gostei|ruim|horr[ií]vel|nao/i;
+function analyzePropertyFeedback(message: string): 'positive' | 'negative' | 'more_options' | 'neutral' {
+  // FIRST: Detect "more options" request (priority over negative)
+  // Matches: "mais opções", "outras opções", "tem mais", "mostra outro", "próximo", "outro imóvel"
+  const moreOptions = /mais\s+op[çc][oõ]es|outr[ao]s?\s+op[çc][oõ]es|tem\s+mais|mostra\s+outro|pr[oó]ximo|outro\s+im[oó]vel|pode\s+me\s+mostrar\s+mais|mais\s+um|mais\s+algum|me\s+mostra\s+mais|quero\s+ver\s+outro|pode\s+mostrar\s+outro/i;
+  if (moreOptions.test(message)) {
+    console.log('📊 Detected feedback: more_options');
+    return 'more_options';
+  }
+  
+  // THEN: Positive feedback
+  const positive = /gostei|interess|visitar|marcar|quero\s+esse|perfeito|[oó]timo|bom|show|pode ser|adorei|amei|lindo|maravilh|excelente|isso|sim|quero ver|agendar|é\s+esse|curti|fechado|fechou/i;
+  
+  // MODIFIED: Remove "mais", "outro", "próximo" from negative (now in more_options)
+  const negative = /caro|longe|pequeno|grande|diferente|menos|demais|muito|acima|baixo|descartado|n[aã]o\s+gostei|ruim|horr[ií]vel|nao\s+quero|não\s+quero|não\s+serve|nao\s+serve|não\s+curti|nao\s+curti/i;
   
   if (positive.test(message)) return 'positive';
   if (negative.test(message)) return 'negative';
@@ -1760,6 +1771,36 @@ function detectFlexibilization(message: string): FlexibilizationResult {
     }
   }
   
+  // ===== PATTERN 7: EXPLICIT BEDROOM REQUESTS =====
+  // "quero 3 quartos", "preciso de 2 dormitórios", "busco apartamento de 4 quartos"
+  if (!updates.detected_bedrooms) {
+    const explicitBedroomPatterns = [
+      // "quero 3 quartos", "preciso de 2 dormitórios", "gostaria de 4 quartos"
+      /(?:quero|preciso|gostaria|prefiro|busco|procuro)\s*(?:de\s*)?\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i,
+      // "me mostra de 3 quartos", "manda de 2 quartos"
+      /(?:me\s+)?(?:mostra|manda|envia|veja)\s*(?:de\s*)?\s*(\d+)\s*(?:quartos?|qtos?)/i,
+      // "que tenha 3 quartos", "com 2 quartos"
+      /(?:tenha|com)\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i,
+      // "3 quartos por favor"
+      /(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)\s*(?:por favor|pf|pfv)?$/i,
+      // "apartamento de 3 quartos", "casa de 4 dormitórios"
+      /(?:apartamento|apto|casa|imovel|imóvel)\s*(?:de|com)\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i
+    ];
+    
+    for (const pattern of explicitBedroomPatterns) {
+      const match = message.match(pattern);
+      if (match) {
+        const num = parseInt(match[1]);
+        if (num >= 1 && num <= 10) {
+          updates.detected_bedrooms = num;
+          fields.push('quartos');
+          console.log(`📝 Explicit bedroom request detected: ${num}`);
+          break;
+        }
+      }
+    }
+  }
+  
   return {
     detected: fields.length > 0,
     updates,
@@ -1792,10 +1833,32 @@ function isSameMessage(msg1: string | null, msg2: string): boolean {
   // Normalize both messages for comparison
   const normalize = (s: string) => s.toLowerCase()
     .replace(/\s+/g, ' ')
-    .replace(/[😊🏠😔🤔💰📍🛏️✅❌]/g, '')
+    .replace(/[😊🏠😔🤔💰📍🛏️✅❌👋🙂☺️💡📞🙏✨💭📋👍]/g, '')
     .trim();
   
   return normalize(msg1) === normalize(msg2);
+}
+
+// ========== PRE-EMPTIVE DUPLICATE CHECK ==========
+// Checks if intended message is a duplicate BEFORE sending
+async function shouldSkipAsDuplicate(
+  supabase: any, 
+  conversationId: string | null, 
+  intendedMessage: string
+): Promise<{ skip: boolean; reason?: string }> {
+  if (!conversationId || !intendedMessage) return { skip: false };
+  
+  try {
+    const lastOutbound = await getLastOutboundMessage(supabase, conversationId);
+    if (lastOutbound && isSameMessage(lastOutbound, intendedMessage)) {
+      console.log('🚫 PRE-EMPTIVE: Would send duplicate message - blocking');
+      return { skip: true, reason: 'duplicate' };
+    }
+    return { skip: false };
+  } catch (error) {
+    console.error('❌ Error in pre-emptive duplicate check:', error);
+    return { skip: false };
+  }
 }
 
 // ========== GET QUALIFICATION PROGRESS ==========
@@ -2873,6 +2936,20 @@ serve(async (req) => {
           console.log(`📝 Flexibilization detected: ${flexibilization.fields.join(', ')}`);
           // Force update with forceUpdate=true to overwrite existing values
           await updateQualificationData(supabase, phoneNumber, flexibilization.updates as ExtractedQualificationData, true);
+          
+          // ===== CRITICAL FIX: CLEAR CONSULTATIVE STATE WHEN KEY CRITERIA CHANGE =====
+          // When bedrooms, neighborhood, budget, or type change, old pending_properties are stale
+          const keyFields = ['quartos', 'bairro', 'orçamento', 'tipo'];
+          const hasKeyFieldChange = flexibilization.fields.some(f => keyFields.includes(f));
+          
+          if (hasKeyFieldChange) {
+            console.log('🔄 Key criteria changed - clearing consultative state to force new search');
+            await updateConsultativeState(supabase, phoneNumber, {
+              pending_properties: [],
+              current_property_index: 0,
+              awaiting_property_feedback: false
+            });
+          }
         }
         
         // ===== EXTRACT AND SAVE QUALIFICATION DATA =====
@@ -2933,18 +3010,23 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
               }
             }
             
-          } else if (feedback === 'negative') {
-            // ===== PRICE FLEXIBILITY DETECTION =====
-            const priceFlexibility = detectPriceFlexibility(messageContent);
+          } else if (feedback === 'negative' || feedback === 'more_options') {
+            // ===== PRICE FLEXIBILITY DETECTION (only for negative feedback) =====
+            if (feedback === 'negative') {
+              const priceFlexibility = detectPriceFlexibility(messageContent);
+              
+              if (priceFlexibility.type !== 'none' && !priceFlexibility.hasNewValue) {
+                // Client wants to flex price but didn't give value
+                console.log(`💰 Price flexibility detected: ${priceFlexibility.type}, asking for value`);
+                aiResponse = priceFlexibility.suggestedQuestion!;
+                // DON'T show next property - wait for value
+              }
+            }
             
-            if (priceFlexibility.type !== 'none' && !priceFlexibility.hasNewValue) {
-              // Client wants to flex price but didn't give value
-              console.log(`💰 Price flexibility detected: ${priceFlexibility.type}, asking for value`);
-              aiResponse = priceFlexibility.suggestedQuestion!;
-              // DON'T show next property - wait for value
-            } else {
-              // Normal negative feedback - show next property
-              console.log('📉 Negative feedback - showing next property');
+            // If no price flexibility or feedback is more_options, show next property
+            if (!aiResponse) {
+              // Advance to next property
+              console.log(`📊 Feedback "${feedback}" - showing next property`);
               
               const nextIndex = currentIndex + 1;
               
@@ -2958,7 +3040,10 @@ LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]
                 });
                 
                 const nameGreet = existingName ? `, ${existingName}` : '';
-                aiResponse = `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
+                // Differentiate messages based on feedback type
+                aiResponse = feedback === 'more_options'
+                  ? `Claro${nameGreet}! 😊 Tenho mais esta opção:`
+                  : `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
                 
                 console.log(`📤 Showing next property: index ${nextIndex}`);
               } else {
