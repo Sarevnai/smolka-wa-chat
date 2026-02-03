@@ -1051,30 +1051,87 @@ function buildFallbackMessage(
   contactName?: string
 ): string {
   const nameGreet = contactName ? `, ${contactName}` : '';
+  const property = properties[0];
+  
+  // Generate consultative question based on property highlights
+  let consultativeQuestion = 'Esse imóvel faz sentido pra você? 😊';
+  
+  if (property?.descricao) {
+    const highlights = extractPropertyHighlightsQuick(property.descricao);
+    if (highlights.topFeature) {
+      consultativeQuestion = `O que você acha? ${highlights.consultiveHook} 😊`;
+    }
+  }
   
   switch (searchType) {
     case 'exact':
-      return `Encontrei uma opção que combina com o que você busca${nameGreet}! 🏠`;
+      return `Encontrei uma opção que combina com o que você busca${nameGreet}! 🏠\n\n${consultativeQuestion}`;
     
     case 'sem_quartos':
       const requestedBedrooms = originalParams.quartos;
-      const foundBedrooms = properties[0]?.quartos;
+      const foundBedrooms = property?.quartos;
       if (foundBedrooms && requestedBedrooms) {
-        return `Não encontrei com ${requestedBedrooms} quarto${requestedBedrooms > 1 ? 's' : ''}${nameGreet}, mas tenho uma opção de ${foundBedrooms} quarto${foundBedrooms > 1 ? 's' : ''} que pode te interessar 🏠`;
+        return `Não encontrei com ${requestedBedrooms} quarto${requestedBedrooms > 1 ? 's' : ''}${nameGreet}, mas tenho uma de ${foundBedrooms} quarto${foundBedrooms > 1 ? 's' : ''} que pode te interessar 🏠\n\n${consultativeQuestion}`;
       }
-      return `Encontrei uma opção${nameGreet}! 🏠`;
+      return `Encontrei uma opção${nameGreet}! 🏠\n\n${consultativeQuestion}`;
     
     case 'sem_bairro':
       const requestedNeighborhood = originalParams.bairro;
-      const foundNeighborhood = properties[0]?.bairro;
+      const foundNeighborhood = property?.bairro;
       if (requestedNeighborhood && foundNeighborhood) {
-        return `Não encontrei em ${requestedNeighborhood}${nameGreet}, mas olha essa opção em ${foundNeighborhood} 🏠`;
+        return `Não encontrei em ${requestedNeighborhood}${nameGreet}, mas olha essa opção em ${foundNeighborhood} 🏠\n\n${consultativeQuestion}`;
       }
-      return `Encontrei uma opção em outra região${nameGreet}! 🏠`;
+      return `Encontrei uma opção em outra região${nameGreet}! 🏠\n\n${consultativeQuestion}`;
     
     case 'no_results':
       return `Não encontrei imóveis com esses critérios no momento 😔\n\nO que você prefere ajustar: preço, região ou número de quartos?`;
   }
+}
+
+/**
+ * Quick extraction of top feature for consultive question
+ */
+function extractPropertyHighlightsQuick(description: string): { topFeature: string | null; consultiveHook: string } {
+  if (!description || description.trim().length === 0) {
+    return { topFeature: null, consultiveHook: 'Esse imóvel faz sentido pra você?' };
+  }
+  
+  const text = description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  // Priority features for consultive hooks
+  const featureHooks: [RegExp, string][] = [
+    // Location - highest impact
+    [/pe\s*na\s*areia|frente\s*(pro\s*)?mar|beira\s*mar/i, 'A localização pé na areia é importante pra você?'],
+    [/vista\s*(pro\s*)?mar|vista\s*mar/i, 'A vista pro mar faz diferença pra você?'],
+    [/proximo\s*(?:ao?\s*)?praia/i, 'A proximidade da praia é essencial?'],
+    
+    // Comfort amenities
+    [/piscina/i, 'A piscina é importante pra você?'],
+    [/churrasqueira|churras/i, 'Ter churrasqueira faz diferença?'],
+    [/varanda\s*gourmet|sacada\s*gourmet/i, 'A varanda gourmet combina com seu estilo?'],
+    [/home\s*office|escritorio/i, 'Espaço para home office é importante?'],
+    
+    // Condition
+    [/mobiliado/i, 'Imóvel mobiliado facilita pra você?'],
+    [/novo|recem\s*(?:construido|entregue)/i, 'Imóvel novo faz diferença?'],
+    [/reformado|reforma\s*recente/i, 'Gosta da ideia de já estar reformado?'],
+    
+    // Pet & Family
+    [/pet\s*place|pet\s*friendly|aceita\s*pet/i, 'Você tem pet? Esse aceita! 🐾'],
+    [/playground|brinquedoteca/i, 'Tem crianças? Esse tem área kids!'],
+    
+    // Premium
+    [/alto\s*padrao|luxo|premium/i, 'O acabamento de alto padrão combina com o que busca?'],
+    [/seguranca|portaria\s*24/i, 'Segurança 24h é prioridade pra você?'],
+  ];
+  
+  for (const [pattern, hook] of featureHooks) {
+    if (pattern.test(text)) {
+      return { topFeature: pattern.source, consultiveHook: hook };
+    }
+  }
+  
+  return { topFeature: null, consultiveHook: 'Esse imóvel faz sentido pra você?' };
 }
 
 async function getPropertyByListingId(supabase: any, listingId: string): Promise<any | null> {
@@ -1095,9 +1152,165 @@ async function getPropertyByListingId(supabase: any, listingId: string): Promise
   }
 }
 
+// ========== PROPERTY DESCRIPTION ANALYSIS ==========
+
+interface PropertyHighlights {
+  amenities: string[];
+  location: string[];
+  condition: string[];
+  differential: string[];
+  summary: string;
+}
+
+/**
+ * Extracts points of interest from property description
+ * Categories: amenities, location advantages, condition, differentials
+ */
+function extractPropertyHighlights(description: string | null | undefined): PropertyHighlights {
+  const highlights: PropertyHighlights = {
+    amenities: [],
+    location: [],
+    condition: [],
+    differential: [],
+    summary: ''
+  };
+  
+  if (!description || description.trim().length === 0) {
+    return highlights;
+  }
+  
+  const text = description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  // ===== AMENITIES (comfort & leisure) =====
+  const amenityPatterns: [RegExp, string][] = [
+    [/piscina/i, '🏊 piscina'],
+    [/churrasqueira|churras/i, '🍖 churrasqueira'],
+    [/academia|fitness|gym/i, '💪 academia'],
+    [/sauna/i, '🧖 sauna'],
+    [/spa/i, '💆 spa'],
+    [/salao de festas|salao de eventos|espaco gourmet/i, '🎉 salão de festas'],
+    [/playground|brinquedoteca/i, '🛝 playground'],
+    [/quadra|esporte/i, '🎾 quadra esportiva'],
+    [/pet\s*place|pet\s*friendly|aceita\s*pet/i, '🐾 pet friendly'],
+    [/varanda\s*gourmet|sacada\s*gourmet/i, '🍷 varanda gourmet'],
+    [/home\s*office|escritorio/i, '💻 espaço home office'],
+    [/closet/i, '👔 closet'],
+    [/banheira|hidro/i, '🛁 banheira/hidro'],
+    [/lareira/i, '🔥 lareira'],
+    [/jardim\s*privativo/i, '🌿 jardim privativo'],
+  ];
+  
+  for (const [pattern, label] of amenityPatterns) {
+    if (pattern.test(text)) {
+      highlights.amenities.push(label);
+    }
+  }
+  
+  // ===== LOCATION ADVANTAGES =====
+  const locationPatterns: [RegExp, string][] = [
+    [/pe\s*na\s*areia|frente\s*(pro\s*)?mar|beira\s*mar/i, '🏖️ pé na areia/frente mar'],
+    [/vista\s*(pro\s*)?mar|vista\s*mar/i, '🌊 vista para o mar'],
+    [/proximo\s*(?:ao?\s*)?(?:praia|lagoa)/i, '📍 próximo à praia/lagoa'],
+    [/centro|localizacao\s*privilegiada|bem\s*localizado/i, '📍 localização privilegiada'],
+    [/silencioso|tranquilo|residencial/i, '🤫 região tranquila'],
+    [/comercio|mercado|padaria|farmacia/i, '🛒 próximo ao comércio'],
+    [/escola|colegio|universidade/i, '🎓 próximo a escolas'],
+    [/transporte|onibus|terminal/i, '🚌 fácil acesso transporte'],
+    [/seguranca|portaria\s*24|vigilancia/i, '🔐 segurança 24h'],
+  ];
+  
+  for (const [pattern, label] of locationPatterns) {
+    if (pattern.test(text)) {
+      highlights.location.push(label);
+    }
+  }
+  
+  // ===== CONDITION =====
+  const conditionPatterns: [RegExp, string][] = [
+    [/novo|recem\s*(?:construido|entregue)|nunca\s*habitado/i, '✨ imóvel novo'],
+    [/reformado|reforma\s*recente|renovado/i, '🔧 reformado recentemente'],
+    [/mobiliado|semi[\s-]?mobiliado/i, '🛋️ mobiliado'],
+    [/pronto\s*para\s*morar/i, '🏠 pronto para morar'],
+    [/excelente\s*estado|otimo\s*estado|bem\s*conservado/i, '👍 excelente estado'],
+    [/sol\s*da\s*manha|nascente/i, '☀️ sol da manhã'],
+    [/ventilado|arejado/i, '🌬️ bem ventilado'],
+    [/luminoso|iluminado|claro/i, '💡 muito iluminado'],
+  ];
+  
+  for (const [pattern, label] of conditionPatterns) {
+    if (pattern.test(text)) {
+      highlights.condition.push(label);
+    }
+  }
+  
+  // ===== DIFFERENTIALS =====
+  const differentialPatterns: [RegExp, string][] = [
+    [/exclusiv|unico|raro/i, '⭐ oportunidade exclusiva'],
+    [/oportunidade|imperd[ií]vel|nao\s*perca/i, '🎯 oportunidade imperdível'],
+    [/abaixo\s*(?:do\s*)?(?:mercado|valor)|desconto/i, '💰 abaixo do mercado'],
+    [/aceita\s*(?:financiamento|carta|permuta)/i, '🏦 aceita financiamento/permuta'],
+    [/documentacao\s*ok|escriturado/i, '📋 documentação em dia'],
+    [/entrega\s*imediata|disponivel\s*imediato/i, '🚀 entrega imediata'],
+    [/alto\s*padrao|luxo|premium/i, '👑 alto padrão'],
+  ];
+  
+  for (const [pattern, label] of differentialPatterns) {
+    if (pattern.test(text)) {
+      highlights.differential.push(label);
+    }
+  }
+  
+  return highlights;
+}
+
+/**
+ * Generates a consultative summary for the client based on property highlights
+ * Max 120 chars to keep WhatsApp messages clean
+ */
+function generateConsultativeSummary(property: any, highlights: PropertyHighlights): string {
+  const allHighlights = [
+    ...highlights.differential.slice(0, 1),  // Priority: differentials first
+    ...highlights.location.slice(0, 1),
+    ...highlights.amenities.slice(0, 2),
+    ...highlights.condition.slice(0, 1)
+  ];
+  
+  // If we have highlights, build a nice summary
+  if (allHighlights.length > 0) {
+    const cleanHighlights = allHighlights.map(h => {
+      // Remove emoji for cleaner summary text
+      return h.replace(/^[\u{1F300}-\u{1F9FF}]+\s*/gu, '');
+    });
+    
+    // Build summary phrase
+    if (cleanHighlights.length === 1) {
+      return `✨ Destaque: ${cleanHighlights[0]}`;
+    } else {
+      return `✨ Destaques: ${cleanHighlights.slice(0, 3).join(', ')}`;
+    }
+  }
+  
+  // Fallback: use first sentence of description if no highlights
+  if (property.descricao && property.descricao.trim().length > 0) {
+    const firstSentence = property.descricao.trim().split(/[.!?\n]/)[0].trim();
+    if (firstSentence.length > 0 && firstSentence.length <= 100) {
+      return `📝 ${firstSentence}`;
+    } else if (firstSentence.length > 100) {
+      return `📝 ${firstSentence.substring(0, 97)}...`;
+    }
+  }
+  
+  return '';
+}
+
+/**
+ * Formats property message for WhatsApp with consultative approach
+ * Includes intelligent summary of highlights instead of raw description truncation
+ */
 function formatPropertyMessage(property: any): string {
   const lines = [`🏠 *${property.tipo} em ${property.bairro}*`];
   
+  // Basic specs
   if (property.quartos > 0) {
     const suiteText = property.suites > 0 ? ` (${property.suites} suíte${property.suites > 1 ? 's' : ''})` : '';
     lines.push(`• ${property.quartos} quarto${property.quartos > 1 ? 's' : ''}${suiteText}`);
@@ -1109,18 +1322,44 @@ function formatPropertyMessage(property: any): string {
     lines.push(`• Condomínio: ${formatCurrency(property.valor_condominio)}`);
   }
   
-  // Add truncated description if available (max 150 chars for WhatsApp readability)
-  if (property.descricao && property.descricao.trim().length > 0) {
-    const descricaoLimpa = property.descricao.trim();
-    const descricaoResumida = descricaoLimpa.length > 150 
-      ? descricaoLimpa.substring(0, 150).trim() + '...'
-      : descricaoLimpa;
-    lines.push(`📝 ${descricaoResumida}`);
+  // Extract highlights and generate consultative summary
+  const highlights = extractPropertyHighlights(property.descricao);
+  const summary = generateConsultativeSummary(property, highlights);
+  
+  if (summary) {
+    lines.push('');  // Empty line for visual separation
+    lines.push(summary);
   }
   
   lines.push(`🔗 ${property.link}`);
   
   return lines.join('\n');
+}
+
+/**
+ * Generates consultative follow-up question based on property features
+ * Used after presenting a property to engage the client consultatively
+ */
+function generateConsultativeQuestion(property: any, highlights: PropertyHighlights, clientName?: string): string {
+  const nameGreet = clientName ? `, ${clientName}` : '';
+  
+  // If property has specific highlights, ask about them
+  if (highlights.amenities.length > 0) {
+    const amenity = highlights.amenities[0].replace(/^[\u{1F300}-\u{1F9FF}]+\s*/gu, '');
+    return `O que você acha${nameGreet}? A ${amenity} é importante pra você? 😊`;
+  }
+  
+  if (highlights.location.length > 0) {
+    const location = highlights.location[0].replace(/^[\u{1F300}-\u{1F9FF}]+\s*/gu, '');
+    return `Essa ${location} faz diferença pra você${nameGreet}? 😊`;
+  }
+  
+  if (highlights.condition.length > 0) {
+    return `Esse imóvel faz sentido pra você${nameGreet}? 😊`;
+  }
+  
+  // Default consultative question
+  return `Esse imóvel faz sentido pra você${nameGreet}? 😊`;
 }
 
 // ========== C2S INTEGRATION ==========
