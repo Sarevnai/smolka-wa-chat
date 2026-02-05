@@ -5,23 +5,15 @@ import {
   Bot, 
   Sparkles, 
   Settings, 
-  Cpu, 
-  Volume2, 
-  Users,
   Loader2,
-  TrendingUp,
-  HelpCircle,
-  FileText
+  FileText,
+  Wrench
 } from "lucide-react";
 
 // Tab Components
 import { AIIdentityTab } from "@/components/ai-config/AIIdentityTab";
 import { AIBehaviorTab } from "@/components/ai-config/AIBehaviorTab";
-import { AIProviderTab } from "@/components/ai-config/AIProviderTab";
-import { AIAudioTab } from "@/components/ai-config/AIAudioTab";
-import { AIProfilesTab } from "@/components/ai-config/AIProfilesTab";
-import { AISalesTab } from "@/components/ai-config/AISalesTab";
-import { AIQualificationTab } from "@/components/ai-config/AIQualificationTab";
+import { AITechnicalTab } from "@/components/ai-config/AITechnicalTab";
 import { AIPromptTab } from "@/components/ai-config/AIPromptTab";
 import { useAIUnifiedConfig } from "@/hooks/useAIUnifiedConfig";
 
@@ -61,9 +53,9 @@ export default function AIUnifiedConfig() {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs - Simplified to 4 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
             <TabsTrigger value="identity" className="gap-2">
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Identidade</span>
@@ -72,25 +64,9 @@ export default function AIUnifiedConfig() {
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Comportamento</span>
             </TabsTrigger>
-            <TabsTrigger value="sales" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Vendas</span>
-            </TabsTrigger>
-            <TabsTrigger value="qualification" className="gap-2">
-              <HelpCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">SPIN</span>
-            </TabsTrigger>
-            <TabsTrigger value="provider" className="gap-2">
-              <Cpu className="h-4 w-4" />
-              <span className="hidden sm:inline">Provedor</span>
-            </TabsTrigger>
-            <TabsTrigger value="audio" className="gap-2">
-              <Volume2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Áudio</span>
-            </TabsTrigger>
-            <TabsTrigger value="profiles" className="gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Perfis</span>
+            <TabsTrigger value="technical" className="gap-2">
+              <Wrench className="h-4 w-4" />
+              <span className="hidden sm:inline">Técnico</span>
             </TabsTrigger>
             <TabsTrigger value="prompt" className="gap-2">
               <FileText className="h-4 w-4" />
@@ -113,49 +89,14 @@ export default function AIUnifiedConfig() {
             <AIBehaviorTab behaviorConfig={behaviorConfig} />
           </TabsContent>
 
-          {/* Sales Tab */}
-          <TabsContent value="sales">
-            <AISalesTab 
+          {/* Technical Tab (combines Provider + Audio) */}
+          <TabsContent value="technical">
+            <AITechnicalTab 
               config={config} 
               updateConfig={updateConfig}
               saveConfig={saveConfig}
               isSaving={isSaving}
             />
-          </TabsContent>
-
-          {/* Qualification Tab */}
-          <TabsContent value="qualification">
-            <AIQualificationTab 
-              config={config} 
-              updateConfig={updateConfig}
-              saveConfig={saveConfig}
-              isSaving={isSaving}
-            />
-          </TabsContent>
-
-          {/* Provider Tab */}
-          <TabsContent value="provider">
-            <AIProviderTab 
-              config={config} 
-              updateConfig={updateConfig}
-              saveConfig={saveConfig}
-              isSaving={isSaving}
-            />
-          </TabsContent>
-
-          {/* Audio Tab */}
-          <TabsContent value="audio">
-            <AIAudioTab 
-              config={config} 
-              updateConfig={updateConfig}
-              saveConfig={saveConfig}
-              isSaving={isSaving}
-            />
-          </TabsContent>
-
-          {/* Profiles Tab */}
-          <TabsContent value="profiles">
-            <AIProfilesTab />
           </TabsContent>
 
           {/* Prompt Tab */}

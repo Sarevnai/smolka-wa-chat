@@ -5,9 +5,28 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Bot, Building2, Save, Plus, Trash2, MessageSquare, AlertTriangle, HelpCircle, Loader2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { 
+  Bot, 
+  Building2, 
+  Save, 
+  Plus, 
+  Trash2, 
+  MessageSquare, 
+  AlertTriangle, 
+  HelpCircle, 
+  Loader2,
+  Heart,
+  Zap,
+  Shield,
+  Clock,
+  Star,
+  Users,
+  ChevronDown
+} from "lucide-react";
 import type { AIAgentConfig } from "@/hooks/useAIUnifiedConfig";
 
 interface AIIdentityTabProps {
@@ -21,6 +40,9 @@ export function AIIdentityTab({ config, updateConfig, saveConfig, isSaving }: AI
   const [newService, setNewService] = useState('');
   const [newLimitation, setNewLimitation] = useState('');
   const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
+  const [newObjection, setNewObjection] = useState("");
+  const [newResponse, setNewResponse] = useState("");
+  const [salesOpen, setSalesOpen] = useState(false);
 
   const addService = () => {
     if (newService.trim()) {
@@ -53,6 +75,24 @@ export function AIIdentityTab({ config, updateConfig, saveConfig, isSaving }: AI
 
   const removeFaq = (index: number) => {
     updateConfig({ faqs: config.faqs.filter((_, i) => i !== index) });
+  };
+
+  const addObjection = () => {
+    if (!newObjection.trim() || !newResponse.trim()) return;
+    updateConfig({
+      objections: [
+        ...config.objections,
+        { objection: newObjection.trim(), response: newResponse.trim() },
+      ],
+    });
+    setNewObjection("");
+    setNewResponse("");
+  };
+
+  const removeObjection = (index: number) => {
+    updateConfig({
+      objections: config.objections.filter((_, i) => i !== index),
+    });
   };
 
   const toneOptions = [
@@ -290,6 +330,220 @@ export function AIIdentityTab({ config, updateConfig, saveConfig, isSaving }: AI
           </div>
         </CardContent>
       </Card>
+
+      {/* Sales Section (Collapsible - Advanced) */}
+      <Collapsible open={salesOpen} onOpenChange={setSalesOpen}>
+        <Card>
+          <CardHeader>
+            <CollapsibleTrigger className="w-full">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-amber-500" />
+                  <CardTitle>Configurações de Vendas</CardTitle>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">Avançado</Badge>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${salesOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+            </CollapsibleTrigger>
+            <CardDescription>Rapport, gatilhos mentais e tratamento de objeções</CardDescription>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-6 pt-0">
+              {/* Rapport */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Heart className="h-4 w-4 text-rose-500" />
+                  <Label className="font-semibold">Técnicas de Rapport</Label>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <Label>Rapport Ativo</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Habilitar técnicas de conexão emocional
+                    </p>
+                  </div>
+                  <Switch
+                    checked={config.rapport_enabled}
+                    onCheckedChange={(checked) => updateConfig({ rapport_enabled: checked })}
+                  />
+                </div>
+
+                {config.rapport_enabled && (
+                  <div className="grid grid-cols-2 gap-3 pl-4 border-l-2 border-rose-200">
+                    <div className="flex items-center justify-between p-2 rounded border">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3 w-3" />
+                        <span className="text-sm">Usar nome</span>
+                      </div>
+                      <Switch
+                        checked={config.rapport_use_name}
+                        onCheckedChange={(checked) => updateConfig({ rapport_use_name: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded border">
+                      <div className="flex items-center gap-2">
+                        <Star className="h-3 w-3" />
+                        <span className="text-sm">Espelhar linguagem</span>
+                      </div>
+                      <Switch
+                        checked={config.rapport_mirror_language}
+                        onCheckedChange={(checked) => updateConfig({ rapport_mirror_language: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded border">
+                      <div className="flex items-center gap-2">
+                        <Heart className="h-3 w-3" />
+                        <span className="text-sm">Empatia</span>
+                      </div>
+                      <Switch
+                        checked={config.rapport_show_empathy}
+                        onCheckedChange={(checked) => updateConfig({ rapport_show_empathy: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded border">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-3 w-3" />
+                        <span className="text-sm">Validar emoções</span>
+                      </div>
+                      <Switch
+                        checked={config.rapport_validate_emotions}
+                        onCheckedChange={(checked) => updateConfig({ rapport_validate_emotions: checked })}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Mental Triggers */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-amber-500" />
+                  <Label className="font-semibold">Gatilhos Mentais</Label>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <Label>Gatilhos Ativos</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Habilitar uso de gatilhos de persuasão
+                    </p>
+                  </div>
+                  <Switch
+                    checked={config.triggers_enabled}
+                    onCheckedChange={(checked) => updateConfig({ triggers_enabled: checked })}
+                  />
+                </div>
+
+                {config.triggers_enabled && (
+                  <div className="grid grid-cols-2 gap-3 pl-4 border-l-2 border-amber-200">
+                    <div className="flex items-center justify-between p-2 rounded border">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-3 w-3" />
+                        <span className="text-sm">Urgência</span>
+                      </div>
+                      <Switch
+                        checked={config.trigger_urgency}
+                        onCheckedChange={(checked) => updateConfig({ trigger_urgency: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded border">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-3 w-3" />
+                        <span className="text-sm">Escassez</span>
+                      </div>
+                      <Switch
+                        checked={config.trigger_scarcity}
+                        onCheckedChange={(checked) => updateConfig({ trigger_scarcity: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded border">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3 w-3" />
+                        <span className="text-sm">Prova Social</span>
+                      </div>
+                      <Switch
+                        checked={config.trigger_social_proof}
+                        onCheckedChange={(checked) => updateConfig({ trigger_social_proof: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded border">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-3 w-3" />
+                        <span className="text-sm">Autoridade</span>
+                      </div>
+                      <Switch
+                        checked={config.trigger_authority}
+                        onCheckedChange={(checked) => updateConfig({ trigger_authority: checked })}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Objections */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-500" />
+                  <Label className="font-semibold">Tratamento de Objeções ({config.objections.length})</Label>
+                </div>
+
+                {config.objections.length > 0 && (
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {config.objections.map((obj, index) => (
+                      <div key={index} className="p-2 border rounded-lg text-sm">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-xs text-muted-foreground">Objeção:</p>
+                            <p className="truncate">{obj.objection}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => removeObjection(index)}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-2 p-3 border border-dashed rounded-lg">
+                  <Input
+                    placeholder="Objeção do cliente..."
+                    value={newObjection}
+                    onChange={(e) => setNewObjection(e.target.value)}
+                  />
+                  <Textarea
+                    placeholder="Resposta da IA..."
+                    value={newResponse}
+                    onChange={(e) => setNewResponse(e.target.value)}
+                    rows={2}
+                  />
+                  <Button
+                    onClick={addObjection}
+                    disabled={!newObjection.trim() || !newResponse.trim()}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Adicionar Objeção
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Save Button */}
       <div className="flex justify-end">
