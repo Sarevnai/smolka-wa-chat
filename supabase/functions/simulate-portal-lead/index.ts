@@ -128,7 +128,7 @@ Se o cliente demonstrar INTERESSE (quero visitar, tenho interesse, quero conhece
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "openai/gpt-5",
           messages: aiMessages,
           max_tokens: 200
         }),

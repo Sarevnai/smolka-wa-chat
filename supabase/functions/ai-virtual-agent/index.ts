@@ -1572,7 +1572,7 @@ async function callAIWithTools(config: AIAgentConfig, messages: any[], useTools:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: config.ai_model || 'google/gemini-2.5-flash',
+        model: config.ai_model || 'openai/gpt-5',
         messages,
         max_tokens: config.max_tokens || 500,
       }),

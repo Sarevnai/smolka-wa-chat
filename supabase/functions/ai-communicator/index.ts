@@ -211,7 +211,7 @@ Quando o usuário pedir qualquer informação, consulte os dados disponíveis e 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model: 'openai/gpt-5',
       messages,
       functions: [
         {
@@ -635,7 +635,7 @@ Seja específico e prático.`;
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model: 'openai/gpt-5',
       messages: [{ role: 'user', content: prompt }]
     }),
   });
