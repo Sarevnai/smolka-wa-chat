@@ -50,6 +50,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { DeleteTestLeadCard } from "@/components/admin/DeleteTestLeadCard";
 
 export default function LeadsManagement() {
   const [filters, setFilters] = useState<LeadsFilters>({});
@@ -401,6 +402,11 @@ export default function LeadsManagement() {
               Programar Remarketing
             </Button>
           </div>
+        </div>
+
+        {/* Admin Tools */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <DeleteTestLeadCard />
         </div>
       </div>
     </Layout>
