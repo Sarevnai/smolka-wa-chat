@@ -2343,11 +2343,13 @@ async function getConsultativeState(supabase: any, phoneNumber: string): Promise
   pending_properties: any[];
   current_property_index: number;
   awaiting_property_feedback: boolean;
+  awaiting_c2s_confirmation?: boolean;
+  c2s_pending_property?: any;
 } | null> {
   try {
     const { data } = await supabase
       .from('conversation_states')
-      .select('pending_properties, current_property_index, awaiting_property_feedback')
+      .select('pending_properties, current_property_index, awaiting_property_feedback, awaiting_c2s_confirmation, c2s_pending_property')
       .eq('phone_number', phoneNumber)
       .maybeSingle();
     return data;
@@ -2364,6 +2366,8 @@ async function updateConsultativeState(
     pending_properties?: any[];
     current_property_index?: number;
     awaiting_property_feedback?: boolean;
+    awaiting_c2s_confirmation?: boolean;
+    c2s_pending_property?: any | null;
   }
 ): Promise<void> {
   try {
@@ -2378,6 +2382,36 @@ async function updateConsultativeState(
   } catch (error) {
     console.error('❌ Error updating consultative state:', error);
   }
+}
+
+// ========== C2S CONFIRMATION DETECTION ==========
+
+function detectConfirmation(message: string): 'yes' | 'correction' | 'no' | 'unclear' {
+  const lower = message.toLowerCase().trim();
+  
+  const yesPatterns = [
+    /^sim$/i, /^isso$/i, /^correto$/i, /^perfeito$/i, /^pode$/i,
+    /tudo certo/i, /está correto/i, /confirmo/i, /isso mesmo/i,
+    /pode ser/i, /pode sim/i, /isso a[ií]/i, /exato/i, /certinho/i,
+    /^ok$/i, /^blz$/i, /beleza/i, /combinado/i, /fechado/i
+  ];
+  
+  const noPatterns = [
+    /^não$/i, /^nao$/i, /errado/i, /incorreto/i, /cancelar/i,
+    /desistir/i, /deixa\s+pra\s+l[aá]/i, /mudei\s+de\s+ideia/i
+  ];
+  
+  // Check for yes patterns
+  if (yesPatterns.some(p => p.test(lower))) return 'yes';
+  
+  // Check for no patterns
+  if (noPatterns.some(p => p.test(lower))) return 'no';
+  
+  // Check for data correction (user providing new data)
+  if (/meu\s+(telefone|nome|email)/i.test(lower)) return 'correction';
+  if (/^[a-záàâãéèêíïóôõöúç\s]{2,50}$/i.test(lower)) return 'correction'; // Just a name
+  
+  return 'unclear';
 }
 
 // ========== TRIAGE FLOW ==========
@@ -3295,6 +3329,7 @@ serve(async (req) => {
         // Check for consultative flow state (awaiting feedback on property)
         const consultativeState = await getConsultativeState(supabase, phoneNumber);
         const isAwaitingFeedback = consultativeState?.awaiting_property_feedback === true;
+        const isAwaitingC2SConfirmation = consultativeState?.awaiting_c2s_confirmation === true;
         const pendingProperties = consultativeState?.pending_properties || [];
         const currentIndex = consultativeState?.current_property_index || 0;
         
@@ -3302,47 +3337,133 @@ serve(async (req) => {
         const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
         console.log(`📊 Qualification progress:`, qualProgress);
         
-        if (isAwaitingFeedback && pendingProperties.length > 0) {
+        // ===== HANDLE C2S CONFIRMATION FLOW (PRIORITY) =====
+        if (isAwaitingC2SConfirmation) {
+          console.log('📤 Awaiting C2S confirmation - processing response');
+          const confirmation = detectConfirmation(messageContent);
+          const pendingProp = consultativeState?.c2s_pending_property;
+          
+          if (confirmation === 'yes') {
+            // Client confirmed - send to C2S directly
+            console.log('✅ Client confirmed - sending to C2S directly');
+            const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
+            
+            const c2sResult = await sendLeadToC2S(supabase, {
+              nome: existingName || 'Cliente',
+              interesse: `Interesse em ${pendingProp?.tipo || 'imóvel'} - ${pendingProp?.bairro || ''}`,
+              tipo_imovel: pendingProp?.tipo,
+              bairro: pendingProp?.bairro,
+              resumo: `Imóvel código ${pendingProp?.codigo || 'N/A'}`
+            }, phoneNumber, historyText, existingName || undefined);
+            
+            // Clear confirmation state
+            await updateConsultativeState(supabase, phoneNumber, {
+              awaiting_c2s_confirmation: false,
+              c2s_pending_property: null
+            });
+            
+            if (c2sResult.success) {
+              c2sTransferred = true;
+              const nameGreet = existingName ? `, ${existingName}` : '';
+              aiResponse = `Perfeito${nameGreet}! 🎉 Seu interesse foi registrado. Um consultor vai entrar em contato em breve para organizar a visita ao imóvel ${pendingProp?.codigo || ''}.`;
+              console.log('✅ Lead sent to C2S after confirmation');
+            } else {
+              aiResponse = `Ops, tive um probleminha técnico 😅 Mas não se preocupe, vou registrar seu interesse manualmente. Um consultor vai entrar em contato em breve!`;
+            }
+          } else if (confirmation === 'correction') {
+            // Client provided new data (likely their name)
+            const detectedName = extractNameFromMessage(messageContent);
+            if (detectedName) {
+              await saveContactNameMake(supabase, phoneNumber, detectedName);
+              console.log(`📝 Name updated during C2S confirmation: ${detectedName}`);
+              
+              // Now send to C2S with the new name
+              const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
+              const c2sResult = await sendLeadToC2S(supabase, {
+                nome: detectedName,
+                interesse: `Interesse em ${pendingProp?.tipo || 'imóvel'} - ${pendingProp?.bairro || ''}`,
+                tipo_imovel: pendingProp?.tipo,
+                bairro: pendingProp?.bairro,
+                resumo: `Imóvel código ${pendingProp?.codigo || 'N/A'}`
+              }, phoneNumber, historyText, detectedName);
+              
+              await updateConsultativeState(supabase, phoneNumber, {
+                awaiting_c2s_confirmation: false,
+                c2s_pending_property: null
+              });
+              
+              if (c2sResult.success) {
+                c2sTransferred = true;
+                aiResponse = `Perfeito, ${detectedName}! 🎉 Um consultor vai entrar em contato para organizar a visita ao imóvel ${pendingProp?.codigo || ''}.`;
+              }
+            } else {
+              aiResponse = `Desculpa, não entendi 😅 Pode me confirmar seu nome completo?`;
+            }
+          } else if (confirmation === 'no') {
+            // Client declined
+            await updateConsultativeState(supabase, phoneNumber, {
+              awaiting_c2s_confirmation: false,
+              c2s_pending_property: null
+            });
+            aiResponse = `Sem problemas! 😊 Quer que eu continue mostrando outras opções?`;
+          } else {
+            // Unclear - ask again
+            aiResponse = `Só pra confirmar: posso encaminhar seu interesse para um consultor entrar em contato? 😊`;
+          }
+        }
+        // ===== NORMAL FEEDBACK FLOW =====
+        else if (isAwaitingFeedback && pendingProperties.length > 0) {
           // Analyze feedback on previously presented property
           const feedback = analyzePropertyFeedback(messageContent);
           console.log(`📊 Property feedback: ${feedback}`);
           
           if (feedback === 'positive') {
-            // Client interested - trigger C2S flow
-            console.log('✅ Positive feedback - initiating C2S flow');
+            // Client interested - trigger C2S flow DIRECTLY
+            console.log('✅ Positive feedback - initiating DETERMINISTIC C2S flow');
             const currentProperty = pendingProperties[currentIndex];
             
-            // Update state to stop showing more properties
-            await updateConsultativeState(supabase, phoneNumber, {
-              awaiting_property_feedback: false
-            });
+            // Check if we have complete data to send directly
+            const hasCompleteData = !!existingName && existingName.toLowerCase() !== 'lead sem nome';
             
-            // Build context for AI to handle C2S
-            const c2sContext = `
-[CONTEXTO: Cliente demonstrou interesse no imóvel ${currentProperty?.codigo || 'N/A'} - ${currentProperty?.tipo || ''} em ${currentProperty?.bairro || ''}.
-PRÓXIMO PASSO: Confirmar dados do cliente e usar enviar_lead_c2s para transferir.
-LEMBRE: Você NÃO agenda visitas. Diga que um consultor vai entrar em contato.]`;
-            
-            // qualData already loaded above
-            const systemPrompt = getPromptForDepartment(agentConfig, currentDepartment, existingName || undefined, history, qualData);
-            
-            const result = await callOpenAI(systemPrompt, history, messageContent + c2sContext, toolsWithVista);
-            aiResponse = result.content;
-            
-            // Process C2S tool call if triggered
-            for (const toolCall of result.toolCalls) {
-              if (toolCall.function.name === 'enviar_lead_c2s') {
-                const args = JSON.parse(toolCall.function.arguments);
-                const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
-                const c2sResult = await sendLeadToC2S(supabase, args, phoneNumber, historyText, existingName || undefined);
-                
-                if (c2sResult.success) {
-                  c2sTransferred = true;
-                  console.log('✅ Lead sent to C2S after positive feedback');
-                }
+            if (hasCompleteData) {
+              // We have name - send to C2S DIRECTLY (no AI dependency)
+              console.log(`✅ Complete data available - sending to C2S directly for ${existingName}`);
+              const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
+              
+              const c2sResult = await sendLeadToC2S(supabase, {
+                nome: existingName,
+                interesse: `Interesse em ${currentProperty?.tipo || 'imóvel'} - ${currentProperty?.bairro || ''}`,
+                tipo_imovel: currentProperty?.tipo,
+                bairro: currentProperty?.bairro,
+                faixa_preco: currentProperty?.preco_formatado,
+                resumo: `Imóvel código ${currentProperty?.codigo || 'N/A'} - Cliente demonstrou interesse em agendar visita`
+              }, phoneNumber, historyText, existingName);
+              
+              // Update state
+              await updateConsultativeState(supabase, phoneNumber, {
+                awaiting_property_feedback: false
+              });
+              
+              if (c2sResult.success) {
+                c2sTransferred = true;
+                aiResponse = `Perfeito, ${existingName}! 🎉 Um consultor vai entrar em contato para organizar a visita ao imóvel ${currentProperty?.codigo || ''} e tirar todas as suas dúvidas.`;
+                console.log('✅ Lead sent to C2S directly after positive feedback');
+              } else {
+                // Fallback if C2S fails
+                aiResponse = `Ótimo, ${existingName}! 😊 Vou registrar seu interesse. Um consultor entrará em contato em breve!`;
               }
+            } else {
+              // Missing name - ask for it and set confirmation state
+              console.log('⚠️ Missing name - setting C2S confirmation state');
+              
+              await updateConsultativeState(supabase, phoneNumber, {
+                awaiting_property_feedback: false,
+                awaiting_c2s_confirmation: true,
+                c2s_pending_property: currentProperty
+              });
+              
+              aiResponse = `Ótimo! Vou te conectar com um consultor para organizar a visita. 😊 Só preciso confirmar: qual seu nome completo?`;
             }
-            
           } else if (feedback === 'negative' || feedback === 'more_options' || feedback === 'interested_but_more') {
             // ===== PRICE FLEXIBILITY DETECTION (only for pure negative feedback) =====
             if (feedback === 'negative') {
