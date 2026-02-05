@@ -426,3 +426,29 @@ export function containsPropertyUrl(message: string): boolean {
   return /smolkaimoveis\.com\.br\/imovel\//i.test(message) ||
          /vistasoft.*imovel/i.test(message);
 }
+
+// ========== PROPERTY BY LISTING ID ==========
+
+export async function getPropertyByListingId(
+  supabase: any,
+  listingId: string
+): Promise<any | null> {
+  try {
+    console.log(`🏠 Fetching property by listing ID: ${listingId}`);
+    
+    const { data, error } = await supabase.functions.invoke('vista-get-property', {
+      body: { codigo: listingId }
+    });
+    
+    if (error || !data?.success) {
+      console.log(`⚠️ Property not found for listing ID: ${listingId}`, error || data?.error);
+      return null;
+    }
+    
+    console.log(`✅ Found property:`, data.property);
+    return data.property;
+  } catch (e) {
+    console.error(`❌ Error fetching property ${listingId}:`, e);
+    return null;
+  }
+}
