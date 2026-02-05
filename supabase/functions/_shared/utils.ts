@@ -118,3 +118,35 @@ export function detectPriceFlexibility(message: string): { type: 'increase' | 'd
   if (decreaseNoValue.test(lower) && !hasValue) return { type: 'decrease', hasNewValue: false, suggestedQuestion: 'Qual seria o valor máximo ideal pra você? 😊' };
   return { type: 'none', hasNewValue: hasValue, suggestedQuestion: null };
 }
+
+// ========== MESSAGE COMPARISON ==========
+export function isSameMessage(msg1: string | null, msg2: string): boolean {
+  if (!msg1) return false;
+  const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[😊🏠😔🤔💰📍🛏️✅❌👋🙂☺️💡📞🙏✨💭📋👍]/g, '').trim();
+  return normalize(msg1) === normalize(msg2);
+}
+
+// ========== NAME EXTRACTION ==========
+export function extractNameFromMessage(message: string): string | null {
+  if (!message || message.length < 2) return null;
+  const namePatterns = [/(?:meu\s+nome\s+[eé]|me\s+chamo|sou\s+(?:o|a)?)\s*([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)*)/i, /^([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)*)$/];
+  for (const pattern of namePatterns) {
+    const match = message.match(pattern);
+    if (match?.[1] && match[1].length >= 2 && match[1].length <= 50) return match[1].trim();
+  }
+  if (message.length <= 30) {
+    const words = message.trim().split(/\s+/);
+    if (words.length >= 1 && words.length <= 4) {
+      const potentialName = words.filter(w => /^[A-ZÀ-Ú][a-zà-ú]+$/.test(w)).join(' ');
+      if (potentialName.length >= 2) return potentialName;
+    }
+  }
+  return null;
+}
+
+// ========== WAITING SIGNAL DETECTION ==========
+export function isWaitingSignal(message: string): boolean {
+  const lower = message.toLowerCase().trim();
+  const waitingPatterns = [/^(ok|okay|beleza|show|blz|certo|pode|perfeito|bom|ótimo|otimo)$/i, /fico\s+(?:no\s+)?aguardo/i, /aguardando/i, /pode\s+(?:buscar|procurar|mandar|enviar|pesquisar)/i, /vou\s+aguardar/i, /t[aá]\s+bom/i, /^sim$/i, /por\s+favor/i, /manda\s+a[ií]/i, /quero\s+ver/i, /mostra\s+(?:pra|para)\s+mim/i];
+  return waitingPatterns.some(pattern => pattern.test(lower));
+}

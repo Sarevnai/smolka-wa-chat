@@ -195,6 +195,50 @@ export interface FallbackSearchResult {
   relaxedFields: string[];
 }
 
+export interface ExtractedQualificationData {
+  detected_neighborhood?: string;
+  detected_property_type?: string;
+  detected_bedrooms?: number;
+  detected_budget_max?: number;
+  detected_interest?: string;
+}
+
+export interface FlexibilizationResult {
+  detected: boolean;
+  updates: {
+    detected_bedrooms?: number;
+    detected_budget_max?: number;
+    detected_neighborhood?: string;
+    detected_property_type?: string;
+  };
+  fields: string[];
+}
+
+export interface PriceFlexibility {
+  type: 'increase' | 'decrease' | 'none';
+  hasNewValue: boolean;
+  suggestedQuestion: string | null;
+}
+
+export type TriageStage = 'greeting' | 'awaiting_name' | 'awaiting_triage' | 'completed' | null;
+
+export interface EssentialQuestion {
+  id: string;
+  question: string;
+  category: string;
+  isQualifying: boolean;
+  enabled: boolean;
+}
+
+export interface AIBehaviorConfig {
+  id: string;
+  essential_questions: EssentialQuestion[];
+  functions: any[];
+  reengagement_hours: number;
+  send_cold_leads: boolean;
+  require_cpf_for_visit: boolean;
+}
+
 export const defaultConfig: AIAgentConfig = {
   agent_name: 'Helena',
   company_name: 'Smolka Imóveis',
