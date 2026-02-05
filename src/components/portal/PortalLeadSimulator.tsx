@@ -180,10 +180,10 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
 
     try {
       // Step 1: Call real simulation endpoint
-      const step1 = addStep('Chamando IA Nina (modo simulação)...');
+      const step1 = addStep('Chamando Aimee (modo simulação)...');
       updateStep(step1, { status: 'running' });
       
-      addMessage('system', `🧪 Testando Nina com lead REAL`, undefined, 'real');
+      addMessage('system', `🧪 Testando Aimee com lead REAL`, undefined, 'real');
 
       const { data, error } = await supabase.functions.invoke('simulate-portal-lead', {
         body: {
@@ -210,8 +210,8 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       const step2 = addStep('Imóvel encontrado no Vista CRM');
       updateStep(step2, { status: 'completed', details: `${data.property.bairro} - ${data.property.categoria}` });
 
-      // Step 3: Display Nina's generated messages
-      const step3 = addStep('Exibindo respostas da Nina...');
+      // Step 3: Display Aimee's generated messages
+      const step3 = addStep('Exibindo respostas da Aimee...');
       updateStep(step3, { status: 'running' });
 
       // Display each message with delay (like real WhatsApp)
@@ -246,7 +246,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       // Enable conversation mode for testing user responses
       setSimulationPhase('conversation');
       setWaitingForInput(true);
-      addMessage('system', '💬 Digite uma resposta para testar o próximo passo da Nina', undefined, 'real');
+      addMessage('system', '💬 Digite uma resposta para testar o próximo passo da Aimee', undefined, 'real');
 
     } catch (error) {
       console.error('Real AI test error:', error);
@@ -465,7 +465,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       addMessage('bot', `Claro, ${leadConfig.name}! Vou buscar outra opção pra você 🔍`, undefined, 'simulated');
       await delay(1000);
       addMessage('bot', `Olha essa outra opção que separei pra você! 🏠`, undefined, 'simulated');
-      addMessage('system', '🔄 Arya busca imóveis similares no Vista CRM', undefined, 'simulated');
+      addMessage('system', '🔄 Aimee busca imóveis similares no Vista CRM', undefined, 'simulated');
     } else if (lowerMessage.includes('gostei') || lowerMessage.includes('interesse') || lowerMessage.includes('visita') || 
         lowerMessage.includes('conhecer') || lowerMessage.includes('agendar')) {
       // User wants to schedule visit - DETECTED SCHEDULING INTENT
@@ -553,7 +553,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
             </TabsContent>
             <TabsContent value="real" className="mt-2">
               <p className="text-sm text-muted-foreground">
-                Chama a edge function real (simulate-portal-lead) para ver como a Arya responde. 
+                Chama a edge function real (simulate-portal-lead) para ver como a Aimee responde. 
                 <strong className="text-primary"> Não envia mensagens no WhatsApp.</strong>
               </p>
             </TabsContent>
@@ -685,7 +685,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
                 ) : (
                   <>
                     {testMode === 'real' ? <Sparkles className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-                    {testMode === 'real' ? 'Testar IA Arya' : 'Iniciar Simulação'}
+                    {testMode === 'real' ? 'Testar Aimee' : 'Iniciar Simulação'}
                   </>
                 )}
               </Button>
@@ -705,7 +705,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <MessageCircle className="h-5 w-5 text-primary" />
-              {testMode === 'real' ? 'Respostas da Nina (IA Real)' : 'Simulação do WhatsApp'}
+              {testMode === 'real' ? 'Respostas da Aimee (IA Real)' : 'Simulação do WhatsApp'}
             </CardTitle>
             <CardDescription>
               {testMode === 'real' 
@@ -719,7 +719,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
                 {messages.length === 0 ? (
                   <div className="text-center text-muted-foreground py-12">
                     <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>Clique em "{testMode === 'real' ? 'Testar IA Nina' : 'Iniciar Simulação'}" para ver o fluxo</p>
+                    <p>Clique em "{testMode === 'real' ? 'Testar Aimee' : 'Iniciar Simulação'}" para ver o fluxo</p>
                   </div>
                 ) : (
                   messages.map((msg) => (

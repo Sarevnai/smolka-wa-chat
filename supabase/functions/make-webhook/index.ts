@@ -3194,7 +3194,7 @@ serve(async (req) => {
               success: true, 
               routed_to: 'ai-arya-vendas',
               development: devInfo.development_name,
-              result: null // Arya already sent the messages directly
+              result: null // Aimee Vendas already sent the messages directly
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
