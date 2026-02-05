@@ -2929,8 +2929,17 @@ Eles vão resolver sua solicitação rapidinho! 😊`
         .eq('phone_number', phoneNumber)
         .maybeSingle();
 
-      const triageStage = convState?.triage_stage || null;
+      let triageStage = convState?.triage_stage || null;
       console.log(`📍 Current triage stage: ${triageStage || 'none'}`);
+
+      // ========== AUTO-HEAL: Reset stale "completed" stage if no department assigned ==========
+      // This prevents loops where triage_stage is "completed" but conversation has no department
+      if (triageStage === 'completed' && !currentDepartment) {
+        console.log('⚠️ Auto-heal: triage_stage is "completed" but no department assigned. Resetting to "awaiting_triage".');
+        triageStage = 'awaiting_triage';
+        await updateTriageStage(phoneNumber, 'awaiting_triage');
+        // Fall through to the awaiting_triage handler below
+      }
 
       // STAGE: GREETING (first message - no stage yet)
       if (!triageStage || triageStage === 'greeting') {

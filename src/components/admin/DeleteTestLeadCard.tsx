@@ -24,6 +24,7 @@ export function DeleteTestLeadCard() {
   const [deletionResult, setDeletionResult] = useState<{
     success: boolean;
     deleted: Record<string, number>;
+    phoneVariations?: string[];
   } | null>(null);
 
   const formatPhone = (value: string) => {
@@ -61,6 +62,7 @@ export function DeleteTestLeadCard() {
         setDeletionResult({
           success: true,
           deleted: deletedCounts,
+          phoneVariations: data.phone_variations_checked as string[] | undefined,
         });
 
         const totalDeleted = Object.values(deletedCounts).reduce(
@@ -107,10 +109,10 @@ export function DeleteTestLeadCard() {
               placeholder="5548999999999"
               value={phone}
               onChange={handlePhoneChange}
-              disabled={isLoading}
+            disabled={isLoading}
             />
             <p className="text-xs text-muted-foreground">
-              Formato: código do país + DDD + número (apenas números)
+              O sistema busca automaticamente todas as variações (com/sem 55, com/sem o 9 após o DDD)
             </p>
           </div>
 
@@ -134,12 +136,24 @@ export function DeleteTestLeadCard() {
           </Button>
 
           {deletionResult && deletionResult.success && (
-            <div className="rounded-lg border border-border bg-muted/50 p-4">
+            <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
               <div className="flex items-center gap-2 text-primary">
                 <CheckCircle2 className="h-5 w-5" />
                 <span className="font-medium">Exclusão concluída</span>
               </div>
-              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+              
+              {deletionResult.phoneVariations && deletionResult.phoneVariations.length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium">Variações verificadas:</span>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {deletionResult.phoneVariations.map((v) => (
+                      <code key={v} className="rounded bg-muted px-1.5 py-0.5">{v}</code>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <ul className="space-y-1 text-sm text-muted-foreground">
                 {Object.entries(deletionResult.deleted).map(([table, count]) => (
                   <li key={table}>
                     • {table}: {count} registro(s)
