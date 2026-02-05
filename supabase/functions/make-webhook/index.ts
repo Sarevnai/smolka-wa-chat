@@ -1457,6 +1457,23 @@ function analyzePropertyFeedback(message: string): 'positive' | 'negative' | 'mo
     /quero\s+saber\s+mais\s+(?:sobre\s+)?esse/i,
     /lindo/i,
     /maravilh/i,
+    // ===== NEW: Confirmação simples de interesse =====
+    /^sim$/i,                           // "sim" sozinho
+    /^sim[,.]?\s/i,                     // "sim, ..." ou "sim ..."
+    /^faz$/i,                           // "faz" sozinho (faz sentido)
+    /^faz\s+sentido/i,                  // "faz sentido"
+    /^pode\s*sim/i,                     // "pode sim", "podesim"
+    /^pode$/i,                          // "pode" sozinho
+    /^isso$/i,                          // "isso" sozinho
+    /^isso\s+mesmo/i,                   // "isso mesmo"
+    /^bora$/i,                          // "bora" (vamos)
+    /^vamos$/i,                         // "vamos"
+    /^beleza$/i,                        // "beleza"
+    /^show$/i,                          // "show"
+    /^top$/i,                           // "top"
+    /faz\s+sentido\s+sim/i,             // "faz sentido sim"
+    /quero\s+(?:sim|agendar|visitar)/i, // "quero sim", "quero agendar"
+    /gostaria\s+(?:de\s+)?(?:visitar|agendar|conhecer)/i, // "gostaria de visitar"
   ];
   
   // Feedback negativo (rejeição real)
