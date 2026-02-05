@@ -2,176 +2,157 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* tweakcn Theme - OKLCH Color System */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 211 10% 11%;
+    --background: oklch(0.9232 0.0026 48.7171);
+    --foreground: oklch(0.2795 0.0368 260.0310);
 
-    --card: 0 0% 100%;
-    --card-foreground: 211 10% 11%;
+    --card: oklch(0.9699 0.0013 106.4238);
+    --card-foreground: oklch(0.2795 0.0368 260.0310);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 211 10% 11%;
+    --popover: oklch(0.9699 0.0013 106.4238);
+    --popover-foreground: oklch(0.2795 0.0368 260.0310);
 
-    /* WhatsApp Web exact colors */
-    --primary: 144 79% 33%;
-    --primary-foreground: 0 0% 100%;
-    --primary-glow: 144 79% 38%;
+    --primary: oklch(0.2704 0.0998 274.4487);
+    --primary-foreground: oklch(1.0000 0 0);
 
-    --secondary: 200 20% 95%;
-    --secondary-foreground: 211 10% 11%;
+    --secondary: oklch(0.8687 0.0043 56.3660);
+    --secondary-foreground: oklch(0.4461 0.0263 256.8018);
 
-    --muted: 200 20% 94%;
-    --muted-foreground: 211 10% 40%;
+    --muted: oklch(0.9232 0.0026 48.7171);
+    --muted-foreground: oklch(0.5510 0.0234 264.3637);
 
-    --accent: 144 79% 96%;
-    --accent-foreground: 144 79% 15%;
+    --accent: oklch(0.6670 0.0528 321.8050);
+    --accent-foreground: oklch(0.3729 0.0306 259.7328);
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: oklch(0.6368 0.2078 25.3313);
+    --destructive-foreground: oklch(1.0000 0 0);
 
-    --border: 200 20% 91%;
-    --input: 200 20% 94%;
-    --ring: 144 79% 33%;
+    --border: oklch(0.8687 0.0043 56.3660);
+    --input: oklch(0.8687 0.0043 56.3660);
+    --ring: oklch(0.5854 0.2041 277.1173);
 
-    /* WhatsApp Web message colors */
-    --message-outbound: 82 59% 85%;
-    --message-inbound: 0 0% 100%;
-    --message-text-outbound: 0 0% 13%;
-    --message-text-inbound: 0 0% 13%;
+    /* Chart colors */
+    --chart-1: oklch(0.5854 0.2041 277.1173);
+    --chart-2: oklch(0.5106 0.2301 276.9656);
+    --chart-3: oklch(0.4568 0.2146 277.0229);
+    --chart-4: oklch(0.3984 0.1773 277.3662);
+    --chart-5: oklch(0.3588 0.1354 278.6973);
 
-    /* WhatsApp Web sidebar */
-    --sidebar-background: 200 20% 94%;
-    --sidebar-header: 144 79% 33%;
-    --sidebar-foreground: 211 10% 11%;
-    --sidebar-primary: 144 79% 33%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 200 20% 90%;
-    --sidebar-accent-foreground: 211 10% 11%;
-    --sidebar-border: 200 20% 89%;
-    --sidebar-ring: 144 79% 33%;
+    /* Message colors - adapted to theme */
+    --message-outbound: oklch(0.85 0.08 277);
+    --message-inbound: oklch(0.97 0.01 106);
+    --message-text-outbound: oklch(0.2795 0.0368 260.0310);
+    --message-text-inbound: oklch(0.2795 0.0368 260.0310);
 
-    /* WhatsApp Web chat area */
-    --chat-background: 45 8% 93%;
-    --chat-header: 0 0% 100%;
+    /* Sidebar */
+    --sidebar-background: oklch(0.8687 0.0043 56.3660);
+    --sidebar-foreground: oklch(0.2795 0.0368 260.0310);
+    --sidebar-primary: oklch(0.5854 0.2041 277.1173);
+    --sidebar-primary-foreground: oklch(1.0000 0 0);
+    --sidebar-accent: oklch(0.9376 0.0260 321.9388);
+    --sidebar-accent-foreground: oklch(0.3729 0.0306 259.7328);
+    --sidebar-border: oklch(0.8687 0.0043 56.3660);
+    --sidebar-ring: oklch(0.5854 0.2041 277.1173);
+
+    /* Chat area */
+    --chat-background: oklch(0.9232 0.0026 48.7171);
+    --chat-header: oklch(0.9699 0.0013 106.4238);
     --chat-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e5ddd5' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 
-    --radius: 0.5rem;
+    /* Design tokens */
+    --radius: 1.25rem;
+    --font-sans: 'Bricolage Grotesque', ui-sans-serif, sans-serif, system-ui;
+    --font-serif: 'Castoro', ui-serif, serif;
+    --font-mono: 'Sometype Mono', ui-monospace, monospace;
+
+    /* Shadow system */
+    --shadow-color: hsl(240 4% 60%);
+    --shadow-2xs: 2px 2px 10px 4px hsl(240 4% 60% / 0.09);
+    --shadow-xs: 2px 2px 10px 4px hsl(240 4% 60% / 0.09);
+    --shadow-sm: 2px 2px 10px 4px hsl(240 4% 60% / 0.18), 2px 1px 2px 3px hsl(240 4% 60% / 0.18);
+    --shadow: 2px 2px 10px 4px hsl(240 4% 60% / 0.18), 2px 1px 2px 3px hsl(240 4% 60% / 0.18);
+    --shadow-md: 2px 2px 10px 4px hsl(240 4% 60% / 0.18), 2px 2px 4px 3px hsl(240 4% 60% / 0.18);
+    --shadow-lg: 2px 2px 10px 4px hsl(240 4% 60% / 0.18), 2px 4px 6px 3px hsl(240 4% 60% / 0.18);
+    --shadow-xl: 2px 2px 10px 4px hsl(240 4% 60% / 0.18), 2px 8px 10px 3px hsl(240 4% 60% / 0.18);
+    --shadow-2xl: 2px 2px 10px 4px hsl(240 4% 60% / 0.45);
+    --shadow-message: 0 1px 0.5px oklch(0 0 0 / 0.13);
 
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    
-    /* Shadows */
-    --shadow-message: 0 1px 0.5px hsl(0 0% 0% / 0.13);
-
-    /* === GOLD SAAS THEME === */
-    --gold-primary: 45 79% 53%;
-    --gold-accent: 48 88% 69%;
-    --gold-dark: 45 73% 41%;
-    --gold-light: 45 79% 93%;
-    
-    --neutral-900: 0 0% 10%;
-    --neutral-800: 0 0% 15%;
-    --neutral-700: 0 0% 25%;
-    --neutral-600: 0 0% 35%;
-    --neutral-500: 0 0% 45%;
-    --neutral-400: 0 0% 60%;
-    --neutral-300: 0 0% 75%;
-    --neutral-200: 0 0% 88%;
-    --neutral-100: 0 0% 95%;
-    
-    --surface-primary: 210 17% 98%;
-    --surface-secondary: 0 0% 100%;
-    --surface-sidebar: 0 0% 98%;
-    --surface-elevated: 0 0% 100%;
-    
-    --success-modern: 142 71% 45%;
-    --warning-modern: 38 92% 50%;
-    --error-modern: 0 84% 60%;
-    --info-modern: 221 83% 53%;
+    --tracking-normal: 0em;
+    --spacing: 0.25rem;
   }
 
   .dark {
-    --background: 17 20% 9%;
-    --foreground: 0 0% 85%;
+    --background: oklch(0.2244 0.0074 67.4370);
+    --foreground: oklch(0.9288 0.0126 255.5078);
 
-    --card: 17 20% 11%;
-    --card-foreground: 0 0% 85%;
+    --card: oklch(0.2801 0.0080 59.3379);
+    --card-foreground: oklch(0.9288 0.0126 255.5078);
 
-    --popover: 17 20% 11%;
-    --popover-foreground: 0 0% 85%;
+    --popover: oklch(0.2801 0.0080 59.3379);
+    --popover-foreground: oklch(0.9288 0.0126 255.5078);
 
-    --primary: 144 79% 38%;
-    --primary-foreground: 0 0% 100%;
-    --primary-glow: 144 79% 43%;
+    --primary: oklch(0.6801 0.1583 276.9349);
+    --primary-foreground: oklch(0.2244 0.0074 67.4370);
 
-    --secondary: 17 20% 15%;
-    --secondary-foreground: 0 0% 75%;
+    --secondary: oklch(0.3359 0.0077 59.4197);
+    --secondary-foreground: oklch(0.8717 0.0093 258.3382);
 
-    --muted: 17 20% 13%;
-    --muted-foreground: 0 0% 60%;
+    --muted: oklch(0.2287 0.0074 67.4469);
+    --muted-foreground: oklch(0.7137 0.0192 261.3246);
 
-    --accent: 144 79% 15%;
-    --accent-foreground: 144 79% 75%;
+    --accent: oklch(0.3896 0.0074 59.4734);
+    --accent-foreground: oklch(0.8717 0.0093 258.3382);
 
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: oklch(0.6368 0.2078 25.3313);
+    --destructive-foreground: oklch(0.2244 0.0074 67.4370);
 
-    --border: 17 20% 20%;
-    --input: 17 20% 15%;
-    --ring: 144 79% 38%;
+    --border: oklch(0.3359 0.0077 59.4197);
+    --input: oklch(0.3359 0.0077 59.4197);
+    --ring: oklch(0.6801 0.1583 276.9349);
 
-    /* WhatsApp Web Dark message colors */
-    --message-outbound: 144 79% 15%;
-    --message-inbound: 17 20% 11%;
-    --message-text-outbound: 0 0% 90%;
-    --message-text-inbound: 0 0% 90%;
+    /* Chart colors */
+    --chart-1: oklch(0.6801 0.1583 276.9349);
+    --chart-2: oklch(0.5854 0.2041 277.1173);
+    --chart-3: oklch(0.5106 0.2301 276.9656);
+    --chart-4: oklch(0.4568 0.2146 277.0229);
+    --chart-5: oklch(0.3984 0.1773 277.3662);
 
-    /* WhatsApp Web Dark sidebar */
-    --sidebar-background: 17 20% 11%;
-    --sidebar-header: 144 79% 38%;
-    --sidebar-foreground: 0 0% 85%;
-    --sidebar-primary: 144 79% 38%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 17 20% 15%;
-    --sidebar-accent-foreground: 0 0% 85%;
-    --sidebar-border: 17 20% 18%;
-    --sidebar-ring: 144 79% 38%;
+    /* Message colors - dark mode */
+    --message-outbound: oklch(0.35 0.10 277);
+    --message-inbound: oklch(0.28 0.008 59);
+    --message-text-outbound: oklch(0.9288 0.0126 255.5078);
+    --message-text-inbound: oklch(0.9288 0.0126 255.5078);
 
-    /* WhatsApp Web Dark chat area */
-    --chat-background: 17 20% 7%;
-    --chat-header: 17 20% 11%;
+    /* Sidebar */
+    --sidebar-background: oklch(0.3359 0.0077 59.4197);
+    --sidebar-foreground: oklch(0.9288 0.0126 255.5078);
+    --sidebar-primary: oklch(0.6801 0.1583 276.9349);
+    --sidebar-primary-foreground: oklch(0.2244 0.0074 67.4370);
+    --sidebar-accent: oklch(0.3896 0.0074 59.4734);
+    --sidebar-accent-foreground: oklch(0.8717 0.0093 258.3382);
+    --sidebar-border: oklch(0.3359 0.0077 59.4197);
+    --sidebar-ring: oklch(0.6801 0.1583 276.9349);
+
+    /* Chat area */
+    --chat-background: oklch(0.2244 0.0074 67.4370);
+    --chat-header: oklch(0.2801 0.0080 59.3379);
     --chat-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 
-    /* === GOLD SAAS THEME DARK === */
-    --gold-primary: 45 79% 58%;
-    --gold-accent: 48 88% 74%;
-    --gold-dark: 45 73% 36%;
-    --gold-light: 45 79% 23%;
-    
-    --neutral-900: 0 0% 95%;
-    --neutral-800: 0 0% 88%;
-    --neutral-700: 0 0% 75%;
-    --neutral-600: 0 0% 60%;
-    --neutral-500: 0 0% 45%;
-    --neutral-400: 0 0% 35%;
-    --neutral-300: 0 0% 25%;
-    --neutral-200: 0 0% 15%;
-    --neutral-100: 0 0% 12%;
-    
-    --surface-primary: 17 20% 9%;
-    --surface-secondary: 17 20% 11%;
-    --surface-sidebar: 17 20% 11%;
-    --surface-elevated: 17 20% 13%;
-    
-    --success-modern: 142 71% 50%;
-    --warning-modern: 38 92% 55%;
-    --error-modern: 0 84% 65%;
-    --info-modern: 221 83% 58%;
+    /* Shadow system - dark mode */
+    --shadow-color: hsl(0 0% 0%);
+    --shadow-2xs: 2px 2px 10px 4px hsl(0 0% 0% / 0.09);
+    --shadow-xs: 2px 2px 10px 4px hsl(0 0% 0% / 0.09);
+    --shadow-sm: 2px 2px 10px 4px hsl(0 0% 0% / 0.18), 2px 1px 2px 3px hsl(0 0% 0% / 0.18);
+    --shadow: 2px 2px 10px 4px hsl(0 0% 0% / 0.18), 2px 1px 2px 3px hsl(0 0% 0% / 0.18);
+    --shadow-md: 2px 2px 10px 4px hsl(0 0% 0% / 0.18), 2px 2px 4px 3px hsl(0 0% 0% / 0.18);
+    --shadow-lg: 2px 2px 10px 4px hsl(0 0% 0% / 0.18), 2px 4px 6px 3px hsl(0 0% 0% / 0.18);
+    --shadow-xl: 2px 2px 10px 4px hsl(0 0% 0% / 0.18), 2px 8px 10px 3px hsl(0 0% 0% / 0.18);
+    --shadow-2xl: 2px 2px 10px 4px hsl(0 0% 0% / 0.45);
   }
 }
 
@@ -182,6 +163,7 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
 }
 
@@ -209,10 +191,10 @@ All colors MUST be HSL.
   
   @keyframes node-pulse {
     0%, 100% {
-      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+      box-shadow: 0 0 0 0 oklch(0.5854 0.2041 277 / 0.5);
     }
     50% {
-      box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+      box-shadow: 0 0 0 8px oklch(0.5854 0.2041 277 / 0);
     }
   }
 }
