@@ -50,7 +50,7 @@ export default function AIUnifiedConfig() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Minha IA</span>
+                <span className="text-muted-foreground">Minha Aimee</span>
                 <span className="text-muted-foreground">/</span>
                 <h1 className="text-2xl font-bold tracking-tight">Configuração</h1>
               </div>
