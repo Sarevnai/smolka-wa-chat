@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { LogOut, User, Crown, Settings, Puzzle, Keyboard } from "lucide-react";
-import monogramaLogo from "@/assets/monograma-logo.png";
+
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -63,7 +63,6 @@ export default function Layout({
               <div className="flex items-center space-x-3">
                 <SidebarTrigger />
                 <div className="flex items-center space-x-2">
-                  <img src={monogramaLogo} alt="Smolka Logo" className="h-6 w-6" />
                   <h1 className="text-lg font-bold text-foreground hidden sm:block">Central de atendimento</h1>
                 </div>
               </div>
