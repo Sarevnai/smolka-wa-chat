@@ -60,23 +60,40 @@ export function extractQualificationData(message: string): ExtractedQualificatio
     }
   }
   
-  // ===== DETECT PROPERTY TYPE =====
-  const typePatterns = [
+  // ===== DETECT PROPERTY TYPE (with correction detection) =====
+  // Priority 1: Commercial types (explicit mentions take precedence)
+  const commercialPatterns = [
+    { pattern: /\b(sala\s+comercial|ponto\s+comercial|loja|sala|comercial|escrit[oó]rio)\b/i, value: 'Comercial' }
+  ];
+  
+  // Priority 2: Other property types
+  const residentialPatterns = [
     { pattern: /\b(apartamento|apto|ap)\b/i, value: 'Apartamento' },
     { pattern: /\b(casa)\b/i, value: 'Casa' },
     { pattern: /\b(kitnet|kit|kitnete)\b/i, value: 'Kitnet' },
     { pattern: /\b(studio|est[úu]dio)\b/i, value: 'Studio' },
     { pattern: /\b(cobertura)\b/i, value: 'Cobertura' },
     { pattern: /\b(sobrado)\b/i, value: 'Sobrado' },
-    { pattern: /\b(terreno|lote)\b/i, value: 'Terreno' },
-    { pattern: /\b(comercial|loja|sala|ponto)\b/i, value: 'Comercial' }
+    { pattern: /\b(terreno|lote)\b/i, value: 'Terreno' }
   ];
   
-  for (const { pattern, value } of typePatterns) {
+  // Check for commercial first (higher priority)
+  for (const { pattern, value } of commercialPatterns) {
     if (pattern.test(lower)) {
       data.detected_property_type = value;
-      console.log(`🏠 Detected property type: "${value}"`);
+      console.log(`🏠 Detected property type (commercial priority): "${value}"`);
       break;
+    }
+  }
+  
+  // Only check residential if no commercial detected
+  if (!data.detected_property_type) {
+    for (const { pattern, value } of residentialPatterns) {
+      if (pattern.test(lower)) {
+        data.detected_property_type = value;
+        console.log(`🏠 Detected property type: "${value}"`);
+        break;
+      }
     }
   }
   
@@ -151,13 +168,135 @@ export function extractQualificationData(message: string): ExtractedQualificatio
   return data;
 }
 
+// ========== CORRECTION DETECTION ==========
+// Detects when user explicitly corrects previous information
+
+export interface CorrectionResult {
+  detected: boolean;
+  fieldsToUpdate: string[];
+  corrections: ExtractedQualificationData;
+}
+
+export function detectCorrection(message: string, existingData: any): CorrectionResult {
+  const lower = message.toLowerCase();
+  const result: CorrectionResult = {
+    detected: false,
+    fieldsToUpdate: [],
+    corrections: {}
+  };
+  
+  // ===== PATTERN 1: Explicit negation of property type =====
+  // "não busco casa", "não é casa", "não quero casa", "não procuro apartamento"
+  const negationPatterns = [
+    /n[aã]o\s+(?:busco|quero|procuro|é|eh|preciso\s+de)\s+(casa|apartamento|apto|kitnet|studio|cobertura|sobrado)/i,
+    /(?:casa|apartamento|apto|kitnet|studio|cobertura|sobrado)\s+n[aã]o/i,
+    /(?:nada\s+de|sem)\s+(casa|apartamento|apto|kitnet|studio|cobertura|sobrado)/i
+  ];
+  
+  for (const pattern of negationPatterns) {
+    if (pattern.test(lower)) {
+      console.log(`🔄 Correction detected: user is negating a property type`);
+      result.detected = true;
+      result.fieldsToUpdate.push('detected_property_type');
+      break;
+    }
+  }
+  
+  // ===== PATTERN 2: Explicit correction with "busco" + new type =====
+  // "busco sala comercial", "procuro escritório", "quero loja"
+  const correctionPhrases = [
+    /(?:busco|procuro|quero|preciso\s+de?)\s+(?:uma?\s+)?(sala\s+comercial|sala|loja|ponto\s+comercial|comercial|escrit[oó]rio)/i,
+    /(?:busco|procuro|quero|preciso\s+de?)\s+(?:uma?\s+)?(apartamento|apto|casa|kitnet|studio|cobertura|sobrado|terreno)/i
+  ];
+  
+  const typeMap: Record<string, string> = {
+    'sala comercial': 'Comercial',
+    'sala': 'Comercial',
+    'loja': 'Comercial',
+    'ponto comercial': 'Comercial',
+    'comercial': 'Comercial',
+    'escritório': 'Comercial',
+    'escritorio': 'Comercial',
+    'apartamento': 'Apartamento',
+    'apto': 'Apartamento',
+    'casa': 'Casa',
+    'kitnet': 'Kitnet',
+    'studio': 'Studio',
+    'cobertura': 'Cobertura',
+    'sobrado': 'Sobrado',
+    'terreno': 'Terreno'
+  };
+  
+  for (const pattern of correctionPhrases) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const newType = typeMap[match[1].toLowerCase()];
+      if (newType && existingData?.detected_property_type && existingData.detected_property_type !== newType) {
+        console.log(`🔄 Correction detected: changing property type from "${existingData.detected_property_type}" to "${newType}"`);
+        result.detected = true;
+        result.fieldsToUpdate.push('detected_property_type');
+        result.corrections.detected_property_type = newType;
+      } else if (newType && !existingData?.detected_property_type) {
+        // Not a correction, but new data - still capture it
+        result.corrections.detected_property_type = newType;
+      }
+      break;
+    }
+  }
+  
+  // ===== PATTERN 3: "na verdade", "corrijo", "errei" patterns =====
+  const explicitCorrectionPatterns = [
+    /(?:na\s+verdade|corrig(?:indo|o)|errei|me\s+enganei|desculpa|desculpe)/i
+  ];
+  
+  for (const pattern of explicitCorrectionPatterns) {
+    if (pattern.test(lower)) {
+      console.log(`🔄 Explicit correction phrase detected`);
+      result.detected = true;
+      // When user explicitly corrects, we should re-extract and force update
+      break;
+    }
+  }
+  
+  // ===== PATTERN 4: Budget correction =====
+  // "até X" when budget already exists suggests correction
+  const budgetCorrectionMatch = message.match(/(?:até|ate|máximo|maximo|no\s+máximo)\s*(?:r\$\s*)?(\d{1,3}(?:[.,]\d{3})*)/i);
+  if (budgetCorrectionMatch && existingData?.detected_budget_max) {
+    let rawValue = budgetCorrectionMatch[1];
+    let value = parseFloat(rawValue.replace(/\./g, '').replace(',', '.'));
+    if (/mil|k/i.test(message) && value < 1000) value *= 1000;
+    
+    if (value !== existingData.detected_budget_max && value >= 500) {
+      console.log(`🔄 Budget correction detected: from R$ ${existingData.detected_budget_max} to R$ ${value}`);
+      result.detected = true;
+      result.fieldsToUpdate.push('detected_budget_max');
+      result.corrections.detected_budget_max = value;
+    }
+  }
+  
+  // ===== PATTERN 5: Bedroom correction =====
+  const bedroomCorrectionMatch = message.match(/(?:na\s+verdade|preciso\s+de|quero|busco)\s*(\d+)\s*(?:quartos?|qtos?)/i);
+  if (bedroomCorrectionMatch && existingData?.detected_bedrooms) {
+    const newBedrooms = parseInt(bedroomCorrectionMatch[1]);
+    if (newBedrooms !== existingData.detected_bedrooms && newBedrooms >= 1 && newBedrooms <= 10) {
+      console.log(`🔄 Bedrooms correction detected: from ${existingData.detected_bedrooms} to ${newBedrooms}`);
+      result.detected = true;
+      result.fieldsToUpdate.push('detected_bedrooms');
+      result.corrections.detected_bedrooms = newBedrooms;
+    }
+  }
+  
+  return result;
+}
+
 // ========== UPDATE QUALIFICATION DATA ==========
 
 export async function updateQualificationData(
   supabase: any, 
   phoneNumber: string, 
   newData: ExtractedQualificationData,
-  forceUpdate: boolean = false
+  forceUpdate: boolean = false,
+  originalMessage?: string
 ): Promise<void> {
   try {
     const { data: existing } = await supabase
@@ -169,19 +308,58 @@ export async function updateQualificationData(
     if (existing) {
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };
       
-      if (newData.detected_neighborhood && (forceUpdate || !existing.detected_neighborhood)) {
+      // Check for corrections if we have the original message
+      let correctionResult: CorrectionResult | null = null;
+      if (originalMessage) {
+        correctionResult = detectCorrection(originalMessage, existing);
+        if (correctionResult.detected) {
+          console.log(`🔄 Correction detected, fields to force update: ${correctionResult.fieldsToUpdate.join(', ')}`);
+        }
+      }
+      
+      // Helper to check if field should be updated
+      const shouldUpdate = (field: string, newValue: any, existingValue: any): boolean => {
+        if (!newValue) return false;
+        if (forceUpdate) return true;
+        if (!existingValue) return true;
+        if (correctionResult?.fieldsToUpdate.includes(field)) return true;
+        if (correctionResult?.corrections[field as keyof ExtractedQualificationData]) return true;
+        return false;
+      };
+      
+      // Apply corrections first
+      if (correctionResult?.corrections.detected_property_type) {
+        updates.detected_property_type = correctionResult.corrections.detected_property_type;
+        // Clear bedrooms if switching to commercial (commercial doesn't have bedrooms)
+        if (correctionResult.corrections.detected_property_type === 'Comercial') {
+          updates.detected_bedrooms = null;
+          console.log(`🔄 Clearing bedrooms since property is now Commercial`);
+        }
+      }
+      if (correctionResult?.corrections.detected_budget_max) {
+        updates.detected_budget_max = correctionResult.corrections.detected_budget_max;
+      }
+      if (correctionResult?.corrections.detected_bedrooms) {
+        updates.detected_bedrooms = correctionResult.corrections.detected_bedrooms;
+      }
+      
+      // Then apply new data with the shouldUpdate logic
+      if (shouldUpdate('detected_neighborhood', newData.detected_neighborhood, existing.detected_neighborhood)) {
         updates.detected_neighborhood = newData.detected_neighborhood;
       }
-      if (newData.detected_property_type && (forceUpdate || !existing.detected_property_type)) {
+      if (shouldUpdate('detected_property_type', newData.detected_property_type, existing.detected_property_type) && 
+          !updates.detected_property_type) {
         updates.detected_property_type = newData.detected_property_type;
       }
-      if (newData.detected_bedrooms && (forceUpdate || !existing.detected_bedrooms)) {
+      if (shouldUpdate('detected_bedrooms', newData.detected_bedrooms, existing.detected_bedrooms) && 
+          !updates.hasOwnProperty('detected_bedrooms')) {
         updates.detected_bedrooms = newData.detected_bedrooms;
       }
-      if (newData.detected_budget_max && (forceUpdate || !existing.detected_budget_max)) {
+      if (shouldUpdate('detected_budget_max', newData.detected_budget_max, existing.detected_budget_max) &&
+          !updates.detected_budget_max) {
         updates.detected_budget_max = newData.detected_budget_max;
       }
-      if (newData.detected_interest && (forceUpdate || !existing.detected_interest)) {
+      if (shouldUpdate('detected_interest', newData.detected_interest, existing.detected_interest)) {
         updates.detected_interest = newData.detected_interest;
       }
       
