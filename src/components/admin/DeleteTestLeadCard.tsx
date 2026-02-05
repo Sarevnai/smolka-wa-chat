@@ -47,7 +47,7 @@ export function DeleteTestLeadCard() {
 
     try {
       const { data, error } = await supabase.functions.invoke("delete-lead", {
-        body: { phone },
+        body: { phone_number: phone },
       });
 
       if (error) throw error;
