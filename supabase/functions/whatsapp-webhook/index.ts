@@ -450,7 +450,7 @@ async function detectDevelopmentFromMessage(messageBody: string): Promise<{
 
 /**
  * 🏗️ Check if a phone number has a recent lead from a landing page with development_id
- * Used to route to ai-arya-vendas (Aimee de Vendas for empreendimentos)
+ * Used to route to Aimee de Vendas (for empreendimentos)
  */
 async function checkDevelopmentLead(phoneNumber: string): Promise<{
   development_id: string;
@@ -552,7 +552,7 @@ async function checkMarketingCampaignSource(phoneNumber: string): Promise<{
 
 /**
  * Find an existing active conversation for this phone number, or create a new one.
- * New conversations start with department_code = NULL (pending triage by Nina).
+ * New conversations start with department_code = NULL (pending triage by Aimee).
  * If the phone comes from a recent campaign, inherit the campaign's department.
  */
 async function findOrCreateConversation(phoneNumber: string): Promise<ConversationRecord | null> {
@@ -649,7 +649,7 @@ async function updateConversationTimestamp(conversationId: string) {
 }
 
 /**
- * Assign department to conversation after Nina's triage
+ * Assign department to conversation after Aimee's triage
  * Also syncs the department_code to the contact for proper RLS filtering
  */
 async function assignDepartmentToConversation(
@@ -1088,7 +1088,7 @@ async function processIncomingMessage(message: any, value: any) {
       }
       
       // ========== FASE 3: FLOW BUILDER EXECUTION (TEMPORARIAMENTE DESATIVADO) ==========
-      // Desativado para permitir que a Nina responda diretamente
+      // Desativado para permitir que a Aimee responda diretamente
       // TODO: Reativar quando o FlowBuilder estiver pronto para produção
       /*
       if (conversation?.department_code) {
@@ -1261,14 +1261,14 @@ async function handleN8NTrigger(
         // If only 1 message exists (the current one), keep history empty = isFirstMessage = true
       }
 
-      // Route to ai-arya-vendas
-      console.log(`📤 Sending to ai-arya-vendas:`, {
+      // Route to Aimee Vendas
+      console.log(`📤 Sending to Aimee Vendas:`, {
         phone: phoneNumber,
         development: developmentLead.development_name,
         historyCount: conversationHistory.length
       });
 
-      const { data: aryaResult, error: aryaError } = await supabase.functions.invoke('ai-arya-vendas', {
+      const { data: vendasResult, error: vendasError } = await supabase.functions.invoke('ai-vendas', {
         body: {
           phone_number: phoneNumber,
           message: messageBody,
@@ -1278,13 +1278,13 @@ async function handleN8NTrigger(
         }
       });
 
-      if (aryaError) {
-        console.error('❌ Error calling ai-arya-vendas:', aryaError);
+      if (vendasError) {
+        console.error('❌ Error calling Aimee Vendas:', vendasError);
       } else {
-        console.log('✅ ai-arya-vendas response:', aryaResult);
+        console.log('✅ Aimee Vendas response:', vendasResult);
         
         // Handle C2S transfer notification
-        if (aryaResult?.c2s_transferred) {
+        if (vendasResult?.c2s_transferred) {
           console.log('🔄 Lead transferred to C2S');
           
           // Update portal_leads_log with CRM status

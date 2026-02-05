@@ -120,7 +120,7 @@ verify_jwt = false
 [functions.ai-reengagement]
 verify_jwt = false
 
-[functions.ai-arya-vendas]
+[functions.ai-vendas]
 verify_jwt = false
 
 [functions.landing-page-webhook]

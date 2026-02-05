@@ -3159,11 +3159,11 @@ serve(async (req) => {
       const devNameLower = (devInfo.development_name || '').toLowerCase();
       
       if (DIRECT_API_DEVELOPMENTS.some(d => devNameLower.includes(d))) {
-        console.log(`🔄 Routing ${devInfo.development_name} lead to ai-arya-vendas via internal call`);
+        console.log(`🔄 Routing ${devInfo.development_name} lead to Aimee Vendas via internal call`);
         
-        // Call ai-arya-vendas to generate response for this development lead
+        // Call Aimee Vendas to generate response for this development lead
         try {
-          const { data: aryaResult, error: aryaError } = await supabase.functions.invoke('ai-arya-vendas', {
+          const { data: vendasResult, error: vendasError } = await supabase.functions.invoke('ai-vendas', {
             body: {
               phone_number: phoneNumber,
               message: messageContent,
@@ -3173,33 +3173,33 @@ serve(async (req) => {
             }
           });
 
-          if (aryaError) {
-            console.error(`❌ ai-arya-vendas error:`, aryaError);
+          if (vendasError) {
+            console.error(`❌ Aimee Vendas error:`, vendasError);
             return new Response(
               JSON.stringify({ 
                 success: false, 
-                error: 'ai-arya-vendas failed', 
+                error: 'ai-vendas failed', 
                 result: null 
               }),
               { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
 
-          console.log(`✅ ai-arya-vendas responded for ${devInfo.development_name}`);
+          console.log(`✅ Aimee Vendas responded for ${devInfo.development_name}`);
           
           // Return response in format Make.com expects
-          // ai-arya-vendas sends messages directly, so we return success with no result for Make
+          // Aimee Vendas sends messages directly, so we return success with no result for Make
           return new Response(
             JSON.stringify({ 
               success: true, 
-              routed_to: 'ai-arya-vendas',
+              routed_to: 'ai-vendas',
               development: devInfo.development_name,
               result: null // Aimee Vendas already sent the messages directly
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         } catch (routeError) {
-          console.error(`❌ Error routing to ai-arya-vendas:`, routeError);
+          console.error(`❌ Error routing to Aimee Vendas:`, routeError);
           return new Response(
             JSON.stringify({ 
               success: false, 
