@@ -859,7 +859,7 @@ serve(async (req) => {
         const flexibilization = detectFlexibilization(messageContent);
         if (flexibilization.detected) {
           console.log(`📝 Flexibilization detected: ${flexibilization.fields.join(', ')}`);
-          await updateQualificationData(supabase, phoneNumber, flexibilization.updates as ExtractedQualificationData, true);
+          await updateQualificationData(supabase, phoneNumber, flexibilization.updates as ExtractedQualificationData, true, messageContent);
           
           // Clear consultative state when key criteria change
           const keyFields = ['quartos', 'bairro', 'orçamento', 'tipo'];
@@ -875,11 +875,11 @@ serve(async (req) => {
           }
         }
         
-        // Extract and save qualification data
+        // Extract and save qualification data (pass message for correction detection)
         const extractedData = extractQualificationData(messageContent);
         if (Object.keys(extractedData).length > 0) {
           console.log(`📊 Extracted qualification data:`, extractedData);
-          await updateQualificationData(supabase, phoneNumber, extractedData);
+          await updateQualificationData(supabase, phoneNumber, extractedData, false, messageContent);
         }
         
         // Check for consultative flow state
