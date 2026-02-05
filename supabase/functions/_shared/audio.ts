@@ -1,7 +1,7 @@
 // ========== AUDIO TRANSCRIPTION & TTS ==========
 // Extracted from make-webhook/index.ts for modularity
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { AudioConfig, AudioResult } from './types.ts';
 
 // ========== TRANSCRIBE AUDIO ==========
