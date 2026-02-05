@@ -3152,65 +3152,9 @@ serve(async (req) => {
     const developmentLead = await checkDevelopmentLead(supabase, phoneNumber);
     const mentionedDevelopment = await detectDevelopmentFromMessage(supabase, messageContent);
     
-    const DIRECT_API_DEVELOPMENTS = ['villa maggiore'];
-    
+    // Process development leads with Helena (Make.com channel handles all portal leads)
     if (developmentLead || mentionedDevelopment) {
       const devInfo = developmentLead || mentionedDevelopment!;
-      const devNameLower = (devInfo.development_name || '').toLowerCase();
-      
-      if (DIRECT_API_DEVELOPMENTS.some(d => devNameLower.includes(d))) {
-        console.log(`🔄 Routing ${devInfo.development_name} lead to Aimee Vendas via internal call`);
-        
-        // Call Aimee Vendas to generate response for this development lead
-        try {
-          const { data: vendasResult, error: vendasError } = await supabase.functions.invoke('ai-vendas', {
-            body: {
-              phone_number: phoneNumber,
-              message: messageContent,
-              development_id: devInfo.development_id,
-              conversation_history: history,
-              contact_name: contact_name
-            }
-          });
-
-          if (vendasError) {
-            console.error(`❌ Aimee Vendas error:`, vendasError);
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                error: 'ai-vendas failed', 
-                result: null 
-              }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-
-          console.log(`✅ Aimee Vendas responded for ${devInfo.development_name}`);
-          
-          // Return response in format Make.com expects
-          // Aimee Vendas sends messages directly, so we return success with no result for Make
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              routed_to: 'ai-vendas',
-              development: devInfo.development_name,
-              result: null // Aimee Vendas already sent the messages directly
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        } catch (routeError) {
-          console.error(`❌ Error routing to Aimee Vendas:`, routeError);
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: 'routing_failed', 
-              result: null 
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-      
       developmentDetected = devInfo.development_name;
       console.log(`🏗️ Routing to Helena for: ${developmentDetected}`);
 
