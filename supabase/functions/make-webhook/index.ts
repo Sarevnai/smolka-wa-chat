@@ -966,36 +966,29 @@ serve(async (req) => {
           
           if (feedback === 'positive') {
             const currentProperty = pendingProperties[currentIndex];
-            const hasCompleteData = !!existingName && existingName.toLowerCase() !== 'lead sem nome';
+            // SEMPRE envia direto para C2S (dados já coletados na triagem)
+            const clientName = existingName || 'Cliente';
             
-            if (hasCompleteData) {
-              const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
-              const c2sResult = await sendLeadToC2S(supabase, {
-                nome: existingName,
-                interesse: `Interesse em ${currentProperty?.tipo || 'imóvel'} - ${currentProperty?.bairro || ''}`,
-                tipo_imovel: currentProperty?.tipo,
-                bairro: currentProperty?.bairro,
-                resumo: `Imóvel código ${currentProperty?.codigo || 'N/A'}`
-              }, phoneNumber, historyText, existingName);
-              
-              await updateConsultativeState(supabase, phoneNumber, {
-                awaiting_property_feedback: false,
-                pending_properties: []
-              });
-              
-              if (c2sResult.success) {
-                c2sTransferred = true;
-                aiResponse = `Que ótimo, ${existingName}! 🎉 Seu interesse foi registrado. Um consultor vai entrar em contato em breve para organizar a visita.`;
-              } else {
-                aiResponse = `Excelente escolha! Vou registrar seu interesse e um consultor entrará em contato 😊`;
-              }
+            const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
+            const c2sResult = await sendLeadToC2S(supabase, {
+              nome: clientName,
+              interesse: `Interesse em ${currentProperty?.tipo || 'imóvel'} - ${currentProperty?.bairro || ''}`,
+              tipo_imovel: currentProperty?.tipo,
+              bairro: currentProperty?.bairro,
+              resumo: `Imóvel código ${currentProperty?.codigo || 'N/A'}`
+            }, phoneNumber, historyText, clientName);
+            
+            await updateConsultativeState(supabase, phoneNumber, {
+              awaiting_property_feedback: false,
+              pending_properties: []
+            });
+            
+            if (c2sResult.success) {
+              c2sTransferred = true;
+              const nameGreet = existingName ? `, ${existingName}` : '';
+              aiResponse = `Que ótimo${nameGreet}! 🎉 Seu interesse foi registrado. Um consultor vai entrar em contato em breve para organizar a visita.`;
             } else {
-              await updateConsultativeState(supabase, phoneNumber, {
-                awaiting_c2s_confirmation: true,
-                c2s_pending_property: currentProperty,
-                awaiting_property_feedback: false
-              });
-              aiResponse = `Que ótimo que gostou! 😊 Para registrar seu interesse, pode me confirmar seu nome completo?`;
+              aiResponse = `Excelente escolha! Vou registrar seu interesse e um consultor entrará em contato 😊`;
             }
           } else if (feedback === 'negative' || feedback === 'more_options' || feedback === 'interested_but_more') {
             const nextIndex = currentIndex + 1;

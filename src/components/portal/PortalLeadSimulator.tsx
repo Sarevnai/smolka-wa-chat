@@ -472,9 +472,9 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       addMessage('bot', `Ótimo, ${leadConfig.name}! 🎉\n\nPosso agendar uma visita para você conhecer o imóvel pessoalmente.\n\nQual dia e horário seria melhor pra você?`, undefined, 'simulated');
       addMessage('system', '✅ DETECTADO: Intenção de agendamento → Pipeline: Qualificação', undefined, 'simulated');
     } else if (lowerMessage.includes('sábado') || lowerMessage.includes('domingo') || lowerMessage.includes('manhã') || lowerMessage.includes('tarde')) {
-      // User provided scheduling preference
-      addMessage('bot', `Perfeito! Sábado de manhã está ótimo! 📅\n\nSó preciso confirmar alguns dados:\n• Nome completo\n• Telefone para contato\n\nPode me passar?`, undefined, 'simulated');
-      addMessage('system', '✅ Horário detectado → Coletando dados para confirmação', undefined, 'simulated');
+      // User provided scheduling preference - HANDOFF DIRETO (dados já coletados na triagem)
+      addMessage('bot', `Perfeito, ${leadConfig.name}! 🎉\n\nVou te conectar com um consultor para agendar a visita. Ele vai entrar em contato pelo WhatsApp em breve! 😊`, undefined, 'simulated');
+      addMessage('system', '🚀 HANDOFF: Lead enviado para C2S automaticamente (dados já coletados na triagem)', undefined, 'simulated');
     } else if (lowerMessage.includes('48 ') || lowerMessage.match(/\d{2}\s*9\d{8}/)) {
       // User provided contact data - HANDOFF
       addMessage('bot', `Perfeito, ${leadConfig.name}! 🎉\n\nVou te passar para um de nossos corretores especializados em ${leadConfig.transactionType === 'SELL' ? 'vendas' : 'locação'}. Ele vai entrar em contato pelo WhatsApp em breve! 😊`, undefined, 'simulated');
