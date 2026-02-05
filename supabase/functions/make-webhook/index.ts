@@ -1,470 +1,88 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-make-api-key',
-};
+// ========== SHARED IMPORTS ==========
+import { corsHeaders } from "../_shared/cors.ts";
+import {
+  MakeWebhookRequest,
+  MediaInfo,
+  DepartmentType,
+  AIAgentConfig,
+  AIBehaviorConfig,
+  ConversationMessage,
+  QualificationData,
+  QualificationProgress,
+  ConsultativeState,
+  AudioConfig,
+  AudioResult,
+  EssentialQuestion,
+  ExtractedQualificationData,
+  defaultConfig,
+} from "../_shared/types.ts";
 
-// ========== TYPES ==========
-interface MakeWebhookRequest {
-  phone: string;
-  message: string;
-  contact_name?: string;
-  message_id?: string;
-  timestamp?: string;
-  message_type?: string;  // "text" | "audio" | "voice" | "image" | "video" | "document" | "button"
-  media_url?: string;
-  media_id?: string;
-  media_mime?: string;
-  media_caption?: string;
-  media_filename?: string;
-  button_text?: string;
-  button_payload?: string;
-}
+import {
+  normalizePhoneNumber,
+  getPhoneVariations,
+  formatCurrency,
+  getRandomEmoji,
+  getRandomPhrase,
+  validateAIResponse,
+  FALLBACK_RESPONSE,
+  extractPropertyCodeFromUrl,
+  containsPropertyUrl,
+  detectConfirmation,
+  analyzePropertyFeedback,
+  detectPriceFlexibility,
+  isSameMessage,
+  extractNameFromMessage,
+  isWaitingSignal,
+} from "../_shared/utils.ts";
 
-interface MediaInfo {
-  type?: string;
-  url?: string;
-  caption?: string;
-  filename?: string;
-  mimeType?: string;
-}
+import {
+  normalizeNeighborhood,
+  expandRegionToNeighborhoods,
+  generateRegionKnowledge,
+  getAllNeighborhoods,
+  isRegionName,
+} from "../_shared/regions.ts";
 
-interface AudioConfig {
-  audio_enabled: boolean;
-  audio_voice_id: string;
-  audio_voice_name: string;
-  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
-  audio_max_chars: number;
-}
+import {
+  buildQuickTransferPrompt,
+  buildLocacaoPrompt,
+  buildVendasPrompt,
+  buildAdminPrompt,
+  buildVirtualAgentPrompt,
+  getPromptForDepartment,
+  toolsWithVista,
+  toolsQuickTransfer,
+} from "../_shared/prompts.ts";
 
-interface AudioResult {
-  audioUrl: string;
-  isVoiceMessage: boolean;
-  contentType: string;
-}
+import {
+  searchProperties,
+  searchPropertiesWithFallback,
+  buildFallbackMessage,
+  getPropertyByListingId,
+  formatPropertyMessage,
+  sendLeadToC2S,
+} from "../_shared/property.ts";
 
-interface Development {
-  id: string;
-  name: string;
-  slug: string;
-  developer: string;
-  address: string | null;
-  neighborhood: string | null;
-  city: string;
-  status: string;
-  delivery_date: string | null;
-  starting_price: number | null;
-  description: string | null;
-  differentials: string[];
-  amenities: string[];
-  unit_types: { tipo: string; area: number; preco_de: number }[];
-  faq: { pergunta: string; resposta: string }[];
-  ai_instructions: string | null;
-  talking_points: string[];
-  c2s_project_id: string | null;
-  hero_image: string | null;
-}
+import {
+  extractQualificationData,
+  updateQualificationData,
+  hasMinimumCriteriaToSearch,
+  buildSearchParamsFromQualification,
+  getQualificationProgress,
+  getNextQualificationQuestion,
+  buildContextSummary,
+  isLoopingQuestion,
+  detectFlexibilization,
+} from "../_shared/qualification.ts";
 
-interface ConversationMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-type DepartmentType = 'locacao' | 'administrativo' | 'vendas' | 'marketing' | null;
-
-// ========== AI AGENT CONFIG (FROM ai-virtual-agent) ==========
-
-interface AIAgentConfig {
-  agent_name: string;
-  company_name: string;
-  company_description: string;
-  services: string[];
-  tone: 'formal' | 'casual' | 'friendly' | 'technical';
-  limitations: string[];
-  faqs: { question: string; answer: string }[];
-  custom_instructions: string;
-  greeting_message: string;
-  fallback_message: string;
-  ai_provider: 'lovable' | 'openai';
-  ai_model: string;
-  max_tokens: number;
-  max_history_messages: number;
-  humanize_responses: boolean;
-  fragment_long_messages: boolean;
-  message_delay_ms: number;
-  emoji_intensity: 'none' | 'low' | 'medium';
-  use_customer_name: boolean;
-  audio_enabled: boolean;
-  audio_voice_id: string;
-  audio_voice_name: string;
-  audio_mode: 'text_only' | 'audio_only' | 'text_and_audio';
-  audio_channel_mirroring: boolean;
-  audio_max_chars: number;
-  target_audience: string;
-  competitive_advantages: string[];
-  company_values: string;
-  service_areas: string[];
-  rapport_enabled: boolean;
-  rapport_use_name: boolean;
-  rapport_mirror_language: boolean;
-  rapport_show_empathy: boolean;
-  rapport_validate_emotions: boolean;
-  triggers_enabled: boolean;
-  trigger_urgency: boolean;
-  trigger_scarcity: boolean;
-  trigger_social_proof: boolean;
-  trigger_authority: boolean;
-  social_proof_text: string;
-  authority_text: string;
-  objections: { objection: string; response: string }[];
-  knowledge_base_url: string;
-  knowledge_base_content: string;
-  knowledge_base_last_update: string;
-  spin_enabled: boolean;
-  spin_situation_questions: string[];
-  spin_problem_questions: string[];
-  spin_implication_questions: string[];
-  spin_need_questions: string[];
-  escalation_criteria: string[];
-  vista_integration_enabled: boolean;
-  // Prompt overrides per department
-  prompt_overrides?: {
-    locacao?: string | null;
-    vendas?: string | null;
-    administrativo?: string | null;
-    geral?: string | null;
-    empreendimentos?: string | null;
-  };
-}
-
-const defaultConfig: AIAgentConfig = {
-  agent_name: 'Helena',
-  company_name: 'Smolka Imóveis',
-  company_description: 'Administradora de imóveis especializada em locação e gestão de propriedades.',
-  services: ['Locação de imóveis', 'Gestão de propriedades', 'Administração de condomínios'],
-  tone: 'friendly',
-  limitations: [],
-  faqs: [],
-  custom_instructions: '',
-  greeting_message: 'Olá! Sou a {agent_name} da {company_name}. Como posso ajudá-lo?',
-  fallback_message: 'Entendi sua solicitação. Um de nossos atendentes entrará em contato no próximo dia útil.',
-  ai_provider: 'openai',
-  ai_model: 'gpt-4o-mini',
-  max_tokens: 250,
-  max_history_messages: 5,
-  humanize_responses: true,
-  fragment_long_messages: true,
-  message_delay_ms: 2000,
-  emoji_intensity: 'low',
-  use_customer_name: true,
-  audio_enabled: false,
-  audio_voice_id: '',
-  audio_voice_name: 'Sarah',
-  audio_mode: 'text_and_audio',
-  audio_channel_mirroring: true,
-  audio_max_chars: 400,
-  target_audience: '',
-  competitive_advantages: [],
-  company_values: '',
-  service_areas: [],
-  rapport_enabled: true,
-  rapport_use_name: true,
-  rapport_mirror_language: true,
-  rapport_show_empathy: true,
-  rapport_validate_emotions: true,
-  triggers_enabled: true,
-  trigger_urgency: true,
-  trigger_scarcity: true,
-  trigger_social_proof: true,
-  trigger_authority: true,
-  social_proof_text: '',
-  authority_text: '',
-  objections: [],
-  knowledge_base_url: '',
-  knowledge_base_content: '',
-  knowledge_base_last_update: '',
-  spin_enabled: true,
-  spin_situation_questions: [],
-  spin_problem_questions: [],
-  spin_implication_questions: [],
-  spin_need_questions: [],
-  escalation_criteria: [],
-  vista_integration_enabled: true,
-};
-
-// ========== FLORIANÓPOLIS REGIONS MAPPING ==========
-
-interface RegionInfo {
-  nome: string;
-  bairros: string[];
-}
-
-const FLORIANOPOLIS_REGIONS: Record<string, RegionInfo> = {
-  norte: {
-    nome: "Região Norte",
-    bairros: [
-      "Ingleses", "Ingleses do Rio Vermelho", "Santinho", "Canasvieiras", 
-      "Jurerê", "Jurerê Internacional", "Daniela", "Cachoeira do Bom Jesus",
-      "Ponta das Canas", "Lagoinha", "Vargem Grande", "Vargem Pequena",
-      "Vargem do Bom Jesus", "Ratones", "Santo Antônio de Lisboa", "Sambaqui",
-      "Praia Brava", "Rio Vermelho", "São João do Rio Vermelho"
-    ]
-  },
-  sul: {
-    nome: "Região Sul", 
-    bairros: [
-      "Campeche", "Rio Tavares", "Morro das Pedras", "Armação", "Armação do Pântano do Sul",
-      "Pântano do Sul", "Ribeirão da Ilha", "Costa de Dentro", "Carianos",
-      "Aeroporto", "Tapera", "Base Aérea", "Alto Ribeirão", "Caeira da Barra do Sul",
-      "Costeira do Pirajubaé", "Saco dos Limões"
-    ]
-  },
-  leste: {
-    nome: "Região Leste",
-    bairros: [
-      "Lagoa da Conceição", "Barra da Lagoa", "Costa da Lagoa", "Canto da Lagoa",
-      "Praia Mole", "Joaquina", "Praia da Joaquina", "Retiro da Lagoa", 
-      "Canto dos Araçás", "Porto da Lagoa"
-    ]
-  },
-  centro: {
-    nome: "Região Central",
-    bairros: [
-      "Centro", "Agronômica", "Trindade", "Córrego Grande", "Pantanal",
-      "Santa Mônica", "Itacorubi", "João Paulo", "Monte Verde", "Saco Grande",
-      "José Mendes", "Prainha", "Carvoeira", "Serrinha"
-    ]
-  },
-  continente: {
-    nome: "Continente",
-    bairros: [
-      "Estreito", "Coqueiros", "Itaguaçu", "Abraão", "Capoeiras", "Bom Abrigo",
-      "Balneário", "Coloninha", "Jardim Atlântico", "Monte Cristo", "Ponte do Imaruim",
-      "Chico Mendes", "Vila Aparecida", "Sapé", "Bela Vista", "Kobrasol"
-    ]
-  }
-};
-
-function getAllNeighborhoods(): string[] {
-  const all: string[] = [];
-  for (const region of Object.values(FLORIANOPOLIS_REGIONS)) {
-    all.push(...region.bairros);
-  }
-  return all;
-}
-
-function stringSimilarity(str1: string, str2: string): number {
-  const s1 = str1.toLowerCase();
-  const s2 = str2.toLowerCase();
-  
-  if (s1 === s2) return 1;
-  if (s1.includes(s2) || s2.includes(s1)) return 0.9;
-  
-  const len1 = s1.length;
-  const len2 = s2.length;
-  const maxLen = Math.max(len1, len2);
-  
-  if (maxLen === 0) return 1;
-  
-  const matrix: number[][] = [];
-  for (let i = 0; i <= len1; i++) matrix[i] = [i];
-  for (let j = 0; j <= len2; j++) matrix[0][j] = j;
-  
-  for (let i = 1; i <= len1; i++) {
-    for (let j = 1; j <= len2; j++) {
-      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
-      );
-    }
-  }
-  
-  return 1 - matrix[len1][len2] / maxLen;
-}
-
-function normalizeNeighborhood(input: string): { normalized: string; confidence: number; original: string } {
-  const trimmed = input.trim();
-  const allNeighborhoods = getAllNeighborhoods();
-  
-  const exactMatch = allNeighborhoods.find(n => n.toLowerCase() === trimmed.toLowerCase());
-  if (exactMatch) return { normalized: exactMatch, confidence: 1.0, original: trimmed };
-  
-  const partialMatch = allNeighborhoods.find(n => 
-    n.toLowerCase().startsWith(trimmed.toLowerCase()) ||
-    trimmed.toLowerCase().startsWith(n.toLowerCase())
-  );
-  if (partialMatch) return { normalized: partialMatch, confidence: 0.95, original: trimmed };
-  
-  let bestMatch = trimmed;
-  let bestScore = 0;
-  
-  for (const neighborhood of allNeighborhoods) {
-    const similarity = stringSimilarity(trimmed, neighborhood);
-    if (similarity > bestScore && similarity >= 0.6) {
-      bestScore = similarity;
-      bestMatch = neighborhood;
-    }
-  }
-  
-  return { normalized: bestMatch, confidence: bestScore, original: trimmed };
-}
-
-function isRegionName(input: string): boolean {
-  const normalized = input.toLowerCase().trim()
-    .replace(/^região\s+/, '')
-    .replace(/^regiao\s+/, '');
-  return Object.keys(FLORIANOPOLIS_REGIONS).includes(normalized);
-}
-
-function expandRegionToNeighborhoods(input: string): { 
-  isRegion: boolean;
-  neighborhoods: string[];
-  regionName?: string;
-  suggestion?: string;
-} {
-  const normalized = input.toLowerCase().trim()
-    .replace(/^região\s+/, '')
-    .replace(/^regiao\s+/, '');
-  
-  if (FLORIANOPOLIS_REGIONS[normalized]) {
-    const region = FLORIANOPOLIS_REGIONS[normalized];
-    return {
-      isRegion: true,
-      neighborhoods: region.bairros,
-      regionName: region.nome,
-      suggestion: `A ${region.nome} tem ótimas opções! Posso sugerir: ${region.bairros.slice(0, 4).join(', ')}... Tem preferência?`
-    };
-  }
-  
-  const result = normalizeNeighborhood(input);
-  
-  if (result.confidence < 0.8 && result.confidence > 0.5) {
-    return {
-      isRegion: false,
-      neighborhoods: [result.normalized],
-      suggestion: `Você quis dizer ${result.normalized}?`
-    };
-  }
-  
-  return { isRegion: false, neighborhoods: [result.normalized] };
-}
-
-function generateRegionKnowledge(): string {
-  const lines: string[] = ['\n📍 CONHECIMENTO LOCAL DE FLORIANÓPOLIS:', ''];
-  
-  for (const [key, region] of Object.entries(FLORIANOPOLIS_REGIONS)) {
-    lines.push(`${region.nome.toUpperCase()}: ${region.bairros.slice(0, 8).join(', ')}${region.bairros.length > 8 ? '...' : ''}`);
-  }
-  
-  lines.push('');
-  lines.push('⚡ REGIÕES:');
-  lines.push('- "norte" → Ingleses, Canasvieiras, Jurerê...');
-  lines.push('- "sul" → Campeche, Armação, Ribeirão...');
-  lines.push('- "leste" ou "lagoa" → Lagoa da Conceição, Barra...');
-  lines.push('- "centro" → Trindade, Agronômica, Itacorubi...');
-  lines.push('- "continente" → Estreito, Coqueiros...');
-  lines.push('');
-  lines.push('⚡ CORREÇÃO DE ERROS: "Tridade" → "Trindade", "Ingleseis" → "Ingleses"');
-  
-  return lines.join('\n');
-}
-
-// ========== PROPERTY LINK EXTRACTION ==========
-
-function extractPropertyCodeFromUrl(message: string): string | null {
-  if (!message) return null;
-  
-  const smolkaUrlMatch = message.match(/smolkaimoveis\.com\.br\/imovel\/([^\s]+)/i);
-  if (smolkaUrlMatch && smolkaUrlMatch[1]) {
-    const urlPath = smolkaUrlMatch[1];
-    const allNumbers = urlPath.match(/\d+/g);
-    if (allNumbers && allNumbers.length > 0) {
-      const lastNumber = allNumbers[allNumbers.length - 1];
-      if (lastNumber.length >= 3 && lastNumber.length <= 6) {
-        console.log(`🔗 Property code extracted from URL: ${lastNumber}`);
-        return lastNumber;
-      }
-    }
-  }
-  
-  const fallbackPatterns = [
-    /codigo[=\/](\d{3,6})\b/i,
-    /\/imovel\/(\d{3,6})(?:\s|$|\/|\?)/i
-  ];
-  
-  for (const pattern of fallbackPatterns) {
-    const match = message.match(pattern);
-    if (match && match[1]) return match[1];
-  }
-  
-  return null;
-}
-
-function containsPropertyUrl(message: string): boolean {
-  return /smolkaimoveis\.com\.br\/imovel\//i.test(message) ||
-         /vistasoft.*imovel/i.test(message);
-}
-
-// ========== HUMANIZATION ==========
-
-const emojiSets = {
-  greeting: ['😊', '👋', '🙂', '☺️'],
-  agreement: ['✅', '👍', '😊', '🙂'],
-  thinking: ['🤔', '💭', '📋', ''],
-  sorry: ['😔', '🙏', '', ''],
-  help: ['💡', '📞', '🏠', ''],
-  thanks: ['🙏', '😊', '✨', ''],
-  farewell: ['👋', '😊', '🙂', ''],
-};
-
-function getRandomEmoji(context: keyof typeof emojiSets, intensity: string): string {
-  if (intensity === 'none') return '';
-  const set = emojiSets[context];
-  const maxIndex = intensity === 'low' ? 2 : set.length;
-  const emoji = set[Math.floor(Math.random() * maxIndex)];
-  return emoji ? ` ${emoji}` : '';
-}
-
-const humanPhrases = {
-  thinking: ['Deixa eu verificar...', 'Um momento...', 'Vou conferir isso...'],
-  agreement: ['Entendi!', 'Certo!', 'Perfeito!', 'Claro!'],
-  transition: ['Olha só,', 'Então,', 'Bom,', 'Veja bem,'],
-  empathy: ['Entendo sua situação.', 'Compreendo.', 'Faz sentido.'],
-};
-
-function getRandomPhrase(type: keyof typeof humanPhrases): string {
-  const phrases = humanPhrases[type];
-  return phrases[Math.floor(Math.random() * phrases.length)];
-}
-
-// ========== VALIDATION ==========
-
-const FORBIDDEN_RESPONSE_PATTERNS = [
-  /quintoandar/i,
-  /vivareal/i,
-  /zap\s*im[oó]veis/i,
-  /olx/i,
-  /imovelweb/i,
-  /outras?\s*imobili[aá]rias?/i,
-];
-
-function validateAIResponse(response: string): { valid: boolean; reason?: string } {
-  if (!response) return { valid: true };
-  
-  for (const pattern of FORBIDDEN_RESPONSE_PATTERNS) {
-    if (pattern.test(response)) {
-      console.log(`🚫 Invalid AI response - matched pattern: ${pattern}`);
-      return { valid: false, reason: `Contains forbidden content` };
-    }
-  }
-  return { valid: true };
-}
-
-const FALLBACK_RESPONSE = "Olá! Sou da Smolka Imóveis 🏠 Como posso ajudar você?";
+import {
+  transcribeAudio,
+  getAudioConfig,
+  generateAudioResponse,
+} from "../_shared/audio.ts";
 
 // ========== CONFIG LOADERS ==========
 
@@ -485,23 +103,6 @@ async function getAIAgentConfig(supabase: any): Promise<AIAgentConfig> {
   }
 }
 
-interface EssentialQuestion {
-  id: string;
-  question: string;
-  category: string;
-  isQualifying: boolean;
-  enabled: boolean;
-}
-
-interface AIBehaviorConfig {
-  id: string;
-  essential_questions: EssentialQuestion[];
-  functions: any[];
-  reengagement_hours: number;
-  send_cold_leads: boolean;
-  require_cpf_for_visit: boolean;
-}
-
 async function getAIBehaviorConfig(supabase: any): Promise<AIBehaviorConfig | null> {
   try {
     const { data } = await supabase
@@ -516,1657 +117,130 @@ async function getAIBehaviorConfig(supabase: any): Promise<AIBehaviorConfig | nu
   }
 }
 
-// ========== UTILITY FUNCTIONS ==========
+// ========== DATABASE FUNCTIONS ==========
 
-function normalizePhoneNumber(phone: string): string {
-  return phone.replace(/\D/g, '');
-}
-
-function getPhoneVariations(phoneNumber: string): string[] {
-  const variations = [phoneNumber];
-  
-  if (phoneNumber.startsWith('55') && phoneNumber.length === 12) {
-    variations.push(phoneNumber.slice(0, 4) + '9' + phoneNumber.slice(4));
-  }
-  if (phoneNumber.startsWith('55') && phoneNumber.length === 13) {
-    variations.push(phoneNumber.slice(0, 4) + phoneNumber.slice(5));
-  }
-  
-  return variations;
-}
-
-function formatCurrency(value: number | null): string {
-  if (!value) return 'Consultar';
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-}
-
-// ========== OPENAI TOOLS WITH VISTA ==========
-
-const toolsWithVista = [
-  {
-    type: "function",
-    function: {
-      name: "buscar_imoveis",
-      description: "Busca imóveis no catálogo da Smolka Imóveis. Use quando o cliente quiser alugar ou comprar e tiver informado região/bairro.",
-      parameters: {
-        type: "object",
-        properties: {
-          tipo: {
-            type: "string",
-            description: "Tipo do imóvel",
-            enum: ["apartamento", "casa", "terreno", "comercial", "cobertura", "kitnet", "sobrado", "sala"]
-          },
-          bairro: {
-            type: "string",
-            description: "Nome do bairro de Florianópolis"
-          },
-          cidade: {
-            type: "string",
-            description: "Nome da cidade (padrão: Florianópolis)"
-          },
-          preco_min: {
-            type: "number",
-            description: "Valor mínimo em reais"
-          },
-          preco_max: {
-            type: "number",
-            description: "Valor máximo em reais"
-          },
-          quartos: {
-            type: "number",
-            description: "Número de dormitórios"
-          },
-          finalidade: {
-            type: "string",
-            description: "OBRIGATÓRIO. Use 'locacao' para alugar, 'venda' para comprar",
-            enum: ["venda", "locacao"]
-          }
-        },
-        required: ["finalidade"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "enviar_lead_c2s",
-      description: "Transferir lead qualificado para corretor. Use após qualificar o cliente (nome, interesse, tipo, região).",
-      parameters: {
-        type: "object",
-        properties: {
-          nome: { type: "string", description: "Nome do cliente" },
-          interesse: { type: "string", description: "Interesse: morar, investir, alugar" },
-          tipo_imovel: { type: "string", description: "Tipo de imóvel desejado" },
-          bairro: { type: "string", description: "Bairro de interesse" },
-          faixa_preco: { type: "string", description: "Faixa de preço" },
-          quartos: { type: "number", description: "Número de quartos" },
-          resumo: { type: "string", description: "Resumo da conversa" }
-        },
-        required: ["nome", "interesse"]
-      }
-    }
-  }
-];
-
-const toolsQuickTransfer = [
-  {
-    type: "function",
-    function: {
-      name: "enviar_lead_c2s",
-      description: "Transferir lead qualificado para corretor especializado no C2S.",
-      parameters: {
-        type: "object",
-        properties: {
-          nome: { type: "string", description: "Nome do cliente" },
-          interesse: { type: "string", description: "Interesse: morar, investir, conhecer" },
-          motivacao: { type: "string", description: "O que chamou atenção do cliente" },
-          resumo: { type: "string", description: "Resumo da conversa" }
-        },
-        required: ["nome", "interesse", "resumo"]
-      }
-    }
-  }
-];
-
-// ========== PROMPT BUILDERS ==========
-
-function buildQuickTransferPrompt(dev: Development, contactName?: string, isFirstMessage?: boolean, history?: ConversationMessage[]): string {
-  const hasName = !!contactName && contactName.toLowerCase() !== 'lead sem nome';
-  const hasHistory = history && history.length > 0;
-  
-  return `Você é a Helena, assistente de atendimento da Smolka Imóveis, especializada em apresentar o empreendimento ${dev.name}.
-
-${hasHistory ? `📜 CONTEXTO: Esta conversa já tem histórico. NÃO repita perguntas já respondidas.
-${hasName ? `🔹 NOME DO CLIENTE: ${contactName} - USE ESTE NOME!` : ''}` : ''}
-
-🎯 OBJETIVO:
-- Qualificar o lead: nome, morar ou investir, prioridades
-- Encaminhar para especialista humano com resumo
-
-📋 REGRAS:
-- Tom cordial e objetivo
-- Uma pergunta por mensagem
-- Mensagens curtas
-- Use emojis com moderação
-
-${isFirstMessage ? `
-🆕 PRIMEIRA MENSAGEM:
-${hasName ? `Responda: "Prazer em te conhecer, ${contactName}! 😊 Você está buscando algo para morar ou para investir?"` : `Responda APENAS: "Pra começar bem, como posso te chamar?"`}
-` : ''}
-
-🔄 ENCAMINHAMENTO:
-Após ter nome + objetivo + prioridade, use enviar_lead_c2s com resumo.
-- NÃO responda perguntas técnicas detalhadas
-- Seja simpática, breve e eficiente`;
-}
-
-function buildLocacaoPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[], qualificationData?: QualificationData | null): string {
-  const hasName = !!contactName;
-  const hasHistory = history && history.length > 0;
-  const contextSummary = buildContextSummary(qualificationData || null);
-  
-  return `🚨 REGRA ZERO: Você é ${config.agent_name} da ${config.company_name} em Florianópolis/SC.
-
-${hasName ? `👤 CLIENTE: ${contactName} - Use o nome naturalmente.` : '⭐ Ainda não sabemos o nome. Pergunte: "A propósito, como posso te chamar?"'}
-
-${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas.` : ''}
-
-${contextSummary}
-
-⛔ ANTI-LOOP - LEIA COM ATENÇÃO:
-- Se dados acima mostram "Região: Centro", NÃO pergunte região
-- Se dados mostram "Quartos: 2", NÃO pergunte quartos
-- NUNCA repita uma pergunta já respondida
-- Se cliente já disse algo, use essa informação
-
-⚡ REGRA DE OURO - UMA PERGUNTA POR VEZ:
-- NUNCA faça 2 perguntas na mesma mensagem
-- Se falta região, pergunte APENAS região
-- Se falta tipo, pergunte APENAS tipo
-- Após cada resposta, faça a PRÓXIMA pergunta
-- Só busque imóveis quando tiver 2+ critérios
-
-💬 EXEMPLOS CORRETOS:
-- ✅ "Qual região você prefere?"
-- ✅ "Quantos quartos você precisa?"
-- ❌ "Qual região e quantos quartos?" (ERRADO - 2 perguntas)
-
-🎯 OBJETIVO: Ajudar o cliente a ALUGAR um imóvel em Florianópolis.
-
-📍 FLUXO DE ATENDIMENTO - LOCAÇÃO:
-1. QUALIFICAÇÃO: Coletar região, tipo, quartos, faixa de preço (UMA pergunta por vez!)
-2. BUSCA: Usar buscar_imoveis quando tiver 2+ critérios
-3. APRESENTAÇÃO: Sistema envia 1 imóvel por vez
-4. PERGUNTA: "Esse imóvel faz sentido pra você?"
-5. AGUARDE resposta antes de mostrar outro
-
-${generateRegionKnowledge()}
-
-🏠 REGRAS PARA APRESENTAR IMÓVEIS:
-- NUNCA envie lista grande. Sistema envia 1 imóvel por vez.
-- Estrutura obrigatória:
-  1. Contexto: "Encontrei um imóvel que pode combinar com o que você busca."
-  2. Dados: tipo, bairro, quartos, preço, diferencial
-  3. Pergunta: "Esse imóvel faz sentido pra você?"
-- AGUARDE a resposta antes de mostrar outro imóvel
-- Se cliente disser NÃO: pergunte o que não se encaixou
-- Se cliente demonstrar INTERESSE: iniciar encaminhamento ao consultor
-
-🚫 REGRA CRÍTICA - NUNCA AGENDAR VISITAS:
-- NUNCA ofereça datas, horários ou confirmação de visita
-- SEMPRE diga: "Quem vai agendar a visita é um consultor da Smolka Imóveis"
-- SEMPRE diga: "Vou te conectar com um consultor especializado"
-
-📤 FLUXO DE ENCAMINHAMENTO C2S:
-Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
-1. Confirmar: "Perfeito! Posso te conectar com um consultor para organizar a visita?"
-2. Se concordar: coletar/confirmar nome, telefone, código do imóvel
-3. Usar enviar_lead_c2s com todos os dados
-4. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
-5. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
-
-💬 ESTILO CONSULTIVO:
-- "Encontrei um imóvel que pode combinar com o que você busca! 🏠"
-- "Esse imóvel faz sentido pra você?"
-- "Entendi! O que não se encaixou? Preço, tamanho ou localização?"
-- "Vou te conectar com um consultor especializado 😊"`;
-}
-
-function buildVendasPrompt(config: AIAgentConfig, contactName?: string, history?: ConversationMessage[], qualificationData?: QualificationData | null): string {
-  const hasName = !!contactName;
-  const hasHistory = history && history.length > 0;
-  const contextSummary = buildContextSummary(qualificationData || null);
-  
-  return `🚨 REGRA ZERO: Você é ${config.agent_name} da ${config.company_name} em Florianópolis/SC.
-
-${hasName ? `👤 CLIENTE: ${contactName} - Use o nome naturalmente.` : '⭐ Ainda não sabemos o nome. Pergunte: "A propósito, como posso te chamar?"'}
-
-${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas.` : ''}
-
-${contextSummary}
-
-⛔ ANTI-LOOP - LEIA COM ATENÇÃO:
-- Se dados acima mostram "Região: Centro", NÃO pergunte região
-- Se dados mostram "Quartos: 2", NÃO pergunte quartos
-- Se dados mostram "Objetivo: morar", NÃO pergunte objetivo
-- NUNCA repita uma pergunta já respondida
-- Se cliente já disse algo, use essa informação
-
-⚡ REGRA DE OURO - UMA PERGUNTA POR VEZ:
-- NUNCA faça 2 perguntas na mesma mensagem
-- Se falta objetivo (morar/investir), pergunte APENAS isso
-- Se falta região, pergunte APENAS região
-- Após cada resposta, faça a PRÓXIMA pergunta
-- Só busque imóveis quando tiver 2+ critérios
-
-💬 EXEMPLOS CORRETOS:
-- ✅ "Você busca para morar ou investir?"
-- ✅ "Qual região te interessa?"
-- ❌ "Qual região e quantos quartos?" (ERRADO - 2 perguntas)
-
-🎯 OBJETIVO: Ajudar o cliente a COMPRAR/INVESTIR em imóvel.
-
-📍 FLUXO DE ATENDIMENTO - VENDAS:
-1. DESCOBRIR: Morar ou investir? (se não sabe)
-2. QUALIFICAÇÃO: Região, tipo, quartos, faixa de preço (UMA pergunta por vez!)
-3. BUSCA: Usar buscar_imoveis quando tiver 2+ critérios
-4. APRESENTAÇÃO: Sistema envia 1 imóvel por vez
-5. PERGUNTA: "Esse imóvel faz sentido pra você?"
-6. AGUARDE resposta antes de mostrar outro
-
-${generateRegionKnowledge()}
-
-🏠 REGRAS PARA APRESENTAR IMÓVEIS:
-- NUNCA envie lista grande. Sistema envia 1 imóvel por vez.
-- Estrutura obrigatória:
-  1. Contexto: "Encontrei um imóvel que pode combinar com o que você busca."
-  2. Dados: tipo, bairro, quartos, preço, diferencial
-  3. Pergunta: "Esse imóvel faz sentido pra você?"
-- AGUARDE a resposta antes de mostrar outro imóvel
-- Se cliente disser NÃO: pergunte o que não se encaixou
-- Se cliente demonstrar INTERESSE: iniciar encaminhamento ao consultor
-
-🚫 REGRA CRÍTICA - NUNCA AGENDAR VISITAS:
-- NUNCA ofereça datas, horários ou confirmação de visita
-- SEMPRE diga: "Quem vai agendar a visita é um consultor da Smolka Imóveis"
-- SEMPRE diga: "Vou te conectar com um consultor especializado"
-
-📤 FLUXO DE ENCAMINHAMENTO C2S:
-Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
-1. Confirmar: "Perfeito! Posso te conectar com um consultor para organizar a visita?"
-2. Se concordar: coletar/confirmar nome, telefone, código do imóvel
-3. Usar enviar_lead_c2s com todos os dados
-4. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
-5. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
-
-💬 ESTILO CONSULTIVO:
-- "Encontrei um imóvel que pode combinar com o que você busca! 🏠"
-- "Esse imóvel faz sentido pra você?"
-- "Entendi! O que não se encaixou? Preço, tamanho ou localização?"
-- "Vou te conectar com um consultor especializado 😊"`;
-}
-
-function buildAdminPrompt(config: AIAgentConfig, contactName?: string): string {
-  const hasName = !!contactName;
-  
-  return `Você é ${config.agent_name} da ${config.company_name} - Setor Administrativo.
-
-${hasName ? `👤 CLIENTE: ${contactName}` : ''}
-
-🎯 OBJETIVO: Ajudar clientes que já são locatários ou proprietários.
-
-📋 DEMANDAS COMUNS:
-- 📄 Boleto / 2ª via de pagamento
-- 📝 Contrato (renovação, rescisão, dúvidas)
-- 🔧 Manutenção (solicitações, acompanhamento)
-- 💰 Financeiro (pagamentos, cobranças)
-- ❓ Outras questões administrativas
-
-🔄 FLUXO:
-1. Identificar a demanda específica
-2. Coletar informações necessárias (contrato, imóvel, etc.)
-3. Orientar próximos passos
-4. Informar que um atendente vai dar continuidade
-
-💬 ESTILO:
-- Profissional e empático
-- Mensagens objetivas
-- Validar as preocupações do cliente
-
-⚠️ LIMITAÇÕES:
-- NÃO emita boletos (apenas oriente)
-- NÃO resolva questões de manutenção (registre e encaminhe)
-- Para assuntos complexos: "Vou registrar sua solicitação e um atendente entrará em contato."`;
-}
-
-function buildVirtualAgentPrompt(config: AIAgentConfig, contactName?: string): string {
-  const hasName = !!contactName;
-  
-  return `Você é ${config.agent_name}, assistente virtual da ${config.company_name} 🏠
-
-${hasName ? `👤 CLIENTE: ${contactName}` : ''}
-
-OBJETIVO: Ajudar clientes de forma cordial e eficiente via WhatsApp.
-
-CAPACIDADES:
-- Tirar dúvidas sobre a empresa
-- Explicar serviços (locação, vendas, administração)
-- Encaminhar para o departamento correto
-- Buscar imóveis no catálogo
-
-${generateRegionKnowledge()}
-
-REGRAS:
-- Seja simpática e profissional
-- Mensagens curtas e diretas
-- Use emojis com moderação
-- Responda em português brasileiro
-
-Se não souber algo específico, diga que vai verificar com um especialista.`;
-}
-
-// ========== PROMPT OVERRIDE HELPER ==========
-
-interface QualificationData {
-  detected_neighborhood?: string;
-  detected_property_type?: string;
-  detected_bedrooms?: number;
-  detected_budget_min?: number;
-  detected_budget_max?: number;
-  detected_interest?: string;
-  qualification_score?: number;
-  questions_answered?: number;
-}
-
-function getPromptForDepartment(
-  config: AIAgentConfig,
-  department: DepartmentType,
-  contactName?: string,
-  history?: ConversationMessage[],
-  qualificationData?: QualificationData | null
-): string {
-  // Check for override first
-  const deptKey = department || 'geral';
-  const override = config.prompt_overrides?.[deptKey as keyof typeof config.prompt_overrides];
-  
-  if (override) {
-    console.log(`📝 Using custom prompt override for department: ${deptKey}`);
-    // Replace placeholders in override
-    let customPrompt = override;
-    if (contactName) {
-      customPrompt = customPrompt.replace(/{nome do contato}/g, contactName);
-      customPrompt = customPrompt.replace(/{nome}/g, contactName);
-    }
-    return customPrompt;
-  }
-  
-  // Fall back to generated prompts
-  switch (department) {
-    case 'locacao':
-      return buildLocacaoPrompt(config, contactName, history, qualificationData);
-    case 'vendas':
-      return buildVendasPrompt(config, contactName, history, qualificationData);
-    case 'administrativo':
-      return buildAdminPrompt(config, contactName);
-    default:
-      return buildVirtualAgentPrompt(config, contactName);
-  }
-}
-
-// ========== PROPERTY SEARCH & FORMAT ==========
-
-async function searchProperties(supabase: any, params: Record<string, any>): Promise<any> {
+async function findOrCreateConversation(
+  supabase: any, 
+  phoneNumber: string, 
+  departmentCode: DepartmentType = null
+): Promise<{ id: string; department_code: DepartmentType; contact_id: string | null } | null> {
   try {
-    let normalizedParams = { ...params };
-    
-    if (params.bairro) {
-      const expansion = expandRegionToNeighborhoods(params.bairro);
-      
-      if (expansion.isRegion) {
-        console.log(`📍 Region detected: ${params.bairro} → ${expansion.regionName}`);
-        normalizedParams.bairro = expansion.neighborhoods[0];
-      } else {
-        const normalized = normalizeNeighborhood(params.bairro);
-        if (normalized.confidence < 1.0 && normalized.confidence >= 0.6) {
-          console.log(`📍 Normalized "${params.bairro}" → "${normalized.normalized}"`);
-        }
-        normalizedParams.bairro = normalized.normalized;
-      }
+    const { data: existingConv } = await supabase
+      .from('conversations')
+      .select('id, department_code, contact_id')
+      .eq('phone_number', phoneNumber)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingConv) {
+      console.log(`✅ Found existing conversation: ${existingConv.id}`);
+      return existingConv;
     }
-    
-    console.log('🏠 Searching properties:', normalizedParams);
-    
-    const { data, error } = await supabase.functions.invoke('vista-search-properties', {
-      body: normalizedParams
-    });
+
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id, department_code')
+      .eq('phone', phoneNumber)
+      .maybeSingle();
+
+    const { data: newConv, error } = await supabase
+      .from('conversations')
+      .insert({
+        phone_number: phoneNumber,
+        contact_id: contact?.id || null,
+        department_code: departmentCode || contact?.department_code || null,
+        status: 'active',
+        last_message_at: new Date().toISOString()
+      })
+      .select('id, department_code, contact_id')
+      .single();
 
     if (error) {
-      console.error('❌ Vista search error:', error);
-      return { success: false, properties: [], error: error.message };
+      console.error('❌ Error creating conversation:', error);
+      return null;
     }
 
-    console.log(`✅ Vista returned ${data?.properties?.length || 0} properties`);
-    return data;
-  } catch (e) {
-    console.error('❌ Error calling Vista:', e);
-    return { success: false, properties: [], error: e instanceof Error ? e.message : 'Unknown error' };
-  }
-}
+    console.log(`✅ New conversation created: ${newConv.id}`);
+    return newConv;
 
-// ========== FALLBACK SEARCH (PROGRESSIVE WIDENING) ==========
-
-interface FallbackSearchResult {
-  success: boolean;
-  properties: any[];
-  searchType: 'exact' | 'sem_quartos' | 'sem_bairro' | 'no_results';
-  originalParams: Record<string, any>;
-  usedParams: Record<string, any>;
-  relaxedFields: string[];
-}
-
-async function searchPropertiesWithFallback(
-  supabase: any, 
-  params: Record<string, any>
-): Promise<FallbackSearchResult> {
-  const relaxedFields: string[] = [];
-  
-  // Attempt 1: Exact search with all criteria
-  console.log('🔍 Fallback search - Attempt 1: exact criteria');
-  let result = await searchProperties(supabase, params);
-  
-  if (result.success && result.properties?.length > 0) {
-    return { 
-      success: true, 
-      properties: result.properties, 
-      searchType: 'exact',
-      originalParams: params,
-      usedParams: params,
-      relaxedFields: []
-    };
-  }
-  
-  // Attempt 2: Remove bedrooms filter
-  if (params.quartos) {
-    console.log('🔍 Fallback search - Attempt 2: removing quartos filter');
-    const paramsNoQuartos = { ...params };
-    delete paramsNoQuartos.quartos;
-    relaxedFields.push('quartos');
-    
-    result = await searchProperties(supabase, paramsNoQuartos);
-    
-    if (result.success && result.properties?.length > 0) {
-      return { 
-        success: true, 
-        properties: result.properties, 
-        searchType: 'sem_quartos',
-        originalParams: params,
-        usedParams: paramsNoQuartos,
-        relaxedFields: ['quartos']
-      };
-    }
-  }
-  
-  // Attempt 3: Remove neighborhood filter (keep only type + price)
-  if (params.bairro) {
-    console.log('🔍 Fallback search - Attempt 3: removing bairro filter');
-    const paramsNoBairro = { ...params };
-    delete paramsNoBairro.bairro;
-    delete paramsNoBairro.quartos;
-    
-    result = await searchProperties(supabase, paramsNoBairro);
-    
-    if (result.success && result.properties?.length > 0) {
-      return { 
-        success: true, 
-        properties: result.properties, 
-        searchType: 'sem_bairro',
-        originalParams: params,
-        usedParams: paramsNoBairro,
-        relaxedFields: ['quartos', 'bairro']
-      };
-    }
-  }
-  
-  // No results found even with relaxed criteria
-  console.log('🔍 Fallback search - No results found');
-  return { 
-    success: true, 
-    properties: [], 
-    searchType: 'no_results',
-    originalParams: params,
-    usedParams: params,
-    relaxedFields: []
-  };
-}
-
-function buildFallbackMessage(
-  searchType: 'exact' | 'sem_quartos' | 'sem_bairro' | 'no_results',
-  originalParams: Record<string, any>,
-  properties: any[],
-  contactName?: string
-): string {
-  const nameGreet = contactName ? `, ${contactName}` : '';
-  const property = properties[0];
-  
-  // Generate consultative question based on property highlights
-  let consultativeQuestion = 'Esse imóvel faz sentido pra você? 😊';
-  
-  if (property?.descricao) {
-    const highlights = extractPropertyHighlightsQuick(property.descricao);
-    if (highlights.topFeature) {
-      consultativeQuestion = `O que você acha? ${highlights.consultiveHook} 😊`;
-    }
-  }
-  
-  switch (searchType) {
-    case 'exact':
-      return `Encontrei uma opção que combina com o que você busca${nameGreet}! 🏠\n\n${consultativeQuestion}`;
-    
-    case 'sem_quartos':
-      const requestedBedrooms = originalParams.quartos;
-      const foundBedrooms = property?.quartos;
-      if (foundBedrooms && requestedBedrooms) {
-        return `Não encontrei com ${requestedBedrooms} quarto${requestedBedrooms > 1 ? 's' : ''}${nameGreet}, mas tenho uma de ${foundBedrooms} quarto${foundBedrooms > 1 ? 's' : ''} que pode te interessar 🏠\n\n${consultativeQuestion}`;
-      }
-      return `Encontrei uma opção${nameGreet}! 🏠\n\n${consultativeQuestion}`;
-    
-    case 'sem_bairro':
-      const requestedNeighborhood = originalParams.bairro;
-      const foundNeighborhood = property?.bairro;
-      if (requestedNeighborhood && foundNeighborhood) {
-        return `Não encontrei em ${requestedNeighborhood}${nameGreet}, mas olha essa opção em ${foundNeighborhood} 🏠\n\n${consultativeQuestion}`;
-      }
-      return `Encontrei uma opção em outra região${nameGreet}! 🏠\n\n${consultativeQuestion}`;
-    
-    case 'no_results':
-      return `Não encontrei imóveis com esses critérios no momento 😔\n\nO que você prefere ajustar: preço, região ou número de quartos?`;
-  }
-}
-
-/**
- * Quick extraction of top feature for consultive question
- */
-function extractPropertyHighlightsQuick(description: string): { topFeature: string | null; consultiveHook: string } {
-  if (!description || description.trim().length === 0) {
-    return { topFeature: null, consultiveHook: 'Esse imóvel faz sentido pra você?' };
-  }
-  
-  const text = description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  
-  // Priority features for consultive hooks
-  const featureHooks: [RegExp, string][] = [
-    // Location - highest impact
-    [/pe\s*na\s*areia|frente\s*(pro\s*)?mar|beira\s*mar/i, 'A localização pé na areia é importante pra você?'],
-    [/vista\s*(pro\s*)?mar|vista\s*mar/i, 'A vista pro mar faz diferença pra você?'],
-    [/proximo\s*(?:ao?\s*)?praia/i, 'A proximidade da praia é essencial?'],
-    
-    // Comfort amenities
-    [/piscina/i, 'A piscina é importante pra você?'],
-    [/churrasqueira|churras/i, 'Ter churrasqueira faz diferença?'],
-    [/varanda\s*gourmet|sacada\s*gourmet/i, 'A varanda gourmet combina com seu estilo?'],
-    [/home\s*office|escritorio/i, 'Espaço para home office é importante?'],
-    
-    // Condition
-    [/mobiliado/i, 'Imóvel mobiliado facilita pra você?'],
-    [/novo|recem\s*(?:construido|entregue)/i, 'Imóvel novo faz diferença?'],
-    [/reformado|reforma\s*recente/i, 'Gosta da ideia de já estar reformado?'],
-    
-    // Pet & Family
-    [/pet\s*place|pet\s*friendly|aceita\s*pet/i, 'Você tem pet? Esse aceita! 🐾'],
-    [/playground|brinquedoteca/i, 'Tem crianças? Esse tem área kids!'],
-    
-    // Premium
-    [/alto\s*padrao|luxo|premium/i, 'O acabamento de alto padrão combina com o que busca?'],
-    [/seguranca|portaria\s*24/i, 'Segurança 24h é prioridade pra você?'],
-  ];
-  
-  for (const [pattern, hook] of featureHooks) {
-    if (pattern.test(text)) {
-      return { topFeature: pattern.source, consultiveHook: hook };
-    }
-  }
-  
-  return { topFeature: null, consultiveHook: 'Esse imóvel faz sentido pra você?' };
-}
-
-async function getPropertyByListingId(supabase: any, listingId: string): Promise<any | null> {
-  try {
-    console.log(`🏠 Fetching property: ${listingId}`);
-    
-    const { data, error } = await supabase.functions.invoke('vista-get-property', {
-      body: { codigo: listingId }
-    });
-    
-    if (error || !data?.success) return null;
-    
-    console.log(`✅ Found property:`, data.property?.codigo);
-    return data.property;
-  } catch (e) {
-    console.error(`❌ Error fetching property:`, e);
+  } catch (error) {
+    console.error('❌ Error in findOrCreateConversation:', error);
     return null;
   }
 }
 
-// ========== PROPERTY DESCRIPTION ANALYSIS ==========
-
-interface PropertyHighlights {
-  amenities: string[];
-  location: string[];
-  condition: string[];
-  differential: string[];
-  summary: string;
-}
-
-/**
- * Extracts points of interest from property description
- * Categories: amenities, location advantages, condition, differentials
- */
-function extractPropertyHighlights(description: string | null | undefined): PropertyHighlights {
-  const highlights: PropertyHighlights = {
-    amenities: [],
-    location: [],
-    condition: [],
-    differential: [],
-    summary: ''
-  };
-  
-  if (!description || description.trim().length === 0) {
-    return highlights;
-  }
-  
-  const text = description.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  
-  // ===== AMENITIES (comfort & leisure) =====
-  const amenityPatterns: [RegExp, string][] = [
-    [/piscina/i, '🏊 piscina'],
-    [/churrasqueira|churras/i, '🍖 churrasqueira'],
-    [/academia|fitness|gym/i, '💪 academia'],
-    [/sauna/i, '🧖 sauna'],
-    [/spa/i, '💆 spa'],
-    [/salao de festas|salao de eventos|espaco gourmet/i, '🎉 salão de festas'],
-    [/playground|brinquedoteca/i, '🛝 playground'],
-    [/quadra|esporte/i, '🎾 quadra esportiva'],
-    [/pet\s*place|pet\s*friendly|aceita\s*pet/i, '🐾 pet friendly'],
-    [/varanda\s*gourmet|sacada\s*gourmet/i, '🍷 varanda gourmet'],
-    [/home\s*office|escritorio/i, '💻 espaço home office'],
-    [/closet/i, '👔 closet'],
-    [/banheira|hidro/i, '🛁 banheira/hidro'],
-    [/lareira/i, '🔥 lareira'],
-    [/jardim\s*privativo/i, '🌿 jardim privativo'],
-  ];
-  
-  for (const [pattern, label] of amenityPatterns) {
-    if (pattern.test(text)) {
-      highlights.amenities.push(label);
-    }
-  }
-  
-  // ===== LOCATION ADVANTAGES =====
-  const locationPatterns: [RegExp, string][] = [
-    [/pe\s*na\s*areia|frente\s*(pro\s*)?mar|beira\s*mar/i, '🏖️ pé na areia/frente mar'],
-    [/vista\s*(pro\s*)?mar|vista\s*mar/i, '🌊 vista para o mar'],
-    [/proximo\s*(?:ao?\s*)?(?:praia|lagoa)/i, '📍 próximo à praia/lagoa'],
-    [/centro|localizacao\s*privilegiada|bem\s*localizado/i, '📍 localização privilegiada'],
-    [/silencioso|tranquilo|residencial/i, '🤫 região tranquila'],
-    [/comercio|mercado|padaria|farmacia/i, '🛒 próximo ao comércio'],
-    [/escola|colegio|universidade/i, '🎓 próximo a escolas'],
-    [/transporte|onibus|terminal/i, '🚌 fácil acesso transporte'],
-    [/seguranca|portaria\s*24|vigilancia/i, '🔐 segurança 24h'],
-  ];
-  
-  for (const [pattern, label] of locationPatterns) {
-    if (pattern.test(text)) {
-      highlights.location.push(label);
-    }
-  }
-  
-  // ===== CONDITION =====
-  const conditionPatterns: [RegExp, string][] = [
-    [/novo|recem\s*(?:construido|entregue)|nunca\s*habitado/i, '✨ imóvel novo'],
-    [/reformado|reforma\s*recente|renovado/i, '🔧 reformado recentemente'],
-    [/mobiliado|semi[\s-]?mobiliado/i, '🛋️ mobiliado'],
-    [/pronto\s*para\s*morar/i, '🏠 pronto para morar'],
-    [/excelente\s*estado|otimo\s*estado|bem\s*conservado/i, '👍 excelente estado'],
-    [/sol\s*da\s*manha|nascente/i, '☀️ sol da manhã'],
-    [/ventilado|arejado/i, '🌬️ bem ventilado'],
-    [/luminoso|iluminado|claro/i, '💡 muito iluminado'],
-  ];
-  
-  for (const [pattern, label] of conditionPatterns) {
-    if (pattern.test(text)) {
-      highlights.condition.push(label);
-    }
-  }
-  
-  // ===== DIFFERENTIALS =====
-  const differentialPatterns: [RegExp, string][] = [
-    [/exclusiv|unico|raro/i, '⭐ oportunidade exclusiva'],
-    [/oportunidade|imperd[ií]vel|nao\s*perca/i, '🎯 oportunidade imperdível'],
-    [/abaixo\s*(?:do\s*)?(?:mercado|valor)|desconto/i, '💰 abaixo do mercado'],
-    [/aceita\s*(?:financiamento|carta|permuta)/i, '🏦 aceita financiamento/permuta'],
-    [/documentacao\s*ok|escriturado/i, '📋 documentação em dia'],
-    [/entrega\s*imediata|disponivel\s*imediato/i, '🚀 entrega imediata'],
-    [/alto\s*padrao|luxo|premium/i, '👑 alto padrão'],
-  ];
-  
-  for (const [pattern, label] of differentialPatterns) {
-    if (pattern.test(text)) {
-      highlights.differential.push(label);
-    }
-  }
-  
-  return highlights;
-}
-
-/**
- * Generates a consultative summary for the client based on property highlights
- * Max 120 chars to keep WhatsApp messages clean
- */
-function generateConsultativeSummary(property: any, highlights: PropertyHighlights): string {
-  const allHighlights = [
-    ...highlights.differential.slice(0, 1),  // Priority: differentials first
-    ...highlights.location.slice(0, 1),
-    ...highlights.amenities.slice(0, 2),
-    ...highlights.condition.slice(0, 1)
-  ];
-  
-  // If we have highlights, build a nice summary
-  if (allHighlights.length > 0) {
-    const cleanHighlights = allHighlights.map(h => {
-      // Remove emoji for cleaner summary text
-      return h.replace(/^[\u{1F300}-\u{1F9FF}]+\s*/gu, '');
-    });
-    
-    // Build summary phrase
-    if (cleanHighlights.length === 1) {
-      return `✨ Destaque: ${cleanHighlights[0]}`;
-    } else {
-      return `✨ Destaques: ${cleanHighlights.slice(0, 3).join(', ')}`;
-    }
-  }
-  
-  // Fallback: use first sentence of description if no highlights
-  if (property.descricao && property.descricao.trim().length > 0) {
-    const firstSentence = property.descricao.trim().split(/[.!?\n]/)[0].trim();
-    if (firstSentence.length > 0 && firstSentence.length <= 100) {
-      return `📝 ${firstSentence}`;
-    } else if (firstSentence.length > 100) {
-      return `📝 ${firstSentence.substring(0, 97)}...`;
-    }
-  }
-  
-  return '';
-}
-
-/**
- * Formats property message for WhatsApp with consultative approach
- * Includes intelligent summary of highlights instead of raw description truncation
- */
-function formatPropertyMessage(property: any): string {
-  const lines = [`🏠 *${property.tipo} em ${property.bairro}*`];
-  
-  // Basic specs
-  if (property.quartos > 0) {
-    const suiteText = property.suites > 0 ? ` (${property.suites} suíte${property.suites > 1 ? 's' : ''})` : '';
-    lines.push(`• ${property.quartos} quarto${property.quartos > 1 ? 's' : ''}${suiteText}`);
-  }
-  if (property.vagas > 0) lines.push(`• ${property.vagas} vaga${property.vagas > 1 ? 's' : ''}`);
-  if (property.area_util > 0) lines.push(`• ${property.area_util}m²`);
-  lines.push(`• ${property.preco_formatado}`);
-  if (property.valor_condominio > 0) {
-    lines.push(`• Condomínio: ${formatCurrency(property.valor_condominio)}`);
-  }
-  
-  // Extract highlights and generate consultative summary
-  const highlights = extractPropertyHighlights(property.descricao);
-  const summary = generateConsultativeSummary(property, highlights);
-  
-  if (summary) {
-    lines.push('');  // Empty line for visual separation
-    lines.push(summary);
-  }
-  
-  lines.push(`🔗 ${property.link}`);
-  
-  return lines.join('\n');
-}
-
-/**
- * Generates consultative follow-up question based on property features
- * Used after presenting a property to engage the client consultatively
- */
-function generateConsultativeQuestion(property: any, highlights: PropertyHighlights, clientName?: string): string {
-  const nameGreet = clientName ? `, ${clientName}` : '';
-  
-  // If property has specific highlights, ask about them
-  if (highlights.amenities.length > 0) {
-    const amenity = highlights.amenities[0].replace(/^[\u{1F300}-\u{1F9FF}]+\s*/gu, '');
-    return `O que você acha${nameGreet}? A ${amenity} é importante pra você? 😊`;
-  }
-  
-  if (highlights.location.length > 0) {
-    const location = highlights.location[0].replace(/^[\u{1F300}-\u{1F9FF}]+\s*/gu, '');
-    return `Essa ${location} faz diferença pra você${nameGreet}? 😊`;
-  }
-  
-  if (highlights.condition.length > 0) {
-    return `Esse imóvel faz sentido pra você${nameGreet}? 😊`;
-  }
-  
-  // Default consultative question
-  return `Esse imóvel faz sentido pra você${nameGreet}? 😊`;
-}
-
-// ========== C2S INTEGRATION ==========
-
-async function sendLeadToC2S(
+async function saveMessage(
   supabase: any,
-  params: Record<string, any>, 
-  phoneNumber: string, 
-  conversationHistory: string,
-  contactName?: string
-): Promise<{ success: boolean; c2s_lead_id?: string; error?: string }> {
+  conversationId: string | null,
+  phoneNumber: string,
+  body: string,
+  direction: 'inbound' | 'outbound',
+  messageId?: string,
+  mediaInfo?: MediaInfo,
+  departmentCode?: DepartmentType
+): Promise<number | null> {
   try {
-    console.log('🏢 Sending lead to C2S:', params);
-    
-    const { data, error } = await supabase.functions.invoke('c2s-create-lead', {
-      body: {
-        name: params.nome || contactName || 'Lead WhatsApp',
-        phone: phoneNumber,
-        type_negotiation: params.finalidade === 'locacao' ? 'Locação' : 'Compra',
-        property_type: params.tipo_imovel,
-        neighborhood: params.bairro,
-        price_range: params.faixa_preco,
-        bedrooms: params.quartos,
-        description: params.interesse || params.resumo,
-        conversation_history: conversationHistory,
-      }
-    });
+    const messageData: any = {
+      conversation_id: conversationId,
+      wa_message_id: messageId || `make_${direction}_${Date.now()}`,
+      wa_from: direction === 'inbound' ? phoneNumber : null,
+      wa_to: direction === 'outbound' ? phoneNumber : null,
+      direction,
+      body,
+      wa_timestamp: new Date().toISOString(),
+      department_code: departmentCode || null,
+      media_type: mediaInfo?.type || null,
+      media_url: mediaInfo?.url || null,
+      media_caption: mediaInfo?.caption || null,
+      media_filename: mediaInfo?.filename || null,
+      media_mime_type: mediaInfo?.mimeType || null
+    };
+
+    const { data, error } = await supabase
+      .from('messages')
+      .insert(messageData)
+      .select('id')
+      .single();
 
     if (error) {
-      console.error('❌ C2S send error:', error);
-      return { success: false, error: error.message };
+      console.error(`❌ Error saving ${direction} message:`, error);
+      return null;
     }
 
-    console.log('✅ Lead sent to C2S');
-    return { success: true, c2s_lead_id: data?.c2s_lead_id };
-  } catch (e) {
-    console.error('❌ Error calling C2S:', e);
-    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
-  }
-}
-
-// ========== CONSULTATIVE FLOW FUNCTIONS ==========
-
-function analyzePropertyFeedback(message: string): 'positive' | 'negative' | 'more_options' | 'interested_but_more' | 'neutral' {
-  const lower = message.toLowerCase().trim();
-  
-  // ===== EXPANDED PATTERNS =====
-  
-  // Pedido de mais opções (expandido com padrões coloquiais)
-  const moreOptionsPatterns = [
-    /mais\s+op[çc][oõ]es/i,
-    /outr[ao]s?\s+op[çc][oõ]es/i,
-    /tem\s+mais/i,
-    /mostr[ae]\s+outr[oa]/i,
-    /pr[oó]xim[oa]/i,
-    /outro\s+im[oó]vel/i,
-    /pode\s+me\s+mostrar\s+mais/i,
-    /mais\s+um/i,
-    /mais\s+algum/i,
-    /quero\s+ver\s+outr[oa]/i,
-    /pode\s+mostrar\s+outr[oa]/i,
-    /envia\s+outr[oa]/i,
-    /manda\s+outr[oa]/i,
-    /t[eê]m\s+outr[oa]/i,
-    /algum\s+outr[oa]/i,
-    /ver\s+mais/i,
-    /mais\s+esse[s]?\s+n[aã]o/i,
-    /pass[ae]\s+pro\s+pr[oó]ximo/i,
-    /pul[ae]\s+esse/i,
-    /segue|seguinte/i,
-    /avan[çc]ar/i,
-    /me\s+mostra\s+mais/i,
-  ];
-  
-  // Feedback positivo (interesse real confirmado)
-  const positivePatterns = [
-    /gostei\s+(?:muito\s+)?(?:desse|dele|dessa)/i,
-    /interess(?:ei|ado|ada|ante)/i,
-    /quero\s+visitar/i,
-    /quero\s+conhecer/i,
-    /marcar\s+visita/i,
-    /agendar/i,
-    /quero\s+esse/i,
-    /é\s+esse/i,
-    /perfeito/i,
-    /[oó]timo/i,
-    /excelente/i,
-    /adorei/i,
-    /amei/i,
-    /fechado/i,
-    /fechou/i,
-    /curti\s+(?:muito\s+)?(?:esse|esse\s+aqui)/i,
-    /pode\s+ser\s+esse/i,
-    /vamos\s+(?:nesse|nessa|com\s+esse)/i,
-    /quero\s+saber\s+mais\s+(?:sobre\s+)?esse/i,
-    /lindo/i,
-    /maravilh/i,
-    // ===== NEW: Confirmação simples de interesse =====
-    /^sim$/i,                           // "sim" sozinho
-    /^sim[,.]?\s/i,                     // "sim, ..." ou "sim ..."
-    /^faz$/i,                           // "faz" sozinho (faz sentido)
-    /^faz\s+sentido/i,                  // "faz sentido"
-    /^pode\s*sim/i,                     // "pode sim", "podesim"
-    /^pode$/i,                          // "pode" sozinho
-    /^isso$/i,                          // "isso" sozinho
-    /^isso\s+mesmo/i,                   // "isso mesmo"
-    /^bora$/i,                          // "bora" (vamos)
-    /^vamos$/i,                         // "vamos"
-    /^beleza$/i,                        // "beleza"
-    /^show$/i,                          // "show"
-    /^top$/i,                           // "top"
-    /faz\s+sentido\s+sim/i,             // "faz sentido sim"
-    /quero\s+(?:sim|agendar|visitar)/i, // "quero sim", "quero agendar"
-    /gostaria\s+(?:de\s+)?(?:visitar|agendar|conhecer)/i, // "gostaria de visitar"
-  ];
-  
-  // Feedback negativo (rejeição real)
-  const negativePatterns = [
-    /n[aã]o\s+gostei/i,
-    /n[aã]o\s+curti/i,
-    /n[aã]o\s+(?:me\s+)?interess/i,
-    /muito\s+caro/i,
-    /acima\s+do\s+(?:meu\s+)?or[çc]amento/i,
-    /fora\s+do\s+(?:meu\s+)?or[çc]amento/i,
-    /longe\s+demais/i,
-    /(?:muito\s+)?pequen[oa]/i,
-    /(?:muito\s+)?grande/i,
-    /n[aã]o\s+serve/i,
-    /n[aã]o\s+(?:é|e)\s+o\s+que\s+(?:eu\s+)?(?:procuro|quero)/i,
-    /descart(?:o|ei|ado)/i,
-    /horr[ií]vel/i,
-    /p[eé]ssim[oa]/i,
-    /ruim/i,
-    /n[aã]o\s+quero/i,
-  ];
-  
-  // ===== COMPOUND DETECTION (PRIORITY) =====
-  
-  const hasMoreIntent = moreOptionsPatterns.some(p => p.test(lower));
-  const hasPositiveIntent = positivePatterns.some(p => p.test(lower));
-  const hasNegativeIntent = negativePatterns.some(p => p.test(lower));
-  
-  // RULE 1: Negative + More → more_options (rejected but wants alternatives)
-  // Ex: "não gostei, tem outro?", "esse não serve, próximo"
-  if (hasNegativeIntent && hasMoreIntent) {
-    console.log('📊 Compound detected: negative + more → more_options');
-    return 'more_options';
-  }
-  
-  // RULE 2: Positive + More → interested_but_more (liked but wants to compare)
-  // Ex: "gostei, mas quero ver mais", "curti, tem outras opções?"
-  if (hasPositiveIntent && hasMoreIntent) {
-    console.log('📊 Compound detected: positive + more → interested_but_more');
-    return 'interested_but_more';
-  }
-  
-  // RULE 3: "mas/porém" followed by action → more_options
-  // Ex: "ok, mas mostra outro", "tá, mas tem mais?"
-  const butMorePattern = /(?:mas|por[eé]m|entretanto)\s*(?:,?\s*)(?:mostr|tem|quero|ver|envi|mand)/i;
-  if (butMorePattern.test(lower)) {
-    console.log('📊 Compound detected: but + action → more_options');
-    return 'more_options';
-  }
-  
-  // ===== SIMPLE DETECTION (in order of specificity) =====
-  
-  if (hasMoreIntent) {
-    console.log('📊 Detected feedback: more_options');
-    return 'more_options';
-  }
-  
-  if (hasPositiveIntent) {
-    console.log('📊 Detected feedback: positive');
-    return 'positive';
-  }
-  
-  if (hasNegativeIntent) {
-    console.log('📊 Detected feedback: negative');
-    return 'negative';
-  }
-  
-  console.log('📊 Detected feedback: neutral');
-  return 'neutral';
-}
-
-// ========== PRICE FLEXIBILITY DETECTION ==========
-
-interface PriceFlexibility {
-  type: 'increase' | 'decrease' | 'none';
-  hasNewValue: boolean;
-  suggestedQuestion: string | null;
-}
-
-function detectPriceFlexibility(message: string): PriceFlexibility {
-  const lower = message.toLowerCase();
-  
-  // Patterns for price INCREASE without specific value
-  const increaseNoValue = /pode ser mais caro|aceito pagar mais|flexivel|flexível|aumento|valor maior|preço maior|pago mais|posso pagar mais|aumentar o valor|subir o preço/i;
-  
-  // Patterns for price DECREASE without specific value
-  const decreaseNoValue = /mais barato|menos|menor valor|mais em conta|orçamento menor|diminuir|reduzir|abaixar/i;
-  
-  // Check if message contains numeric value
-  const hasValue = /\d+\s*(mil|k|reais|R\$|\$)/i.test(message) || /\d{4,}/i.test(message);
-  
-  if (increaseNoValue.test(lower) && !hasValue) {
-    return {
-      type: 'increase',
-      hasNewValue: false,
-      suggestedQuestion: 'Até quanto você considera pagar? Assim consigo buscar opções melhores pra você 😊'
-    };
-  }
-  
-  if (decreaseNoValue.test(lower) && !hasValue) {
-    return {
-      type: 'decrease',
-      hasNewValue: false,
-      suggestedQuestion: 'Qual seria o valor máximo ideal pra você? 😊'
-    };
-  }
-  
-  return { type: 'none', hasNewValue: hasValue, suggestedQuestion: null };
-}
-
-// ========== QUALIFICATION PROGRESS TRACKING ==========
-
-interface QualificationProgress {
-  has_region: boolean;
-  has_type: boolean;
-  has_bedrooms: boolean;
-  has_budget: boolean;
-  has_purpose: boolean;
-}
-
-interface QualificationData {
-  detected_neighborhood: string | null;
-  detected_property_type: string | null;
-  detected_bedrooms: number | null;
-  detected_budget_max: number | null;
-  detected_interest: string | null;
-}
-
-// ========== NEW: EXTRACT QUALIFICATION DATA FROM MESSAGE ==========
-
-interface ExtractedQualificationData {
-  detected_neighborhood?: string;
-  detected_property_type?: string;
-  detected_bedrooms?: number;
-  detected_budget_max?: number;
-  detected_interest?: string;
-}
-
-function extractQualificationData(message: string): ExtractedQualificationData {
-  const data: ExtractedQualificationData = {};
-  const lower = message.toLowerCase();
-  
-  // ===== DETECT REGION/NEIGHBORHOOD =====
-  // Known neighborhoods in Florianópolis
-  const knownNeighborhoods = [
-    'centro', 'beira mar', 'beira-mar', 'beiramar', 'ingleses', 'jurere', 'jurerê',
-    'canasvieiras', 'lagoa', 'lagoa da conceição', 'itacorubi', 'trindade',
-    'coqueiros', 'estreito', 'kobrasol', 'campinas', 'barreiros', 'pantanal',
-    'santa monica', 'santa mônica', 'agronômica', 'agronomica', 'corrego grande',
-    'córrego grande', 'cacupe', 'cacupé', 'saco grande', 'rio tavares', 'campeche',
-    'armação', 'armacao', 'ribeirao', 'ribeirão', 'ribeirao da ilha', 'pântano do sul',
-    'pantano do sul', 'barra da lagoa', 'daniela', 'santo antonio', 'santo antônio',
-    'ratones', 'vargem grande', 'vargem pequena', 'cachoeira do bom jesus', 'santinho',
-    'praia brava', 'ponta das canas', 'costeira', 'capoeiras', 'abraao', 'abraão',
-    'coloninha', 'jardim atlantico', 'jardim atlântico', 'monte verde', 'joao paulo',
-    'joão paulo', 'saco dos limoes', 'saco dos limões', 'carvoeira', 'serrinha',
-    'tapera', 'carianos', 'costeira do pirajubae', 'costeira do pirajubaé'
-  ];
-  
-  // Also check for region names
-  const regionPatterns = [
-    { pattern: /\b(norte|regiao norte|região norte)\b/i, value: 'Norte (Ingleses, Canasvieiras)' },
-    { pattern: /\b(sul|regiao sul|região sul)\b/i, value: 'Sul (Campeche, Armação)' },
-    { pattern: /\b(leste|regiao leste|região leste)\b/i, value: 'Leste (Lagoa)' },
-    { pattern: /\b(continente)\b/i, value: 'Continente (Estreito, Coqueiros)' }
-  ];
-  
-  // Check region patterns first
-  for (const { pattern, value } of regionPatterns) {
-    if (pattern.test(lower)) {
-      data.detected_neighborhood = value;
-      console.log(`📍 Detected region: "${value}"`);
-      break;
-    }
-  }
-  
-  // If no region found, check specific neighborhoods
-  if (!data.detected_neighborhood) {
-    for (const neighborhood of knownNeighborhoods) {
-      if (lower.includes(neighborhood)) {
-        // Capitalize first letter
-        data.detected_neighborhood = neighborhood.charAt(0).toUpperCase() + neighborhood.slice(1);
-        console.log(`📍 Detected neighborhood: "${data.detected_neighborhood}"`);
-        break;
-      }
-    }
-  }
-  
-  // ===== DETECT PROPERTY TYPE =====
-  const typePatterns = [
-    { pattern: /\b(apartamento|apto)\b/i, value: 'Apartamento' },
-    { pattern: /\b(casa)\b/i, value: 'Casa' },
-    { pattern: /\b(kitnet|kit|kitnete)\b/i, value: 'Kitnet' },
-    { pattern: /\b(studio|estudio|estúdio)\b/i, value: 'Studio' },
-    { pattern: /\b(cobertura)\b/i, value: 'Cobertura' },
-    { pattern: /\b(sala\s*comercial|comercial|loja)\b/i, value: 'Comercial' },
-    { pattern: /\b(terreno|lote)\b/i, value: 'Terreno' },
-    { pattern: /\b(sobrado)\b/i, value: 'Sobrado' }
-  ];
-  
-  for (const { pattern, value } of typePatterns) {
-    if (pattern.test(lower)) {
-      data.detected_property_type = value;
-      console.log(`🏠 Detected property type: "${value}"`);
-      break;
-    }
-  }
-  
-  // ===== DETECT BEDROOMS =====
-  const bedroomPatterns = [
-    /(\d+)\s*(?:quartos?|dormit[oó]rios?|qtos?|dorms?)/i,
-    /(?:de|com)\s*(\d+)\s*(?:q|quarto)/i,
-    /(\d+)\s*(?:d|dorm)/i
-  ];
-  
-  for (const pattern of bedroomPatterns) {
-    const match = message.match(pattern);
-    if (match && match[1]) {
-      const num = parseInt(match[1]);
-      if (num >= 1 && num <= 10) {
-        data.detected_bedrooms = num;
-        console.log(`🛏️ Detected bedrooms: ${num}`);
-        break;
-      }
-    }
-  }
-  
-  // ===== DETECT BUDGET (improved parsing for Brazilian format) =====
-  const budgetPatterns = [
-    // "até 3.000.000", "ate 15.000", "até R$ 3.000.000"
-    /(?:até|ate|max|máximo|no máximo)\s*(?:R\$\s*)?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:mil|k)?/i,
-    // "R$ 3.000.000", "R$15.000", "R$ 7000"
-    /R\$\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:mil|k)?/i,
-    // "3 mil", "3mil", "15k"
-    /(\d+)\s*(?:mil|k)\b/i,
-    // "3000 reais", "15000", "3.000.000"
-    /(\d{1,3}(?:[.,]\d{3})*)\s*(?:reais)?/i
-  ];
-  
-  for (const pattern of budgetPatterns) {
-    const match = message.match(pattern);
-    if (match && match[1]) {
-      let rawValue = match[1];
-      let value: number;
-      
-      // Check if it's a formatted number like "3.000.000" or "15.000" (Brazilian format)
-      if (rawValue.includes('.') && /\.\d{3}/.test(rawValue)) {
-        // Dots are thousand separators
-        value = parseFloat(rawValue.replace(/\./g, '').replace(',', '.'));
-      } else if (rawValue.includes(',')) {
-        // Comma might be decimal separator
-        value = parseFloat(rawValue.replace(',', '.'));
-      } else {
-        value = parseFloat(rawValue);
-      }
-      
-      // If value is small and message contains "mil" or "k", multiply by 1000
-      if (value < 1000 && /mil|k/i.test(message)) {
-        value *= 1000;
-      }
-      
-      // Validate reasonable budget range (500 to 100,000,000 for vendas)
-      if (value >= 500 && value <= 100000000) {
-        data.detected_budget_max = value;
-        console.log(`💰 Detected budget: R$ ${value}`);
-        break;
-      }
-    }
-  }
-  
-  // ===== DETECT INTEREST (morar/investir) =====
-  if (/\b(morar|moradia|para mim|próprio|residir|vou morar|pra morar)\b/i.test(lower)) {
-    data.detected_interest = 'morar';
-    console.log(`🎯 Detected interest: morar`);
-  } else if (/\b(investir|investimento|renda|alugar pra|para alugar|capital|retorno)\b/i.test(lower)) {
-    data.detected_interest = 'investir';
-    console.log(`🎯 Detected interest: investir`);
-  }
-  
-  return data;
-}
-
-// ========== NEW: UPDATE QUALIFICATION DATA IN DATABASE ==========
-
-async function updateQualificationData(
-  supabase: any,
-  phoneNumber: string,
-  newData: ExtractedQualificationData,
-  forceUpdate: boolean = false // When true, overwrites existing values (for flexibilization)
-): Promise<void> {
-  // Skip if no data to update
-  if (Object.keys(newData).length === 0) {
-    return;
-  }
-  
-  try {
-    // Check if record already exists
-    const { data: existing } = await supabase
-      .from('lead_qualification')
-      .select('id, detected_neighborhood, detected_property_type, detected_bedrooms, detected_budget_max, detected_interest')
-      .eq('phone_number', phoneNumber)
-      .maybeSingle();
-    
-    const now = new Date().toISOString();
-    
-    const updatePayload: any = {
-      updated_at: now,
-      last_interaction_at: now
-    };
-    
-    // For flexibilization (forceUpdate=true), always overwrite if value is different
-    // For normal extraction, only set if field is empty
-    
-    if (newData.detected_neighborhood) {
-      if (forceUpdate || !existing?.detected_neighborhood) {
-        if (forceUpdate && existing?.detected_neighborhood && existing.detected_neighborhood !== newData.detected_neighborhood) {
-          console.log(`📝 Neighborhood updated from "${existing.detected_neighborhood}" to "${newData.detected_neighborhood}" (flexibilization)`);
-        }
-        updatePayload.detected_neighborhood = newData.detected_neighborhood;
-      }
-    }
-    
-    if (newData.detected_property_type) {
-      if (forceUpdate || !existing?.detected_property_type) {
-        if (forceUpdate && existing?.detected_property_type && existing.detected_property_type !== newData.detected_property_type) {
-          console.log(`📝 Property type updated from "${existing.detected_property_type}" to "${newData.detected_property_type}" (flexibilization)`);
-        }
-        updatePayload.detected_property_type = newData.detected_property_type;
-      }
-    }
-    
-    if (newData.detected_bedrooms) {
-      if (forceUpdate || !existing?.detected_bedrooms) {
-        if (forceUpdate && existing?.detected_bedrooms && existing.detected_bedrooms !== newData.detected_bedrooms) {
-          console.log(`📝 Bedrooms updated from ${existing.detected_bedrooms} to ${newData.detected_bedrooms} (flexibilization)`);
-        }
-        updatePayload.detected_bedrooms = newData.detected_bedrooms;
-      }
-    }
-    
-    // BUDGET: Always update if new value is provided and different (both normal and flexibilization)
-    if (newData.detected_budget_max) {
-      if (!existing?.detected_budget_max || newData.detected_budget_max !== existing.detected_budget_max) {
-        if (existing?.detected_budget_max) {
-          console.log(`💰 Budget updated from R$ ${existing.detected_budget_max} to R$ ${newData.detected_budget_max}`);
-        }
-        updatePayload.detected_budget_max = newData.detected_budget_max;
-      }
-    }
-    
-    if (newData.detected_interest) {
-      if (forceUpdate || !existing?.detected_interest) {
-        updatePayload.detected_interest = newData.detected_interest;
-      }
-    }
-    
-    // Skip if only timestamps in payload (no new data to save)
-    if (Object.keys(updatePayload).length <= 2) {
-      console.log(`📋 No new qualification data to save (already exists)`);
-      return;
-    }
-    
-    if (existing?.id) {
-      // Update existing record
-      const { error } = await supabase
-        .from('lead_qualification')
-        .update(updatePayload)
-        .eq('id', existing.id);
-      
-      if (error) throw error;
-      console.log(`📝 Lead qualification UPDATED:`, updatePayload);
-    } else {
-      // Create new record
-      const { error } = await supabase
-        .from('lead_qualification')
-        .insert({
-          phone_number: phoneNumber,
-          qualification_status: 'qualifying',
-          started_at: now,
-          ...updatePayload
-        });
-      
-      if (error) throw error;
-      console.log(`📝 Lead qualification CREATED:`, updatePayload);
-    }
+    console.log(`💾 ${direction} message saved: ${data.id}`);
+    return data.id;
   } catch (error) {
-    console.error('❌ Error updating qualification data:', error);
+    console.error(`❌ Error in saveMessage:`, error);
+    return null;
   }
 }
 
-// ========== DETERMINISTIC AUTO-SEARCH HELPERS ==========
+async function getConversationHistory(
+  supabase: any,
+  conversationId: string,
+  limit: number = 10
+): Promise<ConversationMessage[]> {
+  try {
+    const { data: messages } = await supabase
+      .from('messages')
+      .select('direction, body')
+      .eq('conversation_id', conversationId)
+      .not('body', 'is', null)
+      .order('created_at', { ascending: true })
+      .limit(limit);
 
-function hasMinimumCriteriaToSearch(department: string | null, progress: QualificationProgress): boolean {
-  // For LOCAÇÃO: region + budget + (type OR bedrooms)
-  if (department === 'locacao') {
-    return progress.has_region && progress.has_budget && (progress.has_type || progress.has_bedrooms);
-  }
-  
-  // For VENDAS: purpose + region + budget + (type OR bedrooms)
-  if (department === 'vendas') {
-    return progress.has_purpose && progress.has_region && progress.has_budget && (progress.has_type || progress.has_bedrooms);
-  }
-  
-  return false;
-}
+    if (!messages?.length) return [];
 
-function buildSearchParamsFromQualification(department: string | null, qualData: QualificationData | null): Record<string, any> | null {
-  if (!qualData) return null;
-  
-  const params: Record<string, any> = {
-    cidade: 'Florianópolis',
-    limit: 5
-  };
-  
-  // Finalidade based on department
-  if (department === 'locacao') {
-    params.finalidade = 'locacao';
-  } else if (department === 'vendas') {
-    params.finalidade = 'venda';
+    return messages.map((m: any) => ({
+      role: m.direction === 'inbound' ? 'user' : 'assistant',
+      content: m.body
+    }));
+  } catch (error) {
+    console.error('❌ Error getting conversation history:', error);
+    return [];
   }
-  
-  // Map neighborhood
-  if (qualData.detected_neighborhood) {
-    // Handle region names vs specific neighborhoods
-    const regionMap: Record<string, string> = {
-      'Norte (Ingleses, Canasvieiras)': 'Ingleses',
-      'Sul (Campeche, Armação)': 'Campeche',
-      'Leste (Lagoa)': 'Lagoa da Conceição',
-      'Continente (Estreito, Coqueiros)': 'Estreito'
-    };
-    params.bairro = regionMap[qualData.detected_neighborhood] || qualData.detected_neighborhood;
-  }
-  
-  // Map property type
-  if (qualData.detected_property_type) {
-    const typeMap: Record<string, string> = {
-      'Apartamento': 'apartamento',
-      'Casa': 'casa',
-      'Kitnet': 'kitnet',
-      'Studio': 'kitnet',
-      'Cobertura': 'cobertura',
-      'Comercial': 'comercial',
-      'Terreno': 'terreno',
-      'Sobrado': 'sobrado'
-    };
-    params.tipo = typeMap[qualData.detected_property_type] || qualData.detected_property_type.toLowerCase();
-  }
-  
-  // Bedrooms
-  if (qualData.detected_bedrooms) {
-    params.quartos = qualData.detected_bedrooms;
-  }
-  
-  // Budget
-  if (qualData.detected_budget_max) {
-    params.preco_max = qualData.detected_budget_max;
-  }
-  
-  return params;
-}
-
-function isWaitingSignal(message: string): boolean {
-  const lower = message.toLowerCase().trim();
-  
-  const waitingPatterns = [
-    /^(ok|okay|beleza|show|blz|certo|pode|perfeito|bom|ótimo|otimo)$/i,
-    /fico\s+(?:no\s+)?aguardo/i,
-    /aguardando/i,
-    /pode\s+(?:buscar|procurar|mandar|enviar|pesquisar)/i,
-    /vou\s+aguardar/i,
-    /t[aá]\s+bom/i,
-    /^sim$/i,
-    /por\s+favor/i,
-    /manda\s+a[ií]/i,
-    /quero\s+ver/i,
-    /mostra\s+(?:pra|para)\s+mim/i
-  ];
-  
-  return waitingPatterns.some(pattern => pattern.test(lower));
-}
-
-// ========== FLEXIBILIZATION DETECTION ==========
-
-interface FlexibilizationResult {
-  detected: boolean;
-  updates: {
-    detected_bedrooms?: number;
-    detected_budget_max?: number;
-    detected_neighborhood?: string;
-    detected_property_type?: string;
-  };
-  fields: string[];
-}
-
-function detectFlexibilization(message: string): FlexibilizationResult {
-  const lower = message.toLowerCase().trim();
-  const updates: FlexibilizationResult['updates'] = {};
-  const fields: string[] = [];
-  
-  // ===== PATTERN 1: Explicit flexibilization =====
-  // "pode ser 2 quartos" / "aceito 2 quartos" / "2 quartos tá bom"
-  const quartosFlex = message.match(/(?:pode\s+ser|aceito|tá\s+bom|ta\s+bom|ok\s+com|pode\s+ter|até|ate)\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i);
-  if (quartosFlex) {
-    updates.detected_bedrooms = parseInt(quartosFlex[1]);
-    fields.push('quartos');
-    console.log(`📝 Flexibilization detected: bedrooms → ${updates.detected_bedrooms}`);
-  }
-  
-  // ===== PATTERN 2: Budget with improved parsing =====
-  // Handle values like "3.000.000", "15.000", "15mil", "15k", "R$ 15.000"
-  const budgetPatterns = [
-    // "pode ser até 15.000" / "até R$ 3.000.000" / "máximo 15k"
-    /(?:pode\s+ser\s+)?(?:até|ate|máximo|maximo|no\s+máximo|no\s+maximo|limite\s+de?)\s*(?:r\$\s*)?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?)\s*(?:mil|k|reais)?/i,
-    // Direct value mention: "15 mil", "3.000.000", "R$ 15.000"
-    /(?:r\$\s*)?(\d{1,3}(?:[.,]\d{3})*)\s*(?:mil|k)?(?:\s*reais)?/i
-  ];
-  
-  for (const pattern of budgetPatterns) {
-    const budgetFlex = message.match(pattern);
-    if (budgetFlex && !updates.detected_budget_max) {
-      let rawValue = budgetFlex[1];
-      let value: number;
-      
-      // Check if it's a formatted number like "3.000.000" or "15.000"
-      if (rawValue.includes('.') && /\.\d{3}/.test(rawValue)) {
-        // Dots are thousand separators (Brazilian format)
-        value = parseFloat(rawValue.replace(/\./g, '').replace(',', '.'));
-      } else if (rawValue.includes(',')) {
-        // Comma might be decimal separator
-        value = parseFloat(rawValue.replace(',', '.'));
-      } else {
-        value = parseFloat(rawValue);
-      }
-      
-      // If "mil" or "k" mentioned and value is small, multiply
-      if (/mil|k/i.test(message) && value < 1000) {
-        value *= 1000;
-      }
-      
-      // Validate reasonable budget range (500 to 100,000,000)
-      if (value >= 500 && value <= 100000000) {
-        updates.detected_budget_max = value;
-        fields.push('orçamento');
-        console.log(`📝 Flexibilization detected: budget → R$ ${updates.detected_budget_max}`);
-        break;
-      }
-    }
-  }
-  
-  // ===== PATTERN 3: Simple keyword responses (answering AI's triage question) =====
-  // When AI asks "qual região?" and user responds with just a region name
-  const simpleKeywords: Record<string, string> = {
-    'valor': 'budget',
-    'preço': 'budget',
-    'preco': 'budget',
-    'orçamento': 'budget',
-    'orcamento': 'budget',
-    'região': 'region',
-    'regiao': 'region',
-    'bairro': 'region',
-    'local': 'region',
-    'localização': 'region',
-    'quartos': 'bedrooms',
-    'quarto': 'bedrooms',
-    'dormitórios': 'bedrooms',
-    'dormitorios': 'bedrooms'
-  };
-  
-  // If user sent a single keyword like "valor" or "região", it's not a flexibilization
-  // but if they sent a region/neighborhood name directly, extract it
-  if (!updates.detected_neighborhood && lower.length < 30) {
-    // Check if it's a direct neighborhood/region answer
-    const allNeighborhoods = getAllNeighborhoods();
-    for (const neighborhood of allNeighborhoods) {
-      if (lower === neighborhood.toLowerCase() || 
-          lower.includes(neighborhood.toLowerCase()) ||
-          neighborhood.toLowerCase().includes(lower)) {
-        const normalized = normalizeNeighborhood(lower);
-        if (normalized.confidence >= 0.7) {
-          updates.detected_neighborhood = normalized.normalized;
-          fields.push('bairro');
-          console.log(`📝 Direct neighborhood answer detected: ${updates.detected_neighborhood}`);
-          break;
-        }
-      }
-    }
-    
-    // Check for region names
-    for (const regionKey of Object.keys(FLORIANOPOLIS_REGIONS)) {
-      if (lower === regionKey || lower.includes(regionKey)) {
-        const region = FLORIANOPOLIS_REGIONS[regionKey];
-        updates.detected_neighborhood = region.bairros[0]; // Use first neighborhood of region
-        fields.push('bairro');
-        console.log(`📝 Direct region answer detected: ${regionKey} → ${updates.detected_neighborhood}`);
-        break;
-      }
-    }
-  }
-  
-  // ===== PATTERN 4: "pode ser no Ribeirão" / "aceito Campeche" =====
-  if (!updates.detected_neighborhood) {
-    const regionFlex = message.match(/(?:pode\s+ser\s+)?(?:no|em|na|região|regiao)\s+([a-záàâãéèêíïóôõöúç\s]+?)(?:\s*[,.]|$)/i);
-    if (regionFlex && regionFlex[1].length > 2 && regionFlex[1].length < 30) {
-      const neighborhood = regionFlex[1].trim();
-      const allNeighborhoods = getAllNeighborhoods();
-      const isValidNeighborhood = allNeighborhoods.some(n => 
-        n.toLowerCase().includes(neighborhood.toLowerCase()) ||
-        neighborhood.toLowerCase().includes(n.toLowerCase())
-      ) || Object.keys(FLORIANOPOLIS_REGIONS).includes(neighborhood.toLowerCase());
-      
-      if (isValidNeighborhood) {
-        const normalized = normalizeNeighborhood(neighborhood);
-        updates.detected_neighborhood = normalized.normalized;
-        fields.push('bairro');
-        console.log(`📝 Flexibilization detected: neighborhood → ${updates.detected_neighborhood}`);
-      }
-    }
-  }
-  
-  // ===== PATTERN 5: Property type =====
-  // "pode ser apartamento" / "aceito casa também" / just "casa" or "apartamento"
-  const typeFlex = message.match(/(?:pode\s+ser\s+)?(?:um|uma)?\s*(apartamento|apto|casa|kitnet|kit|studio|estúdio|estudio|cobertura|sobrado|terreno|comercial|loja|sala)/i);
-  if (typeFlex) {
-    const typeMap: Record<string, string> = {
-      'apartamento': 'Apartamento',
-      'apto': 'Apartamento',
-      'casa': 'Casa',
-      'kitnet': 'Kitnet',
-      'kit': 'Kitnet',
-      'studio': 'Studio',
-      'estúdio': 'Studio',
-      'estudio': 'Studio',
-      'cobertura': 'Cobertura',
-      'sobrado': 'Sobrado',
-      'terreno': 'Terreno',
-      'comercial': 'Comercial',
-      'loja': 'Comercial',
-      'sala': 'Comercial'
-    };
-    updates.detected_property_type = typeMap[typeFlex[1].toLowerCase()] || typeFlex[1];
-    fields.push('tipo');
-    console.log(`📝 Flexibilization detected: property type → ${updates.detected_property_type}`);
-  }
-  
-  // ===== PATTERN 6: Bedrooms as simple number =====
-  // User responds "2" or "3 quartos" to bedroom question
-  if (!updates.detected_bedrooms) {
-    const simpleBedroomMatch = message.match(/^(\d)\s*(?:quartos?|qtos?)?$/i);
-    if (simpleBedroomMatch) {
-      const num = parseInt(simpleBedroomMatch[1]);
-      if (num >= 1 && num <= 10) {
-        updates.detected_bedrooms = num;
-        fields.push('quartos');
-        console.log(`📝 Simple bedroom answer detected: ${num}`);
-      }
-    }
-  }
-  
-  // ===== PATTERN 7: EXPLICIT BEDROOM REQUESTS =====
-  // "quero 3 quartos", "preciso de 2 dormitórios", "busco apartamento de 4 quartos"
-  if (!updates.detected_bedrooms) {
-    const explicitBedroomPatterns = [
-      // "quero 3 quartos", "preciso de 2 dormitórios", "gostaria de 4 quartos"
-      /(?:quero|preciso|gostaria|prefiro|busco|procuro)\s*(?:de\s*)?\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i,
-      // "me mostra de 3 quartos", "manda de 2 quartos"
-      /(?:me\s+)?(?:mostra|manda|envia|veja)\s*(?:de\s*)?\s*(\d+)\s*(?:quartos?|qtos?)/i,
-      // "que tenha 3 quartos", "com 2 quartos"
-      /(?:tenha|com)\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i,
-      // "3 quartos por favor"
-      /(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)\s*(?:por favor|pf|pfv)?$/i,
-      // "apartamento de 3 quartos", "casa de 4 dormitórios"
-      /(?:apartamento|apto|casa|imovel|imóvel)\s*(?:de|com)\s*(\d+)\s*(?:quartos?|qtos?|dormit[oó]rios?)/i
-    ];
-    
-    for (const pattern of explicitBedroomPatterns) {
-      const match = message.match(pattern);
-      if (match) {
-        const num = parseInt(match[1]);
-        if (num >= 1 && num <= 10) {
-          updates.detected_bedrooms = num;
-          fields.push('quartos');
-          console.log(`📝 Explicit bedroom request detected: ${num}`);
-          break;
-        }
-      }
-    }
-  }
-  
-  return {
-    detected: fields.length > 0,
-    updates,
-    fields
-  };
 }
 
 async function getLastOutboundMessage(supabase: any, conversationId: string): Promise<string | null> {
@@ -2179,259 +253,13 @@ async function getLastOutboundMessage(supabase: any, conversationId: string): Pr
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    
     return data?.body || null;
   } catch (error) {
     return null;
   }
 }
 
-// ========== ANTI-REPETITION ==========
-
-function isSameMessage(msg1: string | null, msg2: string): boolean {
-  if (!msg1) return false;
-  
-  // Normalize both messages for comparison
-  const normalize = (s: string) => s.toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[😊🏠😔🤔💰📍🛏️✅❌👋🙂☺️💡📞🙏✨💭📋👍]/g, '')
-    .trim();
-  
-  return normalize(msg1) === normalize(msg2);
-}
-
-// ========== PRE-EMPTIVE DUPLICATE CHECK ==========
-// Checks if intended message is a duplicate BEFORE sending
-async function shouldSkipAsDuplicate(
-  supabase: any, 
-  conversationId: string | null, 
-  intendedMessage: string
-): Promise<{ skip: boolean; reason?: string }> {
-  if (!conversationId || !intendedMessage) return { skip: false };
-  
-  try {
-    const lastOutbound = await getLastOutboundMessage(supabase, conversationId);
-    if (lastOutbound && isSameMessage(lastOutbound, intendedMessage)) {
-      console.log('🚫 PRE-EMPTIVE: Would send duplicate message - blocking');
-      return { skip: true, reason: 'duplicate' };
-    }
-    return { skip: false };
-  } catch (error) {
-    console.error('❌ Error in pre-emptive duplicate check:', error);
-    return { skip: false };
-  }
-}
-
-// ========== GET QUALIFICATION PROGRESS ==========
-
-async function getQualificationProgress(supabase: any, phoneNumber: string): Promise<{
-  progress: QualificationProgress;
-  data: QualificationData | null;
-}> {
-  try {
-    const { data } = await supabase
-      .from('lead_qualification')
-      .select('detected_neighborhood, detected_property_type, detected_bedrooms, detected_budget_max, detected_interest')
-      .eq('phone_number', phoneNumber)
-      .maybeSingle();
-    
-    return {
-      progress: {
-        has_region: !!data?.detected_neighborhood,
-        has_type: !!data?.detected_property_type,
-        has_bedrooms: !!data?.detected_bedrooms,
-        has_budget: !!data?.detected_budget_max,
-        has_purpose: !!data?.detected_interest
-      },
-      data: data || null
-    };
-  } catch (error) {
-    console.error('❌ Error getting qualification progress:', error);
-    return {
-      progress: { has_region: false, has_type: false, has_bedrooms: false, has_budget: false, has_purpose: false },
-      data: null
-    };
-  }
-}
-
-function getNextQualificationQuestion(progress: QualificationProgress, department: string): string | null {
-  // For LOCAÇÃO - order: region → type → bedrooms → budget
-  if (department === 'locacao') {
-    if (!progress.has_region) return '📍 Qual região de Florianópolis você prefere?';
-    if (!progress.has_type) return '🏠 Você busca apartamento, casa ou outro tipo?';
-    if (!progress.has_bedrooms) return '🛏️ Quantos quartos você precisa?';
-    if (!progress.has_budget) return '💰 Qual sua faixa de valor para o aluguel?';
-    return null; // Can search
-  }
-  
-  // For VENDAS - order: purpose → region → type → bedrooms → budget
-  if (department === 'vendas') {
-    if (!progress.has_purpose) return 'Você está buscando para *morar* ou para *investir*?';
-    if (!progress.has_region) return '📍 Qual região de Florianópolis te interessa?';
-    if (!progress.has_type) return '🏠 Que tipo de imóvel você busca?';
-    if (!progress.has_bedrooms) return '🛏️ Quantos quartos são ideais pra você?';
-    if (!progress.has_budget) return '💰 Qual faixa de investimento você considera?';
-    return null;
-  }
-  
-  return null;
-}
-
-// ========== ANTI-LOOP SYSTEM ==========
-
-function buildContextSummary(qualificationData: QualificationData | null): string {
-  if (!qualificationData) return '';
-  
-  const collected: string[] = [];
-  
-  if (qualificationData.detected_neighborhood) {
-    collected.push(`📍 Região: ${qualificationData.detected_neighborhood}`);
-  }
-  if (qualificationData.detected_property_type) {
-    collected.push(`🏠 Tipo: ${qualificationData.detected_property_type}`);
-  }
-  if (qualificationData.detected_bedrooms) {
-    collected.push(`🛏️ Quartos: ${qualificationData.detected_bedrooms}`);
-  }
-  if (qualificationData.detected_budget_max) {
-    collected.push(`💰 Orçamento: até R$ ${qualificationData.detected_budget_max.toLocaleString('pt-BR')}`);
-  }
-  if (qualificationData.detected_interest) {
-    collected.push(`🎯 Objetivo: ${qualificationData.detected_interest}`);
-  }
-  
-  if (collected.length === 0) return '';
-  
-  return `
-📋 DADOS JÁ COLETADOS (NÃO PERGUNTE DE NOVO):
-${collected.join('\n')}
-`;
-}
-
-function isLoopingQuestion(aiResponse: string, qualificationData: QualificationData | null): boolean {
-  if (!qualificationData) return false;
-  
-  const lower = aiResponse.toLowerCase();
-  
-  // If already has region and AI asked region again
-  if (qualificationData.detected_neighborhood) {
-    if (/qual\s+(regi[aã]o|bairro)|onde\s+voc[eê]|localiza[cç][aã]o|prefer[eê]ncia.*regi|que\s+regi/i.test(lower)) {
-      console.log('⚠️ Loop detected: asking region again');
-      return true;
-    }
-  }
-  
-  // If already has bedrooms and AI asked again
-  if (qualificationData.detected_bedrooms) {
-    if (/quantos?\s+quartos?|n[uú]mero\s+de\s+(quartos?|dormit[oó]rios?)|quantos\s+dormit/i.test(lower)) {
-      console.log('⚠️ Loop detected: asking bedrooms again');
-      return true;
-    }
-  }
-  
-  // If already has budget and AI asked again
-  if (qualificationData.detected_budget_max) {
-    if (/faixa\s+de\s+(valor|pre[cç]o)|or[cç]amento|quanto\s+(quer|pode)\s+pagar|qual.*valor/i.test(lower)) {
-      console.log('⚠️ Loop detected: asking budget again');
-      return true;
-    }
-  }
-  
-  // If already has property type and AI asked again
-  if (qualificationData.detected_property_type) {
-    if (/que\s+tipo|qual\s+tipo|tipo\s+de\s+im[oó]vel|apartamento.*casa|busca\s+apartamento/i.test(lower)) {
-      console.log('⚠️ Loop detected: asking property type again');
-      return true;
-    }
-  }
-  
-  // If already has purpose and AI asked again (for vendas)
-  if (qualificationData.detected_interest) {
-    if (/morar\s+ou\s+investir|para\s+morar|para\s+investir|objetivo|finalidade/i.test(lower)) {
-      console.log('⚠️ Loop detected: asking purpose again');
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-async function getConsultativeState(supabase: any, phoneNumber: string): Promise<{
-  pending_properties: any[];
-  current_property_index: number;
-  awaiting_property_feedback: boolean;
-  awaiting_c2s_confirmation?: boolean;
-  c2s_pending_property?: any;
-} | null> {
-  try {
-    const { data } = await supabase
-      .from('conversation_states')
-      .select('pending_properties, current_property_index, awaiting_property_feedback, awaiting_c2s_confirmation, c2s_pending_property')
-      .eq('phone_number', phoneNumber)
-      .maybeSingle();
-    return data;
-  } catch (error) {
-    console.error('❌ Error getting consultative state:', error);
-    return null;
-  }
-}
-
-async function updateConsultativeState(
-  supabase: any, 
-  phoneNumber: string, 
-  updates: {
-    pending_properties?: any[];
-    current_property_index?: number;
-    awaiting_property_feedback?: boolean;
-    awaiting_c2s_confirmation?: boolean;
-    c2s_pending_property?: any | null;
-  }
-): Promise<void> {
-  try {
-    await supabase
-      .from('conversation_states')
-      .upsert({
-        phone_number: phoneNumber,
-        ...updates,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'phone_number' });
-    console.log(`📊 Consultative state updated:`, updates);
-  } catch (error) {
-    console.error('❌ Error updating consultative state:', error);
-  }
-}
-
-// ========== C2S CONFIRMATION DETECTION ==========
-
-function detectConfirmation(message: string): 'yes' | 'correction' | 'no' | 'unclear' {
-  const lower = message.toLowerCase().trim();
-  
-  const yesPatterns = [
-    /^sim$/i, /^isso$/i, /^correto$/i, /^perfeito$/i, /^pode$/i,
-    /tudo certo/i, /está correto/i, /confirmo/i, /isso mesmo/i,
-    /pode ser/i, /pode sim/i, /isso a[ií]/i, /exato/i, /certinho/i,
-    /^ok$/i, /^blz$/i, /beleza/i, /combinado/i, /fechado/i
-  ];
-  
-  const noPatterns = [
-    /^não$/i, /^nao$/i, /errado/i, /incorreto/i, /cancelar/i,
-    /desistir/i, /deixa\s+pra\s+l[aá]/i, /mudei\s+de\s+ideia/i
-  ];
-  
-  // Check for yes patterns
-  if (yesPatterns.some(p => p.test(lower))) return 'yes';
-  
-  // Check for no patterns
-  if (noPatterns.some(p => p.test(lower))) return 'no';
-  
-  // Check for data correction (user providing new data)
-  if (/meu\s+(telefone|nome|email)/i.test(lower)) return 'correction';
-  if (/^[a-záàâãéèêíïóôõöúç\s]{2,50}$/i.test(lower)) return 'correction'; // Just a name
-  
-  return 'unclear';
-}
-
-// ========== TRIAGE FLOW ==========
+// ========== CONVERSATION STATE ==========
 
 type TriageStage = 'greeting' | 'awaiting_name' | 'awaiting_triage' | 'completed' | null;
 
@@ -2469,6 +297,41 @@ async function updateTriageStage(supabase: any, phoneNumber: string, stage: Tria
   }
 }
 
+async function getConsultativeState(supabase: any, phoneNumber: string): Promise<ConsultativeState | null> {
+  try {
+    const { data } = await supabase
+      .from('conversation_states')
+      .select('pending_properties, current_property_index, awaiting_property_feedback, awaiting_c2s_confirmation, c2s_pending_property')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+    return data;
+  } catch (error) {
+    console.error('❌ Error getting consultative state:', error);
+    return null;
+  }
+}
+
+async function updateConsultativeState(
+  supabase: any, 
+  phoneNumber: string, 
+  updates: Partial<ConsultativeState>
+): Promise<void> {
+  try {
+    await supabase
+      .from('conversation_states')
+      .upsert({
+        phone_number: phoneNumber,
+        ...updates,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'phone_number' });
+    console.log(`📊 Consultative state updated:`, updates);
+  } catch (error) {
+    console.error('❌ Error updating consultative state:', error);
+  }
+}
+
+// ========== CONTACT HELPERS ==========
+
 async function getContactName(supabase: any, phoneNumber: string): Promise<string | null> {
   try {
     const { data } = await supabase
@@ -2494,74 +357,118 @@ async function saveContactNameMake(supabase: any, phoneNumber: string, name: str
   }
 }
 
-function extractNameFromMessage(message: string): string | null {
-  const cleaned = message.trim();
-  
-  // Ignore common greetings
-  if (/^(oi|olá|ola|bom dia|boa tarde|boa noite|hey|hello|hi|obrigad[oa]|valeu|blz|ok)$/i.test(cleaned)) {
+async function createOrUpdateContact(
+  supabase: any,
+  phoneNumber: string,
+  contactName?: string
+): Promise<void> {
+  try {
+    const { data: existing } = await supabase
+      .from('contacts')
+      .select('id, name')
+      .eq('phone', phoneNumber)
+      .maybeSingle();
+
+    if (existing) {
+      if (contactName && !existing.name) {
+        await supabase
+          .from('contacts')
+          .update({ name: contactName })
+          .eq('id', existing.id);
+      }
+    } else {
+      await supabase
+        .from('contacts')
+        .insert({
+          phone: phoneNumber,
+          name: contactName || null,
+          status: 'ativo'
+        });
+    }
+  } catch (error) {
+    console.error('❌ Error creating/updating contact:', error);
+  }
+}
+
+// ========== DEVELOPMENT HELPERS ==========
+
+async function checkDevelopmentLead(
+  supabase: any,
+  phoneNumber: string
+): Promise<{ development_id: string; development_name: string; contact_name: string | null } | null> {
+  try {
+    const phoneVariations = getPhoneVariations(phoneNumber);
+    const cutoffTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+    
+    const { data: portalLead } = await supabase
+      .from('portal_leads_log')
+      .select(`id, development_id, contact_name, developments!inner(name, slug)`)
+      .in('contact_phone', phoneVariations)
+      .not('development_id', 'is', null)
+      .gte('created_at', cutoffTime)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!portalLead?.development_id) return null;
+
+    console.log(`🏗️ Development lead found: ${(portalLead.developments as any)?.name}`);
+    return {
+      development_id: portalLead.development_id,
+      development_name: (portalLead.developments as any)?.name || 'Unknown',
+      contact_name: portalLead.contact_name
+    };
+  } catch (error) {
+    console.error('❌ Error checking development lead:', error);
     return null;
   }
-  
-  // Ignore common non-name words
-  const invalidNames = [
-    'sim', 'não', 'nao', 'ok', 'oi', 'olá', 'ola', 'bom', 'boa', 'dia', 'tarde', 'noite',
-    'obrigado', 'obrigada', 'tchau', 'até', 'ate', 'valeu', 'blz', 'beleza',
-    'quero', 'preciso', 'tenho', 'busco', 'procuro', 'apartamento', 'casa', 'imovel', 'imóvel',
-    'alugar', 'comprar', 'vender', 'aluguel', 'venda', 'locação', 'locacao',
-    'centro', 'trindade', 'ingleses', 'campeche', 'lagoa', 'floripa', 'florianópolis',
-    'texto', 'áudio', 'audio', 'mensagem', 'foto', 'imagem', 'pode', 'posso', 'claro'
-  ];
-  
-  // Patterns that explicitly indicate a name - NOW SUPPORTS COMPOUND NAMES (e.g., "Ana Paula")
-  const patterns = [
-    // "Sou o/a João Silva" or "Sou João Silva" - captures up to 3 words
-    /(?:sou\s+(?:o|a)\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})/i,
-    // "Meu nome é Maria Santos"
-    /(?:meu\s+nome\s+[eé]\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})/i,
-    // "Pode me chamar de Ana Paula"
-    /(?:pode\s+me\s+chamar\s+de\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})/i,
-    // "Me chamo Carlos Eduardo"
-    /(?:me\s+chamo\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})/i,
-    // "É a Maria" or "É o João"
-    /^(?:[eé]h?\s+(?:o|a)\s+)([A-Za-zÀ-ÿ]+(?:\s+[A-Za-zÀ-ÿ]+){0,2})$/i,
-  ];
-  
-  for (const pattern of patterns) {
-    const match = cleaned.match(pattern);
-    if (match && match[1]) {
-      const extractedName = match[1].trim();
-      const firstWord = extractedName.split(/\s+/)[0].toLowerCase();
+}
+
+async function detectDevelopmentFromMessage(
+  supabase: any,
+  messageBody: string
+): Promise<{ development_id: string; development_name: string } | null> {
+  try {
+    if (!messageBody || messageBody.length < 5) return null;
+
+    const { data: developments } = await supabase
+      .from('developments')
+      .select('id, name, slug')
+      .eq('is_active', true);
+
+    if (!developments?.length) return null;
+
+    const normalizedMessage = messageBody.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    for (const dev of developments) {
+      const normalizedName = dev.name.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       
-      // Validate: first word is not a common invalid word
-      if (!invalidNames.includes(firstWord) && extractedName.length >= 2 && extractedName.length <= 40) {
-        // Capitalize each word properly
-        return extractedName.split(/\s+/).map(word => 
-          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ).join(' ');
+      if (normalizedName.length >= 5 && normalizedMessage.includes(normalizedName)) {
+        console.log(`🏗️ Development detected: "${dev.name}"`);
+        return { development_id: dev.id, development_name: dev.name };
       }
     }
+
+    return null;
+  } catch (error) {
+    console.error('❌ Error detecting development:', error);
+    return null;
   }
-  
-  // Short response handling: "Ana Paula" or "João" (1-3 words, all valid name characters)
-  const words = cleaned.split(/\s+/);
-  if (words.length >= 1 && words.length <= 3) {
-    // Check all words are valid name parts
-    const allValidNameWords = words.every(word => 
-      /^[A-Za-zÀ-ÿ]+$/.test(word) && 
-      word.length >= 2 && 
-      word.length <= 20 &&
-      !invalidNames.includes(word.toLowerCase())
-    );
-    
-    if (allValidNameWords) {
-      return words.map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-      ).join(' ');
-    }
-  }
-  
-  return null;
 }
+
+async function getDevelopment(supabase: any, developmentId: string): Promise<any | null> {
+  const { data } = await supabase
+    .from('developments')
+    .select('*')
+    .eq('id', developmentId)
+    .eq('is_active', true)
+    .single();
+  return data;
+}
+
+// ========== TRIAGE HELPERS ==========
 
 const TRIAGE_BUTTON_MAP: Record<string, 'locacao' | 'vendas' | 'administrativo'> = {
   'alugar': 'locacao',
@@ -2689,372 +596,6 @@ async function callOpenAI(
     content: choice.message.content || '',
     toolCalls: choice.message.tool_calls || []
   };
-}
-
-// ========== DATABASE FUNCTIONS ==========
-
-async function findOrCreateConversation(
-  supabase: any, 
-  phoneNumber: string, 
-  departmentCode: DepartmentType = null
-): Promise<{ id: string; department_code: DepartmentType; contact_id: string | null } | null> {
-  try {
-    const { data: existingConv } = await supabase
-      .from('conversations')
-      .select('id, department_code, contact_id')
-      .eq('phone_number', phoneNumber)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingConv) {
-      console.log(`✅ Found existing conversation: ${existingConv.id}`);
-      return existingConv;
-    }
-
-    const { data: contact } = await supabase
-      .from('contacts')
-      .select('id, department_code')
-      .eq('phone', phoneNumber)
-      .maybeSingle();
-
-    const { data: newConv, error } = await supabase
-      .from('conversations')
-      .insert({
-        phone_number: phoneNumber,
-        contact_id: contact?.id || null,
-        department_code: departmentCode || contact?.department_code || null,
-        status: 'active',
-        last_message_at: new Date().toISOString()
-      })
-      .select('id, department_code, contact_id')
-      .single();
-
-    if (error) {
-      console.error('❌ Error creating conversation:', error);
-      return null;
-    }
-
-    console.log(`✅ New conversation created: ${newConv.id}`);
-    return newConv;
-
-  } catch (error) {
-    console.error('❌ Error in findOrCreateConversation:', error);
-    return null;
-  }
-}
-
-async function saveMessage(
-  supabase: any,
-  conversationId: string | null,
-  phoneNumber: string,
-  body: string,
-  direction: 'inbound' | 'outbound',
-  messageId?: string,
-  mediaInfo?: MediaInfo,
-  departmentCode?: DepartmentType
-): Promise<number | null> {
-  try {
-    const messageData: any = {
-      conversation_id: conversationId,
-      wa_message_id: messageId || `make_${direction}_${Date.now()}`,
-      wa_from: direction === 'inbound' ? phoneNumber : null,
-      wa_to: direction === 'outbound' ? phoneNumber : null,
-      direction,
-      body,
-      wa_timestamp: new Date().toISOString(),
-      department_code: departmentCode || null,
-      media_type: mediaInfo?.type || null,
-      media_url: mediaInfo?.url || null,
-      media_caption: mediaInfo?.caption || null,
-      media_filename: mediaInfo?.filename || null,
-      media_mime_type: mediaInfo?.mimeType || null
-    };
-
-    const { data, error } = await supabase
-      .from('messages')
-      .insert(messageData)
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error(`❌ Error saving ${direction} message:`, error);
-      return null;
-    }
-
-    console.log(`💾 ${direction} message saved: ${data.id}`);
-    return data.id;
-  } catch (error) {
-    console.error(`❌ Error in saveMessage:`, error);
-    return null;
-  }
-}
-
-// ========== AUDIO TRANSCRIPTION & TTS ==========
-
-async function transcribeAudio(supabase: any, audioUrl: string): Promise<string | null> {
-  try {
-    console.log('🎤 Transcribing audio from Make:', audioUrl);
-    
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: { audioUrl }
-    });
-    
-    if (error || !data?.success) {
-      console.error('❌ Transcription failed:', error || data?.error);
-      return null;
-    }
-    
-    console.log('✅ Audio transcribed:', data.text?.substring(0, 100));
-    return data.text;
-  } catch (error) {
-    console.error('❌ Error in transcribeAudio:', error);
-    return null;
-  }
-}
-
-async function getAudioConfig(supabase: any): Promise<AudioConfig | null> {
-  try {
-    const { data } = await supabase
-      .from('system_settings')
-      .select('setting_value')
-      .eq('setting_key', 'ai_agent_config')
-      .maybeSingle();
-    
-    if (!data?.setting_value) return null;
-    
-    const config = data.setting_value;
-    return {
-      audio_enabled: config.audio_enabled || false,
-      audio_voice_id: config.audio_voice_id || 'EXAVITQu4vr4xnSDxMaL',
-      audio_voice_name: config.audio_voice_name || 'Sarah',
-      audio_mode: config.audio_mode || 'text_and_audio',
-      audio_max_chars: config.audio_max_chars || 1000
-    };
-  } catch (error) {
-    console.error('❌ Error getting audio config:', error);
-    return null;
-  }
-}
-
-async function generateAudioResponse(text: string, audioConfig: AudioConfig): Promise<AudioResult | null> {
-  if (!audioConfig.audio_enabled) return null;
-  
-  const textToConvert = text.length > audioConfig.audio_max_chars 
-    ? text.substring(0, audioConfig.audio_max_chars) + '...'
-    : text;
-  
-  try {
-    console.log('🎙️ Generating TTS audio...');
-    
-    const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
-    if (!ELEVENLABS_API_KEY) {
-      console.error('❌ ELEVENLABS_API_KEY not configured');
-      return null;
-    }
-
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${audioConfig.audio_voice_id}`,
-      {
-        method: 'POST',
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: textToConvert,
-          model_id: 'eleven_multilingual_v2',
-          output_format: 'mp3_44100_128',
-          voice_settings: {
-            stability: 0.70,
-            similarity_boost: 0.85,
-            style: 0.25,
-            use_speaker_boost: true,
-            speed: 0.92,
-          },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ ElevenLabs API error:', response.status, errorText);
-      return null;
-    }
-
-    const audioBuffer = await response.arrayBuffer();
-    console.log('✅ MP3 audio generated:', audioBuffer.byteLength, 'bytes');
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const storageSupabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    const fileName = `ai-audio-${Date.now()}.mp3`;
-    const { error: uploadError } = await storageSupabase
-      .storage
-      .from('whatsapp-media')
-      .upload(fileName, audioBuffer, {
-        contentType: 'audio/mpeg',
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error('❌ Storage upload error:', uploadError);
-      return null;
-    }
-
-    const { data: urlData } = storageSupabase
-      .storage
-      .from('whatsapp-media')
-      .getPublicUrl(fileName);
-
-    console.log('✅ Audio uploaded:', urlData.publicUrl);
-    
-    return {
-      audioUrl: urlData.publicUrl,
-      isVoiceMessage: false,
-      contentType: 'audio/mpeg'
-    };
-  } catch (error) {
-    console.error('❌ Error in generateAudioResponse:', error);
-    return null;
-  }
-}
-
-async function getConversationHistory(
-  supabase: any,
-  conversationId: string,
-  limit: number = 10
-): Promise<ConversationMessage[]> {
-  try {
-    const { data: messages } = await supabase
-      .from('messages')
-      .select('direction, body')
-      .eq('conversation_id', conversationId)
-      .not('body', 'is', null)
-      .order('created_at', { ascending: true })
-      .limit(limit);
-
-    if (!messages?.length) return [];
-
-    return messages.map((m: any) => ({
-      role: m.direction === 'inbound' ? 'user' : 'assistant',
-      content: m.body
-    }));
-  } catch (error) {
-    console.error('❌ Error getting conversation history:', error);
-    return [];
-  }
-}
-
-async function checkDevelopmentLead(
-  supabase: any,
-  phoneNumber: string
-): Promise<{ development_id: string; development_name: string; contact_name: string | null } | null> {
-  try {
-    const phoneVariations = getPhoneVariations(phoneNumber);
-    const cutoffTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-    
-    const { data: portalLead } = await supabase
-      .from('portal_leads_log')
-      .select(`id, development_id, contact_name, developments!inner(name, slug)`)
-      .in('contact_phone', phoneVariations)
-      .not('development_id', 'is', null)
-      .gte('created_at', cutoffTime)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!portalLead?.development_id) return null;
-
-    console.log(`🏗️ Development lead found: ${(portalLead.developments as any)?.name}`);
-    return {
-      development_id: portalLead.development_id,
-      development_name: (portalLead.developments as any)?.name || 'Unknown',
-      contact_name: portalLead.contact_name
-    };
-  } catch (error) {
-    console.error('❌ Error checking development lead:', error);
-    return null;
-  }
-}
-
-async function detectDevelopmentFromMessage(
-  supabase: any,
-  messageBody: string
-): Promise<{ development_id: string; development_name: string } | null> {
-  try {
-    if (!messageBody || messageBody.length < 5) return null;
-
-    const { data: developments } = await supabase
-      .from('developments')
-      .select('id, name, slug')
-      .eq('is_active', true);
-
-    if (!developments?.length) return null;
-
-    const normalizedMessage = messageBody.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-    for (const dev of developments) {
-      const normalizedName = dev.name.toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      
-      if (normalizedName.length >= 5 && normalizedMessage.includes(normalizedName)) {
-        console.log(`🏗️ Development detected: "${dev.name}"`);
-        return { development_id: dev.id, development_name: dev.name };
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('❌ Error detecting development:', error);
-    return null;
-  }
-}
-
-async function getDevelopment(supabase: any, developmentId: string): Promise<Development | null> {
-  const { data } = await supabase
-    .from('developments')
-    .select('*')
-    .eq('id', developmentId)
-    .eq('is_active', true)
-    .single();
-  return data;
-}
-
-async function createOrUpdateContact(
-  supabase: any,
-  phoneNumber: string,
-  contactName?: string
-): Promise<void> {
-  try {
-    const { data: existing } = await supabase
-      .from('contacts')
-      .select('id, name')
-      .eq('phone', phoneNumber)
-      .maybeSingle();
-
-    if (existing) {
-      if (contactName && !existing.name) {
-        await supabase
-          .from('contacts')
-          .update({ name: contactName })
-          .eq('id', existing.id);
-      }
-    } else {
-      await supabase
-        .from('contacts')
-        .insert({
-          phone: phoneNumber,
-          name: contactName || null,
-          status: 'ativo'
-        });
-    }
-  } catch (error) {
-    console.error('❌ Error creating/updating contact:', error);
-  }
 }
 
 // ========== MAIN HANDLER ==========
@@ -3314,15 +855,13 @@ serve(async (req) => {
         // ===== TRIAGE COMPLETED - USE DEPARTMENT-SPECIFIC PROMPTS =====
         console.log(`🤖 Triage completed, dept: ${currentDepartment}`);
         
-        // ===== NEW: DETECT FLEXIBILIZATION FIRST (before normal extraction) =====
+        // Detect flexibilization first
         const flexibilization = detectFlexibilization(messageContent);
         if (flexibilization.detected) {
           console.log(`📝 Flexibilization detected: ${flexibilization.fields.join(', ')}`);
-          // Force update with forceUpdate=true to overwrite existing values
           await updateQualificationData(supabase, phoneNumber, flexibilization.updates as ExtractedQualificationData, true);
           
-          // ===== CRITICAL FIX: CLEAR CONSULTATIVE STATE WHEN KEY CRITERIA CHANGE =====
-          // When bedrooms, neighborhood, budget, or type change, old pending_properties are stale
+          // Clear consultative state when key criteria change
           const keyFields = ['quartos', 'bairro', 'orçamento', 'tipo'];
           const hasKeyFieldChange = flexibilization.fields.some(f => keyFields.includes(f));
           
@@ -3336,32 +875,31 @@ serve(async (req) => {
           }
         }
         
-        // ===== EXTRACT AND SAVE QUALIFICATION DATA =====
+        // Extract and save qualification data
         const extractedData = extractQualificationData(messageContent);
         if (Object.keys(extractedData).length > 0) {
           console.log(`📊 Extracted qualification data:`, extractedData);
           await updateQualificationData(supabase, phoneNumber, extractedData);
         }
         
-        // Check for consultative flow state (awaiting feedback on property)
+        // Check for consultative flow state
         const consultativeState = await getConsultativeState(supabase, phoneNumber);
         const isAwaitingFeedback = consultativeState?.awaiting_property_feedback === true;
         const isAwaitingC2SConfirmation = consultativeState?.awaiting_c2s_confirmation === true;
         const pendingProperties = consultativeState?.pending_properties || [];
         const currentIndex = consultativeState?.current_property_index || 0;
         
-        // ===== LOAD QUALIFICATION DATA FOR ALL PATHS (hoisted to prevent scope issues) =====
+        // Load qualification data
         const { progress: qualProgress, data: qualData } = await getQualificationProgress(supabase, phoneNumber);
         console.log(`📊 Qualification progress:`, qualProgress);
         
-        // ===== HANDLE C2S CONFIRMATION FLOW (PRIORITY) =====
+        // ===== HANDLE C2S CONFIRMATION FLOW =====
         if (isAwaitingC2SConfirmation) {
           console.log('📤 Awaiting C2S confirmation - processing response');
           const confirmation = detectConfirmation(messageContent);
           const pendingProp = consultativeState?.c2s_pending_property;
           
           if (confirmation === 'yes') {
-            // Client confirmed - send to C2S directly
             console.log('✅ Client confirmed - sending to C2S directly');
             const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
             
@@ -3373,7 +911,6 @@ serve(async (req) => {
               resumo: `Imóvel código ${pendingProp?.codigo || 'N/A'}`
             }, phoneNumber, historyText, existingName || undefined);
             
-            // Clear confirmation state
             await updateConsultativeState(supabase, phoneNumber, {
               awaiting_c2s_confirmation: false,
               c2s_pending_property: null
@@ -3383,18 +920,14 @@ serve(async (req) => {
               c2sTransferred = true;
               const nameGreet = existingName ? `, ${existingName}` : '';
               aiResponse = `Perfeito${nameGreet}! 🎉 Seu interesse foi registrado. Um consultor vai entrar em contato em breve para organizar a visita ao imóvel ${pendingProp?.codigo || ''}.`;
-              console.log('✅ Lead sent to C2S after confirmation');
             } else {
               aiResponse = `Ops, tive um probleminha técnico 😅 Mas não se preocupe, vou registrar seu interesse manualmente. Um consultor vai entrar em contato em breve!`;
             }
           } else if (confirmation === 'correction') {
-            // Client provided new data (likely their name)
             const detectedName = extractNameFromMessage(messageContent);
             if (detectedName) {
               await saveContactNameMake(supabase, phoneNumber, detectedName);
-              console.log(`📝 Name updated during C2S confirmation: ${detectedName}`);
               
-              // Now send to C2S with the new name
               const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
               const c2sResult = await sendLeadToC2S(supabase, {
                 nome: detectedName,
@@ -3417,149 +950,99 @@ serve(async (req) => {
               aiResponse = `Desculpa, não entendi 😅 Pode me confirmar seu nome completo?`;
             }
           } else if (confirmation === 'no') {
-            // Client declined
             await updateConsultativeState(supabase, phoneNumber, {
               awaiting_c2s_confirmation: false,
               c2s_pending_property: null
             });
             aiResponse = `Sem problemas! 😊 Quer que eu continue mostrando outras opções?`;
           } else {
-            // Unclear - ask again
             aiResponse = `Só pra confirmar: posso encaminhar seu interesse para um consultor entrar em contato? 😊`;
           }
         }
-        // ===== NORMAL FEEDBACK FLOW =====
+        // ===== PROPERTY FEEDBACK FLOW =====
         else if (isAwaitingFeedback && pendingProperties.length > 0) {
-          // Analyze feedback on previously presented property
           const feedback = analyzePropertyFeedback(messageContent);
           console.log(`📊 Property feedback: ${feedback}`);
           
           if (feedback === 'positive') {
-            // Client interested - trigger C2S flow DIRECTLY
-            console.log('✅ Positive feedback - initiating DETERMINISTIC C2S flow');
             const currentProperty = pendingProperties[currentIndex];
-            
-            // Check if we have complete data to send directly
             const hasCompleteData = !!existingName && existingName.toLowerCase() !== 'lead sem nome';
             
             if (hasCompleteData) {
-              // We have name - send to C2S DIRECTLY (no AI dependency)
-              console.log(`✅ Complete data available - sending to C2S directly for ${existingName}`);
               const historyText = history.map(m => `${m.role}: ${m.content}`).join('\n');
-              
               const c2sResult = await sendLeadToC2S(supabase, {
                 nome: existingName,
                 interesse: `Interesse em ${currentProperty?.tipo || 'imóvel'} - ${currentProperty?.bairro || ''}`,
                 tipo_imovel: currentProperty?.tipo,
                 bairro: currentProperty?.bairro,
-                faixa_preco: currentProperty?.preco_formatado,
-                resumo: `Imóvel código ${currentProperty?.codigo || 'N/A'} - Cliente demonstrou interesse em agendar visita`
+                resumo: `Imóvel código ${currentProperty?.codigo || 'N/A'}`
               }, phoneNumber, historyText, existingName);
               
-              // Update state
               await updateConsultativeState(supabase, phoneNumber, {
-                awaiting_property_feedback: false
+                awaiting_property_feedback: false,
+                pending_properties: []
               });
               
               if (c2sResult.success) {
                 c2sTransferred = true;
-                aiResponse = `Perfeito, ${existingName}! 🎉 Um consultor vai entrar em contato para organizar a visita ao imóvel ${currentProperty?.codigo || ''} e tirar todas as suas dúvidas.`;
-                console.log('✅ Lead sent to C2S directly after positive feedback');
+                aiResponse = `Que ótimo, ${existingName}! 🎉 Seu interesse foi registrado. Um consultor vai entrar em contato em breve para organizar a visita.`;
               } else {
-                // Fallback if C2S fails
-                aiResponse = `Ótimo, ${existingName}! 😊 Vou registrar seu interesse. Um consultor entrará em contato em breve!`;
+                aiResponse = `Excelente escolha! Vou registrar seu interesse e um consultor entrará em contato 😊`;
               }
             } else {
-              // Missing name - ask for it and set confirmation state
-              console.log('⚠️ Missing name - setting C2S confirmation state');
-              
               await updateConsultativeState(supabase, phoneNumber, {
-                awaiting_property_feedback: false,
                 awaiting_c2s_confirmation: true,
-                c2s_pending_property: currentProperty
+                c2s_pending_property: currentProperty,
+                awaiting_property_feedback: false
               });
-              
-              aiResponse = `Ótimo! Vou te conectar com um consultor para organizar a visita. 😊 Só preciso confirmar: qual seu nome completo?`;
+              aiResponse = `Que ótimo que gostou! 😊 Para registrar seu interesse, pode me confirmar seu nome completo?`;
             }
           } else if (feedback === 'negative' || feedback === 'more_options' || feedback === 'interested_but_more') {
-            // ===== PRICE FLEXIBILITY DETECTION (only for pure negative feedback) =====
-            if (feedback === 'negative') {
-              const priceFlexibility = detectPriceFlexibility(messageContent);
-              
-              if (priceFlexibility.type !== 'none' && !priceFlexibility.hasNewValue) {
-                // Client wants to flex price but didn't give value
-                console.log(`💰 Price flexibility detected: ${priceFlexibility.type}, asking for value`);
-                aiResponse = priceFlexibility.suggestedQuestion!;
-                // DON'T show next property - wait for value
-              }
-            }
+            const nextIndex = currentIndex + 1;
             
-            // Show next property for all three feedback types
-            if (!aiResponse) {
-              console.log(`📊 Feedback "${feedback}" - showing next property`);
+            if (nextIndex < pendingProperties.length) {
+              propertiesToSend = [pendingProperties[nextIndex]];
               
-              const nextIndex = currentIndex + 1;
+              await updateConsultativeState(supabase, phoneNumber, {
+                current_property_index: nextIndex,
+                awaiting_property_feedback: true
+              });
               
-              if (nextIndex < pendingProperties.length) {
-                propertiesToSend = [pendingProperties[nextIndex]];
-                
-                await updateConsultativeState(supabase, phoneNumber, {
-                  current_property_index: nextIndex,
-                  awaiting_property_feedback: true
-                });
-                
-                const nameGreet = existingName ? `, ${existingName}` : '';
-                
-                // Customized responses for each feedback type
-                if (feedback === 'interested_but_more') {
-                  aiResponse = `Que bom que gostou${nameGreet}! 😊 Vou guardar esse. Enquanto isso, olha essa outra opção:`;
-                } else if (feedback === 'more_options') {
-                  aiResponse = `Claro${nameGreet}! 😊 Tenho mais esta opção:`;
-                } else {
-                  aiResponse = `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
-                }
-                
-                console.log(`📤 Showing next property: index ${nextIndex}`);
+              const nameGreet = existingName ? `, ${existingName}` : '';
+              
+              if (feedback === 'interested_but_more') {
+                aiResponse = `Que bom que gostou${nameGreet}! 😊 Vou guardar esse. Enquanto isso, olha essa outra opção:`;
+              } else if (feedback === 'more_options') {
+                aiResponse = `Claro${nameGreet}! 😊 Tenho mais esta opção:`;
               } else {
-                // No more properties available
-                await updateConsultativeState(supabase, phoneNumber, {
-                  awaiting_property_feedback: false,
-                  pending_properties: []
-                });
-                
-                if (feedback === 'interested_but_more') {
-                  aiResponse = `Essas são as opções que encontrei! 😊 Quer que eu encaminhe o primeiro que você curtiu para um consultor entrar em contato?`;
-                } else {
-                  aiResponse = `Entendi! Essas eram as opções que encontrei com esses critérios. 🤔\n\nPodemos ajustar a busca? Me conta o que não se encaixou (preço, tamanho, localização).`;
-                }
+                aiResponse = `Entendi${nameGreet}! 😊 Tenho outra opção que pode ser mais adequada.`;
+              }
+            } else {
+              await updateConsultativeState(supabase, phoneNumber, {
+                awaiting_property_feedback: false,
+                pending_properties: []
+              });
+              
+              if (feedback === 'interested_but_more') {
+                aiResponse = `Essas são as opções que encontrei! 😊 Quer que eu encaminhe o primeiro que você curtiu para um consultor entrar em contato?`;
+              } else {
+                aiResponse = `Entendi! Essas eram as opções que encontrei com esses critérios. 🤔\n\nPodemos ajustar a busca? Me conta o que não se encaixou (preço, tamanho, localização).`;
               }
             }
           } else {
-            // Neutral feedback - ask for clarification
             const currentProperty = pendingProperties[currentIndex];
             aiResponse = `O que você achou desse imóvel em ${currentProperty?.bairro || 'N/A'}? Faz sentido pra você? 😊`;
           }
         } else {
-          // Normal flow - no pending feedback
-          // (qualProgress and qualData already loaded above)
-          
-          // ===== DETECT PRICE FLEXIBILITY (moved to main flow) =====
+          // ===== NORMAL QUALIFICATION FLOW =====
           const priceFlexibility = detectPriceFlexibility(messageContent);
           if (priceFlexibility.type !== 'none' && !priceFlexibility.hasNewValue) {
-            console.log(`💰 Price flexibility detected in main flow: ${priceFlexibility.type}`);
             aiResponse = priceFlexibility.suggestedQuestion!;
           }
-          // ===== DETECT WAITING SIGNAL ("fico no aguardo", "ok", etc) =====
           else if (isWaitingSignal(messageContent)) {
-            console.log(`⏳ Waiting signal detected: "${messageContent}"`);
-            
-            // Check if we can search
             if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
-              console.log(`✅ Has criteria, forcing auto-search with fallback`);
-              
               const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
               if (searchParams) {
-                console.log(`🏠 Auto-search params:`, searchParams);
                 const fallbackResult = await searchPropertiesWithFallback(supabase, searchParams);
                 
                 if (fallbackResult.properties.length > 0) {
@@ -3574,32 +1057,19 @@ serve(async (req) => {
                   
                   propertiesToSend = [allProperties[0]];
                   aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
-                  
-                  console.log(`✅ Auto-search with fallback: found ${allProperties.length} properties (${fallbackResult.searchType})`);
                 } else {
                   aiResponse = `Não encontrei imóveis com esses critérios no momento 😔\n\nO que você prefere ajustar: preço, região ou número de quartos?`;
                 }
               }
             } else {
-              // Not enough criteria - ask next question
               const nextQuestion = getNextQualificationQuestion(qualProgress, currentDepartment || 'locacao');
-              if (nextQuestion) {
-                aiResponse = nextQuestion;
-              } else {
-                aiResponse = `Me conta mais sobre o que você procura 😊`;
-              }
+              aiResponse = nextQuestion || `Me conta mais sobre o que você procura 😊`;
             }
           }
-          // ===== NORMAL FLOW - CHECK FOR AUTO-SEARCH OR AI =====
           else {
-            // Check if we now have enough criteria to search automatically
             if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
-              console.log(`✅ Has minimum criteria - triggering auto-search with fallback`);
-              
               const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
               if (searchParams) {
-                console.log(`🏠 Auto-search params:`, searchParams);
-                // USE FALLBACK SEARCH instead of regular search
                 const fallbackResult = await searchPropertiesWithFallback(supabase, searchParams);
                 
                 if (fallbackResult.properties.length > 0) {
@@ -3613,31 +1083,21 @@ serve(async (req) => {
                   });
                   
                   propertiesToSend = [allProperties[0]];
-                  // Use contextual message based on search type
                   aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
-                  
-                  console.log(`✅ Auto-search with fallback: found ${allProperties.length} properties (${fallbackResult.searchType})`);
                 } else {
                   aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔\n\nO que você prefere flexibilizar: valor, região ou quartos?`;
                 }
               }
             } else {
-              // Use deterministic qualification question first
               const nextQuestion = getNextQualificationQuestion(qualProgress, currentDepartment || 'locacao');
               
               if (nextQuestion) {
-                // Just use the deterministic question - no OpenAI needed
                 const nameGreet = existingName ? `, ${existingName}` : '';
                 aiResponse = `${getRandomPhrase('agreement')}${nameGreet} ${nextQuestion}`;
-                console.log(`📝 Using deterministic qualification question`);
               } else {
-                // All questions answered but criteria not met (shouldn't happen) - use AI
                 let tools = toolsWithVista;
-                
-                // Use helper function that checks for overrides
                 const systemPrompt = getPromptForDepartment(agentConfig, currentDepartment, existingName || undefined, history, qualData);
                 
-                // Disable tools for admin department
                 if (currentDepartment === 'administrativo') {
                   tools = [];
                 }
@@ -3645,10 +1105,9 @@ serve(async (req) => {
                 const result = await callOpenAI(systemPrompt, history, aiPromptMessage, tools);
                 aiResponse = result.content;
                 
-                // ===== ANTI-LOOP DETECTION =====
+                // Anti-loop detection
                 if (isLoopingQuestion(aiResponse, qualData)) {
                   console.log('🔄 Loop detected! Replacing with fallback search');
-                  // Check for auto-search as fallback - USE FALLBACK SEARCH
                   if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
                     const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
                     if (searchParams) {
@@ -3673,13 +1132,12 @@ serve(async (req) => {
                   }
                 }
   
-                // ===== PROCESS TOOL CALLS (fallback for AI-triggered search) =====
+                // Process tool calls
                 for (const toolCall of result.toolCalls) {
                   const args = JSON.parse(toolCall.function.arguments);
                   console.log(`🔧 Tool call: ${toolCall.function.name}`, args);
                   
                   if (toolCall.function.name === 'buscar_imoveis') {
-                    // USE FALLBACK SEARCH for AI-triggered searches too
                     const fallbackResult = await searchPropertiesWithFallback(supabase, args);
                     
                     if (fallbackResult.properties.length > 0) {
@@ -3696,8 +1154,6 @@ serve(async (req) => {
                       if (!aiResponse || aiResponse.length < 10) {
                         aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
                       }
-                      
-                      console.log(`✅ Consultative flow with fallback: saved ${allProperties.length} properties (${fallbackResult.searchType})`);
                     } else {
                       if (!aiResponse || aiResponse.length < 10) {
                         aiResponse = `Poxa, não encontrei imóveis com esses critérios 😔 Podemos flexibilizar algo?`;
@@ -3711,7 +1167,6 @@ serve(async (req) => {
                     
                     if (c2sResult.success) {
                       c2sTransferred = true;
-                      console.log('✅ Lead sent to C2S');
                     }
                   }
                 }
@@ -3726,13 +1181,12 @@ serve(async (req) => {
           aiResponse = FALLBACK_RESPONSE;
         }
         
-        // ===== ANTI-REPETITION CHECK =====
+        // Anti-repetition check
         if (conversationId && aiResponse) {
           const lastOutbound = await getLastOutboundMessage(supabase, conversationId);
           if (isSameMessage(lastOutbound, aiResponse)) {
             console.log('⚠️ Duplicate message detected - generating alternative');
             
-            // Check if we can search
             if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
               const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
               if (searchParams) {
@@ -3751,7 +1205,6 @@ serve(async (req) => {
                 }
               }
             } else {
-              // Ask a specific clarifying question
               aiResponse = 'Entendi! Pra refinar a busca, me conta: qual o valor máximo que você considera? 💰';
             }
           }
@@ -3808,11 +1261,10 @@ serve(async (req) => {
 
     console.log(`✅ Processed - Agent: ${agent}, Dept: ${currentDepartment}, Props: ${propertiesToSend.length}, Audio: ${!!audioResult}`);
 
-    // Get final triage stage and consultative state
+    // Get final states
     const finalState = await getConversationState(supabase, phoneNumber);
     const finalConsultativeState = await getConsultativeState(supabase, phoneNumber);
     
-    // Build presentation state for Make.com
     const presentationState = finalConsultativeState?.awaiting_property_feedback ? {
       awaiting_feedback: true,
       current_index: finalConsultativeState.current_property_index || 0,
@@ -3828,7 +1280,6 @@ serve(async (req) => {
         agent,
         conversation_id: conversationId,
         department: currentDepartment,
-        // Properties found for Make to send (1 at a time in consultative flow)
         properties: propertiesToSend.length > 0 ? propertiesToSend.map(p => ({
           codigo: p.codigo,
           foto_destaque: p.foto_destaque,
@@ -3842,17 +1293,13 @@ serve(async (req) => {
           valor_condominio: p.valor_condominio,
           descricao: p.descricao || ''
         })) : undefined,
-        // Consultative presentation state
         presentation_state: presentationState,
-        // Template to send
         send_template: sendTriageTemplate ? { name: 'triagem', language: 'pt_BR' } : null,
-        // Audio for Make to send
         audio: audioResult ? {
           url: audioResult.audioUrl,
           type: audioResult.contentType,
           is_voice_message: audioResult.isVoiceMessage
         } : null,
-        // C2S transfer status
         c2s_transferred: c2sTransferred,
         metadata: {
           development_detected: developmentDetected,
