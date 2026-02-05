@@ -320,7 +320,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
       updateStep(step6, { status: 'running' });
       await delay(400);
       
-      const greeting = `Olá, ${leadConfig.name}! 👋\n\nSou a Nina da Smolka Imóveis!\n\nVi que você se interessou por esse imóvel no ${leadConfig.portal}:`;
+      const greeting = `Olá, ${leadConfig.name}! 👋\n\nSou a Helena da Smolka Imóveis!\n\nVi que você se interessou por esse imóvel no ${leadConfig.portal}:`;
       addMessage('bot', greeting);
       updateStep(step6, { status: 'completed' });
 
@@ -762,7 +762,7 @@ export function PortalLeadSimulator({ onClose }: PortalLeadSimulatorProps) {
                                 <User className="h-3 w-3" />
                               )}
                               <span className="text-xs opacity-70">
-                                {msg.type === 'bot' ? 'Nina' : leadConfig.name}
+                                {msg.type === 'bot' ? 'Aimee' : leadConfig.name}
                               </span>
                             </div>
                             <p className="whitespace-pre-wrap">{msg.content}</p>
