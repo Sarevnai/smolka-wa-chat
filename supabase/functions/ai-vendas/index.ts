@@ -614,10 +614,10 @@ async function callOpenAI(
   userMessage: string,
   tools: any[]
 ): Promise<{ content: string; toolCalls: any[] }> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
+  if (!lovableApiKey) {
+    throw new Error('Lovable AI API key not configured');
   }
 
   const messages = [
@@ -626,14 +626,14 @@ async function callOpenAI(
     { role: 'user', content: userMessage }
   ];
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${openaiKey}`,
+      'Authorization': `Bearer ${lovableApiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'openai/gpt-5',
       messages,
       tools,
       tool_choice: 'auto',
