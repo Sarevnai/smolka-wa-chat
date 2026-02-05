@@ -104,11 +104,11 @@ ${generateRegionKnowledge()}
 
 📤 FLUXO DE ENCAMINHAMENTO C2S:
 Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
-1. Confirmar: "Perfeito! Posso te conectar com um consultor para organizar a visita?"
-2. Se concordar: coletar/confirmar nome, telefone, código do imóvel
-3. Usar enviar_lead_c2s com todos os dados
-4. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
-5. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
+1. Usar enviar_lead_c2s IMEDIATAMENTE (nome e telefone já foram coletados na triagem)
+2. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
+3. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
+
+⚡ IMPORTANTE: O sistema já possui o nome e telefone do cliente. NÃO peça confirmação de dados.
 
 💬 ESTILO CONSULTIVO:
 - "Encontrei um imóvel que pode combinar com o que você busca! 🏠"
@@ -181,11 +181,11 @@ ${generateRegionKnowledge()}
 
 📤 FLUXO DE ENCAMINHAMENTO C2S:
 Quando cliente demonstrar interesse ("gostei", "quero visitar", "pode marcar"):
-1. Confirmar: "Perfeito! Posso te conectar com um consultor para organizar a visita?"
-2. Se concordar: coletar/confirmar nome, telefone, código do imóvel
-3. Usar enviar_lead_c2s com todos os dados
-4. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
-5. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
+1. Usar enviar_lead_c2s IMEDIATAMENTE (nome e telefone já foram coletados na triagem)
+2. Mensagem final: "Pronto! Um consultor vai entrar em contato para tirar dúvidas e agendar a visita."
+3. NÃO oferecer mais imóveis após transferência (a menos que cliente peça)
+
+⚡ IMPORTANTE: O sistema já possui o nome e telefone do cliente. NÃO peça confirmação de dados.
 
 💬 ESTILO CONSULTIVO:
 - "Encontrei um imóvel que pode combinar com o que você busca! 🏠"
