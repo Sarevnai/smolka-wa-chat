@@ -53,20 +53,27 @@ export function DeleteTestLeadCard() {
       if (error) throw error;
 
       if (data.success) {
+        const deletedCounts: Record<string, number> =
+          (data.deleted_counts as Record<string, number> | undefined) ??
+          (data.deleted as Record<string, number> | undefined) ??
+          {};
+
         setDeletionResult({
           success: true,
-          deleted: data.deleted,
+          deleted: deletedCounts,
         });
-        
-        const totalDeleted = Object.values(data.deleted as Record<string, number>)
-          .reduce((sum: number, count) => sum + (count as number), 0);
-        
+
+        const totalDeleted = Object.values(deletedCounts).reduce(
+          (sum: number, count) => sum + (Number(count) || 0),
+          0
+        );
+
         if (totalDeleted > 0) {
           toast.success(`Lead excluído! ${totalDeleted} registros removidos.`);
         } else {
           toast.info("Nenhum registro encontrado para este número.");
         }
-        
+
         setPhone("");
       } else {
         throw new Error(data.error || "Erro ao excluir lead");
