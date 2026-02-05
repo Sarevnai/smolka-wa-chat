@@ -1,195 +1,180 @@
 
 
-# Análise Completa: Make.com Blueprint vs make-webhook
+# Plano de Padronização: Aimee - Nome do Produto
 
-## Estrutura do Blueprint Make.com
+## Conceito de Naming
 
-Após analisar o blueprint completo, identifiquei o fluxo:
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  MÓDULO 1: watchEvents2                                                          │
-│  "Recebe a mensagem do cliente" (WhatsApp Webhook)                              │
-└───────────────────────────────────┬─────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  MÓDULO 14: HTTP Request                                                         │
-│  URL: supabase.co/functions/v1/make-webhook                                     │
-│  FILTRO: "Apenas mensagens reais" (messages exists AND length > 0)              │
-│  Envia: phone, message, message_type, media_url, button_text, etc.              │
-└───────────────────────────────────┬─────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│  MÓDULO 23: Router (BasicRouter)                                                 │
-│  Divide o fluxo em DUAS rotas principais                                        │
-└─────────────┬─────────────────────────────────────────────────────┬─────────────┘
-              │                                                     │
-              ▼                                                     ▼
-┌─────────────────────────────────┐          ┌───────────────────────────────────┐
-│  ROTA 1: Com Propriedades       │          │  ROTA 2: Sem Propriedades         │
-│  FILTRO: 14.data.properties     │          │  FILTRO: 14.data.properties       │
-│          EXISTS                 │          │          NOT EXISTS               │
-└─────────────┬───────────────────┘          └───────────────────┬───────────────┘
-              │                                                   │
-              ▼                                                   ▼
-┌─────────────────────────────────┐          ┌───────────────────────────────────┐
-│  MÓDULO 25: HTTP send-wa-media  │          │  Sub-router com 3 opções:         │
-│  Envia imóveis com foto         │          │  - Texto (Módulo 11)              │
-│                                 │          │  - Audio (Módulo 16)              │
-│  DEPOIS                         │          │  - Template triagem (Módulo 18)   │
-│  ↓                              │          └───────────────────────────────────┘
-│  MÓDULO 24: sendMessage         │
-│  "body": {{14.data.result}}     │ ← AQUI ESTÁ O PROBLEMA!
-└─────────────────────────────────┘
-```
+| Nível | Nome | Descrição |
+|-------|------|-----------|
+| **Produto** | Aimee | Nome comercial da plataforma de IA |
+| **Agentes por Departamento** | Aimee de [Departamento] | Aimee de Locação, Aimee de Vendas, Aimee Administrativa, Aimee de Marketing |
+| **Instância do Cliente** | Helena Smolka | Nome personalizado que o cliente Smolka escolheu para seu agente |
 
 ---
 
-## Problema Identificado
+## Inventário de Referências Encontradas
 
-### Os módulos do Make dependem de `14.data.result`:
+### Edge Functions (código)
 
-| Módulo | Condição/Uso | Esperado |
-|--------|--------------|----------|
-| **24** (Texto após imóveis) | `body: {{14.data.result}}` | Texto de resposta |
-| **11** (Texto simples) | `body: {{14.data.result}}` | Texto de resposta |
-| **18** (Template) | `FILTRO: 14.data.send_template EXISTS` | Campo existe |
-| **16** (Audio) | `link: {{14.data.audio.url}}` | URL de áudio |
+| Arquivo | Linha(s) | Referência Atual | Ação |
+|---------|----------|------------------|------|
+| `ai-arya-vendas/index.ts` | 65-69 | `Você é a Helena, assistente de atendimento da Smolka` (prompt) | ✅ OK - Lê do banco |
+| `ai-arya-vendas/index.ts` | 680 | `console.log('🏗️ Arya Vendas - Phone...')` | ❌ Alterar para `Aimee Vendas` |
+| `ai-arya-vendas/index.ts` | 749 | `action_type: 'ai_arya_redirect_out_of_scope'` | ❌ Alterar para `ai_vendas_redirect_out_of_scope` |
+| `ai-arya-vendas/index.ts` | 778 | `setting_category: 'ai_arya'` | ❌ Alterar para `ai_vendas` |
+| `ai-arya-vendas/index.ts` | 899 | `action_type: 'ai_arya_vendas_welcome'` | ❌ Alterar para `ai_vendas_welcome` |
+| `ai-arya-vendas/index.ts` | 1037 | `action_type: 'ai_arya_vendas'` | ❌ Alterar para `ai_vendas` |
+| `ai-arya-vendas/index.ts` | 1067 | `console.error('❌ Error in ai-arya-vendas:')` | ❌ Alterar para `ai-vendas` |
+| `whatsapp-webhook/index.ts` | 453 | `Used to route to ai-arya-vendas (Arya Vendas for empreendimentos)` | ❌ Alterar comentário |
+| `whatsapp-webhook/index.ts` | 1192 | `(Arya Vendas)` em comentário | ❌ Alterar comentário |
+| `whatsapp-webhook/index.ts` | 1304 | `Arya Vendas handled it` comentário | ❌ Alterar comentário |
+| `whatsapp-webhook/index.ts` | 1474 | `for Arya's triage` comentário | ❌ Alterar comentário |
+| `make-webhook/index.ts` | 3195-3197 | `routed_to: 'ai-arya-vendas'` e `Arya already sent` comentário | ❌ Alterar comentário |
+| `simulate-portal-lead/index.ts` | 339 | `(what Nina would send)` comentário | ❌ Alterar para `Aimee` |
 
-### Os early returns atuais NÃO retornam `result`:
+### Interface React (UI)
 
-**Linha 3055-3058 (Status callback):**
-```javascript
-return { success: true, skipped: true, reason: 'status_callback' }
-// ❌ SEM result - Make trava
-```
+| Arquivo | Linha(s) | Referência Atual | Ação |
+|---------|----------|------------------|------|
+| `DevelopmentsManagement.tsx` | 106-107 | `para atendimento da Arya (Vendas)` | ❌ Alterar para `Aimee de Vendas` |
+| `DevelopmentsManagement.tsx` | 121-122 | `para a Arya atender leads` | ❌ Alterar para `Aimee de Vendas` |
+| `PortalLeadSimulator.tsx` | 183 | `Chamando IA Nina (modo simulação)` | ❌ Alterar para `Aimee` |
+| `PortalLeadSimulator.tsx` | 186 | `Testando Nina com lead REAL` | ❌ Alterar para `Aimee` |
+| `PortalLeadSimulator.tsx` | 214 | `Exibindo respostas da Nina` | ❌ Alterar para `Aimee` |
+| `PortalLeadSimulator.tsx` | 249 | `próximo passo da Nina` | ❌ Alterar para `Aimee` |
+| `PortalLeadSimulator.tsx` | 468 | `Arya busca imóveis similares` | ❌ Alterar para `Aimee de Vendas` |
+| `PortalLeadSimulator.tsx` | 556-557 | `como a Arya responde` | ❌ Alterar para `Aimee` |
+| `PortalLeadSimulator.tsx` | 688 | `Testar IA Arya` (botão) | ❌ Alterar para `Testar Aimee` |
 
-**Linha 3163-3166 (Villa Maggiore):**
-```javascript
-return { success: true, skipped: true, reason: 'handled_by_direct_api' }
-// ❌ SEM result - Make trava
-```
+### Banco de Dados (system_settings)
 
----
+| Tabela | Registro | Valor Atual | Ação |
+|--------|----------|-------------|------|
+| `system_settings` | `setting_category: 'ai_arya'` | `quick_transfer_mode` | ❌ Alterar categoria para `ai_vendas` |
 
-## Consequência do Problema
+### Migrações Históricas (não alterar)
 
-Quando o `make-webhook` retorna sem o campo `result`:
-
-1. **O Router (Módulo 23)** não consegue decidir qual rota seguir
-2. **Os filtros** (`14.data.result`, `14.data.properties`) não encontram dados
-3. **O cenário para** e aguarda indefinidamente
-4. **O cliente não recebe resposta** mesmo que a mensagem tenha sido processada
-
----
-
-## Solução Proposta
-
-### Fase 1: Adicionar `result` em todos os early returns
-
-Modificar todos os pontos de "skip" para incluir o campo `result`:
-
-**Status callbacks (linha 3055-3058):**
-```javascript
-return new Response(
-  JSON.stringify({ 
-    success: true, 
-    skipped: true, 
-    reason: 'status_callback',
-    result: null  // ← ADICIONAR: Make vai ignorar mas não vai travar
-  }),
-  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-);
-```
-
-**Villa Maggiore (linha 3163-3166):**
-```javascript
-// OPÇÃO A: Apenas skip com result null
-return new Response(
-  JSON.stringify({ 
-    success: true, 
-    skipped: true, 
-    reason: 'handled_by_direct_api',
-    result: null  // ← Make não vai tentar enviar mensagem
-  }),
-  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-);
-
-// OPÇÃO B: Chamar ai-arya-vendas e retornar a resposta (mais completo)
-```
-
-### Fase 2: Ajustar filtros no Make.com (Opcional)
-
-Para maior robustez, o Make.com poderia ter um filtro adicional:
-- Antes de enviar mensagem: verificar se `14.data.result` não é nulo e não é vazio
-
----
-
-## Fluxo Corrigido
-
-```text
-┌──────────────────────────┐
-│     Mensagem Recebida    │
-│      (make-webhook)      │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│  É status callback?      │
-└────────────┬─────────────┘
-             │
-     ┌───────┴───────┐
-     │ SIM           │ NÃO
-     ▼               ▼
-┌──────────────┐ ┌──────────────────────────┐
-│ result: null │ │  É lead Villa Maggiore?  │
-│ (skip)       │ └────────────┬─────────────┘
-└──────────────┘              │
-                      ┌───────┴───────┐
-                      │ SIM           │ NÃO
-                      ▼               ▼
-              ┌──────────────┐ ┌──────────────────┐
-              │ Chamar       │ │ Processamento    │
-              │ ai-arya-     │ │ normal Helena    │
-              │ vendas       │ │                  │
-              │              │ │ result: "texto"  │
-              │ result: resp │ │ properties: []   │
-              └──────────────┘ │ send_template:   │
-                               └──────────────────┘
-```
+Os arquivos em `supabase/migrations/` são históricos e não devem ser modificados:
+- `20260115134155_...sql` - Criou configurações com `Nina`
+- `20260115191109_...sql` - Alterou para `Arya`
+- `20260122175523_...sql` - Referência a `ai_arya` em setting_category
+- `20260122235218_...sql` - Renomeou para `Helena`
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `supabase/functions/make-webhook/index.ts` | Adicionar `result: null` nos early returns (linhas 3055-3058 e 3163-3166) |
+### Fase 1: Edge Functions (6 arquivos)
+
+1. **`supabase/functions/ai-arya-vendas/index.ts`**
+   - Logs: `Arya Vendas` → `Aimee Vendas`
+   - `action_type`: `ai_arya_*` → `ai_vendas_*`
+   - `setting_category`: `ai_arya` → `ai_vendas`
+
+2. **`supabase/functions/whatsapp-webhook/index.ts`**
+   - Comentários: remover referências a `Arya`
+
+3. **`supabase/functions/make-webhook/index.ts`**
+   - Comentários: `Arya already sent` → `Aimee Vendas already sent`
+
+4. **`supabase/functions/simulate-portal-lead/index.ts`**
+   - Comentário: `what Nina would send` → `what Aimee would send`
+
+### Fase 2: Interface React (2 arquivos)
+
+1. **`src/pages/admin/DevelopmentsManagement.tsx`**
+   - Textos: `Arya (Vendas)` → `Aimee de Vendas`
+
+2. **`src/components/portal/PortalLeadSimulator.tsx`**
+   - Textos: `Nina`/`Arya` → `Aimee`
+
+### Fase 3: Migração do Banco de Dados
+
+Nova migração SQL para:
+```sql
+-- Atualizar setting_category de ai_arya para ai_vendas
+UPDATE system_settings 
+SET setting_category = 'ai_vendas'
+WHERE setting_category = 'ai_arya';
+```
 
 ---
 
-## Opção Recomendada: B (Roteamento Completo)
+## Padrão de Nomenclatura Final
 
-Para leads do Villa Maggiore que chegam pelo Make.com:
+### Logs e Activity Types
 
-1. **Ao invés de skip**, chamar `ai-arya-vendas` internamente
-2. **Retornar a resposta** no campo `result`
-3. **Make envia a mensagem** normalmente
+| Antes | Depois |
+|-------|--------|
+| `ai_arya_vendas` | `ai_vendas` |
+| `ai_arya_vendas_welcome` | `ai_vendas_welcome` |
+| `ai_arya_redirect_out_of_scope` | `ai_vendas_redirect` |
 
-Isso garante que:
-- O cliente sempre recebe resposta, independente do canal
-- A separação entre números continua funcionando
-- Não há necessidade de alterar o cenário no Make.com
+### Setting Categories
+
+| Antes | Depois |
+|-------|--------|
+| `ai_arya` | `ai_vendas` |
+
+### Console Logs (desenvolvimento)
+
+| Antes | Depois |
+|-------|--------|
+| `🏗️ Arya Vendas - Phone:` | `🏗️ Aimee Vendas - Phone:` |
+| `❌ Error in ai-arya-vendas:` | `❌ Error in ai-vendas:` |
+
+### UI (português para usuários)
+
+| Contexto | Texto |
+|----------|-------|
+| Genérico | "Aimee" |
+| Locação | "Aimee de Locação" |
+| Vendas | "Aimee de Vendas" |
+| Administrativo | "Aimee Administrativa" |
+| Marketing | "Aimee de Marketing" |
 
 ---
 
-## Teste de Validação
+## Impacto e Riscos
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Lead Villa Maggiore via Make | Trava (sem `result`) | Responde via ai-arya-vendas |
-| Status callback | Trava (sem `result`) | Ignora silenciosamente |
-| Lead locação normal | Funciona | Funciona (inalterado) |
+### Baixo Risco
+- Alterações em comentários e logs (não afetam funcionalidade)
+- Alterações em textos de UI
+
+### Médio Risco
+- Alteração de `action_type` nos activity_logs
+  - **Mitigação**: Os logs antigos continuam funcionando, apenas novos logs usarão o novo padrão
+
+### Alto Risco
+- Alteração de `setting_category` no banco
+  - **Mitigação**: A migração atualiza atomicamente, e o código é atualizado junto
+
+---
+
+## Arquivos que NÃO serão alterados
+
+| Arquivo | Motivo |
+|---------|--------|
+| `supabase/functions/ai-arya-vendas/` (nome da pasta) | Renomear Edge Function requer delete + recreate, impacta referências em outros arquivos |
+| Migrações históricas | São registros imutáveis do histórico do banco |
+
+### Consideração sobre renomear a pasta `ai-arya-vendas`
+
+Para renomear a pasta da Edge Function de `ai-arya-vendas` para `ai-vendas` seria necessário:
+1. Criar nova edge function `ai-vendas`
+2. Atualizar todas as referências em `whatsapp-webhook`, `make-webhook`, `landing-page-webhook`, `portal-leads-webhook`
+3. Deletar a antiga `ai-arya-vendas`
+
+**Recomendação**: Fazer isso em uma fase separada para minimizar riscos.
+
+---
+
+## Resumo das Alterações
+
+| Categoria | Arquivos | Alterações |
+|-----------|----------|------------|
+| Edge Functions | 4 | Logs, action_types, comentários |
+| Interface React | 2 | Textos visíveis ao usuário |
+| Banco de Dados | 1 nova migração | setting_category |
+| **Total** | **7 arquivos** | ~30 alterações de texto |
 
