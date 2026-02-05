@@ -1,191 +1,116 @@
 
 
-# Plano de Aplicação do Tema tweakcn (OKLCH)
+# Plano: Atualizar Edge Functions para OpenAI GPT-5
 
 ## Resumo
 
-Este plano irá aplicar o novo tema visual usando cores OKLCH do tweakcn, atualizando as fontes para **Bricolage Grotesque**, **Castoro** e **Sometype Mono**, e implementando o sistema de sombras customizado.
+Este plano irá atualizar todas as Edge Functions que usam o Lovable AI Gateway para utilizar o modelo **openai/gpt-5** em vez de `google/gemini-2.5-flash`.
 
 ---
 
-## Análise do Estado Atual
+## Edge Functions a Atualizar
 
-| Item | Valor Atual | Novo Valor |
-|------|-------------|------------|
-| **Formato de cor** | HSL | OKLCH |
-| **Cor primária** | Verde WhatsApp (144 79% 33%) | Roxo/Índigo (oklch 0.2704 0.0998 274) |
-| **Fonte principal** | Inter | Bricolage Grotesque |
-| **Fonte mono** | Fira Code | Sometype Mono |
-| **Radius** | 0.5rem | 1.25rem |
-| **Tailwind** | v3.4.17 | v3.4.17 (mantido) |
+| Função | Arquivo | Ocorrências | Uso |
+|--------|---------|-------------|-----|
+| **ai-communicator** | `supabase/functions/ai-communicator/index.ts` | 2 | Chat inteligente e insights |
+| **ai-virtual-agent** | `supabase/functions/ai-virtual-agent/index.ts` | 1 | Agente virtual de vendas (Aimee/Helena) |
+| **ai-assistant** | `supabase/functions/ai-assistant/index.ts` | 1 | Assistente de análise de contexto |
+| **simulate-portal-lead** | `supabase/functions/simulate-portal-lead/index.ts` | 1 | Simulador de leads de portal |
 
----
-
-## Pontos de Atenção
-
-### Compatibilidade OKLCH com Tailwind v3
-
-O projeto usa **Tailwind CSS v3.4.17**. O formato OKLCH é suportado nativamente nos navegadores modernos, mas:
-
-1. **Tailwind v3 usa `hsl(var(--color))`** - precisa alterar para usar valores OKLCH diretamente
-2. **Não há necessidade de upgrade para v4** - OKLCH funciona como valores CSS normais
-3. **Componentes existentes** - continuarão funcionando após a atualização
-
-### Variáveis Customizadas a Preservar
-
-O projeto possui variáveis específicas que precisam ser adaptadas ao novo tema:
-
-| Variável | Uso | Ação |
-|----------|-----|------|
-| `--message-outbound` | Bolhas de mensagem enviada | Adaptar para novo tema |
-| `--message-inbound` | Bolhas de mensagem recebida | Adaptar para novo tema |
-| `--chat-background` | Fundo da área de chat | Adaptar para novo tema |
-| `--chat-pattern` | Padrão SVG do fundo | Manter |
-| `--gold-*` | Tema Gold SaaS legado | **Remover** (não mais usado) |
-| `--neutral-*` | Escala de cinzas | Substituir pelo tema |
-| `--surface-*` | Superfícies | Substituir pelo tema |
+**Total:** 5 ocorrências em 4 arquivos
 
 ---
 
-## Arquivos a Modificar
+## Alterações por Arquivo
 
-### 1. `index.html` - Adicionar Google Fonts
+### 1. `ai-communicator/index.ts`
 
-```html
-<!-- Adicionar novas fontes -->
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Castoro&family=Sometype+Mono&display=swap" rel="stylesheet">
-```
-
-### 2. `src/index.css` - Substituir Variáveis CSS
-
-Substituir completamente as variáveis `:root` e `.dark` com os valores OKLCH fornecidos.
-
-**Principais mudanças:**
-- Todas as cores migradas para OKLCH
-- Novas variáveis de fonte (--font-sans, --font-serif, --font-mono)
-- Sistema de sombras expandido (shadow-2xs até shadow-2xl)
-- Radius aumentado de 0.5rem para 1.25rem
-- Cores de mensagem adaptadas ao novo tema
-
-### 3. `tailwind.config.ts` - Atualizar Configuração
-
-**Mudanças necessárias:**
-- Alterar função wrapper de `hsl(var(...))` para `oklch(var(...))`
-- Atualizar fontFamily para usar as novas fontes
-- Adicionar novas variáveis de shadow
-- Adicionar suporte a chart-1 até chart-5
-- Remover cores "gold" legadas (opcional - manter para retrocompatibilidade)
-
----
-
-## Implementação Detalhada
-
-### Fase 1: Atualizar Fontes (index.html)
-
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Castoro&family=Sometype+Mono&display=swap" rel="stylesheet">
-```
-
-### Fase 2: Substituir CSS Variables (src/index.css)
-
-O arquivo será reescrito para usar o novo tema OKLCH. Pontos críticos:
-
-1. **Manter variáveis de mensagem** - Adaptar cores para combinar com o tema
-2. **Manter chat-pattern** - SVG de fundo continua funcionando
-3. **Adicionar novas variáveis** - chart-1 até chart-5, shadows, tracking
-
-**Cores de mensagem adaptadas ao novo tema:**
-```css
-/* Light mode - tons que combinam com o tema roxo */
---message-outbound: oklch(0.85 0.08 277);  /* Lilás suave */
---message-inbound: oklch(0.97 0.01 106);   /* Branco quente */
-
-/* Dark mode */
---message-outbound: oklch(0.35 0.10 277);  /* Roxo escuro */
---message-inbound: oklch(0.28 0.008 59);   /* Cinza quente */
-```
-
-### Fase 3: Atualizar Tailwind Config (tailwind.config.ts)
-
-**Alteração do wrapper de cores:**
+**Linha 214:**
 ```typescript
 // ANTES
-background: "hsl(var(--background))",
+model: 'google/gemini-2.5-flash',
 
-// DEPOIS  
-background: "var(--background)",
+// DEPOIS
+model: 'openai/gpt-5',
 ```
 
-**Nota importante:** Como OKLCH já inclui a função `oklch()` no valor da variável, o Tailwind não precisa mais de wrapper. Exemplo:
-- CSS: `--background: oklch(0.9232 0.0026 48.7171);`
-- Tailwind: `background: "var(--background)"` → compila para `background: oklch(0.9232 0.0026 48.7171);`
+**Linha 638:**
+```typescript
+// ANTES
+model: 'google/gemini-2.5-flash',
 
-**Novas propriedades a adicionar:**
-- fontFamily: serif (Castoro)
-- borderRadius: xl (calc(var(--radius) + 4px))
-- colors: chart-1 até chart-5
-- boxShadow: shadows do tema
+// DEPOIS
+model: 'openai/gpt-5',
+```
 
----
+### 2. `ai-virtual-agent/index.ts`
 
-## Mapeamento de Cores do Novo Tema
+**Linha 1575:**
+```typescript
+// ANTES
+model: config.ai_model || 'google/gemini-2.5-flash',
 
-### Light Mode
+// DEPOIS
+model: config.ai_model || 'openai/gpt-5',
+```
 
-| Variável | Valor OKLCH | Descrição Visual |
-|----------|-------------|------------------|
-| background | oklch(0.9232 0.0026 48.71) | Cinza rosado claro |
-| foreground | oklch(0.2795 0.0368 260) | Azul escuro |
-| primary | oklch(0.2704 0.0998 274) | Índigo profundo |
-| secondary | oklch(0.8687 0.0043 56.37) | Bege claro |
-| accent | oklch(0.6670 0.0528 321.8) | Magenta suave |
-| destructive | oklch(0.6368 0.2078 25.33) | Vermelho |
+### 3. `ai-assistant/index.ts`
 
-### Dark Mode
+**Linha 138:**
+```typescript
+// ANTES
+model: 'google/gemini-2.5-flash',
 
-| Variável | Valor OKLCH | Descrição Visual |
-|----------|-------------|------------------|
-| background | oklch(0.2244 0.0074 67.44) | Marrom escuro |
-| foreground | oklch(0.9288 0.0126 255.5) | Azul muito claro |
-| primary | oklch(0.6801 0.1583 276.93) | Roxo médio |
-| secondary | oklch(0.3359 0.0077 59.42) | Marrom médio |
-| accent | oklch(0.3896 0.0074 59.47) | Marrom acinzentado |
+// DEPOIS
+model: 'openai/gpt-5',
+```
 
----
+### 4. `simulate-portal-lead/index.ts`
 
-## Riscos e Mitigações
+**Linha 131:**
+```typescript
+// ANTES
+model: "google/gemini-2.5-flash",
 
-| Risco | Probabilidade | Impacto | Mitigação |
-|-------|---------------|---------|-----------|
-| Cores OKLCH não suportadas em browsers antigos | Baixa | Médio | Navegadores modernos suportam (Chrome 111+, Firefox 113+, Safari 15.4+) |
-| Contraste insuficiente em algumas áreas | Média | Baixo | Testar visualmente após aplicação |
-| Componentes com cores hardcoded | Baixa | Baixo | Já usam variáveis CSS |
-| Fontes não carregando | Baixa | Médio | Fallback fonts definidos |
+// DEPOIS
+model: "openai/gpt-5",
+```
 
 ---
 
-## Resumo de Arquivos
+## Benefícios do GPT-5
 
-| Arquivo | Ação | Complexidade |
-|---------|------|--------------|
-| `index.html` | Adicionar fonts | Baixa |
-| `src/index.css` | Reescrever variáveis | Alta |
-| `tailwind.config.ts` | Atualizar config | Média |
-
-**Total de arquivos:** 3
-**Estimativa de linhas alteradas:** ~350
+| Aspecto | Gemini 2.5 Flash | OpenAI GPT-5 |
+|---------|------------------|--------------|
+| **Raciocínio** | Bom | Excelente |
+| **Contexto longo** | Muito bom | Excelente |
+| **Multimodal** | Sim | Sim |
+| **Nuance/Precisão** | Bom | Melhor |
+| **Custo** | Menor | Maior |
+| **Latência** | Mais rápido | Ligeiramente mais lento |
 
 ---
 
-## Checklist Pós-Implementação
+## Considerações
 
-- [ ] Verificar tema claro no chat
-- [ ] Verificar tema escuro no chat
-- [ ] Testar toggle de tema
-- [ ] Verificar contraste de botões
-- [ ] Verificar legibilidade de textos
-- [ ] Testar em mobile
-- [ ] Verificar fontes carregando corretamente
+1. **Custo**: O GPT-5 é mais caro que o Gemini Flash. Monitore o uso de créditos no Lovable.
+
+2. **Latência**: Pode haver um pequeno aumento no tempo de resposta (geralmente imperceptível para o usuário).
+
+3. **Compatibilidade**: O Lovable AI Gateway suporta totalmente o GPT-5, então não há mudanças de API necessárias.
+
+4. **Fallback configurável**: A função `ai-virtual-agent` usa `config.ai_model` como preferência, permitindo configuração via banco de dados. O novo default será GPT-5, mas administradores podem sobrescrever.
+
+---
+
+## Resumo de Alterações
+
+| Arquivo | Linhas Alteradas |
+|---------|------------------|
+| `ai-communicator/index.ts` | 214, 638 |
+| `ai-virtual-agent/index.ts` | 1575 |
+| `ai-assistant/index.ts` | 138 |
+| `simulate-portal-lead/index.ts` | 131 |
+
+**Total de edições:** 5 substituições simples de string
 
