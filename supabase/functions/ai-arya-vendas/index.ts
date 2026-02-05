@@ -677,7 +677,7 @@ serve(async (req) => {
       contact_name 
     } = await req.json();
 
-    console.log(`🏗️ Arya Vendas - Phone: ${phone_number}, Development: ${development_id || development_slug}`);
+    console.log(`🏗️ Aimee Vendas - Phone: ${phone_number}, Development: ${development_id || development_slug}`);
 
     // ═══════════════════════════════════════════════════════════════
     // 🚫 OUT OF SCOPE DETECTION - Redirect locação/administrativo
@@ -746,7 +746,7 @@ Eles vão resolver sua solicitação rapidinho! 😊`
       // Log the redirect for metrics
       await supabase.from('activity_logs').insert({
         user_id: '00000000-0000-0000-0000-000000000000',
-        action_type: 'ai_arya_redirect_out_of_scope',
+        action_type: 'ai_vendas_redirect',
         target_table: 'conversations',
         target_id: phone_number,
         metadata: {
@@ -775,7 +775,7 @@ Eles vão resolver sua solicitação rapidinho! 😊`
     const { data: quickModeSetting } = await supabase
       .from('system_settings')
       .select('setting_value')
-      .eq('setting_category', 'ai_arya')
+      .eq('setting_category', 'ai_vendas')
       .eq('setting_key', 'quick_transfer_mode')
       .maybeSingle();
 
@@ -896,7 +896,7 @@ Eles vão resolver sua solicitação rapidinho! 😊`
       // Log the interaction
       await supabase.from('activity_logs').insert({
         user_id: '00000000-0000-0000-0000-000000000000',
-        action_type: 'ai_arya_vendas_welcome',
+        action_type: 'ai_vendas_welcome',
         target_table: 'conversations',
         target_id: phone_number,
         metadata: {
@@ -1034,7 +1034,7 @@ Eles vão resolver sua solicitação rapidinho! 😊`
     // Log the interaction
     await supabase.from('activity_logs').insert({
       user_id: '00000000-0000-0000-0000-000000000000', // System user
-      action_type: 'ai_arya_vendas',
+      action_type: 'ai_vendas',
       target_table: 'conversations',
       target_id: phone_number,
       metadata: {
@@ -1064,7 +1064,7 @@ Eles vão resolver sua solicitação rapidinho! 😊`
     );
 
   } catch (error) {
-    console.error('❌ Error in ai-arya-vendas:', error);
+    console.error('❌ Error in ai-vendas:', error);
     
     return new Response(
       JSON.stringify({ 

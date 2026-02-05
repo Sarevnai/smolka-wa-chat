@@ -336,7 +336,7 @@ Se o cliente demonstrar INTERESSE (quero visitar, tenho interesse, quero conhece
     const agentName = config.agent_name || 'Helena';
     const companyName = config.company_name || 'Smolka Imóveis';
 
-    // Step 3: Generate simulated messages (what Nina would send)
+    // Step 3: Generate simulated messages (what Aimee would send)
     
     // Message 1: Greeting
     const greeting = `Olá, ${leadName}! 👋\n\nSou a ${agentName} da ${companyName}!\n\nVi que você se interessou por esse imóvel no ${portal}:`;

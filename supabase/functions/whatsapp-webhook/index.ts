@@ -450,7 +450,7 @@ async function detectDevelopmentFromMessage(messageBody: string): Promise<{
 
 /**
  * 🏗️ Check if a phone number has a recent lead from a landing page with development_id
- * Used to route to ai-arya-vendas (Arya Vendas for empreendimentos)
+ * Used to route to ai-arya-vendas (Aimee de Vendas for empreendimentos)
  */
 async function checkDevelopmentLead(phoneNumber: string): Promise<{
   development_id: string;
@@ -1189,7 +1189,7 @@ async function handleN8NTrigger(
       console.log(`⏭️ Skipping AI - operator ${convState.operator_id} handling conversation`);
       return;
     }
-    // 🏗️ CHECK FOR DEVELOPMENT/EMPREENDIMENTO LEAD FIRST (Arya Vendas)
+    // 🏗️ CHECK FOR DEVELOPMENT/EMPREENDIMENTO LEAD FIRST (Aimee de Vendas)
     // Priority 0: Recent lead from landing page with development_id
     let developmentLead = await checkDevelopmentLead(phoneNumber);
     
@@ -1301,7 +1301,7 @@ async function handleN8NTrigger(
         }
       }
 
-      // Don't continue to other agents - Arya Vendas handled it
+      // Don't continue to other agents - Aimee Vendas handled it
       return;
     }
 
@@ -1471,7 +1471,7 @@ async function handleN8NTrigger(
       .eq('phone', phoneNumber)
       .maybeSingle();
 
-    // Enhanced payload with conversation info for Arya's triage
+    // Enhanced payload with conversation info for Aimee's triage
     const agentPayload = {
       phoneNumber,
       messageBody,

@@ -103,7 +103,7 @@ export default function DevelopmentsManagement() {
           <div>
             <h1 className="text-2xl font-bold">Empreendimentos</h1>
             <p className="text-muted-foreground">
-              Gerencie os empreendimentos para atendimento da Arya (Vendas)
+              Gerencie os empreendimentos para atendimento da Aimee de Vendas
             </p>
           </div>
           <Button disabled>
@@ -118,7 +118,7 @@ export default function DevelopmentsManagement() {
               <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium">Nenhum empreendimento cadastrado</h3>
               <p className="text-muted-foreground text-sm">
-                Adicione empreendimentos para a Arya atender leads de landing pages
+                Adicione empreendimentos para a Aimee de Vendas atender leads de landing pages
               </p>
             </CardContent>
           </Card>
