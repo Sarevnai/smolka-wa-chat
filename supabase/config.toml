@@ -137,3 +137,6 @@ verify_jwt = false
 
 [functions.release-stale-handovers]
 verify_jwt = false
+
+[functions.delete-lead]
+verify_jwt = true
