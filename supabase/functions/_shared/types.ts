@@ -135,6 +135,7 @@ export interface QualificationProgress {
   has_bedrooms: boolean;
   has_budget: boolean;
   has_purpose: boolean;
+  is_commercial: boolean;
 }
 
 export interface QualificationData {
