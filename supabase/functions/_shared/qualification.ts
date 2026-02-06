@@ -391,15 +391,18 @@ export function hasMinimumCriteriaToSearch(
   department: string | null, 
   progress: QualificationProgress
 ): boolean {
+  // Commercial properties don't need bedrooms - type alone is sufficient
+  const hasPropertyInfo = progress.is_commercial ? progress.has_type : (progress.has_type || progress.has_bedrooms);
+  
   if (department === 'locacao') {
-    return progress.has_region && progress.has_budget && (progress.has_type || progress.has_bedrooms);
+    return progress.has_region && progress.has_budget && hasPropertyInfo;
   }
   
   if (department === 'vendas') {
-    return progress.has_purpose && progress.has_region && progress.has_budget && (progress.has_type || progress.has_bedrooms);
+    return progress.has_purpose && progress.has_region && progress.has_budget && hasPropertyInfo;
   }
   
-  return progress.has_region && (progress.has_type || progress.has_bedrooms);
+  return progress.has_region && hasPropertyInfo;
 }
 
 // ========== BUILD SEARCH PARAMS ==========
@@ -439,7 +442,8 @@ export function buildSearchParamsFromQualification(
     params.tipo = typeMap[qualData.detected_property_type] || qualData.detected_property_type.toLowerCase();
   }
   
-  if (qualData.detected_bedrooms) {
+  // Only include bedrooms for non-commercial property types
+  if (qualData.detected_bedrooms && qualData.detected_property_type !== 'Comercial') {
     params.quartos = qualData.detected_bedrooms;
   }
   
@@ -463,20 +467,23 @@ export async function getQualificationProgress(
       .eq('phone_number', phoneNumber)
       .maybeSingle();
     
+    const isCommercial = data?.detected_property_type === 'Comercial';
+    
     return {
       progress: {
         has_region: !!data?.detected_neighborhood,
         has_type: !!data?.detected_property_type,
-        has_bedrooms: !!data?.detected_bedrooms,
+        has_bedrooms: isCommercial ? true : !!data?.detected_bedrooms, // Commercial skips bedrooms
         has_budget: !!data?.detected_budget_max,
-        has_purpose: !!data?.detected_interest
+        has_purpose: !!data?.detected_interest,
+        is_commercial: isCommercial
       },
       data: data || null
     };
   } catch (error) {
     console.error('❌ Error getting qualification progress:', error);
     return {
-      progress: { has_region: false, has_type: false, has_bedrooms: false, has_budget: false, has_purpose: false },
+      progress: { has_region: false, has_type: false, has_bedrooms: false, has_budget: false, has_purpose: false, is_commercial: false },
       data: null
     };
   }
@@ -490,8 +497,9 @@ export function getNextQualificationQuestion(
 ): string | null {
   if (department === 'locacao') {
     if (!progress.has_region) return '📍 Qual região de Florianópolis você prefere?';
-    if (!progress.has_type) return '🏠 Você busca apartamento, casa ou outro tipo?';
-    if (!progress.has_bedrooms) return '🛏️ Quantos quartos você precisa?';
+    if (!progress.has_type) return '🏠 Você busca apartamento, casa, sala comercial ou outro tipo?';
+    // Skip bedrooms for commercial properties - they don't have bedrooms
+    if (!progress.has_bedrooms && !progress.is_commercial) return '🛏️ Quantos quartos você precisa?';
     if (!progress.has_budget) return '💰 Qual sua faixa de valor para o aluguel?';
     return null;
   }
@@ -500,7 +508,8 @@ export function getNextQualificationQuestion(
     if (!progress.has_purpose) return 'Você está buscando para *morar* ou para *investir*?';
     if (!progress.has_region) return '📍 Qual região de Florianópolis te interessa?';
     if (!progress.has_type) return '🏠 Que tipo de imóvel você busca?';
-    if (!progress.has_bedrooms) return '🛏️ Quantos quartos são ideais pra você?';
+    // Skip bedrooms for commercial properties
+    if (!progress.has_bedrooms && !progress.is_commercial) return '🛏️ Quantos quartos são ideais pra você?';
     if (!progress.has_budget) return '💰 Qual faixa de investimento você considera?';
     return null;
   }
