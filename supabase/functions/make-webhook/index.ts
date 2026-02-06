@@ -259,6 +259,93 @@ async function getLastOutboundMessage(supabase: any, conversationId: string): Pr
   }
 }
 
+// ========== ROBUST ANTI-LOOP: Check last N outbound messages for repeated patterns ==========
+
+async function getRecentOutboundMessages(supabase: any, conversationId: string, limit: number = 5): Promise<string[]> {
+  try {
+    const { data } = await supabase
+      .from('messages')
+      .select('body')
+      .eq('conversation_id', conversationId)
+      .eq('direction', 'outbound')
+      .not('body', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    return (data || []).map((m: any) => m.body).filter(Boolean);
+  } catch (error) {
+    return [];
+  }
+}
+
+function normalizeForComparison(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[😊🏠😔🤔💰📍🛏️✅❌👋🙂☺️💡📞🙏✨💭📋👍🔍📐]/g, '')
+    .replace(/[?!.,;:]+/g, '')
+    .trim();
+}
+
+interface LoopDetectionResult {
+  isLooping: boolean;
+  consecutiveCount: number;
+  recoveryMessage: string | null;
+}
+
+function detectConsecutiveLoop(proposedMessage: string, recentMessages: string[]): LoopDetectionResult {
+  if (recentMessages.length === 0) {
+    return { isLooping: false, consecutiveCount: 0, recoveryMessage: null };
+  }
+
+  const normalizedProposed = normalizeForComparison(proposedMessage);
+  let consecutiveCount = 0;
+
+  for (const msg of recentMessages) {
+    const normalizedMsg = normalizeForComparison(msg);
+    // Check semantic similarity: exact match or high overlap
+    if (normalizedMsg === normalizedProposed || isSemanticallyEqual(normalizedMsg, normalizedProposed)) {
+      consecutiveCount++;
+    } else {
+      break; // Stop counting once a different message is found
+    }
+  }
+
+  if (consecutiveCount >= 1) {
+    // Already sent once = would be 2nd time = loop
+    console.log(`🚨 Anti-loop: message sent ${consecutiveCount}x consecutively, blocking repeat`);
+    
+    const recoveryMessages = [
+      'Me conta um pouco mais sobre o que você procura? Quero encontrar o imóvel ideal pra você! 😊',
+      'Entendi! Vou te ajudar da melhor forma. O que é mais importante pra você nessa busca? 🏠',
+      'Fico à disposição! Me diz como posso ajudar — qualquer detalhe sobre o que busca me ajuda a filtrar melhor 😊',
+      'Posso te ajudar de outra forma? Se quiser, me fala mais sobre suas prioridades que eu refino a busca! ✨',
+    ];
+    const recoveryMessage = recoveryMessages[consecutiveCount % recoveryMessages.length];
+
+    return { isLooping: true, consecutiveCount, recoveryMessage };
+  }
+
+  return { isLooping: false, consecutiveCount: 0, recoveryMessage: null };
+}
+
+function isSemanticallyEqual(a: string, b: string): boolean {
+  // If one contains 80%+ of the other's words, consider them semantically equal
+  const wordsA = new Set(a.split(' ').filter(w => w.length > 2));
+  const wordsB = new Set(b.split(' ').filter(w => w.length > 2));
+  
+  if (wordsA.size === 0 || wordsB.size === 0) return false;
+  
+  let commonWords = 0;
+  for (const word of wordsA) {
+    if (wordsB.has(word)) commonWords++;
+  }
+  
+  const overlapA = commonWords / wordsA.size;
+  const overlapB = commonWords / wordsB.size;
+  
+  return overlapA >= 0.8 || overlapB >= 0.8;
+}
+
 // ========== CONVERSATION STATE ==========
 
 type TriageStage = 'greeting' | 'awaiting_name' | 'awaiting_triage' | 'completed' | null;
@@ -1174,11 +1261,13 @@ serve(async (req) => {
           aiResponse = FALLBACK_RESPONSE;
         }
         
-        // Anti-repetition check
+        // Robust anti-loop: check last 5 outbound messages for consecutive repeats
         if (conversationId && aiResponse) {
-          const lastOutbound = await getLastOutboundMessage(supabase, conversationId);
-          if (isSameMessage(lastOutbound, aiResponse)) {
-            console.log('⚠️ Duplicate message detected - generating alternative');
+          const recentOutbound = await getRecentOutboundMessages(supabase, conversationId, 5);
+          const loopResult = detectConsecutiveLoop(aiResponse, recentOutbound);
+          
+          if (loopResult.isLooping) {
+            console.log(`🚨 Loop detected (${loopResult.consecutiveCount}x). Applying recovery.`);
             
             if (hasMinimumCriteriaToSearch(currentDepartment, qualProgress)) {
               const searchParams = buildSearchParamsFromQualification(currentDepartment, qualData);
@@ -1194,11 +1283,21 @@ serve(async (req) => {
                   propertiesToSend = [allProperties[0]];
                   aiResponse = buildFallbackMessage(fallbackResult.searchType, fallbackResult.originalParams, allProperties, existingName || undefined);
                 } else {
-                  aiResponse = 'Entendi que você está flexibilizando os critérios. Me confirma: quer que eu busque com qual valor máximo e região? 😊';
+                  aiResponse = loopResult.recoveryMessage!;
                 }
+              } else {
+                aiResponse = loopResult.recoveryMessage!;
               }
             } else {
-              aiResponse = 'Entendi! Pra refinar a busca, me conta: qual o valor máximo que você considera? 💰';
+              // Not enough criteria — use the next qualification question or recovery
+              const nextQ = getNextQualificationQuestion(qualProgress, currentDepartment || 'locacao');
+              if (nextQ) {
+                // Only use nextQ if it's DIFFERENT from the looping message
+                const nextQLoop = detectConsecutiveLoop(nextQ, recentOutbound);
+                aiResponse = nextQLoop.isLooping ? loopResult.recoveryMessage! : nextQ;
+              } else {
+                aiResponse = loopResult.recoveryMessage!;
+              }
             }
           }
         }
