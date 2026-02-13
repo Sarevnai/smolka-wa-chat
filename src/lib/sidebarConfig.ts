@@ -48,7 +48,6 @@ export const DEPARTMENT_SIDEBAR_CONFIG: Record<DepartmentType, DepartmentSidebar
       { title: 'Dashboard', url: '/', icon: LayoutDashboard },
       { title: 'Conversas', url: '/chat', icon: MessageCircle, badge: 'unread' },
       { title: 'Pipeline', url: '/pipeline/locacao', icon: Kanban },
-      { title: 'Contatos', url: '/contacts', icon: Users },
       { title: 'Relatórios', url: '/reports', icon: BarChart3 },
     ]
   },
@@ -64,7 +63,6 @@ export const DEPARTMENT_SIDEBAR_CONFIG: Record<DepartmentType, DepartmentSidebar
       { title: 'Dashboard', url: '/', icon: LayoutDashboard },
       { title: 'Conversas', url: '/chat', icon: MessageCircle, badge: 'unread' },
       { title: 'Pipeline', url: '/pipeline/vendas', icon: Kanban },
-      { title: 'Contatos', url: '/contacts', icon: Users },
       { title: 'Relatórios', url: '/reports', icon: BarChart3 },
     ]
   },
