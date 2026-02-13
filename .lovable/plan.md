@@ -1,7 +1,7 @@
 
 # Incorporar Arquitetura 3-Layer (AGENTS.md) no Projeto
 
-## Status: Fase A ✅ Completa | Fase B ✅ Completa | Fase C ⏳ Pendente
+## Status: Fase A ✅ Completa | Fase B ✅ Completa | Fase C ✅ C.1+C.2 Completos | C.3 ⏳ Futuro
 
 ## Contexto
 
@@ -65,11 +65,31 @@ O documento AGENTS.md define uma arquitetura em 3 camadas para maximizar confiab
 - **Decisao**: Manter como esta por enquanto, documentar divida tecnica
 - **Plano futuro**: Quando for refatorar, avaliar se pode substituir por make-webhook + _shared/
 
-## Fase C: Self-Annealing e Observabilidade ⏳ PENDENTE
+## Fase C: Self-Annealing e Observabilidade ✅ C.1+C.2
 
-- [ ] C.1 - Tabela `ai_error_log` + logging estruturado
-- [ ] C.2 - Dashboard de erros na UI
-- [ ] C.3 - Auto-update de directives (futuro avancado)
+### C.1 - Tabela `ai_error_log` + Logging Estruturado ✅ CONCLUIDO
+
+- Tabela `ai_error_log` com campos: agent_name, error_type, error_message, context (JSONB), phone_number, conversation_id, department_code, resolution, resolved_at
+- Indices para agent_name, created_at, error_type
+- RLS: admins full access, service_role full access, managers read-only
+- Modulo `_shared/error-logging.ts`: `logAIError()` (non-blocking) + `withErrorLogging()` (wrapper)
+- Integrado em `whatsapp-webhook` (routing errors, agent invocation errors) e `ai-vendas` (unhandled exceptions)
+
+### C.2 - Dashboard de Erros na UI ✅ CONCLUIDO
+
+- Componente `AIErrorDashboard` com:
+  - Cards de resumo: erros 24h, 7d, 30d
+  - Erros por agente (ranking)
+  - Erros por tipo (categorizado)
+  - Erros recorrentes (agrupados, ≥2 ocorrencias)
+  - Lista de erros recentes (20 mais recentes, scrollable)
+- Hook `useAIErrorDashboard` com refresh a cada 30s
+- Integrado como aba "Erros IA" no dashboard principal (`/admin/ia-dashboard`)
+
+### C.3 - Auto-update de Directives ⏳ FUTURO
+
+- Quando um erro recorrente for identificado, sugerir atualizacao na directive correspondente
+- Edge function periodica que analisa `ai_error_log` e sugere updates em `ai_directives`
 
 ## Modulos Compartilhados (_shared/)
 
@@ -89,6 +109,7 @@ O documento AGENTS.md define uma arquitetura em 3 camadas para maximizar confiab
 | `triage.ts` | ~100 | **NOVO** - Triagem por botao, assign departamento |
 | `media.ts` | ~120 | **NOVO** - Extracao de midia WhatsApp |
 | `business-hours.ts` | ~50 | **NOVO** - Verificacao horario comercial |
+| `error-logging.ts` | ~60 | **NOVO** - Logging estruturado para ai_error_log |
 
 ## Nota sobre Adaptacao ao Lovable
 

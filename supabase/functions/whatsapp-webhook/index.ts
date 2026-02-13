@@ -5,6 +5,7 @@ import { extractTriageButtonId, updateTriageStage, assignDepartmentToConversatio
 import { extractMediaInfo } from '../_shared/media.ts';
 import { checkBusinessHours, type BusinessHoursConfig } from '../_shared/business-hours.ts';
 import { getAudioConfig, generateAudioResponse } from '../_shared/audio.ts';
+import { logAIError } from '../_shared/error-logging.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -472,6 +473,7 @@ async function handleAIRouting(
 
       if (vendasError) {
         console.error('❌ Error calling ai-vendas:', vendasError);
+        await logAIError(supabase, { agent_name: 'ai-vendas', error_type: 'invocation_error', error_message: String(vendasError), phone_number: phoneNumber, conversation_id: conversation?.id });
       } else if (vendasResult?.c2s_transferred) {
         await supabase.from('portal_leads_log')
           .update({ crm_status: 'sent', crm_sent_at: new Date().toISOString(), ai_attended: true, ai_attended_at: new Date().toISOString() })
@@ -516,6 +518,7 @@ async function handleAIRouting(
 
       if (aiError) {
         console.error('❌ Error calling ai-marketing-agent:', aiError);
+        await logAIError(supabase, { agent_name: 'ai-marketing-agent', error_type: 'invocation_error', error_message: String(aiError), phone_number: phoneNumber, conversation_id: conversation?.id });
       } else {
         if (aiResult?.response) {
           await sendAIResponse(phoneNumber, aiResult.response, conversation?.id || null, 'ai-marketing-agent');
@@ -581,6 +584,7 @@ async function handleAIRouting(
 
     if (triggerError) {
       console.error('❌ Error triggering ai-virtual-agent:', triggerError);
+      await logAIError(supabase, { agent_name: 'ai-virtual-agent', error_type: 'invocation_error', error_message: String(triggerError), phone_number: phoneNumber, conversation_id: conversation?.id });
     } else {
       console.log('✅ ai-virtual-agent response:', triggerResult);
       if (triggerResult?.assignedDepartment && conversation?.id) {
@@ -592,8 +596,9 @@ async function handleAIRouting(
         );
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in handleAIRouting:', error);
+    await logAIError(supabase, { agent_name: 'whatsapp-webhook', error_type: 'routing_error', error_message: error?.message || String(error), phone_number: phoneNumber });
   }
 }
 

@@ -239,6 +239,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_error_log: {
+        Row: {
+          agent_name: string
+          context: Json | null
+          conversation_id: string | null
+          created_at: string
+          department_code: string | null
+          error_message: string
+          error_type: string
+          id: string
+          phone_number: string | null
+          resolution: string | null
+          resolved_at: string | null
+        }
+        Insert: {
+          agent_name: string
+          context?: Json | null
+          conversation_id?: string | null
+          created_at?: string
+          department_code?: string | null
+          error_message: string
+          error_type: string
+          id?: string
+          phone_number?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+        }
+        Update: {
+          agent_name?: string
+          context?: Json | null
+          conversation_id?: string | null
+          created_at?: string
+          department_code?: string | null
+          error_message?: string
+          error_type?: string
+          id?: string
+          phone_number?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
       ai_flows: {
         Row: {
           created_at: string
