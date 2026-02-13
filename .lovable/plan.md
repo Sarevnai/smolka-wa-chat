@@ -1,119 +1,111 @@
 
-# Incorporar Arquitetura 3-Layer (AGENTS.md) no Projeto
+# Correções do Fluxo C2S - Ian Veras
 
-## Status: Fase A ✅ Completa | Fase B ✅ Completa | Fase C ✅ C.1+C.2 Completos | C.3 ⏳ Futuro
+## Problemas Identificados
 
-## Contexto
+1. **`contact_id` e `conversation_id` nulos no `c2s_integration`**: Os payloads enviados para `c2s-create-lead` pelo `ai-virtual-agent` e `ai-vendas` nao incluem esses campos, resultando em registros orfaos no banco.
 
-O documento AGENTS.md define uma arquitetura em 3 camadas para maximizar confiabilidade de agentes de IA:
+2. **`qualification_status` nao atualizado apos C2S via tool call**: No `ai-virtual-agent`, quando o envio ao C2S ocorre via tool call da IA (linha ~3821), o status de qualificacao permanece `pending` em vez de ser atualizado para `sent_to_crm`. O fluxo determinista (linha ~2226) ja faz isso corretamente.
 
-1. **Directives** (O que fazer) - SOPs em Markdown, instrucoes claras
-2. **Orchestration** (Decisao) - Roteamento inteligente, tratamento de erros
-3. **Execution** (Trabalho deterministico) - Scripts confiaveis e testaveis
+3. **`ai-vendas` nao atualiza qualificacao nem propaga IDs**: O agente de vendas envia ao C2S sem `contact_id`, `conversation_id`, e nao atualiza a tabela `lead_qualification`.
 
-## Fase A: Directives Layer ✅ COMPLETA
+---
 
-- [x] A.1 - Tabela `ai_directives` criada com versionamento e RLS
-- [x] A.2 - Seed com 5 directives extraidas dos prompts hardcoded
-- [x] A.3 - `getPromptForDepartment()` agora async, busca directive do banco com hierarquia: Override > Directive > Hardcoded
-- [x] A.4 - UI DirectiveEditor integrada na aba Prompt da config IA
+## Plano de Correções
 
-## Fase B: Consolidar Execution Layer ✅ COMPLETA
+### 1. `ai-virtual-agent/index.ts` - Funcao `sendLeadToC2S` (linha ~1477)
 
-### B.1 - Refatorar `ai-vendas` para usar `_shared/` ✅ CONCLUIDO
+Adicionar `contact_id` e `conversation_id` como parametros da funcao e inclui-los no body enviado para `c2s-create-lead`.
 
-**Resultado**: Reduzido de 1077 para ~280 linhas (74% reducao)
+### 2. `ai-virtual-agent/index.ts` - Tool call handler (linha ~3808)
 
-**Modulos criados/usados**:
-- `_shared/whatsapp.ts` (NOVO) - sendWhatsAppMessage, sendWhatsAppMedia, sendAIResponse, saveAndSendMessage
-- `_shared/ai-call.ts` (NOVO) - callLLM (gateway Lovable/OpenAI unificado)
-- `_shared/types.ts` - Development, ConversationMessage, AudioConfig
-- `_shared/utils.ts` - formatCurrency
-- `_shared/prompts.ts` - buildQuickTransferPrompt, toolsQuickTransfer
-- `_shared/audio.ts` - getAudioConfig, generateAudioResponse
+Apos C2S bem-sucedido (linha ~3821):
+- Buscar o `lead_qualification` pelo `phone_number`
+- Atualizar `qualification_status` para `sent_to_crm` e `sent_to_crm_at`
+- Passar `contact_id` e `conversation_id` na chamada a `sendLeadToC2S`
 
-**Logica unica mantida no ai-vendas**:
-- buildEmpreendimentoPrompt (prompt full mode com detalhes do empreendimento)
-- toolsFull (enviar_lead_c2s + enviar_material)
-- Out-of-scope detection (redirect locacao/admin para 48 9 9163-1011)
-- First message welcome flow
-- Material sending handler
+### 3. `ai-vendas/index.ts` - Bloco `enviar_lead_c2s` (linha ~291)
 
-### B.2 - Modularizar `whatsapp-webhook` ✅ CONCLUIDO
+Adicionar `contact_id` e `conversation_id` ao payload do C2S:
+- Buscar o contact pelo phone_number
+- Usar o `conversationId` ja disponivel no escopo
+- Atualizar `lead_qualification` apos transferencia bem-sucedida
 
-**Resultado**: Reduzido de 1705 para ~600 linhas (~65% reducao)
+### 4. `c2s-create-lead/index.ts` - Sem alteracoes necessarias
 
-**Modulos extraidos para `_shared/`**:
-- `_shared/phone-utils.ts` (NOVO) - getPhoneVariations (9o digito brasileiro)
-- `_shared/triage.ts` (NOVO) - extractTriageButtonId, updateTriageStage, assignDepartmentToConversation, DEPARTMENT_WELCOMES
-- `_shared/media.ts` (NOVO) - extractMediaInfo (todos os tipos: image, audio, video, document, sticker, voice, location)
-- `_shared/business-hours.ts` (NOVO) - checkBusinessHours (timezone-aware)
+A funcao ja aceita e salva `contact_id` e `conversation_id` corretamente. O problema esta nos chamadores que nao enviam esses campos.
 
-**Logica mantida no webhook (orquestracao)**:
-- serve() HTTP handler (GET verification + POST processing)
-- processIncomingMessage (dedup, media download, transcription, name detection, triage, routing)
-- processMessageStatus (campaign result updates, raw merge)
-- handleAIRouting (priority: development > marketing > general AI)
-- findOrCreateConversation, ensureContactExists
-- checkCampaignSource, checkMarketingCampaignSource, checkDevelopmentLead, detectDevelopmentFromMessage
+---
 
-### B.3 - Avaliar `ai-virtual-agent` 📋 MARCADO PARA FUTURO
+## Detalhes Tecnicos
 
-- 4047 linhas, maior monolito do sistema
-- **Ainda e chamado ativamente** pelo whatsapp-webhook
-- Duplica TUDO que existe em `_shared/` (regioes, qualificacao, prompts, property, etc.)
-- **Decisao**: Manter como esta por enquanto, documentar divida tecnica
-- **Plano futuro**: Quando for refatorar, avaliar se pode substituir por make-webhook + _shared/
+### Alteracao em `sendLeadToC2S` (ai-virtual-agent)
 
-## Fase C: Self-Annealing e Observabilidade ✅ C.1+C.2
+```typescript
+// Antes
+async function sendLeadToC2S(params, phoneNumber, conversationHistory, contactName?)
 
-### C.1 - Tabela `ai_error_log` + Logging Estruturado ✅ CONCLUIDO
+// Depois  
+async function sendLeadToC2S(params, phoneNumber, conversationHistory, contactName?, contactId?, conversationId?)
+```
 
-- Tabela `ai_error_log` com campos: agent_name, error_type, error_message, context (JSONB), phone_number, conversation_id, department_code, resolution, resolved_at
-- Indices para agent_name, created_at, error_type
-- RLS: admins full access, service_role full access, managers read-only
-- Modulo `_shared/error-logging.ts`: `logAIError()` (non-blocking) + `withErrorLogging()` (wrapper)
-- Integrado em `whatsapp-webhook` (routing errors, agent invocation errors) e `ai-vendas` (unhandled exceptions)
+Adicionar ao body: `contact_id: contactId, conversation_id: conversationId`
 
-### C.2 - Dashboard de Erros na UI ✅ CONCLUIDO
+### Alteracao no tool call handler (ai-virtual-agent, ~3819)
 
-- Componente `AIErrorDashboard` com:
-  - Cards de resumo: erros 24h, 7d, 30d
-  - Erros por agente (ranking)
-  - Erros por tipo (categorizado)
-  - Erros recorrentes (agrupados, ≥2 ocorrencias)
-  - Lista de erros recentes (20 mais recentes, scrollable)
-- Hook `useAIErrorDashboard` com refresh a cada 30s
-- Integrado como aba "Erros IA" no dashboard principal (`/admin/ia-dashboard`)
+```typescript
+const c2sResult = await sendLeadToC2S(
+  args, phoneNumber, historyText, currentContactName,
+  conversation?.contact_id, conversation?.id
+);
 
-### C.3 - Auto-update de Directives ⏳ FUTURO
+if (c2sResult.success) {
+  // ... handoff existente ...
+  
+  // NOVO: Atualizar qualification_status
+  await supabase
+    .from('lead_qualification')
+    .update({ 
+      qualification_status: 'sent_to_crm', 
+      sent_to_crm_at: new Date().toISOString() 
+    })
+    .eq('phone_number', phoneNumber);
+}
+```
 
-- Quando um erro recorrente for identificado, sugerir atualizacao na directive correspondente
-- Edge function periodica que analisa `ai_error_log` e sugere updates em `ai_directives`
+### Alteracao no ai-vendas (~293)
 
-## Modulos Compartilhados (_shared/)
+```typescript
+// Buscar contact_id
+const { data: contact } = await supabase
+  .from('contacts')
+  .select('id')
+  .eq('phone', phone_number)
+  .maybeSingle();
 
-| Modulo | Linhas | Funcao |
-|---|---|---|
-| `types.ts` | 296 | Interfaces e tipos compartilhados |
-| `prompts.ts` | ~500 | Builders de prompt + tools + getPromptForDepartment (async) |
-| `qualification.ts` | 752 | Extracao e qualificacao de leads |
-| `property.ts` | ~200 | Busca e formatacao de imoveis Vista CRM |
-| `regions.ts` | ~100 | Mapeamento bairros Florianopolis |
-| `audio.ts` | 146 | TTS via ElevenLabs |
-| `utils.ts` | 152 | Utilitarios gerais |
-| `whatsapp.ts` | ~220 | Envio WhatsApp + TTS |
-| `ai-call.ts` | ~60 | Gateway LLM unificado |
-| `cors.ts` | ~10 | Headers CORS |
-| `phone-utils.ts` | ~25 | **NOVO** - Variacoes de telefone BR (9o digito) |
-| `triage.ts` | ~100 | **NOVO** - Triagem por botao, assign departamento |
-| `media.ts` | ~120 | **NOVO** - Extracao de midia WhatsApp |
-| `business-hours.ts` | ~50 | **NOVO** - Verificacao horario comercial |
-| `error-logging.ts` | ~60 | **NOVO** - Logging estruturado para ai_error_log |
+const c2sPayload = {
+  ...existente,
+  contact_id: contact?.id || null,
+  conversation_id: conversationId || null,
+};
 
-## Nota sobre Adaptacao ao Lovable
+// Apos sucesso:
+if (!c2sError) {
+  c2sTransferred = true;
+  await supabase
+    .from('lead_qualification')
+    .update({ qualification_status: 'sent_to_crm', sent_to_crm_at: new Date().toISOString() })
+    .eq('phone_number', phone_number);
+}
+```
 
-- **Directives** = tabela `ai_directives` (em vez de arquivos `.md` em disco)
-- **Orchestration** = Edge Functions de webhook (em vez de um agente local)
-- **Execution** = modulos em `_shared/` (em vez de scripts Python em `execution/`)
-- **Self-annealing** = tabela de erros + sugestoes automaticas (planejado)
+---
+
+## Arquivos Modificados
+
+| Arquivo | Tipo de Alteracao |
+|---------|------------------|
+| `supabase/functions/ai-virtual-agent/index.ts` | Propagar IDs + atualizar qualification |
+| `supabase/functions/ai-vendas/index.ts` | Propagar IDs + atualizar qualification |
+
+Nenhuma migracao de banco necessaria - as colunas `contact_id` e `conversation_id` ja existem na tabela `c2s_integration`.
