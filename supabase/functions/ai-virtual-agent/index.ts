@@ -652,6 +652,14 @@ const tools = [
           quartos: {
             type: "number",
             description: "Número de quartos desejados"
+          },
+          property_code: {
+            type: "string",
+            description: "Código do imóvel Vista que o cliente demonstrou interesse (ex: 19219). SEMPRE inclua quando o cliente gostou de um imóvel específico."
+          },
+          property_url: {
+            type: "string",
+            description: "URL do imóvel no site (ex: https://smolkaimoveis.com.br/imovel/19219). SEMPRE inclua quando o cliente gostou de um imóvel específico."
           }
         },
         required: ["interesse"]
@@ -930,7 +938,13 @@ Não espere ter todas as informações - comece a buscar com o que tem.
 1. Colete: tipo de imóvel, bairro e faixa de preço
 2. Chame a função enviar_lead_c2s com os dados coletados
 3. Informe ao cliente: "Vou te passar para um corretor especializado em vendas! Ele vai entrar em contato 😊"
-4. NÃO continue a conversa após o handoff - o corretor assume daqui`;
+4. NÃO continue a conversa após o handoff - o corretor assume daqui
+
+📌 IMÓVEL ESPECÍFICO NO ENVIO AO C2S:
+- Se o cliente GOSTOU de um imóvel específico que você mostrou, SEMPRE inclua property_code (código Vista) e property_url (link do imóvel)
+- Inclua no campo "interesse" os detalhes do imóvel aprovado (código, tipo, bairro, preço)
+- NÃO envie dados genéricos quando o cliente escolheu um imóvel específico
+- Exemplo: property_code="19219", property_url="https://smolkaimoveis.com.br/imovel/19219"`;
   }
 
   // Rapport Techniques (simplified - main rapport is in the 5-step flow)
@@ -1483,10 +1497,14 @@ async function sendLeadToC2S(params: Record<string, any>, phoneNumber: string, c
         neighborhood: params.bairro,
         price_range: params.faixa_preco,
         bedrooms: params.quartos,
-        description: params.interesse,
+        description: params.interesse 
+          + (params.property_code ? ` | Imóvel aprovado: código ${params.property_code}` : '')
+          + (params.property_url ? ` | ${params.property_url}` : ''),
         conversation_history: conversationHistory,
         contact_id: contactId || null,
         conversation_id: convId || null,
+        property_code: params.property_code || null,
+        property_url: params.property_url || null,
       }
     });
 
@@ -4075,20 +4093,36 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
       await sendWhatsAppMessage(phoneNumber, propertyText);
       messagesSent++;
       
+      // Save last property shown for C2S context
+      await supabase
+        .from('conversation_states')
+        .upsert({
+          phone_number: phoneNumber,
+          last_property_shown: {
+            code: property.codigo,
+            url: property.link,
+            type: property.tipo,
+            neighborhood: property.bairro,
+            price: property.preco,
+            price_formatted: property.preco_formatado,
+            bedrooms: property.quartos
+          },
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'phone_number' });
+      console.log(`💾 Saved last_property_shown: ${property.codigo}`);
+
       // Store remaining properties for future interactions
       if (propertiesToSend.length > 1) {
         const remainingProperties = propertiesToSend.slice(1);
         console.log(`💾 Storing ${remainingProperties.length} remaining properties for later`);
         
-        const pendingState: any = {
-          phone_number: phoneNumber,
-          pending_properties: remainingProperties,
-          updated_at: new Date().toISOString()
-        };
-        
         await supabase
           .from('conversation_states')
-          .upsert(pendingState, { onConflict: 'phone_number' });
+          .upsert({
+            phone_number: phoneNumber,
+            pending_properties: remainingProperties,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'phone_number' });
       }
       
       // Ask confirmation question

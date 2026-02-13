@@ -905,6 +905,7 @@ export type Database = {
           is_ai_active: boolean | null
           last_ai_message_at: string | null
           last_human_message_at: string | null
+          last_property_shown: Json | null
           last_search_params: Json | null
           negotiation_pending: boolean | null
           operator_id: string | null
@@ -926,6 +927,7 @@ export type Database = {
           is_ai_active?: boolean | null
           last_ai_message_at?: string | null
           last_human_message_at?: string | null
+          last_property_shown?: Json | null
           last_search_params?: Json | null
           negotiation_pending?: boolean | null
           operator_id?: string | null
@@ -947,6 +949,7 @@ export type Database = {
           is_ai_active?: boolean | null
           last_ai_message_at?: string | null
           last_human_message_at?: string | null
+          last_property_shown?: Json | null
           last_search_params?: Json | null
           negotiation_pending?: boolean | null
           operator_id?: string | null

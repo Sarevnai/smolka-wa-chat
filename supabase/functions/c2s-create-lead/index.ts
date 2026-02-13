@@ -22,6 +22,8 @@ interface LeadData {
   development_name?: string;
   interesse?: string;
   motivacao?: string;
+  property_code?: string;
+  property_url?: string;
 }
 
 Deno.serve(async (req) => {
@@ -74,6 +76,8 @@ Deno.serve(async (req) => {
     if (leadData.bedrooms) criteria.push(`Quartos: ${leadData.bedrooms}`);
     if (leadData.interesse) criteria.push(`Interesse: ${leadData.interesse}`);
     if (leadData.motivacao) criteria.push(`Motivação: ${leadData.motivacao}`);
+    if (leadData.property_code) criteria.push(`Imóvel código: ${leadData.property_code}`);
+    if (leadData.property_url) criteria.push(`Link: ${leadData.property_url}`);
     
     description = criteria.join(" | ");
     if (leadData.description) {
