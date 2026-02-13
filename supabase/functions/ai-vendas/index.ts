@@ -7,6 +7,7 @@ import { formatCurrency } from '../_shared/utils.ts';
 import { buildQuickTransferPrompt, toolsQuickTransfer } from '../_shared/prompts.ts';
 import { callLLM } from '../_shared/ai-call.ts';
 import { sendWhatsAppMessage, sendWhatsAppMedia, saveAndSendMessage, delay } from '../_shared/whatsapp.ts';
+import { logAIError } from '../_shared/error-logging.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -353,6 +354,13 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error in ai-vendas:', error);
+    await logAIError(supabase, {
+      agent_name: 'ai-vendas',
+      error_type: 'unhandled_exception',
+      error_message: error?.message || String(error),
+      phone_number: undefined,
+      context: { stack: error?.stack?.substring(0, 500) }
+    });
     return new Response(
       JSON.stringify({ error: error.message || 'Internal server error', success: false }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
