@@ -1176,7 +1176,7 @@ serve(async (req) => {
                 aiResponse = `${getRandomPhrase('agreement')}${nameGreet} ${nextQuestion}`;
               } else {
                 let tools = toolsWithVista;
-                const systemPrompt = getPromptForDepartment(agentConfig, currentDepartment, existingName || undefined, history, qualData);
+                const systemPrompt = await getPromptForDepartment(agentConfig, currentDepartment, existingName || undefined, history, qualData);
                 
                 if (currentDepartment === 'administrativo') {
                   tools = [];
