@@ -26,14 +26,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  console.log('AuthProvider: Starting initialization');
+  
   
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  console.log('AuthProvider: State initialized', { user, session, profile, loading });
+  
 
   // Fetch user profile function
   const fetchUserProfile = async (userId: string) => {
@@ -143,7 +143,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signOut,
   };
 
-  console.log('AuthProvider: Context value created', contextValue);
+  
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };

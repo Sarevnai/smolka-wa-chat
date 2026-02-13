@@ -238,7 +238,7 @@ export default function Inbox() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-foreground">CRM - Gestão de Demandas</h1>
+            <h1 className="text-4xl font-bold text-foreground">Gestão de Demandas</h1>
             <p className="text-muted-foreground text-lg mt-2">
               Gerencie demandas e tickets de forma eficiente
             </p>
