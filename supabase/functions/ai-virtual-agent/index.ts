@@ -1470,7 +1470,7 @@ async function getPropertyByListingId(listingId: string): Promise<any | null> {
 }
 
 // Send lead to C2S system
-async function sendLeadToC2S(params: Record<string, any>, phoneNumber: string, conversationHistory: string, contactName?: string): Promise<{ success: boolean; c2s_lead_id?: string; error?: string }> {
+async function sendLeadToC2S(params: Record<string, any>, phoneNumber: string, conversationHistory: string, contactName?: string, contactId?: string, convId?: string): Promise<{ success: boolean; c2s_lead_id?: string; error?: string }> {
   try {
     console.log('🏢 Sending lead to C2S:', params);
     
@@ -1485,6 +1485,8 @@ async function sendLeadToC2S(params: Record<string, any>, phoneNumber: string, c
         bedrooms: params.quartos,
         description: params.interesse,
         conversation_history: conversationHistory,
+        contact_id: contactId || null,
+        conversation_id: convId || null,
       }
     });
 
@@ -3816,7 +3818,18 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
             .map(m => `[${m.role === 'user' ? 'Cliente' : 'Agente'}]: ${m.content}`)
             .join('\n');
           
-          const c2sResult = await sendLeadToC2S(args, phoneNumber, historyText, currentContactName);
+          // Fetch contact_id from conversation for C2S payload
+          let contactIdForC2S: string | undefined;
+          if (conversationId) {
+            const { data: convData } = await supabase
+              .from('conversations')
+              .select('contact_id')
+              .eq('id', conversationId)
+              .maybeSingle();
+            contactIdForC2S = convData?.contact_id || undefined;
+          }
+
+          const c2sResult = await sendLeadToC2S(args, phoneNumber, historyText, currentContactName, contactIdForC2S, conversationId);
           
           if (c2sResult.success) {
             console.log(`✅ Lead sent to C2S! ID: ${c2sResult.c2s_lead_id}`);
@@ -3833,6 +3846,16 @@ Responda APENAS com uma frase curta de introdução (máximo 15 palavras) como:
                 operator_takeover_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
               }, { onConflict: 'phone_number' });
+
+            // Update lead_qualification status to sent_to_crm
+            await supabase
+              .from('lead_qualification')
+              .update({ 
+                qualification_status: 'sent_to_crm', 
+                sent_to_crm_at: new Date().toISOString() 
+              })
+              .eq('phone_number', phoneNumber);
+            console.log('✅ Lead qualification updated to sent_to_crm');
               
             console.log('🔄 Conversation handed off to C2S/human');
           } else {
