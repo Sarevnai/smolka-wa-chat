@@ -1,0 +1,1 @@
+ALTER TABLE public.conversation_states ADD COLUMN IF NOT EXISTS last_property_shown jsonb DEFAULT NULL;
