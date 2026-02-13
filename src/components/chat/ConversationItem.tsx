@@ -196,14 +196,14 @@ export function ConversationItem({
       <div className="relative flex-shrink-0">
         <Avatar className="h-10 w-10">
           <AvatarFallback className={cn(
-            "text-white font-medium text-sm",
+            "text-primary-foreground font-medium text-sm",
             viewMode === 'leads' 
               ? temperature === 'hot' 
                 ? "bg-orange-500" 
                 : temperature === 'warm' 
                   ? "bg-yellow-500" 
-                  : "bg-gray-400"
-              : "bg-gray-400"
+                  : "bg-muted-foreground"
+              : "bg-muted-foreground"
           )}>
             {displayInitials}
           </AvatarFallback>
@@ -216,7 +216,7 @@ export function ConversationItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-0.5">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <h3 className="font-medium text-gray-900 text-sm overflow-hidden text-ellipsis whitespace-nowrap max-w-[calc(100%-3rem)]">
+            <h3 className="font-medium text-foreground text-sm overflow-hidden text-ellipsis whitespace-nowrap max-w-[calc(100%-3rem)]">
               {displayName}
             </h3>
             {isAutoDetectedName && (
@@ -299,7 +299,7 @@ export function ConversationItem({
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-gray-500 whitespace-nowrap">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
               {formatLastMessageTime(lastMessage.wa_timestamp || lastMessage.created_at)}
             </span>
             {unreadCount > 0 && (
@@ -311,9 +311,9 @@ export function ConversationItem({
         </div>
         
         <div className="flex items-center gap-2">
-          <p className="text-xs text-gray-600 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+          <p className="text-xs text-muted-foreground flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
             {lastMessage.direction === "outbound" && (
-              <span className="text-gray-500">✓✓ </span>
+              <span className="text-muted-foreground/70">✓✓ </span>
             )}
             {truncateMessage(lastMessage.body)}
           </p>
