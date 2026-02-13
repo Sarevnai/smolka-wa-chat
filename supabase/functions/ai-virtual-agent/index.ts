@@ -3665,6 +3665,57 @@ Eles vão resolver sua solicitação rapidinho! 😊`
       return true;
     }) || [];
 
+    // ========== CONTEXT RECOVERY FOR RETURNING LEADS ==========
+    let qualificationContext = '';
+    
+    // Fetch prior qualification data to avoid re-asking questions
+    const { data: priorQualification } = await supabase
+      .from('lead_qualification')
+      .select('*')
+      .eq('phone_number', phoneNumber)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Fetch conversation state for search context
+    const { data: convState } = await supabase
+      .from('conversation_states')
+      .select('last_search_params, pending_properties, awaiting_property_feedback, awaiting_c2s_confirmation')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
+
+    if (priorQualification) {
+      const q = priorQualification;
+      const parts: string[] = [];
+      
+      if (q.detected_interest) parts.push(`Interesse: ${q.detected_interest}`);
+      if (q.detected_property_type) parts.push(`Tipo: ${q.detected_property_type}`);
+      if (q.detected_neighborhood) parts.push(`Bairro: ${q.detected_neighborhood}`);
+      if (q.detected_bedrooms) parts.push(`Quartos: ${q.detected_bedrooms}`);
+      if (q.detected_budget_min || q.detected_budget_max) {
+        const budgetParts = [];
+        if (q.detected_budget_min) budgetParts.push(`min R$${q.detected_budget_min.toLocaleString('pt-BR')}`);
+        if (q.detected_budget_max) budgetParts.push(`max R$${q.detected_budget_max.toLocaleString('pt-BR')}`);
+        parts.push(`Orçamento: ${budgetParts.join(' - ')}`);
+      }
+      if (q.answers && Object.keys(q.answers).length > 0) {
+        for (const [key, value] of Object.entries(q.answers)) {
+          if (value && typeof value === 'string') parts.push(`${key}: ${value}`);
+        }
+      }
+      if (q.qualification_status) parts.push(`Status: ${q.qualification_status}`);
+      if (q.is_broker) parts.push(`⚠️ Identificado como corretor`);
+
+      if (parts.length > 0) {
+        qualificationContext = `\n\n📋 DADOS JÁ COLETADOS DESTE LEAD (NÃO pergunte novamente o que já foi respondido):\n${parts.join('\n')}\n\nIMPORTANTE: Use estas informações para continuar a conversa naturalmente. Se o lead está retornando após dias, faça um breve resumo do que já sabe e pergunte se algo mudou, em vez de começar do zero.`;
+        console.log(`📋 Context recovery: ${parts.length} data points loaded for ${phoneNumber}`);
+      }
+    }
+
+    if (convState?.last_search_params) {
+      qualificationContext += `\n\n🔍 ÚLTIMA BUSCA REALIZADA: ${JSON.stringify(convState.last_search_params)}`;
+    }
+
     // ========== NAME DETECTION AND SAVING ==========
     let currentContactName = contactName;
     
@@ -3673,28 +3724,51 @@ Eles vão resolver sua solicitação rapidinho! 😊`
       // Find the last assistant message
       const lastAssistantMessage = conversationHistory.filter(m => m.role === 'assistant').pop();
       
-      // Check if the last assistant message asked for the name
-      if (lastAssistantMessage && didAskForName(lastAssistantMessage.content)) {
-        const detectedName = extractCustomerName(messageBody);
-        if (detectedName) {
-          console.log(`👤 Nome detectado na mensagem: "${detectedName}"`);
-          
-          // Save name to database
-          const { error: updateError } = await supabase
+      // Check if the last assistant message was asking for a name
+      const nameAskPatterns = [
+        /como posso te chamar/i,
+        /qual (?:é )?(?:o )?seu nome/i,
+        /me diz(?:er)? (?:o )?seu nome/i,
+        /como (?:você )?(?:se )?chama/i,
+        /pra começar.*como/i,
+      ];
+      
+      const wasAskingName = lastAssistantMessage && nameAskPatterns.some(p => p.test(lastAssistantMessage.content));
+      
+      if (wasAskingName) {
+        // The current message is likely a name response
+        const nameCandidate = messageBody.trim();
+        // Simple heuristic: if it's 1-4 words and no special chars, it's likely a name
+        const isLikelyName = /^[A-Za-zÀ-ÿ\s]{2,40}$/.test(nameCandidate) && nameCandidate.split(/\s+/).length <= 4;
+        
+        if (isLikelyName) {
+          const detectedName = nameCandidate.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+          const { error: nameError } = await supabase
             .from('contacts')
-            .update({ 
-              name: detectedName, 
-              updated_at: new Date().toISOString() 
-            })
+            .update({ name: detectedName })
             .eq('phone', phoneNumber);
           
-          if (updateError) {
-            console.error('❌ Error saving name to contacts:', updateError);
+          if (nameError) {
+            console.error('❌ Error saving detected name:', nameError);
           } else {
             console.log(`✅ Nome "${detectedName}" salvo no banco para ${phoneNumber}`);
             currentContactName = detectedName;
           }
         }
+      }
+    }
+
+    // Also recover name from prior qualification or contacts if not yet set
+    if (!currentContactName && priorQualification) {
+      // Try to get name from contacts table
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('name')
+        .eq('phone', phoneNumber)
+        .maybeSingle();
+      if (contactData?.name) {
+        currentContactName = contactData.name;
+        console.log(`📋 Name recovered from contacts: ${currentContactName}`);
       }
     }
 
@@ -3704,7 +3778,7 @@ Eles vão resolver sua solicitação rapidinho! 😊`
     });
 
     // Build dynamic system prompt with all new features (using potentially updated name)
-    const systemPrompt = buildSystemPrompt(config, currentContactName, contactType);
+    const systemPrompt = buildSystemPrompt(config, currentContactName, contactType) + qualificationContext;
 
     // Determine expected response mode BEFORE calling AI to set appropriate max_tokens
     let expectedMode: 'text' | 'audio' = 'text';
