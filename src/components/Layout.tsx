@@ -1,9 +1,10 @@
 import { useLocation } from "react-router-dom";
-import { LogOut, User, Crown, Settings, Puzzle, Keyboard } from "lucide-react";
+import { LogOut, User, Crown, Settings, Puzzle, Keyboard, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import AICommunicatorWidget from "@/components/ai/AICommunicatorWidget";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -12,8 +13,10 @@ import { BreadcrumbNav } from "@/components/navigation/BreadcrumbNav";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { cn } from "@/lib/utils";
 import { useDepartment } from "@/contexts/DepartmentContext";
+import { getDepartmentConfig } from "@/lib/sidebarConfig";
 import { Skeleton } from "@/components/ui/skeleton";
 export default function Layout({
   children
@@ -26,7 +29,9 @@ export default function Layout({
     profile,
     signOut
   } = useAuth();
-  const { loading: departmentLoading } = useDepartment();
+  const { loading: departmentLoading, isAdmin, userDepartment } = useDepartment();
+  const departmentConfig = getDepartmentConfig(userDepartment);
+  const DeptIcon = departmentConfig.icon;
 
   // Initialize keyboard shortcuts
   useKeyboardShortcuts();
@@ -63,12 +68,28 @@ export default function Layout({
               <div className="flex items-center space-x-3">
                 <SidebarTrigger />
                 <div className="flex items-center space-x-2">
-                  <h1 className="text-lg font-bold text-foreground hidden sm:block">Central de atendimento</h1>
+                  {isAdmin ? (
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-4 w-4 text-yellow-500" />
+                      <h1 className="text-lg font-bold text-foreground hidden sm:block">Administração</h1>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={cn("gap-1.5 font-medium", departmentConfig.textColor, departmentConfig.borderColor)}>
+                        <DeptIcon className="h-3.5 w-3.5" />
+                        {departmentConfig.label}
+                      </Badge>
+                      <h1 className="text-lg font-bold text-foreground hidden sm:block">Central de Atendimento</h1>
+                    </div>
+                  )}
                 </div>
               </div>
               
               {/* Live indicator, Theme Toggle, Notifications and User Menu */}
               <div className="flex items-center space-x-3">
+                {/* Global Search */}
+                {user && <GlobalSearch />}
+
                 <div className="flex items-center space-x-1">
                   <div className="h-2 w-2 rounded-full bg-live-indicator animate-pulse" />
                   <span className="text-sm font-medium text-muted-foreground hidden sm:inline">Live</span>
