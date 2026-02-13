@@ -50,7 +50,7 @@ export default function Pipeline() {
 
   return (
     <Layout>
-      <div className="p-6">
+      <div>
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <Button

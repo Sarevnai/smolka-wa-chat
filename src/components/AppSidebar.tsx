@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useState } from "react";
 
-const integrationItems: { title: string; url: string; icon: typeof Settings }[] = [];
+
 
 const aiItems = [
   { title: "Dashboard IA", url: "/admin/ia-dashboard", icon: LayoutDashboard },
@@ -64,12 +64,18 @@ export function AppSidebar() {
   const permissions = usePermissions();
   const { count: triageCount } = useTriageConversations();
   const { isAdmin, userDepartment, activeDepartment, loading } = useDepartment();
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [integrationsOpen, setIntegrationsOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-
+  
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
+
+  // Auto-open sections based on active route
+  const isAdminRoute = currentPath.startsWith('/admin') && !currentPath.startsWith('/admin/ia-') && !currentPath.startsWith('/admin/leads') && !currentPath.startsWith('/admin/empreendimentos') && !currentPath.startsWith('/admin/whatsapp-profile');
+  const isAiRoute = currentPath.startsWith('/admin/ia-') || currentPath.startsWith('/admin/leads') || currentPath.startsWith('/admin/empreendimentos') || currentPath.startsWith('/admin/whatsapp-profile');
+  const isIntegrationRoute = currentPath.startsWith('/integrations');
+
+  const [adminOpen, setAdminOpen] = useState(isAdminRoute);
+  const [integrationsOpen, setIntegrationsOpen] = useState(isIntegrationRoute);
+  const [aiOpen, setAiOpen] = useState(isAiRoute);
   
   // Determine which department to show - only apply fallback after loading completes
   const effectiveDepartment = loading 
@@ -210,18 +216,6 @@ export function AppSidebar() {
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarMenuSub>
-                      {integrationItems.map((item) => (
-                        <SidebarMenuSubItem key={item.title}>
-                          <SidebarMenuSubButton asChild className={getNavClassName(item.url)}>
-                            <Link to={item.url}>
-                              <item.icon className="h-4 w-4 mr-2" />
-                              {!collapsed && <span>{item.title}</span>}
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
                   </SidebarMenu>
                 </SidebarGroupContent>
               </CollapsibleContent>

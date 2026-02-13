@@ -63,7 +63,7 @@ export function AdminDashboardContent({ stats, onRefresh }: AdminDashboardConten
           value={stats.totalMessages}
           description="Todas as mensagens processadas"
           icon={MessageCircle}
-          trend={{ value: 12, isPositive: true }}
+          
           className="animate-fade-in"
         />
         
@@ -72,7 +72,7 @@ export function AdminDashboardContent({ stats, onRefresh }: AdminDashboardConten
           value={stats.messagestoday}
           description="Mensagens enviadas e recebidas hoje"
           icon={Activity}
-          trend={{ value: 8, isPositive: true }}
+          
           className="animate-fade-in [animation-delay:0.1s]"
         />
         
@@ -81,7 +81,7 @@ export function AdminDashboardContent({ stats, onRefresh }: AdminDashboardConten
           value={stats.activeConversations}
           description="Conversas nos últimos 7 dias"
           icon={Users}
-          trend={{ value: 23, isPositive: true }}
+          
           className="animate-fade-in [animation-delay:0.2s]"
         />
         
@@ -90,7 +90,7 @@ export function AdminDashboardContent({ stats, onRefresh }: AdminDashboardConten
           value={`${stats.responseRate}%`}
           description="Percentual de respostas recebidas"
           icon={Target}
-          trend={{ value: -2, isPositive: false }}
+          
           className="animate-fade-in [animation-delay:0.3s]"
         />
       </div>

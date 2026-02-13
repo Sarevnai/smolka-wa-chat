@@ -58,13 +58,6 @@ const Index = () => {
     );
   }
 
-  // Debug log para identificar problemas de renderização do dashboard
-  console.log('[Index] Dashboard rendering:', {
-    isAdmin,
-    userDepartment,
-    effectiveDepartment,
-    userId: user?.id
-  });
 
   return (
     <Layout>

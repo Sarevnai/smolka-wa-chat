@@ -103,7 +103,7 @@ export function DepartmentDashboardContent({ department, stats, onRefresh }: Dep
             value={stats.triagePending || 0}
             description="Conversas aguardando triagem"
             icon={AlertTriangle}
-            trend={{ value: 5, isPositive: false }}
+            
             className="animate-fade-in"
           />
           
@@ -120,7 +120,7 @@ export function DepartmentDashboardContent({ department, stats, onRefresh }: Dep
             value={stats.completedTickets || 0}
             description="Tickets finalizados hoje"
             icon={CheckCircle}
-            trend={{ value: 12, isPositive: true }}
+            
             className="animate-fade-in [animation-delay:0.2s]"
           />
           
@@ -180,7 +180,7 @@ export function DepartmentDashboardContent({ department, stats, onRefresh }: Dep
           value={stats.messagestoday}
           description="Mensagens do setor hoje"
           icon={MessageCircle}
-          trend={{ value: 8, isPositive: true }}
+          
           className="animate-fade-in"
         />
         
@@ -189,7 +189,7 @@ export function DepartmentDashboardContent({ department, stats, onRefresh }: Dep
           value={stats.activeConversations}
           description="Conversas nos últimos 7 dias"
           icon={Users}
-          trend={{ value: 15, isPositive: true }}
+          
           className="animate-fade-in [animation-delay:0.1s]"
         />
         
@@ -198,7 +198,7 @@ export function DepartmentDashboardContent({ department, stats, onRefresh }: Dep
           value={stats.qualifiedLeads || 0}
           description="Leads qualificados no período"
           icon={Target}
-          trend={{ value: 10, isPositive: true }}
+          
           className="animate-fade-in [animation-delay:0.2s]"
         />
         
