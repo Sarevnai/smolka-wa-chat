@@ -1,111 +1,152 @@
 
-# Correções do Fluxo C2S - Ian Veras
 
-## Problemas Identificados
+# Correcao: Propriedade especifica nao e enviada ao C2S
 
-1. **`contact_id` e `conversation_id` nulos no `c2s_integration`**: Os payloads enviados para `c2s-create-lead` pelo `ai-virtual-agent` e `ai-vendas` nao incluem esses campos, resultando em registros orfaos no banco.
+## Problema Identificado
 
-2. **`qualification_status` nao atualizado apos C2S via tool call**: No `ai-virtual-agent`, quando o envio ao C2S ocorre via tool call da IA (linha ~3821), o status de qualificacao permanece `pending` em vez de ser atualizado para `sent_to_crm`. O fluxo determinista (linha ~2226) ja faz isso corretamente.
+O fluxo atual tem uma falha estrutural no handoff para o C2S:
 
-3. **`ai-vendas` nao atualiza qualificacao nem propaga IDs**: O agente de vendas envia ao C2S sem `contact_id`, `conversation_id`, e nao atualiza a tabela `lead_qualification`.
+1. A IA busca imoveis via `buscar_imoveis` e apresenta o imovel 19219 (Apartamento, Centro, 2 quartos, R$ 618.000)
+2. O cliente diz "Legal, gostei dessa opcao"
+3. A IA chama `enviar_lead_c2s` mas essa funcao **nao tem parametro para indicar qual imovel especifico o cliente gostou**
+4. O payload enviado ao C2S contem apenas dados genericos: "Interesse em Apartamentos - Centro - Florianopolis"
+5. O corretor recebe o lead **sem saber qual imovel foi apresentado e aprovado pelo cliente**
 
----
+O problema nao e que "mandou outro imovel" - e que **nao mandou nenhum imovel especifico**. O C2S recebe apenas criterios genericos (bairro, tipo, faixa de preco) sem o codigo/link do imovel que o cliente viu e gostou.
 
-## Plano de Correções
+## Causa Raiz
 
-### 1. `ai-virtual-agent/index.ts` - Funcao `sendLeadToC2S` (linha ~1477)
+A tool `enviar_lead_c2s` nao possui campos para:
+- Codigo do imovel Vista (`property_code`)
+- URL do imovel (`property_url`)
+- Detalhes do imovel apresentado
 
-Adicionar `contact_id` e `conversation_id` como parametros da funcao e inclui-los no body enviado para `c2s-create-lead`.
+Alem disso, o `conversation_states` salva os `last_search_params` (parametros de busca) mas nao salva **quais imoveis foram efetivamente mostrados ao cliente**.
 
-### 2. `ai-virtual-agent/index.ts` - Tool call handler (linha ~3808)
+## Plano de Correcao
 
-Apos C2S bem-sucedido (linha ~3821):
-- Buscar o `lead_qualification` pelo `phone_number`
-- Atualizar `qualification_status` para `sent_to_crm` e `sent_to_crm_at`
-- Passar `contact_id` e `conversation_id` na chamada a `sendLeadToC2S`
+### 1. Adicionar campo `property_code` na tool `enviar_lead_c2s`
 
-### 3. `ai-vendas/index.ts` - Bloco `enviar_lead_c2s` (linha ~291)
+Incluir um novo parametro na definicao da tool:
 
-Adicionar `contact_id` e `conversation_id` ao payload do C2S:
-- Buscar o contact pelo phone_number
-- Usar o `conversationId` ja disponivel no escopo
-- Atualizar `lead_qualification` apos transferencia bem-sucedida
+```text
+property_code: string - "Codigo do imovel Vista que o cliente demonstrou interesse (ex: 19219)"
+property_url: string - "Link do imovel no site"
+```
 
-### 4. `c2s-create-lead/index.ts` - Sem alteracoes necessarias
+Isso permite que o LLM informe qual imovel especifico o cliente gostou quando chamar a funcao.
 
-A funcao ja aceita e salva `contact_id` e `conversation_id` corretamente. O problema esta nos chamadores que nao enviam esses campos.
+### 2. Salvar imoveis apresentados no `conversation_states`
+
+Quando o sistema envia um imovel para o cliente (apos `buscar_imoveis`), salvar os dados do imovel no `conversation_states.last_search_params` ou em um novo campo, para que em interacoes futuras a IA saiba o que ja foi mostrado.
+
+### 3. Propagar dados do imovel no payload do C2S
+
+Na funcao `sendLeadToC2S`, incluir os campos `property_code` e `property_url` no body enviado para `c2s-create-lead`:
+
+```text
+property_code: params.property_code
+property_url: params.property_url
+```
+
+E incluir na descricao do lead: "Cliente gostou do imovel codigo 19219 - https://smolkaimoveis.com.br/imovel/19219"
+
+### 4. Atualizar prompt para instruir a IA
+
+Adicionar instrucao no system prompt para que, ao chamar `enviar_lead_c2s`, a IA inclua o codigo e link do imovel que o cliente aprovou:
+
+```text
+Ao usar enviar_lead_c2s apos o cliente aprovar um imovel:
+- SEMPRE inclua property_code com o codigo do imovel mostrado
+- SEMPRE inclua property_url com o link do imovel
+- Inclua no campo interesse os detalhes especificos do imovel aprovado
+```
 
 ---
 
 ## Detalhes Tecnicos
 
-### Alteracao em `sendLeadToC2S` (ai-virtual-agent)
+### Arquivo: `supabase/functions/ai-virtual-agent/index.ts`
+
+**Alteracao 1 - Tool definition (~linha 629)**
+
+Adicionar `property_code` e `property_url` aos parametros de `enviar_lead_c2s`:
 
 ```typescript
-// Antes
-async function sendLeadToC2S(params, phoneNumber, conversationHistory, contactName?)
-
-// Depois  
-async function sendLeadToC2S(params, phoneNumber, conversationHistory, contactName?, contactId?, conversationId?)
-```
-
-Adicionar ao body: `contact_id: contactId, conversation_id: conversationId`
-
-### Alteracao no tool call handler (ai-virtual-agent, ~3819)
-
-```typescript
-const c2sResult = await sendLeadToC2S(
-  args, phoneNumber, historyText, currentContactName,
-  conversation?.contact_id, conversation?.id
-);
-
-if (c2sResult.success) {
-  // ... handoff existente ...
-  
-  // NOVO: Atualizar qualification_status
-  await supabase
-    .from('lead_qualification')
-    .update({ 
-      qualification_status: 'sent_to_crm', 
-      sent_to_crm_at: new Date().toISOString() 
-    })
-    .eq('phone_number', phoneNumber);
+properties: {
+  // ... campos existentes ...
+  property_code: {
+    type: "string",
+    description: "Codigo do imovel Vista que o cliente demonstrou interesse (ex: 19219)"
+  },
+  property_url: {
+    type: "string", 
+    description: "URL do imovel no site (ex: https://smolkaimoveis.com.br/imovel/19219)"
+  }
 }
 ```
 
-### Alteracao no ai-vendas (~293)
+**Alteracao 2 - Funcao `sendLeadToC2S` (~linha 1473)**
+
+Incluir property_code e property_url no body e na description:
 
 ```typescript
-// Buscar contact_id
-const { data: contact } = await supabase
-  .from('contacts')
-  .select('id')
-  .eq('phone', phone_number)
-  .maybeSingle();
-
-const c2sPayload = {
-  ...existente,
-  contact_id: contact?.id || null,
-  conversation_id: conversationId || null,
-};
-
-// Apos sucesso:
-if (!c2sError) {
-  c2sTransferred = true;
-  await supabase
-    .from('lead_qualification')
-    .update({ qualification_status: 'sent_to_crm', sent_to_crm_at: new Date().toISOString() })
-    .eq('phone_number', phone_number);
+body: {
+  // ... campos existentes ...
+  property_code: params.property_code || null,
+  property_url: params.property_url || null,
+  description: params.interesse + 
+    (params.property_code ? ` | Imovel aprovado: codigo ${params.property_code}` : '') +
+    (params.property_url ? ` | ${params.property_url}` : ''),
 }
 ```
+
+**Alteracao 3 - Salvar imoveis apresentados (~linha 4060)**
+
+Apos enviar o imovel ao cliente, salvar no `conversation_states`:
+
+```typescript
+await supabase
+  .from('conversation_states')
+  .upsert({
+    phone_number: phoneNumber,
+    last_property_shown: {
+      code: property.Codigo,
+      url: property.link,
+      type: property.Tipo,
+      neighborhood: property.Bairro,
+      price: property.ValorVenda || property.ValorAluguel
+    },
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'phone_number' });
+```
+
+**Alteracao 4 - Instrucao no prompt (~linha 928)**
+
+Atualizar a secao de encaminhamento C2S:
+
+```text
+ENCAMINHAMENTO PARA C2S (USE enviar_lead_c2s):
+- SEMPRE inclua property_code e property_url do imovel que o cliente aprovou
+- Se o cliente gostou de um imovel especifico, passe o codigo e link dele
+- Nao envie dados genericos quando o cliente escolheu um imovel especifico
+```
+
+### Arquivo: `supabase/functions/c2s-create-lead/index.ts`
+
+Verificar se aceita `property_code` e `property_url` no payload. Se nao, adicionar esses campos ao registro em `c2s_integration.lead_data`.
+
+### Migracao de banco (se necessario)
+
+Se `conversation_states` nao tiver campo para imovel apresentado, pode ser necessario adicionar coluna `last_property_shown` do tipo JSONB.
 
 ---
 
 ## Arquivos Modificados
 
-| Arquivo | Tipo de Alteracao |
-|---------|------------------|
-| `supabase/functions/ai-virtual-agent/index.ts` | Propagar IDs + atualizar qualification |
-| `supabase/functions/ai-vendas/index.ts` | Propagar IDs + atualizar qualification |
+| Arquivo | Alteracao |
+|---------|-----------|
+| `supabase/functions/ai-virtual-agent/index.ts` | Tool definition + sendLeadToC2S + salvar imovel mostrado + prompt |
+| `supabase/functions/c2s-create-lead/index.ts` | Aceitar property_code/url no payload (se necessario) |
+| Migracao SQL | Coluna `last_property_shown` em `conversation_states` (se necessario) |
 
-Nenhuma migracao de banco necessaria - as colunas `contact_id` e `conversation_id` ja existem na tabela `c2s_integration`.
