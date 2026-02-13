@@ -381,22 +381,48 @@ REGRAS:
 Se não souber algo específico, diga que vai verificar com um especialista.`;
 }
 
+// ========== DIRECTIVE FETCHER ==========
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+
+async function fetchDirective(department: DepartmentType, context: string = 'atendimento_completo'): Promise<string | null> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const client = createClient(supabaseUrl, supabaseKey);
+    
+    const dept = department || 'marketing';
+    const { data, error } = await client
+      .from('ai_directives')
+      .select('directive_content')
+      .eq('department', dept)
+      .eq('context', context)
+      .eq('is_active', true)
+      .single();
+    
+    if (error || !data) return null;
+    return data.directive_content;
+  } catch (e) {
+    console.error('⚠️ Failed to fetch directive, using fallback:', e);
+    return null;
+  }
+}
+
 // ========== PROMPT OVERRIDE HELPER ==========
 
-export function getPromptForDepartment(
+export async function getPromptForDepartment(
   config: AIAgentConfig,
   department: DepartmentType,
   contactName?: string,
   history?: ConversationMessage[],
   qualificationData?: QualificationData | null
-): string {
-  // Check for override first
+): Promise<string> {
+  // Priority 1: Check for manual override (prompt_overrides from admin UI)
   const deptKey = department || 'geral';
   const override = config.prompt_overrides?.[deptKey as keyof typeof config.prompt_overrides];
   
   if (override) {
-    console.log(`📝 Using custom prompt override for department: ${deptKey}`);
-    // Replace placeholders in override
+    console.log(`📝 Using prompt override for: ${deptKey}`);
     let customPrompt = override;
     if (contactName) {
       customPrompt = customPrompt.replace(/{nome do contato}/g, contactName);
@@ -405,7 +431,66 @@ export function getPromptForDepartment(
     return customPrompt;
   }
   
-  // Fall back to generated prompts
+  // Priority 2: Check for directive from ai_directives table
+  const directive = await fetchDirective(department);
+  if (directive) {
+    console.log(`📋 Using ai_directive for: ${deptKey}`);
+    // Wrap directive in the standard prompt structure with dynamic context
+    const hasName = !!contactName;
+    const hasHistory = history && history.length > 0;
+    const contextSummary = buildContextSummary(qualificationData || null);
+    
+    return `🚨 REGRA ZERO: Você é ${config.agent_name} da ${config.company_name} em Florianópolis/SC.
+
+${hasName ? `👤 CLIENTE: ${contactName} - Use o nome naturalmente.` : '⭐ Ainda não sabemos o nome. Pergunte: "A propósito, como posso te chamar?"'}
+
+${hasHistory ? `📜 CONTEXTO: Já há histórico. NÃO repita perguntas já respondidas.` : ''}
+
+${contextSummary}
+
+⛔ ANTI-LOOP - LEIA COM ATENÇÃO:
+- Se dados acima mostram informações já coletadas, NÃO pergunte de novo
+- NUNCA repita uma pergunta já respondida
+
+${directive}
+
+${config.custom_instructions ? `\n📌 INSTRUÇÕES ESPECIAIS:\n${config.custom_instructions}` : ''}`;
+  }
+  
+  // Priority 3: Fall back to hardcoded generated prompts
+  console.log(`🔧 Using hardcoded prompt for: ${deptKey}`);
+  switch (department) {
+    case 'locacao':
+      return buildLocacaoPrompt(config, contactName, history, qualificationData);
+    case 'vendas':
+      return buildVendasPrompt(config, contactName, history, qualificationData);
+    case 'administrativo':
+      return buildAdminPrompt(config, contactName);
+    default:
+      return buildVirtualAgentPrompt(config, contactName);
+  }
+}
+
+// Sync version for backward compatibility (uses only overrides + hardcoded, no DB)
+export function getPromptForDepartmentSync(
+  config: AIAgentConfig,
+  department: DepartmentType,
+  contactName?: string,
+  history?: ConversationMessage[],
+  qualificationData?: QualificationData | null
+): string {
+  const deptKey = department || 'geral';
+  const override = config.prompt_overrides?.[deptKey as keyof typeof config.prompt_overrides];
+  
+  if (override) {
+    let customPrompt = override;
+    if (contactName) {
+      customPrompt = customPrompt.replace(/{nome do contato}/g, contactName);
+      customPrompt = customPrompt.replace(/{nome}/g, contactName);
+    }
+    return customPrompt;
+  }
+  
   switch (department) {
     case 'locacao':
       return buildLocacaoPrompt(config, contactName, history, qualificationData);

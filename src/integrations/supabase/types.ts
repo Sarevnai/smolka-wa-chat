@@ -203,6 +203,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_directives: {
+        Row: {
+          context: string
+          created_at: string
+          department: Database["public"]["Enums"]["department_type"]
+          directive_content: string
+          id: string
+          is_active: boolean
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          context: string
+          created_at?: string
+          department: Database["public"]["Enums"]["department_type"]
+          directive_content: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          context?: string
+          created_at?: string
+          department?: Database["public"]["Enums"]["department_type"]
+          directive_content?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
       ai_flows: {
         Row: {
           created_at: string

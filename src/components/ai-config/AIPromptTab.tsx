@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import { DirectiveEditor } from "./DirectiveEditor";
+import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -134,6 +136,10 @@ export function AIPromptTab({ config, updateConfig, saveConfig, isSaving }: AIPr
   
   return (
     <div className="space-y-6">
+      {/* Directives Editor (3-Layer Architecture) */}
+      <DirectiveEditor />
+      
+      <Separator />
       {/* Department Selector */}
       <Card>
         <CardHeader className="pb-3">
