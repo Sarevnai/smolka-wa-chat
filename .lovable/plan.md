@@ -1,7 +1,7 @@
 
 # Incorporar Arquitetura 3-Layer (AGENTS.md) no Projeto
 
-## Status: Fase A ✅ Completa | Fase B 🔄 Em Progresso
+## Status: Fase A ✅ Completa | Fase B ✅ Completa | Fase C ⏳ Pendente
 
 ## Contexto
 
@@ -18,7 +18,7 @@ O documento AGENTS.md define uma arquitetura em 3 camadas para maximizar confiab
 - [x] A.3 - `getPromptForDepartment()` agora async, busca directive do banco com hierarquia: Override > Directive > Hardcoded
 - [x] A.4 - UI DirectiveEditor integrada na aba Prompt da config IA
 
-## Fase B: Consolidar Execution Layer 🔄 EM PROGRESSO
+## Fase B: Consolidar Execution Layer ✅ COMPLETA
 
 ### B.1 - Refatorar `ai-vendas` para usar `_shared/` ✅ CONCLUIDO
 
@@ -39,20 +39,31 @@ O documento AGENTS.md define uma arquitetura em 3 camadas para maximizar confiab
 - First message welcome flow
 - Material sending handler
 
-### B.2 - Modularizar `whatsapp-webhook` ⏳ PENDENTE
+### B.2 - Modularizar `whatsapp-webhook` ✅ CONCLUIDO
 
-- O whatsapp-webhook (1705 linhas) ainda tem logica duplicada
-- Agora pode importar de `_shared/whatsapp.ts` e `_shared/ai-call.ts`
-- Handlers a extrair: triage, text messages, media, status updates
-- **Risco**: Alto - webhook de producao, precisa testar cada tipo de mensagem
+**Resultado**: Reduzido de 1705 para ~600 linhas (~65% reducao)
+
+**Modulos extraidos para `_shared/`**:
+- `_shared/phone-utils.ts` (NOVO) - getPhoneVariations (9o digito brasileiro)
+- `_shared/triage.ts` (NOVO) - extractTriageButtonId, updateTriageStage, assignDepartmentToConversation, DEPARTMENT_WELCOMES
+- `_shared/media.ts` (NOVO) - extractMediaInfo (todos os tipos: image, audio, video, document, sticker, voice, location)
+- `_shared/business-hours.ts` (NOVO) - checkBusinessHours (timezone-aware)
+
+**Logica mantida no webhook (orquestracao)**:
+- serve() HTTP handler (GET verification + POST processing)
+- processIncomingMessage (dedup, media download, transcription, name detection, triage, routing)
+- processMessageStatus (campaign result updates, raw merge)
+- handleAIRouting (priority: development > marketing > general AI)
+- findOrCreateConversation, ensureContactExists
+- checkCampaignSource, checkMarketingCampaignSource, checkDevelopmentLead, detectDevelopmentFromMessage
 
 ### B.3 - Avaliar `ai-virtual-agent` 📋 MARCADO PARA FUTURO
 
 - 4047 linhas, maior monolito do sistema
-- **Ainda e chamado ativamente** pelo whatsapp-webhook (linha 1490)
+- **Ainda e chamado ativamente** pelo whatsapp-webhook
 - Duplica TUDO que existe em `_shared/` (regioes, qualificacao, prompts, property, etc.)
 - **Decisao**: Manter como esta por enquanto, documentar divida tecnica
-- **Plano futuro**: Quando for refatorar whatsapp-webhook (B.2), avaliar se pode substituir por make-webhook + _shared/
+- **Plano futuro**: Quando for refatorar, avaliar se pode substituir por make-webhook + _shared/
 
 ## Fase C: Self-Annealing e Observabilidade ⏳ PENDENTE
 
@@ -71,9 +82,13 @@ O documento AGENTS.md define uma arquitetura em 3 camadas para maximizar confiab
 | `regions.ts` | ~100 | Mapeamento bairros Florianopolis |
 | `audio.ts` | 146 | TTS via ElevenLabs |
 | `utils.ts` | 152 | Utilitarios gerais |
-| `whatsapp.ts` | ~220 | **NOVO** - Envio WhatsApp + TTS |
-| `ai-call.ts` | ~60 | **NOVO** - Gateway LLM unificado |
+| `whatsapp.ts` | ~220 | Envio WhatsApp + TTS |
+| `ai-call.ts` | ~60 | Gateway LLM unificado |
 | `cors.ts` | ~10 | Headers CORS |
+| `phone-utils.ts` | ~25 | **NOVO** - Variacoes de telefone BR (9o digito) |
+| `triage.ts` | ~100 | **NOVO** - Triagem por botao, assign departamento |
+| `media.ts` | ~120 | **NOVO** - Extracao de midia WhatsApp |
+| `business-hours.ts` | ~50 | **NOVO** - Verificacao horario comercial |
 
 ## Nota sobre Adaptacao ao Lovable
 
