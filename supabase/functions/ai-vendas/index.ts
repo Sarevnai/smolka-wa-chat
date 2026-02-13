@@ -290,6 +290,13 @@ serve(async (req) => {
 
       if (functionName === 'enviar_lead_c2s') {
         try {
+          // Fetch contact_id for C2S payload
+          const { data: contact } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('phone', phone_number)
+            .maybeSingle();
+
           const c2sPayload = {
             name: args.nome || contact_name || 'Lead sem nome',
             phone: phone_number,
@@ -304,13 +311,25 @@ serve(async (req) => {
             development_id: development.id,
             development_name: development.name,
             interesse: args.interesse,
-            motivacao: args.motivacao
+            motivacao: args.motivacao,
+            contact_id: contact?.id || null,
+            conversation_id: conversationId || null,
           };
 
           const { error: c2sError } = await supabase.functions.invoke('c2s-create-lead', { body: c2sPayload });
           if (!c2sError) {
             c2sTransferred = true;
             console.log('✅ Lead sent to C2S');
+
+            // Update lead_qualification status
+            await supabase
+              .from('lead_qualification')
+              .update({ 
+                qualification_status: 'sent_to_crm', 
+                sent_to_crm_at: new Date().toISOString() 
+              })
+              .eq('phone_number', phone_number);
+            console.log('✅ Lead qualification updated to sent_to_crm');
           }
         } catch (error) {
           console.error('Error sending to C2S:', error);
