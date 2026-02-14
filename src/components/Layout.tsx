@@ -20,9 +20,9 @@ import { getDepartmentConfig } from "@/lib/sidebarConfig";
 import { Skeleton } from "@/components/ui/skeleton";
 export default function Layout({
   children
-}: {
-  children: React.ReactNode;
-}) {
+
+
+}: {children: React.ReactNode;}) {
   const location = useLocation();
   const {
     user,
@@ -53,8 +53,8 @@ export default function Layout({
           <Skeleton className="h-8 w-1/2" />
           <Skeleton className="h-64 w-full" />
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   return <SidebarProvider>
@@ -68,20 +68,20 @@ export default function Layout({
               <div className="flex items-center space-x-3">
                 <SidebarTrigger />
                 <div className="flex items-center space-x-2">
-                  {isAdmin ? (
-                    <div className="flex items-center gap-2">
-                      <Crown className="h-4 w-4 text-yellow-500" />
+                  {isAdmin ?
+                <div className="flex items-center gap-2">
+                      
                       <h1 className="text-lg font-bold text-foreground hidden sm:block">Administração</h1>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
+                    </div> :
+
+                <div className="flex items-center gap-2">
                       <Badge variant="outline" className={cn("gap-1.5 font-medium", departmentConfig.textColor, departmentConfig.borderColor)}>
                         <DeptIcon className="h-3.5 w-3.5" />
                         {departmentConfig.label}
                       </Badge>
                       <h1 className="text-lg font-bold text-foreground hidden sm:block">Central de Atendimento</h1>
                     </div>
-                  )}
+                }
                 </div>
               </div>
               
