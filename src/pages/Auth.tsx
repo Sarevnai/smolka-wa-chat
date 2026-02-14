@@ -94,7 +94,7 @@ export default function Auth() {
                   required />
 
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" variant="gold" className="w-full" disabled={isLoading}>
                 {isLoading ? 'Entrando...' : 'Entrar'}
               </Button>
             </form>
