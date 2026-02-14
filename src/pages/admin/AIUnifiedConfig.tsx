@@ -1,14 +1,14 @@
 import { useState } from "react";
 import Layout from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Bot, 
-  Sparkles, 
-  Settings, 
+import {
+  Bot,
+  Sparkles,
+  Settings,
   Loader2,
   FileText,
-  Wrench
-} from "lucide-react";
+  Wrench } from
+"lucide-react";
 
 // Tab Components
 import { AIIdentityTab } from "@/components/ai-config/AIIdentityTab";
@@ -27,8 +27,8 @@ export default function AIUnifiedConfig() {
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </Layout>
-    );
+      </Layout>);
+
   }
 
   return (
@@ -37,9 +37,9 @@ export default function AIUnifiedConfig() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <Bot className="h-6 w-6 text-white" />
-            </div>
+            
+
+
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Minha Aimee</span>
@@ -76,12 +76,12 @@ export default function AIUnifiedConfig() {
 
           {/* Identity Tab */}
           <TabsContent value="identity">
-            <AIIdentityTab 
-              config={config} 
+            <AIIdentityTab
+              config={config}
               updateConfig={updateConfig}
               saveConfig={saveConfig}
-              isSaving={isSaving}
-            />
+              isSaving={isSaving} />
+
           </TabsContent>
 
           {/* Behavior Tab */}
@@ -91,25 +91,25 @@ export default function AIUnifiedConfig() {
 
           {/* Technical Tab (combines Provider + Audio) */}
           <TabsContent value="technical">
-            <AITechnicalTab 
-              config={config} 
+            <AITechnicalTab
+              config={config}
               updateConfig={updateConfig}
               saveConfig={saveConfig}
-              isSaving={isSaving}
-            />
+              isSaving={isSaving} />
+
           </TabsContent>
 
           {/* Prompt Tab */}
           <TabsContent value="prompt">
-            <AIPromptTab 
-              config={config} 
+            <AIPromptTab
+              config={config}
               updateConfig={updateConfig}
               saveConfig={saveConfig}
-              isSaving={isSaving}
-            />
+              isSaving={isSaving} />
+
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
-  );
+    </Layout>);
+
 }
