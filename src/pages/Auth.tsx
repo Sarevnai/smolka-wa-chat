@@ -48,8 +48,8 @@ export default function Auth() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex flex-col items-center justify-center gap-4 mb-4">
-            <img src="/lovable-uploads/d8138758-50be-45b7-9d69-ea5f3c1af483.png" alt="Logo Atendimento ADM" className="w-16 h-16" />
-            <h1 className="text-2xl font-bold">Central de atendimento</h1>
+            
+            <h1 className="text-2xl font-bold">Aimee.ai</h1>
           </div>
           <p className="text-muted-foreground">Entre com suas credenciais para acessar</p>
         </div>
@@ -76,9 +76,9 @@ export default function Auth() {
                   type="email"
                   placeholder="seu@email.com"
                   value={loginData.email}
-                  onChange={e => setLoginData({ ...loginData, email: e.target.value })}
-                  required
-                />
+                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                  required />
+
               </div>
               <div className="space-y-2">
                 <Label htmlFor="login-password" className="flex items-center gap-2">
@@ -90,9 +90,9 @@ export default function Auth() {
                   type="password"
                   placeholder="••••••••"
                   value={loginData.password}
-                  onChange={e => setLoginData({ ...loginData, password: e.target.value })}
-                  required
-                />
+                  onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                  required />
+
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? 'Entrando...' : 'Entrar'}
@@ -101,6 +101,6 @@ export default function Auth() {
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
+    </div>);
+
 }
