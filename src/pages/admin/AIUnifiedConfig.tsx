@@ -46,7 +46,7 @@ export default function AIUnifiedConfig() {
                 <span className="text-muted-foreground">/</span>
                 <h1 className="text-2xl font-bold tracking-tight">Configuração</h1>
               </div>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Central unificada de configuração do seu agente de IA
               </p>
             </div>
